@@ -1,0 +1,66 @@
+# Rust
+# 编译输出目录（Cargo.lock 应该提交到应用程序项目中）
+**/target/
+*.pdb
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Node.js / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+pnpm-debug.log*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 构建输出
+dist/
+dist-ssr/
+build/
+*.local
+
+# Tauri
+# Tauri生成的文件（如果有的话，通常在target目录下，但这里单独列出）
+**/tauri/gen/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+.env.production
+
+# 日志文件
+logs/
+*.log
+
+# IDE和编辑器
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# 操作系统文件
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# 临时文件
+*.tmp
+*.temp
+*.cache
+.cache/

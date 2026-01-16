@@ -1,0 +1,19 @@
+[package]
+name = "simple-player"
+version = "0.1.0"
+edition = "2024"
+description = "A high-performance MD3 audio player built with Tauri."
+
+[build-dependencies]
+# 使用 Tauri v2 的构建工具
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri v2 核心库
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# 预留后续高性能组件
+# rodio = "0.19" # 音频播放
+# rayon = "1.10" # 并行计算

@@ -1,0 +1,67 @@
+/* 引入 Tailwind v4 核心 */
+@import "tailwindcss";
+
+/* 配置深色模式策略：
+  这里自定义了 'dark' 变体。
+  意思是：只要父级元素(如 html 标签)有 .dark 类，
+  子元素的 dark: 前缀样式就会生效。
+*/
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* MD3 风格的基础设置 */
+@theme {
+  /* 这里以后会用来定义 MD3 的动态颜色变量，先预留位置 */
+  /* --color-primary: ... */
+}
+
+/* 基础样式重置 */
+:root {
+  /* 默认背景和文字 (浅色模式) */
+  --bg-app: theme('colors.neutral.50');
+  --text-app: theme('colors.neutral.900');
+}
+
+:root.dark {
+  /* 深色模式下的变量 (MD3 推荐使用深灰色而不是纯黑) */
+  --bg-app: theme('colors.neutral.900');
+  --text-app: theme('colors.neutral.50');
+}
+
+body {
+  @apply bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-300;
+  font-family: 'Roboto', sans-serif;
+  overflow: hidden;
+  /* 播放器防滚动 */
+  /* 新增：禁止选中文字，鼠标变为默认箭头 */
+  user-select: none;
+  cursor: default;
+}
+
+/* 自定义滚动条样式 */
+@layer utilities {
+  /* 全局滚动条尺寸 */
+  ::-webkit-scrollbar {
+    width: 4px; /* Win11 的滚动条通常很细 */
+    height: 4px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent; 
+  }
+
+  /* 默认情况 (浅色模式逻辑) */
+  ::-webkit-scrollbar-thumb {
+    @apply bg-neutral-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-400; /* 变深 */
+  }
+
+  /* 深色模式逻辑 (逻辑反转) */
+  .dark ::-webkit-scrollbar-thumb {
+    @apply bg-neutral-600; /* 基础色是深灰 */
+  }
+  .dark ::-webkit-scrollbar-thumb:hover {
+    @apply bg-neutral-500; /* 悬停时变亮 */
+  }
+}
