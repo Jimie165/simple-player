@@ -1,82 +1,89 @@
 import { useState, useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { VscChromeClose, VscChromeMaximize, VscChromeMinimize, VscChromeRestore } from 'react-icons/vsc';
+import {
+    VscChromeMinimize,
+    VscChromeMaximize,
+    VscChromeRestore,
+    VscChromeClose
+} from 'react-icons/vsc';
 
 export default function TitleBar() {
-    const [appWindow, setAppWindow] = useState<any>(null);
     const [isMaximized, setIsMaximized] = useState(false);
+    // 获取当前窗口实例
+    const appWindow = getCurrentWindow();
 
     useEffect(() => {
-        const win = getCurrentWindow();
-        setAppWindow(win);
+        // 定义检查函数
+        const checkMaximized = async () => {
+            const maximized = await appWindow.isMaximized();
+            setIsMaximized(maximized);
+        };
 
-        // 1. 初始化时检查当前状态
-        win.isMaximized().then(setIsMaximized);
+        // 1. 初始化时检查一次
+        checkMaximized();
 
-        // 2. 建立监听器：当窗口大小改变时（包括拖拽边缘、Snap吸附、Win快捷键），同步状态
-        const unlisten = win.listen('tauri://resize', async () => {
-            const max = await win.isMaximized();
-            setIsMaximized(max);
-        });
+        // 2. 监听窗口 resize 事件
+        // 无论是拖拽、双击标题栏还是点击按钮，只要窗口大小变了，都会触发这个事件
+        const unlisten = appWindow.listen('tauri://resize', checkMaximized);
 
         // 清理监听器
         return () => {
-            unlisten.then((f) => f());
+            unlisten.then(f => f());
         };
     }, []);
 
-    const minimize = () => appWindow?.minimize();
-
-    const toggleMaximize = async () => {
-        if (!appWindow) return;
-        // 切换状态，图标状态会由上面的 listener 自动更新，这里不需要手动 set
-        await appWindow.toggleMaximize();
+    // 最小化
+    const handleMinimize = () => {
+        appWindow.minimize();
     };
 
-    const close = () => appWindow?.close();
+    // 切换最大化/还原
+    const handleToggleMaximize = () => {
+        appWindow.toggleMaximize();
+        // 注意：这里不需要手动 setIsMaximized，因为 toggle 会触发 resize 事件，
+        // 上面的 useEffect 会自动监听到并更新状态。
+    };
+
+    // 关闭
+    const handleClose = () => {
+        appWindow.close();
+    };
 
     return (
-        <div className="fixed top-0 left-0 right-0 h-10 flex justify-end items-center z-50 bg-transparent px-4 select-none transition-colors">
+        // 固定在右上角，z-index 设为最高，防止被其他层遮挡
+        <div className="fixed top-0 right-0 z-[100] flex h-10 items-center">
 
-            {/* 空白拖拽区 (Spacer)
-        1. flex-1: 占满左侧空间
-        2. data-tauri-drag-region: 允许拖动
-        3. onDoubleClick: 允许双击放大/还原 (Windows 标准体验)
-      */}
-            <div
-                className="flex-1 h-full"
-                data-tauri-drag-region
-                onDoubleClick={toggleMaximize}
-            />
+            {/* 最小化按钮 */}
+            <button
+                onClick={handleMinimize}
+                className="group flex h-full w-12 items-center justify-center transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
+            >
+                <VscChromeMinimize className="text-sm text-neutral-900 dark:text-neutral-100" />
+            </button>
 
-            {/* 按钮区域 */}
-            <div className="flex items-center gap-2 pl-2">
-                <TitleButton onClick={minimize}>
-                    <VscChromeMinimize />
-                </TitleButton>
-                <TitleButton onClick={toggleMaximize}>
-                    {isMaximized ? <VscChromeRestore /> : <VscChromeMaximize />}
-                </TitleButton>
-                <TitleButton onClick={close} isClose>
-                    <VscChromeClose />
-                </TitleButton>
-            </div>
-        </div>
-    );
-}
+            {/* 最大化/还原按钮 (根据状态切换图标) */}
+            <button
+                onClick={handleToggleMaximize}
+                className="group flex h-full w-12 items-center justify-center transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
+            >
+                {isMaximized ? (
+                    // 还原图标 (两个小方块)
+                    <VscChromeRestore className="text-sm text-neutral-900 dark:text-neutral-100" />
+                ) : (
+                    // 最大化图标 (一个方块)
+                    <VscChromeMaximize className="text-sm text-neutral-900 dark:text-neutral-100" />
+                )}
+            </button>
 
-function TitleButton({ children, onClick, isClose = false }: { children: React.ReactNode, onClick: () => void, isClose?: boolean }) {
-    return (
-        <div
-            onClick={onClick}
-            className={`
-        flex h-8 w-8 items-center justify-center rounded-full transition-all cursor-pointer text-sm
-        ${isClose
-                    ? 'text-neutral-600 dark:text-neutral-400 hover:bg-red-500 hover:text-white'
-                    : 'text-neutral-600 dark:text-neutral-400 hover:bg-neutral-200 dark:hover:bg-neutral-700 active:bg-neutral-300 dark:active:bg-neutral-600'}
-      `}
-        >
-            {children}
+            {/* 关闭按钮 (Hover 变红) */}
+            <button
+                onClick={handleClose}
+                className="group flex h-full w-12 items-center justify-center transition-colors hover:bg-red-500"
+            >
+                {/* 关闭按钮图标在 hover 时变白，平时跟随主题色 */}
+                <VscChromeClose className="text-base text-neutral-900 dark:text-neutral-100 group-hover:text-white" />
+            </button>
+
         </div>
     );
 }

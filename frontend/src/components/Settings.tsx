@@ -42,7 +42,7 @@ export default function Settings() {
 
                 {/* 关于信息 */}
                 <section className="rounded-2xl bg-neutral-100 p-6 dark:bg-neutral-800/50 border border-neutral-200/50 dark:border-neutral-700/50">
-                    <h3 className="text-lg font-semibold mb-2">关于 MD3 Player</h3>
+                    <h3 className="text-lg font-semibold mb-2">关于 Simple Player</h3>
                     <p className="text-sm text-neutral-500 leading-relaxed">
                         这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器，遵循 Material Design 3 设计规范。
                     </p>
