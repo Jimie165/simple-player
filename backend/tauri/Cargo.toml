@@ -11,9 +11,22 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 # Tauri v2 核心库
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2" # 用于打开文件对话框
+tauri-plugin-fs = "2"     # 用于文件系统访问
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+lofty = "0.22.4"
+base64 = "0.22.1"
+url = "2.5" # 需要用来处理文件路径转 URI
 
-# 预留后续高性能组件
-# rodio = "0.19" # 音频播放
-# rayon = "1.10" # 并行计算
+[dependencies.windows]
+version = "0.61"
+features = [
+    "Foundation",
+    "Media",
+    "Media_Core",
+    "Media_Playback",
+    "Storage",
+    "Storage_Streams", 
+    "System",
+]

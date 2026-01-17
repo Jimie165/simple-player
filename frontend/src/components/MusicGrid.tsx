@@ -1,12 +1,20 @@
-import { Fragment } from 'react';
-import { Menu, Transition } from '@headlessui/react';
+import type { Dispatch, SetStateAction } from 'react';
+import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import PageContainer from './PageContainer';
 import { IoPlay } from 'react-icons/io5';
 // 引入新图标：文件、文件夹、下拉箭头
 import { MdFileOpen, MdFolderOpen, MdKeyboardArrowDown } from 'react-icons/md';
-import clsx from 'clsx';
+import type { SongMetadata } from '../types';
 
-export default function MusicGrid() {
+import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
+
+interface MusicGridProps {
+    onPlay: () => void;
+    setMetadata: Dispatch<SetStateAction<SongMetadata | null>>;
+}
+
+export default function MusicGrid({ onPlay, setMetadata }: MusicGridProps) {
     const albums = Array.from({ length: 20 }).map((_, i) => ({
         id: i,
         title: `Album Title ${i + 1}`,
@@ -17,70 +25,100 @@ export default function MusicGrid() {
     // 定义下拉菜单组件
     const OpenFileMenu = () => {
         return (
-            <Menu as="div" className="relative inline-block text-left z-20">
-                <div>
-                    <Menu.Button className="
-            flex items-center gap-2 px-4 py-2 rounded-lg 
-            bg-neutral-200 text-neutral-900 hover:bg-neutral-300
-            dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600
-            transition-colors text-sm font-medium
-          ">
-                        <MdFileOpen className="text-lg" />
-                        <span>打开文件</span>
-                        <MdKeyboardArrowDown className="text-lg opacity-70" />
-                    </Menu.Button>
-                </div>
+            <Menu>
+                <MenuButton className="
+                    relative inline-flex items-center gap-2 px-4 py-2 rounded-lg 
+                    bg-neutral-200 text-neutral-900 hover:bg-neutral-300
+                    dark:bg-neutral-700 dark:text-neutral-100 dark:hover:bg-neutral-600
+                    transition-colors text-sm font-medium z-20
+                ">
+                    <MdFileOpen className="text-lg" />
+                    <span>打开文件</span>
+                    <MdKeyboardArrowDown className="text-lg opacity-70" />
+                </MenuButton>
 
-                <Transition
-                    as={Fragment}
-                    enter="transition ease-out duration-100"
-                    enterFrom="transform opacity-0 scale-95"
-                    enterTo="transform opacity-100 scale-100"
-                    leave="transition ease-in duration-75"
-                    leaveFrom="transform opacity-100 scale-100"
-                    leaveTo="transform opacity-0 scale-95"
+                <MenuItems
+                    transition
+                    className="
+                        absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-xl 
+                        bg-white dark:bg-neutral-800 
+                        shadow-lg ring-1 ring-black/5 focus:outline-none
+                        border border-neutral-200 dark:border-neutral-700 overflow-hidden
+                        transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0
+                        z-50
+                    "
                 >
-                    {/* 下拉菜单面板 */}
-                    <Menu.Items className="
-            absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-xl 
-            bg-white dark:bg-neutral-800 
-            shadow-lg ring-1 ring-black/5 focus:outline-none
-            border border-neutral-200 dark:border-neutral-700 overflow-hidden
-          ">
-                        <div className="p-1">
-                            <Menu.Item>
-                                {({ active }) => (
-                                    <button
-                                        onClick={() => console.log('Open File Clicked')}
-                                        className={clsx(
-                                            'group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors',
-                                            active ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-300' : 'text-neutral-900 dark:text-neutral-200'
-                                        )}
-                                    >
-                                        <MdFileOpen className="text-lg opacity-70" />
-                                        打开文件
-                                    </button>
-                                )}
-                            </Menu.Item>
-                            <Menu.Item>
-                                {({ active }) => (
-                                    <button
-                                        onClick={() => console.log('Open Folder Clicked')}
-                                        className={clsx(
-                                            'group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm transition-colors',
-                                            active ? 'bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-blue-300' : 'text-neutral-900 dark:text-neutral-200'
-                                        )}
-                                    >
-                                        <MdFolderOpen className="text-lg opacity-70" />
-                                        打开文件夹
-                                    </button>
-                                )}
-                            </Menu.Item>
-                        </div>
-                    </Menu.Items>
-                </Transition>
+                    <div className="p-1">
+                        <MenuItem>
+                            <button
+                                onClick={handleOpenFile}
+                                className="
+                                    group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm 
+                                    transition-colors text-neutral-900 dark:text-neutral-200
+                                    data-[focus]:bg-blue-50 data-[focus]:text-blue-600 
+                                    dark:data-[focus]:bg-white/10 dark:data-[focus]:text-blue-300
+                                "
+                            >
+                                <MdFileOpen className="text-lg opacity-70" />
+                                打开文件
+                            </button>
+                        </MenuItem>
+                        <MenuItem>
+                            <button
+                                onClick={() => console.log('Open Folder Clicked')}
+                                className="
+                                    group flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm 
+                                    transition-colors text-neutral-900 dark:text-neutral-200
+                                    data-[focus]:bg-blue-50 data-[focus]:text-blue-600 
+                                    dark:data-[focus]:bg-white/10 dark:data-[focus]:text-blue-300
+                                "
+                            >
+                                <MdFolderOpen className="text-lg opacity-70" />
+                                打开文件夹
+                            </button>
+                        </MenuItem>
+                    </div>
+                </MenuItems>
             </Menu>
         );
+    };
+
+    const handleOpenFile = async () => {
+        try {
+            const selected = await open({
+                multiple: false,
+                filters: [{ name: 'Audio', extensions: ['mp3', 'flac', 'wav', 'ogg', 'm4a', 'mp4'] }] // 加上 mp4/m4a
+            });
+
+            if (selected && typeof selected === 'string') {
+                // 1. 先获取元数据
+                let meta = null;
+                try {
+                    // 注意：Rust 返回的是 Result，前端 invoke 会抛出异常如果 Error
+                    // 这里我们用 invoke 返回值
+                    meta = await invoke<SongMetadata>('get_metadata', { path: selected });
+                    console.log('Metadata:', meta);
+                    setMetadata(meta);
+                } catch (e) {
+                    console.error('Failed to load metadata:', e);
+                    // 构建默认 meta
+                    meta = {
+                        title: selected.split('\\').pop() || 'Unknown File',
+                        artist: 'Unknown Artist',
+                        album: 'Unknown Album',
+                        duration: 0,
+                        cover: null
+                    };
+                    setMetadata(meta);
+                }
+
+                // 2. 播放音频 (并将 meta 传给后端用于 SMTC)
+                await invoke('play_audio', { path: selected, metadata: meta });
+                onPlay();
+            }
+        } catch (err) {
+            console.error('Failed to open audio:', err);
+        }
     };
 
     return (

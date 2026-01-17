@@ -13,6 +13,8 @@
     "@headlessui/react": "^2.2.9",
     "@material/material-color-utilities": "^0.3.0",
     "@tauri-apps/api": "^2.9.1",
+    "@tauri-apps/plugin-dialog": "^2.6.0",
+    "@tauri-apps/plugin-fs": "^2.4.5",
     "clsx": "^2.1.1",
     "framer-motion": "^12.26.2",
     "react": "^19.2.0",

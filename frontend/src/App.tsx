@@ -7,14 +7,18 @@ import MusicGrid from './components/MusicGrid';
 import Library from './components/Library';
 import Settings from './components/Settings';
 
+import type { SongMetadata } from './types';
+
 type PageId = 'home' | 'library' | 'videos' | 'queue' | 'playlists' | 'settings';
 
 function App() {
   useTheme();
 
   const [currentPage, setCurrentPage] = useState<PageId>('home');
+  const [isPlaying, setIsPlaying] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [history, setHistory] = useState<PageId[]>([]);
+  const [currentMetadata, setCurrentMetadata] = useState<SongMetadata | null>(null);
 
   const handleNavigate = (page: string) => {
     const target = page as PageId;
@@ -35,7 +39,11 @@ function App() {
 
   const renderContent = () => {
     switch (currentPage) {
-      case 'home': return <MusicGrid />;
+      case 'home':
+        return <MusicGrid
+          onPlay={() => setIsPlaying(true)}
+          setMetadata={setCurrentMetadata}
+        />;
       case 'library': return <Library />;
       case 'settings': return <Settings />;
       default: return null;
@@ -90,7 +98,11 @@ function App() {
         </div>
       </div>
 
-      <PlayerControl />
+      <PlayerControl
+        isPlaying={isPlaying}
+        setIsPlaying={setIsPlaying}
+        metadata={currentMetadata}
+      />
     </div>
   );
 }
