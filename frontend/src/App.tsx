@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { useTheme } from './hooks/useTheme';
-import TitleBar from './components/TitleBar';
+import TitleBar from './components/TitleBar'; // 这里的 TitleBar 只负责按钮逻辑，不负责布局占位
 import Sidebar from './components/Sidebar';
 import PlayerControl from './components/PlayerControl';
 import MusicGrid from './components/MusicGrid';
+import Library from './components/Library';
 import Settings from './components/Settings';
 
 type PageId = 'home' | 'library' | 'videos' | 'queue' | 'playlists' | 'settings';
 
 function App() {
-  useTheme(); // 确保主题加载
+  useTheme();
 
   const [currentPage, setCurrentPage] = useState<PageId>('home');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -35,27 +36,24 @@ function App() {
   const renderContent = () => {
     switch (currentPage) {
       case 'home': return <MusicGrid />;
+      case 'library': return <Library />;
       case 'settings': return <Settings />;
-      default: return (
-        <div className="flex h-full items-center justify-center text-neutral-400">
-          页面 {currentPage} 开发中
-        </div>
-      );
+      default: return null;
     }
   };
 
   return (
-    // 背景色设置为深色模式下的标准背景
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F3F3F3] dark:bg-[#202020] text-neutral-900 dark:text-neutral-50 font-sans">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F3F3F3] dark:bg-[#202020] text-neutral-900 dark:text-neutral-50 font-sans selection:bg-blue-500/30">
 
-      {/* 1. 标题栏 (绝对定位，不占据流式布局空间) */}
+      {/* 1. 系统控制按钮层 (最小化/关闭) 
+         它绝对定位在最右上角，覆盖在所有层之上，确保永远可点击
+      */}
       <TitleBar />
 
-      {/* 2. 中间主要区域 */}
       <div className="flex flex-1 overflow-hidden relative">
 
-        {/* 左侧：Sidebar 
-            注意：Sidebar 内部已经加了 pt-10 来避开 TitleBar
+        {/* 2. 左侧：侧边栏 (通顶)
+          它直接占满左侧高度，不受标题栏影响。
         */}
         <Sidebar
           activeId={currentPage}
@@ -66,22 +64,33 @@ function App() {
           onBack={handleBack}
         />
 
-        {/* 右侧：主内容区 
-            仿照 Win11：
-            - 左上角大圆角 (rounded-tl-xl)
-            - 背景色比 Sidebar 稍亮或稍暗 (这里用 #272727)
-            - 只有内容区上方需要留出 TitleBar 的高度 (pt-10)
+        {/* 3. 右侧：垂直布局容器
+          包含：顶部的拖拽条 + 下面的内容区
         */}
-        <main className="flex flex-1 flex-col overflow-hidden bg-white dark:bg-[#272727] rounded-tl-xl border-l border-t border-neutral-200/50 dark:border-neutral-700/30 shadow-sm pt-10 transition-all duration-300">
-          <div className="flex-1 overflow-y-auto scroll-smooth p-6">
+        <div className="flex flex-1 flex-col min-w-0 bg-white dark:bg-[#272727] rounded-tl-xl border-l border-t border-neutral-200/50 dark:border-neutral-700/30 overflow-hidden shadow-sm relative">
+
+          {/* 【关键修改】右侧标题栏背景层 (40px)
+             1. bg-white: 也就是你要求的“保留白色”，不透明。
+             2. data-tauri-drag-region: 允许拖拽窗口。
+             3. z-10: 确保它盖在滚动内容上面（虽然这里是 flex 布局，不会重叠）。
+          */}
+          <div
+            data-tauri-drag-region
+            className="h-10 w-full shrink-0 bg-white dark:bg-[#272727] border-b border-transparent transition-colors z-10"
+          />
+
+          {/* 【关键修改】真正的内容滚动区
+             1. flex-1: 占据剩余高度。
+             2. overflow-y-auto: 滚动条只出现在这里！不会通到顶部。
+          */}
+          <main className="flex-1 overflow-y-auto scroll-smooth relative">
             {renderContent()}
-          </div>
-        </main>
+          </main>
+
+        </div>
       </div>
 
-      {/* 3. 底部播放栏 */}
       <PlayerControl />
-
     </div>
   );
 }
