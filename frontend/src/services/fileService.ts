@@ -7,8 +7,8 @@ export const fileService = {
         return invoke<SongMetadata>('get_metadata', { path });
     },
 
-    // 扫描文件夹内的音频文件
-    readFolder: async (folder: string): Promise<string[]> => {
-        return invoke<string[]>('read_folder_audio', { folder });
+    // 扫描文件夹内的音频文件，返回元数据列表
+    readFolder: async (folder: string): Promise<SongMetadata[]> => {
+        return invoke<SongMetadata[]>('read_folder_audio_files', { folder });
     },
 };

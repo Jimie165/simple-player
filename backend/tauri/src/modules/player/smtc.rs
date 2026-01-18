@@ -1,4 +1,4 @@
-use crate::metadata::SongMetadata;
+use crate::modules::library::SongMetadata;
 use base64::Engine;
 use windows::Media::MediaPlaybackType;
 use windows::Media::Playback::MediaPlaybackItem;
@@ -8,9 +8,9 @@ use windows::Storage::Streams::{
 use windows::core::HSTRING;
 
 /// 将元数据直接绑定到 MediaPlaybackItem
-/// 这样 MediaPlayer 播放此 Item 时，会自动显示这些信息，且不会被覆盖
+/// 这样 MediaPlayer 播放此 Item 时，会自动显示这些信息
 pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows::core::Result<()> {
-    // 1. 获取该媒体项的显示属性 (DisplayProperties)
+    // 1. 获取该媒体项的显示属性
     let props = item.GetDisplayProperties()?;
 
     // 2. 设置类型为音乐
@@ -28,17 +28,16 @@ pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows:
             props.SetThumbnail(&stream_ref)?;
         }
     } else {
-        // 如果没有封面，设置为空
         props.SetThumbnail(None)?;
     }
 
-    // 5. 重要：必须调用 ApplyDisplayProperties 将修改应用回 Item
+    // 5. 应用修改
     item.ApplyDisplayProperties(&props)?;
 
     Ok(())
 }
 
-/// 辅助：将 Data URI (Base64) 转为 Windows RandomAccessStreamReference
+/// 将 Data URI (Base64) 转为 Windows RandomAccessStreamReference
 fn base64_to_stream_ref(data_uri: &str) -> Option<RandomAccessStreamReference> {
     // 1. 去掉前缀
     let parts: Vec<&str> = data_uri.split(',').collect();

@@ -1,28 +1,52 @@
 use base64::prelude::*;
 use lofty::prelude::*;
 use lofty::read_from_path;
-use serde::{Deserialize, Serialize}; // 添加 Deserialize
+use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-// 添加 Clone, Deserialize, 并把字段改为 pub
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SongMetadata {
+    pub id: Option<i64>,
     pub title: String,
     pub artist: String,
     pub album: String,
     pub duration: u64,
     pub cover: Option<String>,
     pub path: Option<String>,
+    pub size: Option<u64>,
+    pub sample_rate: Option<u32>,
+    pub bitrate: Option<u32>,
+}
+
+impl SongMetadata {
+    /// 从数据库 Song 模型转换为 SongMetadata
+    pub fn from_db_song(song: &crate::modules::database::Song) -> Self {
+        SongMetadata {
+            id: Some(song.id),
+            title: song.title.clone(),
+            artist: song.artist.clone(),
+            album: song.album.clone(),
+            duration: song.duration as u64,
+            cover: song.cover.clone(),
+            path: Some(song.path.clone()),
+            size: None,
+            sample_rate: None,
+            bitrate: None,
+        }
+    }
 }
 
 pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
-    let path = Path::new(path);
+    let path_obj = Path::new(path);
+
+    // 0. 获取文件大小
+    let size = std::fs::metadata(path_obj).map(|m| m.len()).ok();
 
     // 1. 使用 lofty 读取文件标签
     let tagged_file =
-        read_from_path(path).map_err(|e| format!("Failed to read metadata: {}", e))?;
+        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
 
-    // 2. 获取标签信息 (ID3 等)
+    // 2. 获取标签信息
     let tag = tagged_file.primary_tag();
 
     let title = tag
@@ -40,17 +64,17 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
         .and_then(|t| t.album().map(|s| s.to_string()))
         .unwrap_or_else(|| "Unknown Album".to_string());
 
-    // 3. 获取音频属性 (时长)
+    // 3. 获取音频属性
     let properties = tagged_file.properties();
     let duration = properties.duration().as_secs();
+    let sample_rate = properties.sample_rate();
+    let bitrate = properties.audio_bitrate();
 
-    // 4. 获取封面图片 (如果有)
+    // 4. 获取封面图片
     let mut cover_base64 = None;
     if let Some(t) = tag {
         if let Some(picture) = t.pictures().first() {
-            // 将图片二进制数据转为 Base64
             let b64 = BASE64_STANDARD.encode(picture.data());
-            // 拼接 Data URI Scheme，方便前端 img 标签直接显示
             let mime_type = picture
                 .mime_type()
                 .map(|m| m.as_str())
@@ -60,11 +84,15 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
     }
 
     Ok(SongMetadata {
+        id: None,
         title,
         artist,
         album,
         duration,
         cover: cover_base64,
-        path: Some(path.display().to_string().replace('\\', "/")),
+        path: Some(path_obj.display().to_string().replace('\\', "/")),
+        size,
+        sample_rate,
+        bitrate,
     })
 }

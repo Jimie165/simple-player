@@ -16,5 +16,9 @@ export const libraryService = {
 
     scanLibrary: async (): Promise<SongMetadata[]> => {
         return invoke('scan_library');
+    },
+
+    deleteSong: async (id: number): Promise<void> => {
+        return invoke('delete_song', { id });
     }
 };

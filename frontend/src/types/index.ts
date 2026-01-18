@@ -1,11 +1,15 @@
 // 歌曲元数据
 export interface SongMetadata {
+    id?: number;
     title: string;
     artist: string;
     album: string;
     duration: number; // 秒
     cover: string | null; // Base64
     path?: string; // 文件路径
+    size?: number; // 字节
+    sample_rate?: number; // Hz
+    bitrate?: number; // kbps
 }
 
 // 最近播放/历史记录项

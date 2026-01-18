@@ -33,7 +33,7 @@ export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: S
                         {metadata?.title || "未播放音乐"}
                     </div>
                     <div className="text-xs text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-neutral-300 transition-colors truncate w-full mt-0.5">
-                        {metadata?.artist || "MD3 Player"}
+                        {metadata?.artist || "Simple Player"}
                     </div>
                 </div>
             </button>

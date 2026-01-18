@@ -45,32 +45,19 @@ export default function MusicGrid() {
     const handleItemClick = async (item: typeof recentHistory[0]) => {
         if (item.type === 'folder') {
             try {
-                // 1. Get songs from folder
-                // Note: fileService.readFolder should return paths? 
-                // Wait, you added `getSongsInFolder` earlier. We should use that to get Metadata directly.
-                // If you use `readFolder`, you get paths, then map. 
-                // Assuming you have `getSongsInFolder` (best practice):
-
-                // If you don't have getSongsInFolder implemented yet, use this loop:
-                const files = await fileService.readFolder(item.path);
-                const songs: SongMetadata[] = [];
-                for (const file of files) {
-                    try {
-                        const meta = await fileService.getMetadata(file);
-                        songs.push(meta);
-                    } catch (e) { }
-                }
+                // Get songs from folder (returns SongMetadata[] directly)
+                const songs = await fileService.readFolder(item.path);
 
                 if (songs.length === 0) return;
 
-                // 2. Set Playlist
+                // Set Playlist
                 setPlaylist(songs);
 
-                // 3. Turn OFF Shuffle (Folders usually play in order)
+                // Turn OFF Shuffle (Folders usually play in order)
                 setShuffleState(false);
                 toggleShuffleList(false);
 
-                // 4. Play First Song
+                // Play First Song
                 setCurrentSongIndex(0);
                 const firstSong = songs[0];
                 if (firstSong.path) {
@@ -79,7 +66,7 @@ export default function MusicGrid() {
                     setIsPlaying(true);
                 }
 
-                // 5. Update Recent Timestamp
+                // Update Recent Timestamp
                 addToRecent({
                     ...item,
                     lastPlayed: Date.now()
@@ -99,15 +86,8 @@ export default function MusicGrid() {
         try {
             const selected = await open({ directory: true, multiple: false });
             if (selected && typeof selected === 'string') {
-                // Fetch songs
-                const files = await fileService.readFolder(selected); // Or getSongsInFolder
-                const songs: SongMetadata[] = [];
-                for (const file of files) {
-                    try {
-                        const meta = await fileService.getMetadata(file);
-                        songs.push(meta);
-                    } catch (e) { }
-                }
+                // Fetch songs (now returns SongMetadata[] directly)
+                const songs = await fileService.readFolder(selected);
 
                 if (songs.length === 0) return;
 
@@ -131,7 +111,7 @@ export default function MusicGrid() {
                     type: 'folder',
                     title: folderName,
                     description: `${songs.length} 首歌曲`,
-                    cover: null,
+                    cover: songs[0]?.cover || null,
                     path: selected,
                     lastPlayed: Date.now()
                 });

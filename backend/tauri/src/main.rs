@@ -1,12 +1,15 @@
-mod audio;
-mod metadata;
-mod smtc;
-// 新增模块
 mod commands;
-mod utils;
+mod modules;
 
-use audio::AudioState;
-use commands::{files, player}; // 引入拆分后的指令
+use modules::database;
+use modules::player::AudioState;
+use rusqlite::Connection;
+use std::fs;
+use std::sync::Mutex;
+use tauri::Manager;
+
+/// 数据库状态，用于 Tauri 状态管理
+pub struct DbState(pub Mutex<Connection>);
 
 fn main() {
     let audio_state = AudioState::new();
@@ -14,23 +17,96 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .setup(|app| {
+            // 初始化数据库
+            let app_data_dir = app.path().app_data_dir()?;
+            fs::create_dir_all(&app_data_dir)?;
+            
+            let db_path = app_data_dir.join("library.db");
+            let conn = Connection::open(&db_path)
+                .expect("Failed to open database");
+            
+            // 初始化表结构
+            database::init_schema(&conn)
+                .expect("Failed to initialize database schema");
+            
+            // 迁移旧的 JSON 配置（如果存在）
+            migrate_old_config(app, &conn);
+            
+            // 注入数据库状态
+            app.manage(DbState(Mutex::new(conn)));
+            
+            Ok(())
+        })
         .manage(audio_state)
         .invoke_handler(tauri::generate_handler![
             // Player commands
-            player::play_audio,
-            player::pause_audio,
-            player::resume_audio,
-            player::set_volume,
-            player::seek_audio,
+            commands::player::play_audio,
+            commands::player::pause_audio,
+            commands::player::resume_audio,
+            commands::player::set_volume,
+            commands::player::seek_audio,
             // File commands
-            files::get_metadata,
-            files::read_folder_audio_files,
+            commands::files::get_metadata,
+            commands::files::read_folder_audio_files,
             // Library commands
             commands::library::get_library_folders,
             commands::library::add_library_folder,
             commands::library::remove_library_folder,
             commands::library::scan_library,
+            commands::library::get_library_songs,
+            commands::library::refresh_library,
+            commands::library::delete_song,
+            // Playlist commands
+            commands::playlist::get_playlists,
+            commands::playlist::create_playlist,
+            commands::playlist::delete_playlist,
+            commands::playlist::rename_playlist,
+            commands::playlist::add_to_playlist,
+            commands::playlist::remove_from_playlist,
+            commands::playlist::get_playlist_songs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+/// 迁移旧的 JSON 配置到 SQLite
+fn migrate_old_config(app: &tauri::App, conn: &Connection) {
+    use serde::{Deserialize, Serialize};
+    
+    #[derive(Serialize, Deserialize, Default)]
+    struct OldConfig {
+        library_folders: Vec<String>,
+    }
+    
+    let config_path = match app.path().app_config_dir() {
+        Ok(path) => path.join("library.json"),
+        Err(_) => return,
+    };
+    
+    if !config_path.exists() {
+        return;
+    }
+    
+    // 读取旧配置
+    let content = match fs::read_to_string(&config_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    
+    let old_config: OldConfig = match serde_json::from_str(&content) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    
+    // 迁移文件夹到数据库
+    let count = old_config.library_folders.len();
+    for folder in old_config.library_folders {
+        let _ = database::FolderRepo::add(conn, &folder);
+    }
+    
+    // 删除旧配置文件
+    let _ = fs::remove_file(&config_path);
+    
+    println!("Migrated {} folders from old config", &count);
 }

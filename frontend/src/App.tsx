@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from './hooks/useTheme';
-import clsx from 'clsx'; // 确保引入了 clsx
+import clsx from 'clsx';
+import { useNavigationStore } from './store/useNavigationStore';
 
 import TitleBar from './components/layout/TitleBar';
 import Sidebar from './components/layout/Sidebar';
@@ -16,6 +17,7 @@ import type { PageId } from './types/index';
 
 function App() {
   useTheme();
+  const customBackHandler = useNavigationStore((state) => state.customBackHandler);
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -28,7 +30,7 @@ function App() {
   }, []);
 
   const [currentPage, setCurrentPage] = useState<PageId>('home');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [history, setHistory] = useState<PageId[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
@@ -45,6 +47,10 @@ function App() {
   const handleBack = () => {
     if (isFullScreen) {
       setIsFullScreen(false);
+      return;
+    }
+    if (customBackHandler) {
+      customBackHandler();
       return;
     }
     if (history.length === 0) return;
@@ -74,19 +80,18 @@ function App() {
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
-        {/* 即使在全屏模式下，它们也依然被渲染，只是被挡住了。这样就不会触发卸载/重载 */}
         <div className="absolute inset-0 flex z-0">
           <Sidebar
             activeId={currentPage}
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-            canGoBack={history.length > 0}
+            canGoBack={history.length > 0 || !!customBackHandler}
             onBack={handleBack}
           />
 
           <div className="flex flex-1 flex-col min-w-0 bg-white dark:bg-[#272727] rounded-tl-xl border-l border-t border-neutral-200/50 dark:border-neutral-700/30 overflow-hidden shadow-sm relative">
-            <div data-tauri-drag-region className="h-10 w-full shrink-0 bg-white dark:bg-[#272727] transition-colors z-10" />
+            <div data-tauri-drag-region className="h-8 w-full shrink-0 bg-white dark:bg-[#272727] transition-colors z-10" />
             <main className="flex-1 overflow-y-auto scroll-smooth relative">
               {renderContent()}
             </main>
@@ -94,11 +99,8 @@ function App() {
         </div>
 
         {/* --- 层级 2: 沉浸模式 (覆盖层) --- */}
-        {/* 使用 CSS transition 实现平滑过渡，并不真正销毁组件 */}
         <div className={clsx(
           "absolute inset-0 z-40 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
-          // 当全屏时：完全不透明，允许鼠标交互 (visible)
-          // 当非全屏时：完全透明，禁用鼠标交互 (invisible pointer-events-none)，让点击穿透到底层
           isFullScreen
             ? "opacity-100 visible translate-y-0"
             : "opacity-0 invisible translate-y-4 pointer-events-none"

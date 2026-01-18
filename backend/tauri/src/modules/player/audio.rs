@@ -1,13 +1,11 @@
 use std::sync::{Arc, Mutex};
 use windows::Foundation::Uri;
 use windows::Media::Core::MediaSource;
-use windows::Media::Playback::{MediaPlaybackItem, MediaPlayer}; // 引入 MediaPlaybackItem
+use windows::Media::Playback::{MediaPlaybackItem, MediaPlayer};
 use windows::core::HSTRING;
 
-// 引入元数据结构
-use crate::metadata::SongMetadata;
-// 引入 SMTC 模块
-use crate::smtc;
+use crate::modules::library::SongMetadata;
+use super::smtc;
 
 pub struct AudioState {
     player: Arc<Mutex<Option<MediaPlayer>>>,
@@ -22,12 +20,10 @@ impl AudioState {
         let player = MediaPlayer::new().expect("Failed to create Windows MediaPlayer");
 
         // 开启自动 SMTC 集成
-        // 注意：当我们使用 MediaPlaybackItem 时，MediaPlayer 会自动帮我们更新 SMTC
-        // 但前提是 CommandManager 必须启用
         let command_manager = player.CommandManager().unwrap();
         command_manager.SetIsEnabled(true).unwrap();
 
-        // 这一步是告诉播放器：“我要用你的 Play/Pause 按钮功能”
+        // 启用播放控制按钮
         let smtc = player.SystemMediaTransportControls().unwrap();
         smtc.SetIsPlayEnabled(true).unwrap();
         smtc.SetIsPauseEnabled(true).unwrap();
@@ -51,15 +47,12 @@ impl AudioState {
             let source = MediaSource::CreateFromUri(&uri)
                 .map_err(|e| format!("Failed to create source: {}", e))?;
 
-            // 3. 【关键步骤】创建 MediaPlaybackItem
-            // 相比直接 SetSource，使用 Item 可以让我们绑定元数据
+            // 3. 创建 MediaPlaybackItem
             let item = MediaPlaybackItem::Create(&source)
                 .map_err(|e| format!("Failed to create playback item: {}", e))?;
 
-            // 4. 【关键步骤】如果有元数据，直接应用到 Item 上
-            // 这样 Windows 播放时会直接显示我们提供的信息，而不会去读文件里的垃圾信息
+            // 4. 如果有元数据，应用到 Item 上
             if let Some(meta) = metadata {
-                // 忽略错误，SMTC 更新失败不应阻止播放
                 let _ = smtc::apply_metadata(&item, &meta);
             }
 

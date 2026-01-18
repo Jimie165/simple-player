@@ -1,5 +1,5 @@
-use crate::audio::AudioState;
-use crate::metadata::SongMetadata;
+use crate::modules::library::SongMetadata;
+use crate::modules::player::AudioState;
 use tauri::State;
 
 #[tauri::command]

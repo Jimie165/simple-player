@@ -1,4 +1,3 @@
-pub mod files;
+pub mod database;
 pub mod library;
 pub mod player;
-pub mod playlist;

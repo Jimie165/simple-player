@@ -1,24 +1,22 @@
-use crate::metadata::{self, SongMetadata};
-use crate::utils::file_scanner;
+use crate::modules::library::{self, SongMetadata};
 use std::path::Path;
 
 #[tauri::command]
 pub fn get_metadata(path: String) -> Result<SongMetadata, String> {
-    metadata::get_metadata(&path)
+    library::get_metadata(&path)
 }
 
-// 新增：读取文件夹内的所有音频文件路径
+/// 读取文件夹内的所有音频文件路径
 #[tauri::command]
 pub fn read_folder_audio_files(folder: String) -> Vec<SongMetadata> {
-    let paths = file_scanner::scan_audio_files(&folder);
+    let paths = library::scan_audio_files(&folder);
     let mut songs = Vec::new();
 
     for path in paths {
-        // 解析元数据
-        if let Ok(meta) = metadata::get_metadata(&path) {
+        if let Ok(meta) = library::get_metadata(&path) {
             songs.push(meta);
         } else {
-            // 如果解析失败，也可以由 path 生成一个简易的 metadata，防止文件丢失
+            // 如果解析失败，生成简易 metadata
             let p = Path::new(&path);
             let filename = p
                 .file_name()
@@ -26,12 +24,16 @@ pub fn read_folder_audio_files(folder: String) -> Vec<SongMetadata> {
                 .unwrap_or("Unknown")
                 .to_string();
             songs.push(SongMetadata {
+                id: None,
                 title: filename,
                 artist: "Unknown".to_string(),
                 album: "Unknown".to_string(),
                 duration: 0,
                 cover: None,
                 path: Some(path.replace('\\', "/")),
+                size: None,
+                sample_rate: None,
+                bitrate: None,
             });
         }
     }
