@@ -12,6 +12,7 @@ pub struct SongMetadata {
     pub album: String,
     pub duration: u64,
     pub cover: Option<String>,
+    pub path: Option<String>,
 }
 
 pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
@@ -64,5 +65,6 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
         album,
         duration,
         cover: cover_base64,
+        path: Some(path.display().to_string().replace('\\', "/")),
     })
 }

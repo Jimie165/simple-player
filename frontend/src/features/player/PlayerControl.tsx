@@ -1,0 +1,50 @@
+import { useState } from 'react';
+import clsx from 'clsx';
+import { usePlayerStore } from '../../store/usePlayerStore';
+
+// 引入子组件
+import SongInfo from './components/SongInfo';
+import PlaybackControls from './components/PlaybackControls';
+import ExtraControls from './components/ExtraControls';
+
+// 引入 Common 组件
+import InfoDialog from '../../components/common/InfoDialog';
+
+interface PlayerControlProps {
+    isFullScreen: boolean;
+    toggleFullScreen: () => void;
+}
+
+export default function PlayerControl({ isFullScreen, toggleFullScreen }: PlayerControlProps) {
+    const { metadata } = usePlayerStore();
+    const [isInfoOpen, setIsInfoOpen] = useState(false);
+
+    return (
+        <>
+            <div className={clsx(
+                "flex h-24 w-full flex-col justify-center border-t px-4 z-50 transition-colors duration-300",
+                "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#202020]"
+            )}>
+                {/* 30-40-30 布局容器 */}
+                <div className="flex items-center justify-between gap-4">
+
+                    <SongInfo
+                        metadata={metadata}
+                        isFullScreen={isFullScreen}
+                        toggleFullScreen={toggleFullScreen}
+                    />
+
+                    <PlaybackControls />
+
+                    <ExtraControls
+                        onInfoClick={() => setIsInfoOpen(true)}
+                    />
+
+                </div>
+            </div>
+
+            {/* 属性弹窗放在最外层 */}
+            <InfoDialog isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
+        </>
+    );
+}

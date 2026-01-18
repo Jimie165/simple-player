@@ -1,5 +1,5 @@
-import PageContainer from './PageContainer'; // 引入容器
-import { useTheme } from '../hooks/useTheme';
+import PageContainer from '../../components/layout/PageContainer';
+import { useTheme } from '../../hooks/useTheme';
 import { VscColorMode } from 'react-icons/vsc';
 
 export default function Settings() {

@@ -1,4 +1,4 @@
-import { VscMenu, VscArrowLeft } from 'react-icons/vsc';
+import { MdMenu, MdArrowLeft } from 'react-icons/md';
 
 interface ContentHeaderProps {
     title?: string;
@@ -15,7 +15,7 @@ export default function ContentHeader({ title, canGoBack, onToggleSidebar, onBac
                 onClick={onToggleSidebar}
                 className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-200 dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors"
             >
-                <VscMenu className="text-xl" />
+                <MdMenu className="text-xl" />
             </button>
 
             {/* 后退按钮 (仅当有历史记录时可用) */}
@@ -29,7 +29,7 @@ export default function ContentHeader({ title, canGoBack, onToggleSidebar, onBac
                         : 'text-neutral-300 dark:text-neutral-700 cursor-default'}
         `}
             >
-                <VscArrowLeft className="text-xl" />
+                <MdArrowLeft className="text-xl" />
             </button>
 
             {/* 当前页面标题 (可选) */}
