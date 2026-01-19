@@ -1,10 +1,13 @@
 import { useState, useMemo } from 'react';
-import { MdAccessTime, MdPlayArrow, MdArrowDropUp, MdArrowDropDown, MdMoreHoriz, MdDeleteOutline, MdInfoOutline } from 'react-icons/md';
-import { IoMusicalNotes } from 'react-icons/io5';
+import { MdAccessTime, MdPlayArrow, MdArrowDropUp, MdArrowDropDown, MdMoreHoriz, MdDeleteOutline, MdInfoOutline, MdPlaylistPlay } from 'react-icons/md';
+import { IoMusicalNotes, IoCheckboxOutline } from 'react-icons/io5';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
 import InfoDialog from '../../../components/common/InfoDialog';
+import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import { useLibraryStore } from '../../../store/useLibraryStore';
+import { IoAdd, IoPerson, IoDisc } from 'react-icons/io5';
 
 interface SongListViewProps {
     songs: SongMetadata[];
@@ -15,6 +18,8 @@ interface SongListViewProps {
     hideArtist?: boolean; // 新增：是否隐藏艺人列
     hideAlbum?: boolean; // 新增：是否隐藏专辑列
     disableSort?: boolean; // 新增：禁用排序点击
+    onOpenArtist?: (artist: string) => void;
+    onOpenAlbum?: (album: string) => void;
 }
 
 type SortKey = 'title' | 'artist' | 'album' | 'duration' | null;
@@ -28,7 +33,9 @@ export default function SongListView({
     enableDelete = true,
     hideArtist = false,
     hideAlbum = false,
-    disableSort = false
+    disableSort = false,
+    onOpenArtist,
+    onOpenAlbum
 }: SongListViewProps) {
     const [sortKey, setSortKey] = useState<SortKey>(null);
     const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
@@ -36,6 +43,23 @@ export default function SongListView({
     // 属性模态框状态
     const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
     const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
+
+    // 删除确认状态
+    const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+    const [songToDelete, setSongToDelete] = useState<SongMetadata | null>(null);
+
+    // 打开删除确认框
+    const handleDeleteClick = (song: SongMetadata) => {
+        setSongToDelete(song);
+        setIsDeleteConfirmOpen(true);
+    };
+
+    // 确认删除
+    const confirmDelete = () => {
+        if (songToDelete && onDelete) {
+            onDelete(songToDelete);
+        }
+    };
 
     const handleOpenProperties = (song: SongMetadata) => {
         setPropertySong(song);
@@ -127,6 +151,16 @@ export default function SongListView({
                 isOpen={isPropertiesOpen}
                 onClose={() => setIsPropertiesOpen(false)}
                 song={propertySong}
+            />
+
+            <ConfirmDialog
+                isOpen={isDeleteConfirmOpen}
+                onClose={() => setIsDeleteConfirmOpen(false)}
+                onConfirm={confirmDelete}
+                title="从音乐库删除"
+                description={`确定要从音乐库中删除 "${songToDelete?.title || '此歌曲'}" 吗？此操作不会删除本地文件。`}
+                confirmText="删除"
+                type="danger"
             />
 
             {/* 表头 (Sticky) */}
@@ -231,44 +265,113 @@ export default function SongListView({
                                     anchor="bottom end"
                                     className="w-48 origin-top-right rounded-lg bg-white dark:bg-[#2c2c2c] shadow-xl border border-neutral-200/50 dark:border-neutral-700/50 p-1 text-sm text-neutral-700 dark:text-neutral-200 focus:outline-none z-50 transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
                                 >
-                                    {enableDelete && (
-                                        <>
-                                            <MenuItem>
-                                                {({ focus }) => (
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            if (onDelete) onDelete(song);
-                                                        }}
-                                                        className={clsx(
-                                                            "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
-                                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
-                                                        )}
-                                                    >
-                                                        <MdDeleteOutline className="text-lg opacity-70" />
-                                                        移除
-                                                    </button>
-                                                )}
-                                            </MenuItem>
-                                            <div className="my-1 h-px bg-neutral-200 dark:bg-neutral-700/50" />
-                                        </>
-                                    )}
                                     <MenuItem>
-                                        {({ focus }) => (
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onPlay(song, index);
+                                            }}
+                                            className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                        >
+                                            <MdPlayArrow className="text-lg opacity-70" />
+                                            播放
+                                        </button>
+                                    </MenuItem>
+
+                                    <MenuItem>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                useLibraryStore.getState().addToNext(song);
+                                            }}
+                                            className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                        >
+                                            <MdPlaylistPlay className="text-lg opacity-70" />
+                                            下一首播放
+                                        </button>
+                                    </MenuItem>
+
+                                    <MenuItem>
+                                        <button
+                                            className="group flex w-full items-center justify-between rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <IoAdd className="text-lg opacity-70" />
+                                                添加到
+                                            </div>
+                                            <span className="text-xs opacity-50">&gt;</span>
+                                        </button>
+                                    </MenuItem>
+
+                                    <MenuItem>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenProperties(song);
+                                            }}
+                                            className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                        >
+                                            <MdInfoOutline className="text-lg opacity-70" />
+                                            属性
+                                        </button>
+                                    </MenuItem>
+
+                                    {onOpenAlbum && (
+                                        <MenuItem>
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleOpenProperties(song);
+                                                    if (onOpenAlbum && song.album) onOpenAlbum(song.album);
                                                 }}
-                                                className={clsx(
-                                                    "group flex w-full items-center gap-2 rounded-md px-2 py-1.5 transition-colors",
-                                                    focus ? "bg-neutral-100 dark:bg-white/10" : ""
-                                                )}
+                                                className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
                                             >
-                                                <MdInfoOutline className="text-lg opacity-70" />
-                                                属性
+                                                <IoDisc className="text-lg opacity-70" />
+                                                显示专辑
                                             </button>
-                                        )}
+                                        </MenuItem>
+                                    )}
+
+                                    {onOpenArtist && (
+                                        <MenuItem>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (onOpenArtist && song.artist) onOpenArtist(song.artist);
+                                                }}
+                                                className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                            >
+                                                <IoPerson className="text-lg opacity-70" />
+                                                显示艺人
+                                            </button>
+                                        </MenuItem>
+                                    )}
+
+                                    {enableDelete && (
+                                        <MenuItem>
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteClick(song);
+                                                }}
+                                                className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-red-600 dark:text-red-400 data-[focus]:bg-red-50 dark:data-[focus]:bg-red-900/20"
+                                            >
+                                                <MdDeleteOutline className="text-lg opacity-70" />
+                                                从音乐库删除
+                                            </button>
+                                        </MenuItem>
+                                    )}
+
+                                    <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />
+
+                                    <MenuItem>
+                                        <button
+                                            className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
+                                            onClick={(e) => { e.stopPropagation(); }}
+                                        >
+                                            <IoCheckboxOutline className="text-lg opacity-70" />
+                                            选择
+                                        </button>
                                     </MenuItem>
                                 </MenuItems>
                             </Menu>
@@ -276,6 +379,6 @@ export default function SongListView({
                     </div>
                 ))}
             </div>
-        </div>
+        </div >
     );
 }

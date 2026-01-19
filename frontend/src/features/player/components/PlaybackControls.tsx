@@ -21,7 +21,7 @@ export default function PlaybackControls() {
         setMetadata
     } = usePlayerStore();
 
-    const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory, toggleShuffleList, addToRecent } = useLibraryStore();
+    const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory, toggleShuffleList } = useLibraryStore();
 
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -110,22 +110,12 @@ export default function PlaybackControls() {
     };
 
     // --- 监听 Metadata 变化，添加到最近播放 ---
+    // 监听 Metadata 变化，添加到最近播放 - 移除此逻辑，改由触发播放的源头控制
+    /*
     useEffect(() => {
-        // 只有当 metadata 存在且有有效路径时才记录
-        if (metadata && metadata.path) {
-            addToRecent({
-                id: metadata.path,
-                type: 'file', // 标记为单曲文件
-                title: metadata.title || 'Unknown',
-                description: metadata.artist || 'Unknown Artist',
-                cover: metadata.cover || null,
-                path: metadata.path,
-                lastPlayed: Date.now()
-            });
-        }
-        // 依赖项：当 metadata 引用变化(切歌)时触发
-        // 注意：如果只是暂停/播放，metadata 对象引用通常不变，不会重复触发
+        // ... (removed)
     }, [metadata, addToRecent]);
+    */
 
     // 监听 repeatMode 变化，同步物理列表
     useEffect(() => {

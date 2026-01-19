@@ -17,7 +17,7 @@ import type { PageId } from './types/index';
 
 function App() {
   useTheme();
-  const customBackHandler = useNavigationStore((state) => state.customBackHandler);
+  const { canGoBack: isStoreCanGoBack, pop: storePop } = useNavigationStore();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -39,6 +39,14 @@ function App() {
   const handleNavigate = (page: string) => {
     const target = page as PageId;
     if (target === currentPage) return;
+
+    // Fix: When returning to Library, user wants to reset to the top-level tab interface
+    // (clearing any Detail views), but keeping the tab history logic is handled by Store.
+    // clearSubviews() will reset to the last active Library Tab state.
+    if (target === 'library') {
+      useNavigationStore.getState().clearSubviews();
+    }
+
     setHistory((prev) => [...prev, currentPage]);
     setCurrentPage(target);
     if (isFullScreen) setIsFullScreen(false);
@@ -49,10 +57,14 @@ function App() {
       setIsFullScreen(false);
       return;
     }
-    if (customBackHandler) {
-      customBackHandler();
+
+    // Priority 1: Library Internal Navigation (Store)
+    if (isStoreCanGoBack) {
+      storePop();
       return;
     }
+
+    // Priority 2: App Page History
     if (history.length === 0) return;
     const newHistory = [...history];
     const prevPage = newHistory.pop();
@@ -86,7 +98,7 @@ function App() {
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-            canGoBack={history.length > 0 || !!customBackHandler}
+            canGoBack={history.length > 0 || isStoreCanGoBack}
             onBack={handleBack}
           />
 

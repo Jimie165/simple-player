@@ -1,19 +1,26 @@
+import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import PageContainer from '../../components/layout/PageContainer';
 import OpenFileMenu from './components/OpenFileMenu';
 import RecentItemCard from './components/RecentItemCard';
 import EmptyState from './components/EmptyState';
+import InfoDialog from '../../components/common/InfoDialog';
 
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { audioService } from '../../services/audioService';
 import { fileService } from '../../services/fileService';
-import type { SongMetadata } from '../../types';
+import { libraryService } from '../../services/libraryService';
+import type { SongMetadata, RecentItem } from '../../types';
 
 export default function MusicGrid() {
     // Store Actions
-    const { recentHistory, addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList } = useLibraryStore();
+    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+
+    // 属性对话框状态
+    const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+    const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
 
     // Helper: Play Single File
     const playSingleFile = async (path: string) => {
@@ -42,7 +49,7 @@ export default function MusicGrid() {
     };
 
     // Core: Handle Recent Item Click
-    const handleItemClick = async (item: typeof recentHistory[0]) => {
+    const handleItemClick = async (item: RecentItem) => {
         if (item.type === 'folder') {
             try {
                 // Get songs from folder (returns SongMetadata[] directly)
@@ -75,9 +82,59 @@ export default function MusicGrid() {
             } catch (e) {
                 console.error("Failed to play folder", e);
             }
+        } else if (item.type === 'album') {
+            try {
+                // Determine artist from item (might be in description or extra field)
+                // In types, we added artist optional field.
+
+                const allSongs = await libraryService.scanLibrary();
+                const albumSongs = allSongs.filter(s =>
+                    s.album === item.title &&
+                    (item.artist ? s.artist === item.artist : true)
+                );
+
+                if (albumSongs.length > 0) {
+                    setPlaylist(albumSongs);
+                    setShuffleState(false);
+                    toggleShuffleList(false);
+                    setCurrentSongIndex(0);
+
+                    const first = albumSongs[0];
+                    if (first.path) {
+                        setMetadata(first);
+                        await audioService.play(first.path, first);
+                        setIsPlaying(true);
+                    }
+
+                    // Update timestamp
+                    addToRecent({
+                        ...item,
+                        lastPlayed: Date.now()
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to play recent album", e);
+            }
         } else {
             // Single File
             playSingleFile(item.path);
+        }
+    };
+
+    // 删除最近使用项
+    const handleDeleteRecent = (item: RecentItem) => {
+        removeFromRecent(item.id);
+    };
+
+    // 显示属性
+    const handleShowProperties = async (item: RecentItem) => {
+        if (item.type !== 'file') return;
+        try {
+            const meta = await fileService.getMetadata(item.path);
+            setPropertySong(meta);
+            setIsPropertiesOpen(true);
+        } catch (e) {
+            console.error('Failed to get metadata', e);
         }
     };
 
@@ -136,6 +193,12 @@ export default function MusicGrid() {
             title="主页"
             actions={<OpenFileMenu onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} />}
         >
+            <InfoDialog
+                isOpen={isPropertiesOpen}
+                onClose={() => setIsPropertiesOpen(false)}
+                song={propertySong}
+            />
+
             <section>
                 <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
                     <span>最近使用</span>
@@ -150,6 +213,8 @@ export default function MusicGrid() {
                                 key={item.id}
                                 item={item}
                                 onClick={() => handleItemClick(item)}
+                                onDelete={handleDeleteRecent}
+                                onShowProperties={handleShowProperties}
                             />
                         ))}
                     </div>

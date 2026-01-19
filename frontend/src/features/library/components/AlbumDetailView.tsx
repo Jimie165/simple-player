@@ -10,6 +10,8 @@ interface AlbumDetailViewProps {
     onPlayAll: () => void;
     onShuffle: () => void;
     onDeleteSong?: (song: SongMetadata) => void;
+    onOpenArtistByName?: (name: string) => void;
+    onOpenAlbumByName?: (name: string) => void;
 }
 
 export default function AlbumDetailView({
@@ -17,7 +19,8 @@ export default function AlbumDetailView({
     onPlay,
     onPlayAll,
     onShuffle,
-    onDeleteSong
+    onDeleteSong,
+    onOpenArtistByName
 }: AlbumDetailViewProps) {
 
     const totalDuration = useMemo(() => {
@@ -25,9 +28,12 @@ export default function AlbumDetailView({
     }, [album]);
 
     const formatDuration = (sec: number) => {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        if (h > 0) {
+            return `${h} 小时 ${m} 分钟`;
+        }
+        return `${m} 分钟`;
     };
 
     return (
@@ -50,7 +56,7 @@ export default function AlbumDetailView({
                     <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-50 truncate leading-tight tracking-tight mt-2" title={album.name}>
                         {album.name}
                     </h1>
-                    <h2 className="text-2xl font-medium text-[#d34836] dark:text-[#ff6b58] truncate" title={album.artist}>
+                    <h2 className="text-2xl font-medium text-[#1867c0] dark:text-[#64b5f6] truncate" title={album.artist}>
                         {album.artist}
                     </h2>
 
@@ -94,6 +100,7 @@ export default function AlbumDetailView({
                     hideArtist={true}
                     hideAlbum={true}
                     disableSort={true}
+                    onOpenArtist={onOpenArtistByName}
                 />
             </div>
         </div>

@@ -10,17 +10,20 @@ export interface SongMetadata {
     size?: number; // 字节
     sample_rate?: number; // Hz
     bitrate?: number; // kbps
+    year?: number; // release year
 }
 
 // 最近播放/历史记录项
 export interface RecentItem {
     id: string; // 通常是路径
-    type: 'file' | 'folder';
+    type: 'file' | 'folder' | 'album';
     title: string;
     description: string;
     cover?: string | null;
     path: string;
     lastPlayed: number; // 时间戳
+    // 专辑额外信息
+    artist?: string;
 }
 
 // 播放模式

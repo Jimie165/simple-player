@@ -10,6 +10,7 @@ interface LibraryState {
     currentSongIndex: number;
 
     addToRecent: (item: RecentItem) => void;
+    removeFromRecent: (id: string) => void;
     setPlaylist: (songs: SongMetadata[]) => void;
     setCurrentSongIndex: (index: number) => void;
     pushHistory: (index: number) => void;
@@ -22,6 +23,14 @@ interface LibraryState {
 
     // 修改：getNextIndex 需要根据 repeatMode 判断是否停止
     getNextIndex: (repeatMode: 'off' | 'all' | 'one') => number;
+
+    // 新增：从播放列表中移除特定歌曲（用于同步库删除操作）
+    removeSongFromPlaylist: (path: string) => void;
+
+    // Add to Queue (Add to end of playlist)
+    addToPlaylist: (song: SongMetadata) => void;
+    // Add to Next (Insert after current song)
+    addToNext: (song: SongMetadata) => void;
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
@@ -33,9 +42,14 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     currentSongIndex: -1,
 
     addToRecent: (item) => set((state) => {
-        const filtered = state.recentHistory.filter(i => i.path !== item.path);
+        // 使用 id 去重而不是 path，因为专辑的 id 是 album:name:artist 格式
+        const filtered = state.recentHistory.filter(i => i.id !== item.id);
         return { recentHistory: [item, ...filtered].slice(0, 100) };
     }),
+
+    removeFromRecent: (id) => set((state) => ({
+        recentHistory: state.recentHistory.filter(i => i.id !== id)
+    })),
 
     setPlaylist: (songs) => set({
         playlist: songs,
@@ -110,5 +124,73 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         }
 
         return nextIndex; // 正常下一首
-    }
+    },
+
+    removeSongFromPlaylist: (path) => {
+        const { playlist, currentSongIndex, originalPlaylist } = get();
+
+        // 1. 从播放列表移除
+        const newPlaylist = playlist.filter(s => s.path !== path);
+        const newOriginalPlaylist = originalPlaylist.filter(s => s.path !== path);
+
+        // 如果没变，说明不在列表里，直接返回
+        if (newPlaylist.length === playlist.length) return;
+
+        // 2. 修正当前索引
+        let newIndex = currentSongIndex;
+        const removingCurrent = playlist[currentSongIndex]?.path === path;
+
+        if (removingCurrent) {
+            // 如果移除的是当前播放的歌，是否需要切歌由组件层决定，这里只保证索引指向合理位置
+            // 如果只有这一首，变成 -1
+            if (newPlaylist.length === 0) {
+                newIndex = -1;
+            } else if (newIndex >= newPlaylist.length) {
+                // 如果是最后一首，指向新的最后一首
+                newIndex = newPlaylist.length - 1;
+            }
+            // 如果不是最后一首，索引不变，指向下一首（原 index 指向的位置现在是下一首了）
+        } else {
+            // 如果移除的是当前之前的歌，索引减一
+            const removedIndex = playlist.findIndex(s => s.path === path);
+            if (removedIndex !== -1 && removedIndex < currentSongIndex) {
+                newIndex = currentSongIndex - 1;
+            }
+        }
+
+        set({
+            playlist: newPlaylist,
+            originalPlaylist: newOriginalPlaylist,
+            currentSongIndex: newIndex,
+            // 简单处理：清空播放历史，防止 history 指向错误的 index
+            playHistory: []
+        });
+    },
+
+    addToPlaylist: (song) => set((state) => ({
+        playlist: [...state.playlist, song],
+        originalPlaylist: [...state.originalPlaylist, song]
+    })),
+
+    addToNext: (song) => set((state) => {
+        const { playlist, originalPlaylist, currentSongIndex } = state;
+        if (playlist.length === 0) {
+            return {
+                playlist: [song],
+                originalPlaylist: [song],
+                currentSongIndex: 0
+            };
+        }
+
+        const newPlaylist = [...playlist];
+        newPlaylist.splice(currentSongIndex + 1, 0, song);
+
+        const newOriginal = [...originalPlaylist];
+        newOriginal.splice(currentSongIndex + 1, 0, song);
+
+        return {
+            playlist: newPlaylist,
+            originalPlaylist: newOriginal
+        };
+    }),
 }));
