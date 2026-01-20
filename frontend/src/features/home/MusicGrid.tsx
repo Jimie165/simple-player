@@ -5,23 +5,30 @@ import PageContainer from '../../components/layout/PageContainer';
 import OpenFileMenu from './components/OpenFileMenu';
 import EmptyState from './components/EmptyState';
 import InfoDialog from '../../components/common/InfoDialog';
-import ConfirmDialog from '../../components/common/ConfirmDialog';
-import CoverImage from '../../components/common/CoverImage';
-
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
-import { audioService } from '../../services/audioService';
 import { fileService } from '../../services/fileService';
+import { audioService } from '../../services/audioService';
 import { libraryService } from '../../services/libraryService';
-import type { SongMetadata, RecentItem } from '../../types';
-import CardPlayButton from '../../components/common/CardPlayButton';
-import MusicContextMenu from '../../components/common/MusicContextMenu';
-import type { MusicItemType } from '../../components/common/MusicContextMenu';
 
-export default function MusicGrid() {
+import type { RecentItem } from '../../types';
+import type { SongMetadata } from '../../types';
+import MusicContextMenu, { getMusicMenuGroups } from '../../components/common/MusicContextMenu';
+import type { MusicItemType } from '../../components/common/MusicContextMenu';
+import CursorContextMenu from '../../components/common/CursorContextMenu';
+import ConfirmDialog from '../../components/common/ConfirmDialog';
+import CoverImage from '../../components/common/CoverImage';
+
+import CardPlayButton from '../../components/common/CardPlayButton';
+
+interface MusicGridProps {
+    onNavigateToLibrary?: () => void;
+}
+
+export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     // Store Actions
-    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, addToPlaylist } = useLibraryStore();
+    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
     const { push } = useNavigationStore();
 
@@ -33,11 +40,19 @@ export default function MusicGrid() {
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [itemToDelete, setItemToDelete] = useState<RecentItem | null>(null);
 
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, item });
+    };
+
     // Helper: Play Single File
-    const playSingleFile = async (path: string) => {
+    const playSingleFile = async (path: string, isLibraryItem = false) => {
         try {
             let meta: SongMetadata | null = null;
-            try { meta = await fileService.getMetadata(path); } catch (e) { }
+            try { meta = await fileService.getMetadata(path); } catch { /* ignore metadata errors */ }
 
             const safeMeta = meta || {
                 title: path.split(/[\\/]/).pop() || 'Unknown',
@@ -61,7 +76,8 @@ export default function MusicGrid() {
                 cover: safeMeta.cover,
                 path: path,
                 lastPlayed: Date.now(),
-                artist: safeMeta.artist
+                artist: safeMeta.artist,
+                isLibraryItem: isLibraryItem
             });
         } catch (err) { console.error(err); }
     };
@@ -107,11 +123,11 @@ export default function MusicGrid() {
                     }
                     addToRecent({ ...item, lastPlayed: Date.now() });
                 }
-            } catch (e) {
-                console.error("Failed to play recent album", e);
+            } catch (err) {
+                console.error("Failed to play recent album", err);
             }
         } else {
-            playSingleFile(item.path);
+            playSingleFile(item.path, item.isLibraryItem);
         }
     };
 
@@ -141,7 +157,8 @@ export default function MusicGrid() {
         }
     };
 
-    // Join Queue Wrapper in MusicGrid
+    // Join Queue Wrapper in MusicGrid - Now "Play Next"
+    const { addToNext } = useLibraryStore();
     const handleJoinQueue = async (item: RecentItem) => {
         if (item.type === 'file') {
             // Mock SongMetadata from RecentItem for simple adding
@@ -151,39 +168,95 @@ export default function MusicGrid() {
             };
             try {
                 const meta = await fileService.getMetadata(item.path);
-                if (meta) addToPlaylist(meta);
-            } catch (e) { addToPlaylist(song); }
+                if (meta) addToNext(meta); else addToNext(song);
+            } catch { addToNext(song); }
         } else if (item.type === 'folder') {
             const songs = await fileService.readFolder(item.path);
-            songs.forEach(s => addToPlaylist(s));
+            // Reverse to maintain order when adding to next (LIFO stack effect on "Next" position)
+            [...songs].reverse().forEach(s => addToNext(s));
         } else if (item.type === 'album') {
             const allSongs = await libraryService.scanLibrary();
             const albumSongs = allSongs.filter(s => s.album === item.title && (item.artist ? s.artist === item.artist : true));
-            albumSongs.forEach(s => addToPlaylist(s));
+            [...albumSongs].reverse().forEach(s => addToNext(s));
         }
     };
 
     // Navigation Helpers
     const handleNavigateToAlbum = async (item: RecentItem) => {
+        onNavigateToLibrary?.();
         const allSongs = await libraryService.scanLibrary();
-        const albumSongs = allSongs.filter(s => s.album === item.title && (item.artist ? s.artist === item.artist : true));
+        let albumName = "";
+        let artistName = item.artist;
+
+        if (item.type === 'file') {
+            // Find song in library to get real album name
+            // Normalize paths for comparison (Windows drive letters can be inconsistent)
+            const normalizedPath = (item.path || '').toLowerCase().replace(/[\\/]/g, '/');
+            const song = allSongs.find(s => (s.path || '').toLowerCase().replace(/[\\/]/g, '/') === normalizedPath);
+            if (song) {
+                albumName = song.album || "Unknown Album";
+                artistName = song.artist || "Unknown Artist";
+            } else {
+                console.warn("Song not found in library during navigation attempt", item);
+                alert("无法在媒体库中找到该歌曲，无法跳转到专辑。");
+                return;
+            }
+        } else {
+            albumName = item.title;
+        }
+
+        // Filter songs for this album
+        const albumSongs = allSongs.filter(s => {
+            const sAlbum = s.album || "Unknown Album";
+            const tAlbum = albumName || "Unknown Album";
+            // If we have a target artist, match it
+            if (artistName) {
+                const sArtist = s.artist || "Unknown Artist";
+                const tArtist = artistName || "Unknown Artist";
+                return sAlbum === tAlbum && sArtist === tArtist;
+            }
+            return sAlbum === tAlbum;
+        });
+
+        if (albumSongs.length === 0) {
+            console.warn("No songs found for album", albumName);
+            alert(`无法找到专辑 "${albumName}" 的相关歌曲。`);
+            return;
+        }
+
         // Construct AlbumData
         const albumData = {
-            name: item.title,
-            artist: item.artist || "Unknown",
-            cover: item.cover,
+            name: albumName,
+            artist: artistName || "Unknown",
+            cover: albumSongs[0]?.cover || null, // Use cover from first song in album
             songs: albumSongs
         };
         push({ type: 'album_detail', data: albumData });
     };
 
     const handleNavigateToArtist = async (item: RecentItem) => {
-        // Need full artist data which implies songs etc.
-        // This is heavy if we scan library every time.
-        // But for now it ensures consistency.
+        onNavigateToLibrary?.();
         const allSongs = await libraryService.scanLibrary();
-        const artistName = item.artist || "Unknown";
+        let artistName = item.artist || "Unknown";
+
+        if (item.type === 'file') {
+            // Optionally verify artist from library if needed, but item.artist should be reliable if set
+            // But to be safe:
+            const normalizedPath = (item.path || '').toLowerCase().replace(/[\\/]/g, '/');
+            const song = allSongs.find(s => (s.path || '').toLowerCase().replace(/[\\/]/g, '/') === normalizedPath);
+            if (song && song.artist) {
+                artistName = song.artist;
+            }
+        }
+
         const artistSongs = allSongs.filter(s => s.artist === artistName);
+
+        if (artistSongs.length === 0) {
+            console.warn("No songs found for artist", artistName);
+            alert(`无法找到艺人 "${artistName}" 的相关歌曲。`);
+            return;
+        }
+
         const artistData = {
             name: artistName,
             cover: artistSongs[0]?.cover || null,
@@ -238,10 +311,13 @@ export default function MusicGrid() {
         }
     };
 
-    const getMusicType = (itemType: string): MusicItemType => {
-        if (itemType === 'file') return 'song';
-        if (itemType === 'album') return 'album';
-        if (itemType === 'folder') return 'folder';
+    const getMusicType = (item: RecentItem): MusicItemType => {
+        if (item.type === 'file') {
+            // Distinguish between library songs and raw files
+            return item.isLibraryItem ? 'song' : 'file';
+        }
+        if (item.type === 'album') return 'album';
+        if (item.type === 'folder') return 'folder';
         return 'song';
     }
 
@@ -280,6 +356,7 @@ export default function MusicGrid() {
                                 key={item.id}
                                 className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                                 onClick={() => handleItemClick(item)}
+                                onContextMenu={(e) => handleContextMenu(e, item)}
                             >
                                 <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
                                     {item.type === 'folder' ? (
@@ -310,14 +387,17 @@ export default function MusicGrid() {
                                         <MusicContextMenu
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
-                                            type={getMusicType(item.type)}
+                                            type={getMusicType(item)}
                                             onPlay={() => handleItemClick(item)}
                                             onAddToQueue={() => handleJoinQueue(item)}
+                                            // Only show AddToPlaylist if it's a library item (Album or Song in Library)
+                                            onAddToPlaylist={(item.type === 'album' || (item.type === 'file' && item.isLibraryItem)) ? () => { console.log('Add to playlist', item) } : undefined}
                                             onShowProperties={item.type === 'file' ? () => handleShowProperties(item) : undefined}
-                                            onShowAlbum={(item.type === 'album' || (item.type === 'file' && item.isLibraryItem)) ? () => handleNavigateToAlbum(item) : undefined}
-                                            onShowArtist={(item.artist && (item.type === 'album' || item.isLibraryItem)) ? () => handleNavigateToArtist(item) : undefined}
+                                            onShowAlbum={item.type === 'file' || item.type === 'album' ? () => handleNavigateToAlbum(item) : undefined}
+                                            onShowArtist={item.artist && (item.type === 'file' || item.type === 'album') ? () => handleNavigateToArtist(item) : undefined}
                                             onDelete={() => handleDeleteClick(item)}
                                             deleteText="删除"
+                                            onOpen={() => setContextMenu(null)}
                                         />
                                     </div>
                                 </div>
@@ -333,6 +413,27 @@ export default function MusicGrid() {
                             </div>
                         ))}
                     </div>
+                )}
+
+                {/* Cursor Context Menu */}
+                {contextMenu && (
+                    <CursorContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        onClose={() => setContextMenu(null)}
+                        menuGroups={getMusicMenuGroups({
+                            type: getMusicType(contextMenu.item),
+                            onPlay: () => handleItemClick(contextMenu.item),
+                            onAddToQueue: () => handleJoinQueue(contextMenu.item),
+                            // Only show AddToPlaylist if it's a library item (Album or Song in Library)
+                            onAddToPlaylist: (contextMenu.item.type === 'album' || (contextMenu.item.type === 'file' && contextMenu.item.isLibraryItem)) ? () => { console.log('Add to playlist', contextMenu.item) } : undefined,
+                            onShowProperties: contextMenu.item.type === 'file' ? () => handleShowProperties(contextMenu.item) : undefined,
+                            onShowAlbum: contextMenu.item.type === 'file' || contextMenu.item.type === 'album' ? () => handleNavigateToAlbum(contextMenu.item) : undefined,
+                            onShowArtist: contextMenu.item.artist && (contextMenu.item.type === 'file' || contextMenu.item.type === 'album') ? () => handleNavigateToArtist(contextMenu.item) : undefined,
+                            onDelete: () => handleDeleteClick(contextMenu.item),
+                            deleteText: "删除"
+                        })}
+                    />
                 )}
             </section>
         </PageContainer>

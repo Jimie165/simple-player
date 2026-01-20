@@ -23,7 +23,7 @@ export default function PlayerControl({ isFullScreen, toggleFullScreen }: Player
         <>
             <div className={clsx(
                 "flex h-24 w-full flex-col justify-center border-t px-4 z-50 transition-colors duration-300",
-                "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-[#202020]"
+                "border-outline-variant/20 bg-surface-container-high"
             )}>
                 {/* 30-40-30 布局容器 */}
                 <div className="flex items-center justify-between gap-4">

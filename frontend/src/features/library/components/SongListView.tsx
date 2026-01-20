@@ -6,7 +6,8 @@ import InfoDialog from '../../../components/common/InfoDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import CoverImage from '../../../components/common/CoverImage';
-import MusicContextMenu from '../../../components/common/MusicContextMenu';
+import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
+import CursorContextMenu from '../../../components/common/CursorContextMenu';
 
 interface SongListViewProps {
     songs: SongMetadata[];
@@ -46,6 +47,14 @@ export default function SongListView({
     // 删除确认状态
     const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
     const [songToDelete, setSongToDelete] = useState<SongMetadata | null>(null);
+
+    // 右键菜单状态
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, song, index });
+    };
 
     // 打开删除确认框
     const handleDeleteClick = (song: SongMetadata) => {
@@ -112,7 +121,7 @@ export default function SongListView({
             onClick={() => allowSort && !disableSort && handleSort(colKey)}
             className={clsx(
                 "flex items-center gap-1 select-none transition-colors",
-                (allowSort && !disableSort) ? "cursor-pointer hover:text-neutral-800 dark:hover:text-neutral-200" : "",
+                (allowSort && !disableSort) ? "cursor-pointer hover:text-on-surface" : "",
                 className
             )}
         >
@@ -166,8 +175,8 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky top-0 z-10 grid gap-4 py-3 px-4 border-b border-neutral-200/60 dark:border-neutral-800/60",
-                    "text-[13px] text-neutral-500 font-medium bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur-md transition-colors"
+                    "sticky top-0 z-10 grid gap-4 py-3 px-4 border-b border-outline-variant/10",
+                    "text-[13px] text-on-surface-variant font-medium bg-surface/95 dark:bg-surface-container-low/95 backdrop-blur-md transition-colors"
                 )}>
                 <div className="text-center">#</div>
                 {/* 标题栏对齐修正：使用 pl-0，让文字直接靠左（对齐封面左侧） */}
@@ -189,11 +198,12 @@ export default function SongListView({
                     <div
                         key={song.path || index}
                         onDoubleClick={() => onPlay(song, index)}
+                        onContextMenu={(e) => handleContextMenu(e, song, index)}
                         style={gridStyle}
                         className={clsx(
-                            "group grid gap-4 px-4 py-2 items-center rounded-md transition-colors",
-                            "hover:bg-neutral-100/80 dark:hover:bg-white/5",
-                            "cursor-default text-[14px]" // 调整基础字号
+                            "group grid gap-4 px-4 py-2 items-center rounded-lg transition-colors",
+                            "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1", // Simplified active state
+                            "cursor-default text-[14px]"
                         )}
                     >
                         {/* 序号 / 播放按钮 */}
@@ -249,17 +259,40 @@ export default function SongListView({
                                 type="song"
                                 variant="clean"
                                 onPlay={() => onPlay(song, index)}
-                                onAddToQueue={() => useLibraryStore.getState().addToPlaylist(song)}
+                                // Use addToNext for "Play Next" behavior
+                                onAddToQueue={() => useLibraryStore.getState().addToNext(song)}
+                                onAddToPlaylist={() => console.log('Add to playlist', song)}
                                 onShowProperties={() => handleOpenProperties(song)}
                                 onShowAlbum={onOpenAlbum && song.album ? () => onOpenAlbum(song.album!) : undefined}
                                 onShowArtist={onOpenArtist && song.artist ? () => onOpenArtist(song.artist!) : undefined}
                                 onDelete={enableDelete && onDelete ? () => handleDeleteClick(song) : undefined}
                                 deleteText="从音乐库删除"
+                                onOpen={() => setContextMenu(null)}
                             />
                         </div>
                     </div>
                 ))}
             </div>
+
+            {/* Custom Context Menu */}
+            {contextMenu && (
+                <CursorContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    menuGroups={getMusicMenuGroups({
+                        type: 'song',
+                        onPlay: () => onPlay(contextMenu.song, contextMenu.index),
+                        onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song),
+                        onAddToPlaylist: () => console.log('Add to playlist', contextMenu.song),
+                        onShowProperties: () => handleOpenProperties(contextMenu.song),
+                        onShowAlbum: onOpenAlbum && contextMenu.song.album ? () => onOpenAlbum(contextMenu.song.album!) : undefined,
+                        onShowArtist: onOpenArtist && contextMenu.song.artist ? () => onOpenArtist(contextMenu.song.artist!) : undefined,
+                        onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song) : undefined,
+                        deleteText: "从音乐库删除"
+                    })}
+                />
+            )}
         </div >
     );
 }

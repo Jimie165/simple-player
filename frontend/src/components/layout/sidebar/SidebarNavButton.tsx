@@ -37,13 +37,13 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
             >
                 {/* 1. 独立的背景层 (胶囊) */}
                 <div className={clsx(
-                    "absolute top-1/2 -translate-y-1/2 h-10 rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "absolute top-1/2 -translate-y-1/2 h-10 rounded-full transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                     "left-3",
                     // 宽度逻辑：因为现在父容器宽度正常了，这里计算就会准确
                     collapsed ? "w-12" : "w-[calc(100%-24px)]",
                     isActive
-                        ? "bg-blue-100 dark:bg-blue-900/40"
-                        : "bg-transparent group-hover:bg-neutral-200 dark:group-hover:bg-white/10"
+                        ? "bg-secondary-container"
+                        : "bg-transparent group-hover:bg-surface-container-high"
                 )} />
 
                 {/* 2. 内容容器 (图标 + 文字) */}
@@ -54,8 +54,8 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                         <item.icon className={clsx(
                             "text-[24px] transition-colors duration-200",
                             isActive
-                                ? "text-blue-900 dark:text-blue-100"
-                                : "text-neutral-500 group-hover:text-neutral-900 dark:text-neutral-400 dark:group-hover:text-neutral-200"
+                                ? "text-on-secondary-container"
+                                : "text-on-surface-variant group-hover:text-on-surface"
                         )} />
                     </div>
 
@@ -63,8 +63,8 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                     <span className={clsx(
                         "whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                         isActive
-                            ? "text-neutral-900 dark:text-neutral-50 font-medium"
-                            : "text-neutral-600 dark:text-neutral-400 font-normal group-hover:text-neutral-900 dark:group-hover:text-neutral-200",
+                            ? "text-on-secondary-container font-bold"
+                            : "text-on-surface-variant font-medium group-hover:text-on-surface",
                         // 文字显示逻辑：展开时显示，折叠时隐藏
                         collapsed ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-4"
                     )}>

@@ -72,7 +72,7 @@ export default function ArtistDetailView({
     return (
         <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-300">
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-0 px-4 relative">
+            <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-6 px-6 relative">
                 {/* (Back Button Removed) */}
 
                 {/* Artist Cover */}
@@ -109,14 +109,14 @@ export default function ArtistDetailView({
                     <div className="flex items-center justify-center md:justify-start gap-3">
                         <button
                             onClick={onPlayAll}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary shadow-md transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
                             <span className="font-medium">全部播放</span>
                         </button>
                         <button
                             onClick={onShuffle}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-white transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-full btn-blur text-primary transition-all active:scale-95 hover:bg-surface-container-highest"
                         >
                             <MdShuffle className="text-xl" />
                             <span className="font-medium">随机播放</span>

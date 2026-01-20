@@ -47,7 +47,16 @@ export default function PlaylistDetail({ id, name }: PlaylistDetailProps) {
         setMetadata(song);
         setIsPlaying(true);
         setPlaylist(songs);
-        setCurrentSongIndex(index);
+
+        // Check if shuffle is active from the store
+        // Note: access external store state directly or via hook props if available
+        if (usePlayerStore.getState().isShuffling) {
+            setCurrentSongIndex(index);
+            toggleShuffleList(true);
+        } else {
+            setCurrentSongIndex(index);
+        }
+
         addToRecent({
             id: song.path,
             type: 'file',
@@ -104,17 +113,17 @@ export default function PlaylistDetail({ id, name }: PlaylistDetailProps) {
                 <div className="flex gap-2">
                     <button
                         onClick={handlePlayAll}
-                        className="p-2 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors text-neutral-900 dark:text-neutral-100"
+                        className="p-2 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface transition-colors active:scale-95"
                         title="全部播放"
                     >
-                        <MdPlayArrow />
+                        <MdPlayArrow className="text-xl" />
                     </button>
                     <button
                         onClick={handleShuffle}
-                        className="p-2 rounded-full bg-neutral-100 dark:bg-neutral-800 hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors text-neutral-900 dark:text-neutral-100"
+                        className="p-2 rounded-full bg-surface-container-high hover:bg-surface-container-highest text-on-surface transition-colors active:scale-95"
                         title="随机播放"
                     >
-                        <MdShuffle />
+                        <MdShuffle className="text-xl" />
                     </button>
                 </div>
             }

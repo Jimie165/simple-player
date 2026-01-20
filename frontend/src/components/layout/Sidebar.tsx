@@ -27,8 +27,8 @@ export default function Sidebar({ activeId, onNavigate, collapsed, onToggle, can
         <div
             className={clsx(
                 // 修改点 1: 添加 overflow-hidden 禁止根容器出现滚动条
-                "flex h-full flex-col transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)] z-50 overflow-hidden",
-                "bg-[#FDFDFD] dark:bg-[#141414] border-r border-transparent dark:border-neutral-800",
+                "flex h-full flex-col transition-[width] duration-300 cubic-bezier(0.2, 0.0, 0.0, 1.0) z-50 overflow-hidden",
+                "bg-surface-container border-r border-transparent dark:border-outline-variant/10",
                 "py-2", // 保持 py-2
                 collapsed ? "w-[72px]" : "w-[280px]"
             )}

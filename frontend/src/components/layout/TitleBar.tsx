@@ -12,7 +12,18 @@ export default function TitleBar() {
         checkMaximized();
 
         const unlisten = systemService.onResize(checkMaximized);
-        return () => { unlisten.then(f => f()); };
+        return () => {
+            unlisten
+                .then(f => {
+                    if (f) {
+                        const result = f() as any;
+                        if (result instanceof Promise) {
+                            result.catch((e: any) => console.warn("TitleBar unlisten failed (async)", e));
+                        }
+                    }
+                })
+                .catch(e => console.warn("Failed to get resize unlisten handle", e));
+        };
     }, []);
 
     return (

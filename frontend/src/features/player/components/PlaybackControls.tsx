@@ -151,8 +151,22 @@ export default function PlaybackControls() {
         setupListeners();
 
         return () => {
-            unlistenNext?.();
-            unlistenPrev?.();
+            // Safely unlisten (Handle Promise rejection properly for Tauri events)
+            const safeUnlisten = (fn: (() => void) | undefined) => {
+                if (fn) {
+                    try {
+                        const result = fn() as any;
+                        // If it returns a promise (Tauri V2), catch it.
+                        if (result instanceof Promise) {
+                            result.catch((e: any) => console.warn("Failed to unlisten (async)", e));
+                        }
+                    } catch (e) {
+                        console.warn("Failed to unlisten (sync)", e);
+                    }
+                }
+            };
+            safeUnlisten(unlistenNext);
+            safeUnlisten(unlistenPrev);
         };
     }, []);
 

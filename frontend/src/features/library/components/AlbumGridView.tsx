@@ -5,7 +5,8 @@ import { useLibraryStore } from '../../../store/useLibraryStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import CardPlayButton from '../../../components/common/CardPlayButton';
-import MusicContextMenu from '../../../components/common/MusicContextMenu';
+import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
+import CursorContextMenu from '../../../components/common/CursorContextMenu';
 
 // 定义专辑数据结构
 export interface AlbumData {
@@ -28,6 +29,14 @@ interface AlbumGridViewProps {
 export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false }: AlbumGridViewProps) {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; album: AlbumData } | null>(null);
+
+    const handleContextMenu = (e: React.MouseEvent, album: AlbumData) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, album });
+    };
 
     const handleDeleteClick = (album: AlbumData) => {
         setAlbumToDelete(album);
@@ -60,6 +69,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                         key={album.name + album.artist}
                         className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                         onClick={() => onOpenAlbum(album)}
+                        onContextMenu={(e) => handleContextMenu(e, album)}
                     >
                         {/* 封面区域 (M3 风格：更大的圆角，阴影) */}
                         <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5">
@@ -82,11 +92,13 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                                     className="absolute bottom-3 right-3"
                                     buttonClassName="w-10 h-10"
                                     onPlay={() => onPlayAlbum(album)}
-                                    onAddToQueue={() => album.songs.forEach(song => useLibraryStore.getState().addToPlaylist(song))}
+                                    onAddToQueue={() => [...album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
+                                    onAddToPlaylist={() => console.log('Add album to playlist', album)}
                                     onShowAlbum={() => onOpenAlbum(album)}
                                     onShowArtist={(!hideArtist && onOpenArtist && album.artist) ? () => onOpenArtist(album.artist) : undefined}
                                     onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
                                     deleteText="从音乐库删除"
+                                    onOpen={() => setContextMenu(null)}
                                 />
                             </div>
                         </div>
@@ -105,6 +117,24 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                     </div>
                 ))}
             </div>
+            {/* Cursor Context Menu */}
+            {contextMenu && (
+                <CursorContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    menuGroups={getMusicMenuGroups({
+                        type: 'album',
+                        onPlay: () => onPlayAlbum(contextMenu.album),
+                        onAddToQueue: () => [...contextMenu.album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
+                        onAddToPlaylist: () => console.log('Add album to playlist', contextMenu.album),
+                        onShowAlbum: () => onOpenAlbum(contextMenu.album),
+                        onShowArtist: (!hideArtist && onOpenArtist && contextMenu.album.artist) ? () => onOpenArtist(contextMenu.album.artist) : undefined,
+                        onDelete: onDeleteAlbum ? () => handleDeleteClick(contextMenu.album) : undefined,
+                        deleteText: "从音乐库删除"
+                    })}
+                />
+            )}
         </>
     );
 }

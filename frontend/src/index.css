@@ -1,67 +1,177 @@
-/* 引入 Tailwind v4 核心 */
 @import "tailwindcss";
 
-/* 配置深色模式策略：
-  这里自定义了 'dark' 变体。
-  意思是：只要父级元素(如 html 标签)有 .dark 类，
-  子元素的 dark: 前缀样式就会生效。
-*/
 @custom-variant dark (&:where(.dark, .dark *));
 
-/* MD3 风格的基础设置 */
 @theme {
-  /* 这里以后会用来定义 MD3 的动态颜色变量，先预留位置 */
-  /* --color-primary: ... */
+  /* MD3 Color System (Blue Key) */
+  --color-primary: var(--md-sys-color-primary);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-on-secondary: var(--md-sys-color-on-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+
+  --color-tertiary: var(--md-sys-color-tertiary);
+  --color-on-tertiary: var(--md-sys-color-on-tertiary);
+  --color-tertiary-container: var(--md-sys-color-tertiary-container);
+  --color-on-tertiary-container: var(--md-sys-color-on-tertiary-container);
+
+  --color-error: var(--md-sys-color-error);
+  --color-on-error: var(--md-sys-color-on-error);
+  
+  --color-surface: var(--md-sys-color-surface);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-surface-variant: var(--md-sys-color-surface-variant);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  
+  --color-outline: var(--md-sys-color-outline);
+  --color-outline-variant: var(--md-sys-color-outline-variant);
+
+  /* New Surface Containers (Level 1-5) */
+  --color-surface-container-lowest: var(--md-sys-color-surface-container-lowest);
+  --color-surface-container-low: var(--md-sys-color-surface-container-low);
+  --color-surface-container: var(--md-sys-color-surface-container);
+  --color-surface-container-high: var(--md-sys-color-surface-container-high);
+  --color-surface-container-highest: var(--md-sys-color-surface-container-highest);
+
+  /* Custom Blur Button Utility */
+  --color-glass-surface: var(--glass-surface);
+  --color-glass-border: var(--glass-border);
 }
 
-/* 基础样式重置 */
 :root {
-  /* 默认背景和文字 (浅色模式) */
-  --bg-app: theme('colors.neutral.50');
-  --text-app: theme('colors.neutral.900');
+  /* Light Mode (Blue Primary) */
+  --md-sys-color-primary: #005AC1;
+  --md-sys-color-on-primary: #FFFFFF;
+  --md-sys-color-primary-container: #D8E2FF;
+  --md-sys-color-on-primary-container: #001A41;
+
+  --md-sys-color-secondary: #575E71;
+  --md-sys-color-on-secondary: #FFFFFF;
+  --md-sys-color-secondary-container: #DCE2F9;
+  --md-sys-color-on-secondary-container: #141B2C;
+
+  --md-sys-color-tertiary: #715573;
+  --md-sys-color-on-tertiary: #FFFFFF;
+  --md-sys-color-tertiary-container: #FBD7FC;
+  --md-sys-color-on-tertiary-container: #29132D;
+
+  --md-sys-color-error: #BA1A1A;
+  --md-sys-color-on-error: #FFFFFF;
+
+  --md-sys-color-surface: #F9F9FC;
+  --md-sys-color-on-surface: #191C20;
+  --md-sys-color-surface-variant: #E1E2EC;
+  --md-sys-color-on-surface-variant: #44474F;
+
+  --md-sys-color-outline: #74777F;
+  --md-sys-color-outline-variant: #C4C6D0;
+
+  /* Surface Containers */
+  --md-sys-color-surface-container-lowest: #FFFFFF;
+  --md-sys-color-surface-container-low: #F3F3F6;
+  --md-sys-color-surface-container: #EDEDF1; /* App Background */
+  --md-sys-color-surface-container-high: #E7E8EE;
+  --md-sys-color-surface-container-highest: #E2E2E6;
+
+  /* Gaussian Blur Button (Light) */
+  --glass-surface: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.5);
 }
 
 :root.dark {
-  /* 深色模式下的变量 (MD3 推荐使用深灰色而不是纯黑) */
-  --bg-app: theme('colors.neutral.900');
-  --text-app: theme('colors.neutral.50');
+  /* Dark Mode (Blue Primary) */
+  --md-sys-color-primary: #ADC6FF;
+  --md-sys-color-on-primary: #002E69;
+  --md-sys-color-primary-container: #004494;
+  --md-sys-color-on-primary-container: #D8E2FF;
+
+  --md-sys-color-secondary: #BFC6DC;
+  --md-sys-color-on-secondary: #293041;
+  --md-sys-color-secondary-container: #3F4759;
+  --md-sys-color-on-secondary-container: #DCE2F9;
+
+  --md-sys-color-tertiary: #DEBCDF;
+  --md-sys-color-on-tertiary: #402843;
+  --md-sys-color-tertiary-container: #583E5B;
+  --md-sys-color-on-tertiary-container: #FBD7FC;
+
+  --md-sys-color-error: #FFB4AB;
+  --md-sys-color-on-error: #690005;
+
+  --md-sys-color-surface: #111318;
+  --md-sys-color-on-surface: #E2E2E6;
+  --md-sys-color-surface-variant: #44474F;
+  --md-sys-color-on-surface-variant: #C4C6D0;
+
+  --md-sys-color-outline: #8E9099;
+  --md-sys-color-outline-variant: #44474F;
+
+  /* Surface Containers */
+  --md-sys-color-surface-container-lowest: #0C0E13;
+  --md-sys-color-surface-container-low: #191C20;
+  --md-sys-color-surface-container: #1D2024; /* App Background */
+  --md-sys-color-surface-container-high: #282A2F;
+  --md-sys-color-surface-container-highest: #33353A;
+
+  /* Gaussian Blur Button (Dark) */
+  --glass-surface: rgba(30, 30, 30, 0.5);
+  --glass-border: rgba(255, 255, 255, 0.1);
 }
 
 body {
-  @apply bg-[var(--bg-app)] text-[var(--text-app)] transition-colors duration-300;
-  font-family: 'Roboto', sans-serif;
+  @apply bg-surface-container text-on-surface transition-colors duration-300;
+  font-family: 'Roboto', 'Inter', system-ui, sans-serif;
   overflow: hidden;
-  /* 播放器防滚动 */
-  /* 新增：禁止选中文字，鼠标变为默认箭头 */
   user-select: none;
   cursor: default;
 }
 
-/* 自定义滚动条样式 */
+/* Utilities */
 @layer utilities {
-  /* 全局滚动条尺寸 */
-  ::-webkit-scrollbar {
-    width: 4px; /* Win11 的滚动条通常很细 */
-    height: 4px;
-  }
+  /* M3 Elevation */
+  .elevation-1 { box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15); }
+  .elevation-2 { box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15); }
+  .elevation-3 { box-shadow: 0px 1px 3px 0px rgba(0,0,0,0.3), 0px 4px 8px 3px rgba(0,0,0,0.15); }
   
-  ::-webkit-scrollbar-track {
-    background: transparent; 
+  /* Modern Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-outline-variant/40 rounded-full hover:bg-outline-variant/60 transition-colors; }
+
+  /* M3 Ripple Implementation */
+  .ripple {
+    position: relative;
+    overflow: hidden;
+    transform: translate3d(0, 0, 0);
+  }
+  .ripple::after {
+    content: "";
+    display: block;
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    background-image: radial-gradient(circle, currentColor 10%, transparent 10.01%);
+    background-repeat: no-repeat;
+    background-position: 50%;
+    transform: scale(10, 10);
+    opacity: 0;
+    transition: transform .5s, opacity 1s;
+  }
+  .ripple:active::after {
+    transform: scale(0, 0);
+    opacity: 0.12;
+    transition: 0s;
   }
 
-  /* 默认情况 (浅色模式逻辑) */
-  ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-300 rounded-full;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-neutral-400; /* 变深 */
-  }
-
-  /* 深色模式逻辑 (逻辑反转) */
-  .dark ::-webkit-scrollbar-thumb {
-    @apply bg-neutral-600; /* 基础色是深灰 */
-  }
-  .dark ::-webkit-scrollbar-thumb:hover {
-    @apply bg-neutral-500; /* 悬停时变亮 */
+  /* Gaussian Blur Button Style */
+  .btn-blur {
+    @apply bg-glass-surface backdrop-blur-md border border-glass-border shadow-lg active:scale-95 transition-all duration-200;
   }
 }

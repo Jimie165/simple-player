@@ -76,7 +76,7 @@ export default function AlbumDetailView({
                     <div className="flex flex-wrap gap-3 mt-6">
                         <button
                             onClick={onPlayAll}
-                            className="flex items-center gap-2 bg-[#1867c0] hover:bg-[#155ab0] active:bg-[#124d9e] text-white px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
+                            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
                             全部播放
@@ -84,7 +84,7 @@ export default function AlbumDetailView({
 
                         <button
                             onClick={onShuffle}
-                            className="flex items-center gap-2 bg-transparent hover:bg-[#1867c0]/10 text-[#1867c0] px-6 py-2.5 rounded-full font-medium transition-all hover:shadow-md active:scale-95 border border-[#1867c0]"
+                            className="flex items-center gap-2 btn-blur text-primary px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                         >
                             <MdShuffle className="text-xl" />
                             随机播放

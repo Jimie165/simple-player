@@ -5,6 +5,7 @@ import { useNavigationStore } from './store/useNavigationStore';
 
 import TitleBar from './components/layout/TitleBar';
 import Sidebar from './components/layout/Sidebar';
+import GlobalDetailStack from './components/layout/GlobalDetailStack';
 
 import MusicGrid from './features/home/MusicGrid';
 import Library from './features/library/Library';
@@ -20,7 +21,7 @@ import { useQueuePersistence } from './hooks/useQueuePersistence';
 
 function App() {
   useTheme();
-  const { canGoBack: isStoreCanGoBack, pop: storePop } = useNavigationStore();
+  const { hasOverlay, pop: storePop } = useNavigationStore();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -46,15 +47,14 @@ function App() {
     const target = page as PageId;
     if (target === currentPage) return;
 
-    // Fix: When returning to Library, user wants to reset to the top-level tab interface
-    // (clearing any Detail views), but keeping the tab history logic is handled by Store.
-    // clearSubviews() will reset to the last active Library Tab state.
-    if (target === 'library') {
-      useNavigationStore.getState().clearSubviews();
-    }
-
     setHistory((prev) => [...prev, currentPage]);
     setCurrentPage(target);
+
+    // Clear Global Overlays when switching main tabs
+    if (hasOverlay) {
+      useNavigationStore.getState().reset();
+    }
+
     if (isFullScreen) setIsFullScreen(false);
   };
 
@@ -69,8 +69,8 @@ function App() {
       return;
     }
 
-    // Priority 1: Library Internal Navigation (Store)
-    if (isStoreCanGoBack) {
+    // Priority 1: Global Overlay Store (Album/Artist Details)
+    if (hasOverlay) {
       storePop();
       return;
     }
@@ -97,7 +97,7 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-[#F3F3F3] dark:bg-[#202020] text-neutral-900 dark:text-neutral-50 font-sans">
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans">
 
       {/* 1. 标题栏 (始终在最顶层 z-[100]) */}
       <TitleBar />
@@ -111,36 +111,48 @@ function App() {
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-            canGoBack={history.length > 0 || isStoreCanGoBack}
+            canGoBack={history.length > 0 || hasOverlay}
             onBack={handleBack}
             onSearch={handleSearch}
           />
 
-          <div className="flex flex-1 flex-col min-w-0 bg-white dark:bg-[#272727] rounded-tl-xl border-l border-t border-neutral-200/50 dark:border-neutral-700/30 overflow-hidden shadow-sm relative">
-            <div data-tauri-drag-region className="h-8 w-full shrink-0 bg-white dark:bg-[#272727] transition-colors z-10" />
-            <main className="flex-1 overflow-y-auto scroll-smooth relative">
-              {renderContent()}
+          {/* Main Content Area - M3 Surface Container Lowest/Low */}
+          <div className="flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-[24px] border-l border-t border-outline-variant/20 overflow-hidden shadow-sm relative z-0 transition-colors duration-300">
+            {/* Drag Region matching main content background */}
+            <div data-tauri-drag-region className="h-6 w-full shrink-0 bg-transparent z-10" />
+
+            <main className="flex-1 overflow-y-auto scroll-smooth relative no-scrollbar">
+              {/* Simple Fade Transition for Page Switch */}
+              <div key={currentPage} className="animate-in fade-in duration-300 slide-in-from-bottom-2 h-full">
+                {renderContent()}
+              </div>
             </main>
+
+            {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
+            <GlobalDetailStack />
           </div>
         </div>
 
-        {/* --- 层级 2: 沉浸模式 (覆盖层) --- */}
+
+        {/* --- 层级 3: 沉浸模式 (Now Playing Overlay) --- */}
         <div className={clsx(
-          "absolute inset-0 z-40 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
+          "absolute inset-0 z-[60] transition-all duration-500 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
           isFullScreen
             ? "opacity-100 visible translate-y-0"
-            : "opacity-0 invisible translate-y-4 pointer-events-none"
+            : "opacity-0 invisible translate-y-8 pointer-events-none"
         )}>
           <NowPlayingView metadata={metadata} />
         </div>
 
       </div>
 
-      {/* 4. 底部播放控制 */}
-      <PlayerControl
-        isFullScreen={isFullScreen}
-        toggleFullScreen={() => setIsFullScreen(!isFullScreen)}
-      />
+      {/* 4. 底部播放控制 - M3 Surface Container */}
+      <div className="bg-surface-container-high border-t border-outline-variant/10 z-[70]">
+        <PlayerControl
+          isFullScreen={isFullScreen}
+          toggleFullScreen={() => setIsFullScreen(!isFullScreen)}
+        />
+      </div>
     </div>
   );
 }
