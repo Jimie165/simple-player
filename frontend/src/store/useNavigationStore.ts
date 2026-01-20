@@ -1,8 +1,7 @@
 import { create } from 'zustand';
-import type { ArtistData } from '../features/library/components/ArtistGridView';
-import type { AlbumData } from '../features/library/components/AlbumGridView';
 
-export type ViewType = 'library' | 'artist_detail' | 'album_detail';
+
+export type ViewType = 'library' | 'artist_detail' | 'album_detail' | 'playlist_list' | 'playlist_detail';
 
 export interface ViewState {
     type: ViewType;
@@ -34,7 +33,7 @@ interface NavigationState {
 // Initial State
 const INITIAL_VIEW: ViewState = { type: 'library', tab: 'songs' };
 
-export const useNavigationStore = create<NavigationState>((set, get) => ({
+export const useNavigationStore = create<NavigationState>((set) => ({
     history: [INITIAL_VIEW],
 
     currentView: INITIAL_VIEW,

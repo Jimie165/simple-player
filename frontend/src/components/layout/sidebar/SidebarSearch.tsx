@@ -6,15 +6,22 @@ import CustomTooltip from '../../common/CustomTooltip';
 interface SidebarSearchProps {
     collapsed: boolean;
     onToggle: () => void;
+    onSearch: (query: string) => void;
 }
 
-export default function SidebarSearch({ collapsed, onToggle }: SidebarSearchProps) {
+export default function SidebarSearch({ collapsed, onToggle, onSearch }: SidebarSearchProps) {
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     const handleSearchClick = () => {
         if (collapsed) {
             onToggle();
             setTimeout(() => searchInputRef.current?.focus(), 300);
+        }
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            onSearch(e.currentTarget.value);
         }
     };
 
@@ -58,6 +65,7 @@ export default function SidebarSearch({ collapsed, onToggle }: SidebarSearchProp
                             type="text"
                             placeholder="搜索"
                             readOnly={collapsed}
+                            onKeyDown={handleKeyDown}
                             className={clsx(
                                 "bg-transparent text-base text-neutral-900 dark:text-neutral-100 placeholder-neutral-500 focus:outline-none min-w-0 transition-all duration-300",
                                 collapsed ? "w-0 opacity-0 pointer-events-none" : "w-full opacity-100 ml-2 mr-4"

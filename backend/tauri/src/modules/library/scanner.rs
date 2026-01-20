@@ -65,6 +65,7 @@ fn scan_recursive_inner(path: &Path, audio_files: &mut Vec<String>) {
 }
 
 /// 检查路径是否是音频文件
+#[allow(dead_code)]
 pub fn is_audio_file(path: &str) -> bool {
     let path = Path::new(path);
     if let Some(ext) = path.extension().and_then(|s| s.to_str()) {

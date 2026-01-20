@@ -17,6 +17,7 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .manage(audio_state)
         .setup(|app| {
             // 初始化数据库
             let app_data_dir = app.path().app_data_dir()?;
@@ -26,7 +27,7 @@ fn main() {
             let conn = Connection::open(&db_path)
                 .expect("Failed to open database");
             
-            // 初始化表结构
+            // 初始化表结构（带迁移）
             database::init_schema(&conn)
                 .expect("Failed to initialize database schema");
             
@@ -36,9 +37,12 @@ fn main() {
             // 注入数据库状态
             app.manage(DbState(Mutex::new(conn)));
             
+            // 初始化 AudioState 的 AppHandle (用于未来的 SMTC 事件)
+            let audio_state: tauri::State<AudioState> = app.state();
+            audio_state.init_with_app_handle(app.handle().clone());
+            
             Ok(())
         })
-        .manage(audio_state)
         .invoke_handler(tauri::generate_handler![
             // Player commands
             commands::player::play_audio,
@@ -57,14 +61,25 @@ fn main() {
             commands::library::get_library_songs,
             commands::library::refresh_library,
             commands::library::delete_song,
+            commands::library::batch_delete_songs,
+            commands::library::search_library,
+            commands::library::toggle_favorite,
+            commands::library::batch_toggle_favorite,
+            commands::library::get_favorites,
+            commands::library::increment_play_count,
             // Playlist commands
             commands::playlist::get_playlists,
             commands::playlist::create_playlist,
             commands::playlist::delete_playlist,
             commands::playlist::rename_playlist,
             commands::playlist::add_to_playlist,
+            commands::playlist::batch_add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::get_playlist_songs,
+            // Queue commands
+            commands::queue::save_play_queue,
+            commands::queue::get_play_queue,
+            commands::queue::clear_play_queue,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

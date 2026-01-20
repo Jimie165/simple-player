@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { RecentItem, SongMetadata } from '../types/index';
 
 interface LibraryState {
@@ -33,7 +34,7 @@ interface LibraryState {
     addToNext: (song: SongMetadata) => void;
 }
 
-export const useLibraryStore = create<LibraryState>((set, get) => ({
+export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     // ... 前面的状态和函数保持不变 ...
     recentHistory: [],
     playHistory: [],
@@ -71,23 +72,31 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
     },
 
     toggleShuffleList: (enable) => {
-        // ... 保持之前的物理洗牌逻辑不变 ...
         const { originalPlaylist, playlist, currentSongIndex } = get();
         const currentSong = playlist[currentSongIndex];
 
         if (enable) {
             if (originalPlaylist.length === 0) return;
+
+            // Fisher-Yates 洗牌
             let shuffled = [...originalPlaylist];
             for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
-            let newIndex = 0;
+
+            // 【核心修复】将当前歌曲移动到队列第一位
             if (currentSong) {
-                newIndex = shuffled.findIndex(s => s.path === currentSong.path);
-                if (newIndex === -1) newIndex = 0;
+                const currentIdx = shuffled.findIndex(s => s.path === currentSong.path);
+                if (currentIdx > 0) {
+                    // 从原位置移除，插入到开头
+                    shuffled.splice(currentIdx, 1);
+                    shuffled.unshift(currentSong);
+                }
             }
-            set({ playlist: shuffled, currentSongIndex: newIndex, playHistory: [] });
+
+            // 当前歌曲现在是队列的第一首
+            set({ playlist: shuffled, currentSongIndex: 0, playHistory: [] });
         } else {
             if (originalPlaylist.length === 0) return;
             let newIndex = 0;
@@ -193,4 +202,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
             originalPlaylist: newOriginal
         };
     }),
+}), {
+    name: 'library-store',
+    partialize: (state) => ({ recentHistory: state.recentHistory }),
 }));

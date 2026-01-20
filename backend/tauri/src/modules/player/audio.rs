@@ -3,12 +3,15 @@ use windows::Foundation::Uri;
 use windows::Media::Core::MediaSource;
 use windows::Media::Playback::{MediaPlaybackItem, MediaPlayer};
 use windows::core::HSTRING;
+use tauri::AppHandle;
 
 use crate::modules::library::SongMetadata;
 use super::smtc;
 
 pub struct AudioState {
     player: Arc<Mutex<Option<MediaPlayer>>>,
+    #[allow(dead_code)]
+    app_handle: Arc<Mutex<Option<AppHandle>>>,
 }
 
 unsafe impl Send for AudioState {}
@@ -32,7 +35,21 @@ impl AudioState {
 
         Self {
             player: Arc::new(Mutex::new(Some(player))),
+            app_handle: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// 在应用启动后调用，注入 AppHandle
+    pub fn init_with_app_handle(&self, app_handle: AppHandle) {
+        let mut handle_lock = self.app_handle.lock().unwrap();
+        *handle_lock = Some(app_handle);
+        
+        // 注意：Windows MediaPlayer 的 CommandManager 已经启用，
+        // 播放/暂停会自动工作。但上一首/下一首需要前端自行处理，
+        // 因为 CommandManager 不会自动切歌。
+        // 
+        // 一个更好的解决方案是在前端使用 MediaSession API，
+        // 或者用户接受 SMTC 只能控制播放/暂停。
     }
 
     pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {

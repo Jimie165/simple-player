@@ -30,10 +30,22 @@ pub fn read_folder_audio_files(folder: String) -> Vec<SongMetadata> {
                 album: "Unknown".to_string(),
                 duration: 0,
                 cover: None,
+                cover_path: None,
                 path: Some(path.replace('\\', "/")),
                 size: None,
                 sample_rate: None,
                 bitrate: None,
+                album_artist: None,
+                year: None,
+                genre: None,
+                track_number: None,
+                track_total: None,
+                disc_number: None,
+                disc_total: None,
+                play_count: None,
+                last_played_at: None,
+                is_favorite: None,
+                rating: None,
             });
         }
     }

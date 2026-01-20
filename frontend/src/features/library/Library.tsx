@@ -1,7 +1,10 @@
 import { useState, useEffect, useMemo } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
-import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck } from 'react-icons/md';
+import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdRefresh, MdShuffle } from 'react-icons/md';
+
+// ... (existing helper function: handleRefresh)
+
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
 import PageContainer from '../../components/layout/PageContainer';
@@ -39,21 +42,53 @@ export default function Library() {
     const [librarySongs, setLibrarySongs] = useState<SongMetadata[]>([]);
 
     const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
-    const { setPlaylist, setCurrentSongIndex, addToRecent } = useLibraryStore();
+    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList } = useLibraryStore();
+
 
     // Use Global Navigation Store
-    const { currentView, push } = useNavigationStore();
+    const { currentView, push, pop } = useNavigationStore();
 
     // Derived State from Store
     const currentTab = currentView.type === 'library' ? (currentView.tab || 'songs') : 'songs';
 
     const refreshLibrary = async () => {
         try {
-            const songs = await libraryService.scanLibrary();
+            const songs = await libraryService.refreshLibrary();
             setLibrarySongs(songs);
         } catch (e) {
             console.error("Failed to scan library", e);
         } finally {
+        }
+    };
+
+
+
+
+    const deleteSong = async (song: SongMetadata) => {
+        if (song.id) {
+            await libraryService.deleteSong(song.id as number);
+            // 本地过滤，保持原有顺序
+            setLibrarySongs(prev => prev.filter(s => s.id !== song.id));
+        }
+    };
+
+    const deleteAlbum = async (album: AlbumData) => {
+        const ids = album.songs.map(s => s.id).filter((id): id is number => id !== undefined);
+        if (ids.length > 0) {
+            await libraryService.batchDeleteSongs(ids);
+            // 本地过滤
+            const idSet = new Set(ids);
+            setLibrarySongs(prev => prev.filter(s => !s.id || !idSet.has(s.id as number)));
+        }
+    };
+
+    const deleteArtist = async (artist: ArtistData) => {
+        const ids = artist.songs.map(s => s.id).filter((id): id is number => id !== undefined);
+        if (ids.length > 0) {
+            await libraryService.batchDeleteSongs(ids);
+            // 本地过滤
+            const idSet = new Set(ids);
+            setLibrarySongs(prev => prev.filter(s => !s.id || !idSet.has(s.id as number)));
         }
     };
 
@@ -63,8 +98,8 @@ export default function Library() {
         try {
             const selected = await open({ directory: true, multiple: false });
             if (selected && typeof selected === 'string') {
-                await libraryService.addFolder(selected);
-                await refreshLibrary();
+                const songs = await libraryService.addFolder(selected);
+                setLibrarySongs(songs);
             }
         } catch (err) { console.error(err); }
     };
@@ -83,6 +118,7 @@ export default function Library() {
                     name: song.album || "Unknown Album",
                     artist: song.artist || "Unknown Artist",
                     cover: song.cover || null,
+                    cover_path: song.cover_path || null,
                     songs: []
                 });
             }
@@ -161,59 +197,123 @@ export default function Library() {
         if (found) handleOpenAlbum(found);
     };
 
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = librarySongs) => {
+    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = librarySongs, addToHistory = true) => {
         if (!song.path) return;
+
         await audioService.play(song.path, song);
         setMetadata(song);
         setIsPlaying(true);
-        setPlaylist(scopeSongs);
-        setCurrentSongIndex(index);
-        addToRecent({
-            id: song.path,
-            type: 'file',
-            title: song.title,
-            description: song.artist,
-            cover: song.cover,
-            path: song.path,
-            lastPlayed: Date.now(),
-            artist: song.artist
-        });
+
+        // 只有当传入了 scopeSongs 时才重置列表
+        // 如果我们已经手动设置了洗牌后的列表（传入空数组），就跳过这一步
+        if (scopeSongs.length > 0) {
+            setPlaylist(scopeSongs);
+            setCurrentSongIndex(index);
+        }
+
+        if (addToHistory) {
+
+            addToRecent({
+                id: song.path,
+                type: 'file',
+                title: song.title,
+                description: song.artist,
+                cover: song.cover,
+                cover_path: song.cover_path || null,
+                path: song.path,
+                lastPlayed: Date.now(),
+                isLibraryItem: true,
+                artist: song.artist
+            });
+        }
     };
 
     // --------------------------------------------------------
     // Render Content Switcher
     // --------------------------------------------------------
+    // 监听数据变化，如果在详情页时数据消失（如删除最后首歌），则返回
+    useEffect(() => {
+        if (currentView.type === 'album_detail') {
+            const data = currentView.data as AlbumData;
+            const exists = albums.some(a => a.name === data.name && a.artist === data.artist);
+            if (!exists) pop();
+        } else if (currentView.type === 'artist_detail') {
+            const data = currentView.data as ArtistData;
+            const exists = artists.some(a => a.name === data.name);
+            if (!exists) pop();
+        }
+    }, [currentView, albums, artists, pop]);
+
     const renderContent = () => {
         switch (currentView.type) {
             case 'library':
                 return (
                     <div className="flex flex-col h-full">
-                        {/* Tabs */}
-                        <div className="flex items-center gap-1 mb-6 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg w-fit">
-                            {[
-                                { id: 'songs', label: '歌曲', icon: MdMusicNote },
-                                { id: 'albums', label: '专辑', icon: MdAlbum },
-                                { id: 'artists', label: '艺人', icon: MdPerson },
-                            ].map((tab) => (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => {
-                                        // If different tab, push to stack
-                                        if (currentTab !== tab.id) {
-                                            push({ type: 'library', tab: tab.id as any });
-                                        }
-                                    }}
-                                    className={clsx(
-                                        "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                                        currentTab === tab.id
-                                            ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm"
-                                            : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
-                                    )}
-                                >
-                                    <tab.icon className="text-lg" />
-                                    {tab.label}
-                                </button>
-                            ))}
+                        {/* Header: Tabs on left, Shuffle on right */}
+                        <div className="flex items-center justify-between mb-6">
+                            {/* Tab 按钮组 */}
+                            <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
+                                {[
+                                    { id: 'songs', label: '歌曲', icon: MdMusicNote },
+                                    { id: 'albums', label: '专辑', icon: MdAlbum },
+                                    { id: 'artists', label: '艺人', icon: MdPerson },
+                                ].map((tab) => (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => {
+                                            if (currentTab !== tab.id) {
+                                                push({ type: 'library', tab: tab.id as any });
+                                            }
+                                        }}
+                                        className={clsx(
+                                            "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
+                                            currentTab === tab.id
+                                                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm"
+                                                : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
+                                        )}
+                                    >
+                                        <tab.icon className="text-lg" />
+                                        {tab.label}
+                                    </button>
+                                ))
+                                }
+                            </div>
+
+                            {/* 随机播放按钮 - 胶囊状，右侧 */}
+                            <button
+                                onClick={() => {
+                                    // 根据当前 tab 决定播放哪组歌曲
+                                    let songsToPlay: SongMetadata[] = [];
+                                    if (currentTab === 'songs') {
+                                        songsToPlay = [...librarySongs];
+                                    } else if (currentTab === 'albums' && albums.length > 0) {
+                                        songsToPlay = albums.flatMap(a => a.songs);
+                                    } else if (currentTab === 'artists' && artists.length > 0) {
+                                        songsToPlay = artists.flatMap(a => a.songs);
+                                    }
+
+                                    if (songsToPlay.length > 0) {
+                                        // 1. 随机选一首
+                                        const randomIndex = Math.floor(Math.random() * songsToPlay.length);
+                                        const song = songsToPlay[randomIndex];
+
+                                        // 2. 同步更新 Store
+                                        setPlaylist(songsToPlay);
+                                        setCurrentSongIndex(randomIndex);
+                                        toggleShuffleList(true); // 洗牌并把选中的歌置顶 (Index becomes 0)
+                                        setShuffleState(true);
+
+                                        // 3. 播放 (禁止 handlePlaySong 重置列表)
+                                        // 传入 index 0，因为在洗牌后的列表中它就是第 0 个
+                                        handlePlaySong(song, 0, [], true);
+                                    }
+                                }}
+
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-500 hover:bg-blue-600 text-white font-medium text-sm transition-colors shadow-sm"
+                            >
+                                <MdShuffle className="text-lg" />
+                                随机播放
+                            </button>
                         </div>
 
                         {/* Sort for Albums */}
@@ -251,17 +351,7 @@ export default function Library() {
                                 <SongListView
                                     songs={librarySongs}
                                     onPlay={(song) => handlePlaySong(song, librarySongs.indexOf(song))}
-                                    // onDelete logic is inside SongListView context menu, using proper service?
-                                    // Wait, onDelete prop is optional but valuable.
-                                    onDelete={async () => {
-                                        // TODO: Implement delete library logic if needed here or verify SongListView handles it?
-                                        // SongListView context menu currently:
-                                        // onConfirm={() => { libraryService.deleteSong(song.id).then(...) }}
-                                        // We should verify if it triggers refresh.
-                                        // Ideally we pass a refresh callback.
-                                        // For now let's pass refreshLibrary just in case we wire it up.
-                                        await refreshLibrary();
-                                    }}
+                                    onDelete={deleteSong}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
                                 />
@@ -270,11 +360,20 @@ export default function Library() {
                                 <AlbumGridView
                                     albums={albums}
                                     onPlayAlbum={(album) => {
-                                        // Play Album Logic (Play first song, queue rest)
-                                        // Reuse AudioService shuffle logic or custom?
-                                        // Simple: Play all songs in album.
+                                        addToRecent({
+                                            id: `album:${album.name}:${album.artist}`,
+                                            type: 'album',
+                                            title: album.name,
+                                            artist: album.artist,
+                                            description: `${album.songs.length} 首歌曲`,
+                                            cover: album.cover,
+                                            cover_path: album.cover_path || null,
+                                            path: album.songs[0]?.path || '',
+                                            lastPlayed: Date.now(),
+                                            isLibraryItem: true
+                                        });
                                         if (album.songs.length > 0) {
-                                            handlePlaySong(album.songs[0], 0, album.songs);
+                                            handlePlaySong(album.songs[0], 0, album.songs, false);
                                         }
                                     }}
                                     onOpenAlbum={handleOpenAlbum}
@@ -283,7 +382,7 @@ export default function Library() {
                                         const found = artists.find(a => a.name === artistName);
                                         if (found) handleOpenArtist(found);
                                     }}
-                                    onDeleteAlbum={async () => await refreshLibrary()}
+                                    onDeleteAlbum={deleteAlbum}
                                 />
                             )}
                             {currentTab === 'artists' && (
@@ -295,19 +394,20 @@ export default function Library() {
                                         }
                                     }}
                                     onOpenArtist={handleOpenArtist}
-                                    onDeleteArtist={async () => await refreshLibrary()}
+                                    onDeleteArtist={deleteArtist}
                                 />
                             )}
                         </div>
                     </div>
                 );
 
-            case 'artist_detail':
-                const artistData = currentView.data as ArtistData;
-                // We need to filter albums for this artist.
-                // Re-calculate or pass albums?
-                // Better to calculate from librarySongs for consistency or pass pre-calculated?
-                // Efficient to filter now.
+            case 'artist_detail': {
+                const initData = currentView.data as ArtistData;
+                // 使用最新数据 (解决删除后 UI 更新滞后问题)
+                const freshData = artists.find(a => a.name === initData.name);
+                const artistData = freshData || initData;
+
+                // 重新计算该艺人的专辑 (使用 useMemo 的 results)
                 const artistAlbums = albums.filter(a => a.artist === artistData.name);
 
                 return (
@@ -319,50 +419,115 @@ export default function Library() {
                             if (artistData.songs.length > 0) handlePlaySong(artistData.songs[0], 0, artistData.songs);
                         }}
                         onShuffle={() => {
-                            // Shuffle logic
                             if (artistData.songs.length > 0) {
-                                // Simple fake shuffle: play random index? 
-                                // Or use store toggleShuffle?
-                                // Let's just play first and toggle shuffle on.
-                                handlePlaySong(artistData.songs[0], 0, artistData.songs);
+                                const randomIndex = Math.floor(Math.random() * artistData.songs.length);
+                                const song = artistData.songs[randomIndex];
+
+                                setPlaylist(artistData.songs);
+                                setCurrentSongIndex(randomIndex);
+                                toggleShuffleList(true);
                                 setShuffleState(true);
+
+                                handlePlaySong(song, 0, [], false);
                             }
+
+
                         }}
                         onPlayAlbum={(album) => {
-                            if (album.songs.length > 0) handlePlaySong(album.songs[0], 0, album.songs);
+                            addToRecent({
+                                id: `album:${album.name}:${album.artist}`,
+                                type: 'album',
+                                title: album.name,
+                                artist: album.artist,
+                                description: `${album.songs.length} 首歌曲`,
+                                cover: album.cover,
+                                cover_path: album.cover_path || null,
+                                path: album.songs[0]?.path || '',
+                                lastPlayed: Date.now(),
+                                isLibraryItem: true
+                            });
+                            if (album.songs.length > 0) handlePlaySong(album.songs[0], 0, album.songs, false);
                         }}
                         onOpenAlbum={handleOpenAlbum}
                         onPlaySong={(song, idx) => handlePlaySong(song, idx, artistData.songs)}
-                        onDeleteSong={async () => await refreshLibrary()}
-                        onDeleteAlbum={async () => await refreshLibrary()}
+                        onDeleteSong={deleteSong}
+                        onDeleteAlbum={deleteAlbum}
                         // Pass helpers for internal SongListView
                         onOpenArtistByName={handleOpenArtistByName} // New prop for DetailView to pass down
                         onOpenAlbumByName={handleOpenAlbumByName} // New prop for DetailView to pass down
                     />
                 );
+            }
 
-            case 'album_detail':
-                const albumData = currentView.data as AlbumData;
+            case 'album_detail': {
+                const initData = currentView.data as AlbumData;
+                // 使用最新数据
+                const freshData = albums.find(a => a.name === initData.name && a.artist === initData.artist);
+                const albumData = freshData || initData;
+
                 return (
                     <AlbumDetailView
                         album={albumData}
                         onPlay={(song, idx) => handlePlaySong(song, idx, albumData.songs)}
                         onPlayAll={() => {
-                            if (albumData.songs.length > 0) handlePlaySong(albumData.songs[0], 0, albumData.songs);
+                            addToRecent({
+                                id: `album:${albumData.name}:${albumData.artist}`,
+                                type: 'album',
+                                title: albumData.name,
+                                artist: albumData.artist,
+                                description: `${albumData.songs.length} 首歌曲`,
+                                cover: albumData.cover,
+                                cover_path: albumData.cover_path || null,
+                                path: albumData.songs[0]?.path || '',
+                                lastPlayed: Date.now(),
+                                isLibraryItem: true
+                            });
+                            if (albumData.songs.length > 0) handlePlaySong(albumData.songs[0], 0, albumData.songs, false);
                         }}
                         onShuffle={() => {
+                            addToRecent({
+                                id: `album:${albumData.name}:${albumData.artist}`,
+                                type: 'album',
+                                title: albumData.name,
+                                artist: albumData.artist,
+                                description: `${albumData.songs.length} 首歌曲`,
+                                cover: albumData.cover,
+                                cover_path: albumData.cover_path || null,
+                                path: albumData.songs[0]?.path || '',
+                                lastPlayed: Date.now(),
+                                isLibraryItem: true
+                            });
                             if (albumData.songs.length > 0) {
-                                handlePlaySong(albumData.songs[0], 0, albumData.songs);
+                                const randomIndex = Math.floor(Math.random() * albumData.songs.length);
+                                const song = albumData.songs[randomIndex];
+
+                                setPlaylist(albumData.songs);
+                                setCurrentSongIndex(randomIndex);
+                                toggleShuffleList(true);
                                 setShuffleState(true);
+
+                                handlePlaySong(song, 0, [], false);
                             }
+
+
                         }}
-                        onDeleteSong={async () => await refreshLibrary()}
+                        onDeleteSong={deleteSong}
                         onOpenArtistByName={handleOpenArtistByName}
                         onOpenAlbumByName={handleOpenAlbumByName}
                     />
                 );
+            }
             default:
                 return <div>Unknown View</div>;
+        }
+    };
+
+    const handleRefresh = async () => {
+        try {
+            const songs = await libraryService.refreshLibrary();
+            setLibrarySongs(songs);
+        } catch (e) {
+            console.error("Failed to refresh library", e);
         }
     };
 
@@ -373,7 +538,16 @@ export default function Library() {
             hideHeader={currentView.type !== 'library'}
             actions={
                 currentView.type === 'library' ? (
-                    <LibraryHeaderButton onClick={handleAddFolder} />
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleRefresh}
+                            className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
+                            title="刷新音乐库"
+                        >
+                            <MdRefresh className="text-xl" />
+                        </button>
+                        <LibraryHeaderButton onClick={handleAddFolder} />
+                    </div>
                 ) : null
             }
         >

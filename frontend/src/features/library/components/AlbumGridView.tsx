@@ -1,16 +1,18 @@
 import { useState } from 'react';
-import { IoPlay, IoMusicalNotes, IoEllipsisHorizontal, IoAdd, IoPerson, IoTrash, IoCheckboxOutline } from 'react-icons/io5';
-import { MdPlaylistPlay } from 'react-icons/md';
-import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
+
+import CoverImage from '../../../components/common/CoverImage';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
+import CardPlayButton from '../../../components/common/CardPlayButton';
+import MusicContextMenu from '../../../components/common/MusicContextMenu';
 
 // 定义专辑数据结构
 export interface AlbumData {
     name: string;
     artist: string;
     cover: string | null;
+    cover_path: string | null;
     songs: SongMetadata[]; // 包含的歌曲
 }
 
@@ -61,122 +63,31 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                     >
                         {/* 封面区域 (M3 风格：更大的圆角，阴影) */}
                         <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5">
-                            {album.cover ? (
-                                <img src={album.cover} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500 ease-out" />
-                            ) : (
-                                <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                    <IoMusicalNotes className="text-6xl opacity-50" />
-                                </div>
-                            )}
+                            <CoverImage
+                                song={album.songs[0]}
+                                src={album.cover} // Fallback to base64 if present, or let CoverImage prefer song path
+                                className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+                                iconClassName="text-6xl opacity-50"
+                            />
 
                             {/* 交互遮罩：仅在hover时出现，渐变背景提供更好的文字对比度 */}
                             <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
 
                                 {/* 左下角：播放按钮 (M3 FAB 风格) */}
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        onPlayAlbum(album);
-                                    }}
-                                    className="absolute bottom-3 left-3 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white hover:bg-white/30 hover:scale-110 active:scale-95 transition-all duration-200 z-10"
-                                    title="播放专辑"
-                                >
-                                    <IoPlay className="translate-x-0.5" />
-                                </button>
+                                <CardPlayButton onClick={() => onPlayAlbum(album)} title="播放专辑" />
 
                                 {/* 右下角：更多菜单 (M3 风格) */}
-                                <div className="absolute bottom-3 right-3" onClick={(e) => e.stopPropagation()}>
-                                    <Menu as="div" className="relative">
-                                        <MenuButton className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors">
-                                            <IoEllipsisHorizontal />
-                                        </MenuButton>
-                                        <MenuItems
-                                            transition
-                                            anchor="bottom end"
-                                            className="w-56 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm/6 text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-50"
-                                        >
-                                            <MenuItem>
-                                                <button onClick={() => onPlayAlbum(album)} className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
-                                                    <IoPlay className="size-4 opacity-70" />
-                                                    播放
-                                                </button>
-                                            </MenuItem>
-                                            <MenuItem>
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        album.songs.forEach(song => {
-                                                            useLibraryStore.getState().addToNext(song);
-                                                        });
-                                                    }}
-                                                    className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
-                                                >
-                                                    <MdPlaylistPlay className="size-4 opacity-70" />
-                                                    下一首播放
-                                                </button>
-                                            </MenuItem>
-                                            <MenuItem>
-                                                <button className="group flex w-full items-center justify-between rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
-                                                    <div className="flex items-center gap-3">
-                                                        <IoAdd className="size-4 opacity-70" />
-                                                        添加到
-                                                    </div>
-                                                    <span className="text-xs opacity-50">&gt;</span>
-                                                </button>
-                                            </MenuItem>
-
-                                            <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />
-
-                                            {/* <MenuItem>
-                                                <button onClick={() => onOpenAlbum(album)} className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
-                                                    <IoDisc className="size-4 opacity-70" />
-                                                    显示专辑
-                                                </button>
-                                            </MenuItem> */}
-                                            {!hideArtist && (
-                                                <MenuItem>
-                                                    <button
-                                                        onClick={() => {
-                                                            if (onOpenArtist && album.artist) {
-                                                                onOpenArtist(album.artist);
-                                                            }
-                                                        }}
-                                                        className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
-                                                    >
-                                                        <IoPerson className="size-4 opacity-70" />
-                                                        显示艺人
-                                                    </button>
-                                                </MenuItem>
-                                            )}
-                                            <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />
-
-                                            {onDeleteAlbum && (
-                                                <MenuItem>
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            handleDeleteClick(album);
-                                                        }}
-                                                        className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-red-600 dark:text-red-400 data-[focus]:bg-red-50 dark:data-[focus]:bg-red-900/20"
-                                                    >
-                                                        <IoTrash className="size-4 opacity-70" />
-                                                        从音乐库删除
-                                                    </button>
-                                                </MenuItem>
-                                            )}
-                                            <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />
-                                            <MenuItem>
-                                                <button
-                                                    className="group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10"
-                                                    onClick={(e) => { e.stopPropagation(); /* TODO: Select Mode */ }}
-                                                >
-                                                    <IoCheckboxOutline className="size-4 opacity-70" />
-                                                    选择
-                                                </button>
-                                            </MenuItem>
-                                        </MenuItems>
-                                    </Menu>
-                                </div>
+                                <MusicContextMenu
+                                    type="album"
+                                    className="absolute bottom-3 right-3"
+                                    buttonClassName="w-10 h-10"
+                                    onPlay={() => onPlayAlbum(album)}
+                                    onAddToQueue={() => album.songs.forEach(song => useLibraryStore.getState().addToPlaylist(song))}
+                                    onShowAlbum={() => onOpenAlbum(album)}
+                                    onShowArtist={(!hideArtist && onOpenArtist && album.artist) ? () => onOpenArtist(album.artist) : undefined}
+                                    onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
+                                    deleteText="从音乐库删除"
+                                />
                             </div>
                         </div>
 

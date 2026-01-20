@@ -1,6 +1,7 @@
 import clsx from 'clsx';
-import { IoMusicalNotes } from 'react-icons/io5';
+// IoMusicalNotes removed, used inside CoverImage
 import type { SongMetadata } from '../../../types';
+import CoverImage from '../../../components/common/CoverImage';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
@@ -21,11 +22,11 @@ export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: S
                         ? "w-0 h-14 opacity-0 -translate-y-12 scale-150 mr-0"
                         : "w-14 h-14 opacity-100 translate-y-0 scale-100 mr-4 rounded-md"
                 )}>
-                    {metadata?.cover ? (
-                        <img src={metadata.cover} alt="Cover" className="w-full h-full object-cover" />
-                    ) : (
-                        <IoMusicalNotes className="text-2xl text-neutral-400" />
-                    )}
+                    <CoverImage
+                        song={metadata}
+                        className="w-full h-full object-cover"
+                        iconClassName="text-2xl text-neutral-400"
+                    />
                 </div>
 
                 <div className="min-w-0 flex-1 flex flex-col justify-center transition-all duration-500 pr-4">

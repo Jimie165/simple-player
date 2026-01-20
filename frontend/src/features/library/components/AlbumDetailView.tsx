@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
-import { IoPlay, IoShuffle, IoMusicalNotes } from 'react-icons/io5';
+import { MdPlayArrow, MdShuffle } from 'react-icons/md';
 import SongListView from './SongListView';
+import CoverImage from '../../../components/common/CoverImage';
 import type { AlbumData } from './AlbumGridView';
 import type { SongMetadata } from '../../../types';
 
@@ -42,13 +43,12 @@ export default function AlbumDetailView({
             <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6">
                 {/* Cover: Elevation, Large Radius */}
                 <div className="w-48 h-48 md:w-60 md:h-60 rounded-3xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
-                    {album.cover ? (
-                        <img src={album.cover} className="w-full h-full object-cover" alt={album.name} />
-                    ) : (
-                        <div className="flex items-center justify-center w-full h-full text-neutral-400">
-                            <IoMusicalNotes className="text-7xl" />
-                        </div>
-                    )}
+                    <CoverImage
+                        song={album.songs[0]}
+                        src={album.cover}
+                        className="w-full h-full object-cover"
+                        iconClassName="text-7xl"
+                    />
                 </div>
 
                 {/* Details */}
@@ -63,6 +63,10 @@ export default function AlbumDetailView({
                     <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 font-medium flex items-center gap-2">
                         <span className="bg-neutral-100 dark:bg-white/10 px-2 py-0.5 rounded-md text-xs">Album</span>
                         <span>•</span>
+                        <span>{album.songs[0]?.year || 'Unknown Year'}</span>
+                        <span>•</span>
+                        <span>{album.songs[0]?.genre || 'Unknown Genre'}</span>
+                        <span>•</span>
                         <span>{album.songs.length} 首歌</span>
                         <span>•</span>
                         <span>{formatDuration(totalDuration)}</span>
@@ -74,7 +78,7 @@ export default function AlbumDetailView({
                             onClick={onPlayAll}
                             className="flex items-center gap-2 bg-[#1867c0] hover:bg-[#155ab0] active:bg-[#124d9e] text-white px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
                         >
-                            <IoPlay className="text-xl" />
+                            <MdPlayArrow className="text-xl" />
                             全部播放
                         </button>
 
@@ -82,7 +86,7 @@ export default function AlbumDetailView({
                             onClick={onShuffle}
                             className="flex items-center gap-2 bg-transparent hover:bg-[#1867c0]/10 text-[#1867c0] px-6 py-2.5 rounded-full font-medium transition-all hover:shadow-md active:scale-95 border border-[#1867c0]"
                         >
-                            <IoShuffle className="text-xl" />
+                            <MdShuffle className="text-xl" />
                             随机播放
                         </button>
                     </div>
@@ -95,7 +99,7 @@ export default function AlbumDetailView({
                     songs={album.songs}
                     onPlay={onPlay}
                     onDelete={onDeleteSong}
-                    enableDelete={false}
+                    enableDelete={!!onDeleteSong}
                     hideCover={true}
                     hideArtist={true}
                     hideAlbum={true}

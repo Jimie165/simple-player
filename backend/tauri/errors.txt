@@ -1,0 +1,51 @@
+﻿cargo :     Checking 
+simple-player v0.1.0 
+(D:\Workspace\Project
+s\Repositories\simple
+-player\backend\tauri
+)
+所在位置 行:1 字符: 1
++ cargo check 2>&1 | 
+Out-File -FilePath er
+rors.txt -Encoding ut
+f8; Get- ...
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (    Che   
+ cking si...\back    
+end\tauri):Strin    g
+) [], RemoteExc    ep
+tion
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+error[E0063]: missing
+ fields `album_artist
+`, `cover_path`, `dis
+c_number` and 9 other
+ fields in initialize
+r of `metadata::SongM
+etadata`
+  --> tauri\src\comma
+nds\files.rs:26:24
+   |
+26 |             song
+s.push(SongMetadata {
+   |                 
+       ^^^^^^^^^^^^ m
+issing `album_artist`
+, `cover_path`, `disc
+_number` and 9 other 
+fields
+
+For more information 
+about this error, try
+ `rustc --explain E00
+63`.
+error: could not comp
+ile `simple-player` (
+bin "simple-player") 
+due to 1 previous err
+or

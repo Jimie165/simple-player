@@ -1,6 +1,8 @@
 import { useState, useMemo } from 'react';
 import { MdPlayArrow, MdShuffle } from 'react-icons/md';
 import { IoPerson } from 'react-icons/io5';
+import CardPlayButton from '../../../components/common/CardPlayButton';
+import CoverImage from '../../../components/common/CoverImage';
 import clsx from 'clsx';
 import type { ArtistData } from './ArtistGridView';
 import type { AlbumData } from './AlbumGridView';
@@ -36,8 +38,22 @@ export default function ArtistDetailView({
     onDeleteAlbum,
     onOpenAlbumByName
 }: ArtistDetailViewProps) {
-    // 默认显示歌曲视图 (Apple Music 风格通常也是直接列出重点内容，这里如果用户想默认看歌曲，可以默认 'songs')
-    const [activeTab, setActiveTab] = useState<'albums' | 'songs'>('songs');
+    // 默认显示用户上次选择的视图，如果没有则默认为 'songs'
+    const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
+        try {
+            const saved = localStorage.getItem('artist_detail_active_tab');
+            return (saved === 'albums' || saved === 'songs') ? saved : 'songs';
+        } catch {
+            return 'songs';
+        }
+    });
+
+    const handleTabChange = (tab: 'albums' | 'songs') => {
+        setActiveTab(tab);
+        try {
+            localStorage.setItem('artist_detail_active_tab', tab);
+        } catch { }
+    };
 
     // 计算总时长
     const totalDuration = useMemo(() => {
@@ -61,8 +77,12 @@ export default function ArtistDetailView({
 
                 {/* Artist Cover */}
                 <div className="w-40 h-40 md:w-48 md:h-48 rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
-                    {artist.cover ? (
-                        <img src={artist.cover} className="w-full h-full object-cover" alt={artist.name} />
+                    {artist.songs.length > 0 ? (
+                        <CoverImage
+                            song={artist.songs[0]}
+                            className="w-full h-full object-cover"
+                            iconClassName="text-6xl"
+                        />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-neutral-400">
                             <IoPerson className="text-6xl" />
@@ -92,7 +112,7 @@ export default function ArtistDetailView({
                             className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
-                            <span className="font-medium">播放全部</span>
+                            <span className="font-medium">全部播放</span>
                         </button>
                         <button
                             onClick={onShuffle}
@@ -108,7 +128,7 @@ export default function ArtistDetailView({
             {/* Tabs Navigation */}
             <div className="flex items-center gap-8 px-4 border-b border-neutral-200 dark:border-neutral-800 mb-4">
                 <button
-                    onClick={() => setActiveTab('albums')}
+                    onClick={() => handleTabChange('albums')}
                     className={clsx(
                         "pb-3 text-sm font-medium transition-all relative",
                         activeTab === 'albums'
@@ -122,7 +142,7 @@ export default function ArtistDetailView({
                     )}
                 </button>
                 <button
-                    onClick={() => setActiveTab('songs')}
+                    onClick={() => handleTabChange('songs')}
                     className={clsx(
                         "pb-3 text-sm font-medium transition-all relative",
                         activeTab === 'songs'
@@ -156,26 +176,27 @@ export default function ArtistDetailView({
                                 <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
                                     <div
                                         className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
-                                        onClick={() => onOpenAlbum(album)}
+                                        onClick={() => onPlayAlbum(album)}
                                     >
-                                        {album.cover ? (
-                                            <img src={album.cover} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300" alt={album.name} />
+                                        {album.songs.length > 0 ? (
+                                            <CoverImage
+                                                song={album.songs[0]}
+                                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                iconClassName="text-6xl"
+                                            />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-neutral-400">
                                                 <IoPerson className="text-6xl" />
                                             </div>
                                         )}
-                                        {/* Hover Overlay */}
                                         <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <button
+                                            <CardPlayButton
                                                 onClick={(e) => {
                                                     e.stopPropagation();
                                                     onPlayAlbum(album);
                                                 }}
-                                                className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md border border-white/20 shadow-lg flex items-center justify-center text-white hover:bg-white/30 hover:scale-110 active:scale-95 transition-all"
-                                            >
-                                                <MdPlayArrow className="text-3xl" />
-                                            </button>
+                                                className="!static !inset-auto !translate-x-0 scale-125 hover:!scale-[1.35] active:!scale-110"
+                                            />
                                         </div>
                                     </div>
                                     <div className="px-1 text-center md:text-left">
@@ -189,9 +210,14 @@ export default function ArtistDetailView({
                                             {/* Artist Name */}
                                             {album.artist}
                                         </div>
-                                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5">
-                                            {/* Year on new line */}
-                                            {album.songs[0]?.year || "Unknown Year"}
+                                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
+                                            <span>{album.songs[0]?.year || "Unknown Year"}</span>
+                                            {album.songs[0]?.genre && (
+                                                <>
+                                                    <span>•</span>
+                                                    <span>{album.songs[0]?.genre}</span>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

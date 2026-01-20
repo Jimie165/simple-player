@@ -14,6 +14,9 @@ import PlayerControl from './features/player/PlayerControl';
 
 import { usePlayerStore } from './store/usePlayerStore';
 import type { PageId } from './types/index';
+import SearchResultsView from './features/search/SearchResultsView';
+import PlaylistsRoot from './features/playlists/PlaylistsRoot';
+import { useQueuePersistence } from './hooks/useQueuePersistence';
 
 function App() {
   useTheme();
@@ -33,6 +36,9 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [history, setHistory] = useState<PageId[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useQueuePersistence(); // Activate queue persistence
 
   const metadata = usePlayerStore((state) => state.metadata);
 
@@ -50,6 +56,11 @@ function App() {
     setHistory((prev) => [...prev, currentPage]);
     setCurrentPage(target);
     if (isFullScreen) setIsFullScreen(false);
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    handleNavigate('search');
   };
 
   const handleBack = () => {
@@ -79,6 +90,8 @@ function App() {
       case 'home': return <MusicGrid />;
       case 'library': return <Library />;
       case 'settings': return <Settings />;
+      case 'search': return <SearchResultsView query={searchQuery} />;
+      case 'playlists': return <PlaylistsRoot />;
       default: return null;
     }
   };
@@ -100,6 +113,7 @@ function App() {
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             canGoBack={history.length > 0 || isStoreCanGoBack}
             onBack={handleBack}
+            onSearch={handleSearch}
           />
 
           <div className="flex flex-1 flex-col min-w-0 bg-white dark:bg-[#272727] rounded-tl-xl border-l border-t border-neutral-200/50 dark:border-neutral-700/30 overflow-hidden shadow-sm relative">

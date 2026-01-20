@@ -1,20 +1,40 @@
+import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { IoMusicalNotes } from 'react-icons/io5';
 import type { SongMetadata } from '../../types';
+import { resolveCover } from '../../utils/cover';
 
 interface NowPlayingViewProps {
     metadata: SongMetadata | null;
 }
 
 export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
-    const hasCover = !!metadata?.cover;
+    const [coverUrl, setCoverUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const loadCover = async () => {
+            if (!metadata) {
+                setCoverUrl(null);
+                return;
+            }
+            const url = await resolveCover(metadata);
+            if (isMounted) {
+                setCoverUrl(url);
+            }
+        };
+
+        loadCover();
+        return () => { isMounted = false; };
+    }, [metadata]);
+
+    const hasCover = !!coverUrl;
 
     return (
-        // 修改点：去掉了 bg-white/50 中的 /50，改为纯色 bg-white
-        // 同时也确认暗色模式是实心的 dark:bg-[#121212]
         <div className="relative flex-1 w-full h-full overflow-hidden bg-white dark:bg-[#121212]">
 
-            {/* 顶部拖动区域 (保持不变) */}
+            {/* 顶部拖动区域 */}
             <div
                 data-tauri-drag-region
                 className="absolute top-0 left-0 right-0 h-14 z-50"
@@ -24,19 +44,11 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
             <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
                 {hasCover ? (
                     <div className="absolute inset-0 scale-105">
-                        {/* 这里的逻辑是：
-                底层是实心的 bg-white/bg-[#121212] (父容器)
-                上面盖一张图片，图片本身有 opacity-60。
-                
-                结果：用户看到的是 60% 的图片 + 40% 的实心背景色混合。
-                因为底层是实心的，所以侧边栏再也不会透出来了。
-             */}
                         <img
-                            src={metadata!.cover!}
+                            src={coverUrl!}
                             alt="Background"
                             className="w-full h-full object-cover blur-[60px] opacity-60 dark:opacity-40 transition-all duration-700"
                         />
-                        {/* 渐变遮罩保持不变 */}
                         <div className="absolute inset-0 bg-gradient-to-t from-white/80 via-transparent to-white/30 dark:from-[#121212] dark:via-transparent dark:to-black/20" />
                     </div>
                 ) : (
@@ -44,7 +56,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
                 )}
             </div>
 
-            {/* 内容层 (保持不变) */}
+            {/* 内容层 */}
             <div className="absolute inset-0 z-10 flex items-end p-8 pb-12 sm:p-12 sm:pb-16">
                 <div className="relative group animate-in fade-in slide-in-from-bottom-12 zoom-in-95 duration-700 ease-out">
                     <div className={clsx(
@@ -53,7 +65,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
                         "bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center"
                     )}>
                         {hasCover ? (
-                            <img src={metadata!.cover!} alt="Album Art" className="w-full h-full object-cover" />
+                            <img src={coverUrl!} alt="Album Art" className="w-full h-full object-cover" />
                         ) : (
                             <IoMusicalNotes className="text-6xl text-neutral-400" />
                         )}

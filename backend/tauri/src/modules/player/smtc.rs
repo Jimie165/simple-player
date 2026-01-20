@@ -23,11 +23,29 @@ pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows:
     music_props.SetAlbumTitle(&HSTRING::from(&meta.album))?;
 
     // 4. 设置封面
+    let mut thumbnail_set = false;
+
+    // A. 尝试 Base64 (旧兼容)
     if let Some(cover_base64) = &meta.cover {
         if let Some(stream_ref) = base64_to_stream_ref(cover_base64) {
             props.SetThumbnail(&stream_ref)?;
+            thumbnail_set = true;
         }
-    } else {
+    } 
+    
+    // B. 尝试文件路径 (如果未设置)
+    if !thumbnail_set {
+        if let Some(path) = &meta.cover_path {
+            if let Ok(bytes) = std::fs::read(path) {
+                if let Some(stream_ref) = bytes_to_stream_ref(&bytes) {
+                    props.SetThumbnail(&stream_ref)?;
+                    thumbnail_set = true;
+                }
+            }
+        }
+    }
+
+    if !thumbnail_set {
         props.SetThumbnail(None)?;
     }
 
@@ -48,16 +66,21 @@ fn base64_to_stream_ref(data_uri: &str) -> Option<RandomAccessStreamReference> {
         .decode(base64_data)
         .ok()?;
 
-    // 3. 写入内存流
+    bytes_to_stream_ref(&bytes)
+}
+
+/// 将字节数组转为 Windows RandomAccessStreamReference
+fn bytes_to_stream_ref(bytes: &[u8]) -> Option<RandomAccessStreamReference> {
+    // 1. 写入内存流
     let stream = InMemoryRandomAccessStream::new().ok()?;
     let writer = DataWriter::CreateDataWriter(&stream.GetOutputStreamAt(0).ok()?).ok()?;
 
-    writer.WriteBytes(&bytes).ok()?;
+    writer.WriteBytes(bytes).ok()?;
     writer.StoreAsync().ok()?;
     writer.FlushAsync().ok()?;
     writer.DetachStream().ok()?;
 
-    // 4. 创建引用
+    // 2. 创建引用
     stream.Seek(0).ok()?;
     RandomAccessStreamReference::CreateFromStream(&stream).ok()
 }

@@ -12,17 +12,17 @@ interface SidebarProps {
     onToggle: () => void;
     canGoBack: boolean;
     onBack: () => void;
+    onSearch: (query: string) => void;
 }
 
 const navItems: NavItem[] = [
     { id: 'home', icon: MdHomeFilled, label: '主页' },
     { id: 'library', icon: MdLibraryMusic, label: '音乐库' },
     { id: 'videos', icon: MdVideoLibrary, label: '视频库' },
-    { id: 'queue', icon: MdQueueMusic, label: '播放队列' },
     { id: 'playlists', icon: MdFeaturedPlayList, label: '播放列表' },
 ];
 
-export default function Sidebar({ activeId, onNavigate, collapsed, onToggle, canGoBack, onBack }: SidebarProps) {
+export default function Sidebar({ activeId, onNavigate, collapsed, onToggle, canGoBack, onBack, onSearch }: SidebarProps) {
     return (
         <div
             className={clsx(
@@ -44,6 +44,7 @@ export default function Sidebar({ activeId, onNavigate, collapsed, onToggle, can
                 <SidebarSearch
                     collapsed={collapsed}
                     onToggle={onToggle}
+                    onSearch={onSearch}
                 />
             </div>
 

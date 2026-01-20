@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     IoPlayCircle, IoPauseCircle, IoPlaySkipBack, IoPlaySkipForward,
-    IoShuffle, IoRepeat
 } from 'react-icons/io5';
+import { MdShuffle, MdRepeat } from 'react-icons/md';
 import clsx from 'clsx';
+import { listen } from '@tauri-apps/api/event';
 // Store & Services
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -124,6 +125,37 @@ export default function PlaybackControls() {
         }
     }, [repeatMode]);
 
+    // --- 监听 SMTC 事件（Windows 媒体控制按钮）---
+    const handleNextRef = useRef(handleNext);
+    const handlePrevRef = useRef(handlePrev);
+
+    // 保持 ref 更新
+    useEffect(() => {
+        handleNextRef.current = handleNext;
+        handlePrevRef.current = handlePrev;
+    });
+
+    useEffect(() => {
+        let unlistenNext: (() => void) | undefined;
+        let unlistenPrev: (() => void) | undefined;
+
+        const setupListeners = async () => {
+            unlistenNext = await listen('smtc:next', () => {
+                handleNextRef.current();
+            });
+            unlistenPrev = await listen('smtc:previous', () => {
+                handlePrevRef.current();
+            });
+        };
+
+        setupListeners();
+
+        return () => {
+            unlistenNext?.();
+            unlistenPrev?.();
+        };
+    }, []);
+
     // --- 自动播放监听 ---
     useEffect(() => {
         let interval: number;
@@ -201,7 +233,7 @@ export default function PlaybackControls() {
                                 : "text-neutral-400 dark:text-neutral-500"
                         )}
                     >
-                        <IoShuffle />
+                        <MdShuffle />
                     </button>
                 </CustomTooltip>
 
@@ -213,8 +245,17 @@ export default function PlaybackControls() {
                 </CustomTooltip>
 
                 {/* 播放/暂停 */}
-                <CustomTooltip text={isPlaying ? "暂停" : "播放"}>
-                    <button onClick={togglePlay} className="text-5xl text-blue-600 hover:scale-105 active:scale-95 transition-transform drop-shadow-md">
+                <CustomTooltip text={!metadata ? "没有歌曲" : (isPlaying ? "暂停" : "播放")}>
+                    <button
+                        onClick={metadata ? togglePlay : undefined}
+                        disabled={!metadata}
+                        className={clsx(
+                            "text-5xl transition-transform drop-shadow-md",
+                            metadata
+                                ? "text-blue-600 hover:scale-105 active:scale-95 cursor-pointer"
+                                : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
+                        )}
+                    >
                         {isPlaying ? <IoPauseCircle /> : <IoPlayCircle />}
                     </button>
                 </CustomTooltip>
@@ -240,7 +281,7 @@ export default function PlaybackControls() {
                                 : "text-neutral-400 dark:text-neutral-500"
                         )}
                     >
-                        <IoRepeat />
+                        <MdRepeat />
                         {repeatMode === 'one' && (
                             <span className="absolute top-1.5 right-1.5 text-[8px] font-bold leading-none">1</span>
                         )}
@@ -255,7 +296,10 @@ export default function PlaybackControls() {
                     <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-all group-hover:h-1.5"></div>
                     <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-blue-600 rounded-full pointer-events-none transition-all group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
                     <div className="absolute top-1/2 -ml-1.5 h-3 w-3 bg-blue-600 rounded-full shadow-sm pointer-events-none transition-transform group-hover:scale-125 -translate-y-1/2" style={{ left: `${progressPercent}%` }} />
-                    <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />
+                    {/* 只有在有歌曲时才允许拖动进度条 */}
+                    {metadata && (
+                        <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />
+                    )}
                 </div>
                 <span className="w-8 tabular-nums">{formatTime(metadata?.duration || 0)}</span>
             </div>

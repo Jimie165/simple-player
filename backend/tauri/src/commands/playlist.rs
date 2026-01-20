@@ -38,6 +38,17 @@ pub fn add_to_playlist(db: State<'_, DbState>, playlist_id: i64, song_id: i64) -
     PlaylistRepo::add_song(&conn, playlist_id, song_id).map_err(|e| e.to_string())
 }
 
+/// 批量添加歌曲到播放列表
+#[tauri::command]
+pub fn batch_add_to_playlist(
+    db: State<'_, DbState>,
+    playlist_id: i64,
+    song_ids: Vec<i64>,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    PlaylistRepo::batch_add_songs(&conn, playlist_id, &song_ids).map_err(|e| e.to_string())
+}
+
 /// 从播放列表移除歌曲
 #[tauri::command]
 pub fn remove_from_playlist(db: State<'_, DbState>, playlist_id: i64, song_id: i64) -> Result<(), String> {
