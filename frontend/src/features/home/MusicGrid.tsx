@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
-import { IoFolderOpen } from 'react-icons/io5';
+import clsx from 'clsx';
+import { IoFolderOpen, IoCheckbox, IoSquareOutline } from 'react-icons/io5';
 import PageContainer from '../../components/layout/PageContainer';
 import OpenFileMenu from './components/OpenFileMenu';
 import EmptyState from './components/EmptyState';
 import InfoDialog from '../../components/common/InfoDialog';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useSelectionStore } from '../../store/useSelectionStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { fileService } from '../../services/fileService';
@@ -31,6 +33,7 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
     const { push } = useNavigationStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
 
     // 属性对话框状态
     const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
@@ -83,7 +86,17 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     };
 
     // Core: Handle Recent Item Click
-    const handleItemClick = async (item: RecentItem) => {
+    const handleItemClick = async (item: RecentItem, e?: React.MouseEvent) => {
+        const id = item.id;
+
+        // Selection Mode Logic
+        if (isSelectionMode) {
+            e?.stopPropagation();
+            toggleSelection(id, item.type, item);
+            return;
+        }
+
+        // Normal Playback Logic
         if (item.type === 'folder') {
             try {
                 const songs = await fileService.readFolder(item.path);
@@ -351,67 +364,92 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                     <EmptyState />
                 ) : (
                     <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
-                        {recentHistory.map((item) => (
-                            <div
-                                key={item.id}
-                                className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                                onClick={() => handleItemClick(item)}
-                                onContextMenu={(e) => handleContextMenu(e, item)}
-                            >
-                                <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
-                                    {item.type === 'folder' ? (
-                                        <IoFolderOpen className="text-6xl text-blue-400 opacity-80" />
-                                    ) : (
-                                        <CoverImage
-                                            // Construct a minimal SongMetadata for CoverImage
-                                            song={{
-                                                title: item.title,
-                                                artist: item.artist || '',
-                                                album: '',
-                                                duration: 0,
-                                                path: item.path,
-                                                cover: item.cover,
-                                                cover_path: item.cover_path
-                                            }}
-                                            className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
-                                            iconClassName="text-6xl opacity-50"
-                                        />
-                                    )}
+                        {recentHistory.map((item) => {
+                            const isSelected = selectedIds.has(item.id);
 
-                                    {/* 交互遮罩 */}
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                        {/* Play Button */}
-                                        <CardPlayButton onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
+                            return (
+                                <div
+                                    key={item.id}
+                                    className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
+                                    onClick={(e) => handleItemClick(item, e)}
+                                    onContextMenu={(e) => handleContextMenu(e, item)}
+                                >
+                                    <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
+                                        {item.type === 'folder' ? (
+                                            <IoFolderOpen className="text-6xl text-blue-400 opacity-80" />
+                                        ) : (
+                                            <CoverImage
+                                                // Construct a minimal SongMetadata for CoverImage
+                                                song={{
+                                                    title: item.title,
+                                                    artist: item.artist || '',
+                                                    album: '',
+                                                    duration: 0,
+                                                    path: item.path,
+                                                    cover: item.cover,
+                                                    cover_path: item.cover_path
+                                                }}
+                                                className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+                                                iconClassName="text-6xl opacity-50"
+                                            />
+                                        )}
 
-                                        {/* Menu Button */}
-                                        <MusicContextMenu
-                                            className="absolute bottom-3 right-3"
-                                            buttonClassName="w-10 h-10"
-                                            type={getMusicType(item)}
-                                            onPlay={() => handleItemClick(item)}
-                                            onAddToQueue={() => handleJoinQueue(item)}
-                                            // Only show AddToPlaylist if it's a library item (Album or Song in Library)
-                                            onAddToPlaylist={(item.type === 'album' || (item.type === 'file' && item.isLibraryItem)) ? () => { console.log('Add to playlist', item) } : undefined}
-                                            onShowProperties={item.type === 'file' ? () => handleShowProperties(item) : undefined}
-                                            onShowAlbum={item.type === 'file' || item.type === 'album' ? () => handleNavigateToAlbum(item) : undefined}
-                                            onShowArtist={item.artist && (item.type === 'file' || item.type === 'album') ? () => handleNavigateToArtist(item) : undefined}
-                                            onDelete={() => handleDeleteClick(item)}
-                                            deleteText="删除"
-                                            onOpen={() => setContextMenu(null)}
-                                        />
+                                        {/* Selection Checkbox Overlay */}
+                                        {isSelectionMode && (
+                                            <div className="absolute top-2 left-2 z-20">
+                                                <div
+                                                    onClick={(e) => { e.stopPropagation(); toggleSelection(item.id, item.type, item); }}
+                                                    className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
+                                                >
+                                                    {isSelected
+                                                        ? <IoCheckbox className="text-primary text-xl" />
+                                                        : <IoSquareOutline className="text-neutral-700 text-xl" />
+                                                    }
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 交互遮罩 - In Selection Mode, disable hover effects related to play */}
+                                        {!isSelectionMode && (
+                                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                {/* Play Button */}
+                                                <CardPlayButton onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
+
+                                                {/* Menu Button */}
+                                                <MusicContextMenu
+                                                    className="absolute bottom-3 right-3"
+                                                    buttonClassName="w-10 h-10"
+                                                    type={getMusicType(item)}
+                                                    onPlay={() => handleItemClick(item)}
+                                                    onAddToQueue={() => handleJoinQueue(item)}
+                                                    // Only show AddToPlaylist if it's a library item (Album or Song in Library)
+                                                    onAddToPlaylist={(item.type === 'album' || (item.type === 'file' && item.isLibraryItem)) ? () => { console.log('Add to playlist', item) } : undefined}
+                                                    onShowProperties={item.type === 'file' ? () => handleShowProperties(item) : undefined}
+                                                    onShowAlbum={item.type === 'file' || item.type === 'album' ? () => handleNavigateToAlbum(item) : undefined}
+                                                    onShowArtist={item.artist && (item.type === 'file' || item.type === 'album') ? () => handleNavigateToArtist(item) : undefined}
+                                                    onDelete={() => handleDeleteClick(item)}
+                                                    deleteText="删除"
+                                                    onSelect={() => toggleSelectionMode({ id: item.id, type: item.type, data: item })}
+                                                    onOpen={() => setContextMenu(null)}
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col gap-0.5 px-1">
+                                        <span className={clsx(
+                                            "truncate text-base font-semibold",
+                                            isSelected ? "text-primary" : "text-neutral-900 dark:text-neutral-50"
+                                        )} title={item.title}>
+                                            {item.title}
+                                        </span>
+                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={item.description}>
+                                            {item.description}
+                                        </span>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-col gap-0.5 px-1">
-                                    <span className="truncate text-base font-semibold text-neutral-900 dark:text-neutral-50" title={item.title}>
-                                        {item.title}
-                                    </span>
-                                    <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={item.description}>
-                                        {item.description}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 )}
 
@@ -431,7 +469,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                             onShowAlbum: contextMenu.item.type === 'file' || contextMenu.item.type === 'album' ? () => handleNavigateToAlbum(contextMenu.item) : undefined,
                             onShowArtist: contextMenu.item.artist && (contextMenu.item.type === 'file' || contextMenu.item.type === 'album') ? () => handleNavigateToArtist(contextMenu.item) : undefined,
                             onDelete: () => handleDeleteClick(contextMenu.item),
-                            deleteText: "删除"
+                            deleteText: "删除",
+                            onSelect: () => toggleSelectionMode({ id: contextMenu.item.id, type: contextMenu.item.type, data: contextMenu.item })
                         })}
                     />
                 )}

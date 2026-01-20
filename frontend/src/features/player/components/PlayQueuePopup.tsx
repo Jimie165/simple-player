@@ -1,18 +1,30 @@
+import { useState } from 'react';
 import clsx from 'clsx';
-import { IoMusicalNotes, IoPlay } from 'react-icons/io5';
+import { IoMusicalNotes, IoPlay, IoRemoveCircleOutline } from 'react-icons/io5';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
+import { useNavigationStore } from '../../../store/useNavigationStore';
 import { audioService } from '../../../services/audioService';
-import type { SongMetadata } from '../../../types'; // 引入类型
+import type { SongMetadata } from '../../../types';
+import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
+import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import InfoDialog from '../../../components/common/InfoDialog';
 
 interface PlayQueuePopupProps {
     show: boolean;
 }
 
 export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
-    // playlist 现在是 SongMetadata[] 类型
-    const { playlist, currentSongIndex, setCurrentSongIndex } = useLibraryStore();
+    const { playlist, currentSongIndex, setCurrentSongIndex, removeSongFromPlaylist, addToNext } = useLibraryStore();
     const { setMetadata, setIsPlaying } = usePlayerStore();
+    const { push } = useNavigationStore();
+
+    // Context menu state
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
+
+    // Properties dialog state
+    const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
+    const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
 
     const handlePlay = async (song: SongMetadata, index: number) => {
         if (!song.path) return;
@@ -26,6 +38,35 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         }
     };
 
+    const handleRemoveFromQueue = (song: SongMetadata) => {
+        if (song.path) {
+            removeSongFromPlaylist(song.path);
+        }
+    };
+
+    const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setContextMenu({ x: e.clientX, y: e.clientY, song, index });
+    };
+
+    const handleShowProperties = (song: SongMetadata) => {
+        setPropertySong(song);
+        setIsPropertiesOpen(true);
+    };
+
+    const handleShowAlbum = (song: SongMetadata) => {
+        if (song.album) {
+            push({ type: 'album_detail', data: { name: song.album } });
+        }
+    };
+
+    const handleShowArtist = (song: SongMetadata) => {
+        if (song.artist) {
+            push({ type: 'artist_detail', data: { name: song.artist } });
+        }
+    };
+
     return (
         <div className={clsx(
             "absolute bottom-full right-0 mb-4 w-80 max-h-96 rounded-2xl shadow-xl border overflow-hidden flex flex-col",
@@ -33,6 +74,13 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
             "transition-all duration-200 origin-bottom-right z-[60]",
             show ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible pointer-events-none"
         )}>
+            {/* Properties Dialog */}
+            <InfoDialog
+                isOpen={isPropertiesOpen}
+                onClose={() => setIsPropertiesOpen(false)}
+                song={propertySong}
+            />
+
             {/* 标题 */}
             <div className="p-4 border-b border-neutral-200/50 dark:border-neutral-700/50 bg-neutral-50/50 dark:bg-white/5">
                 <h3 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100">播放队列</h3>
@@ -56,6 +104,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                 <div
                                     key={index}
                                     onDoubleClick={() => handlePlay(song, index)}
+                                    onContextMenu={(e) => handleContextMenu(e, song, index)}
                                     className={clsx(
                                         "group flex items-center gap-3 p-2 rounded-lg text-xs cursor-default transition-colors",
                                         isCurrent
@@ -68,10 +117,28 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                     </div>
 
                                     <div className="flex-1 flex flex-col min-w-0">
-                                        {/* 显示标题 */}
                                         <span className="truncate font-medium">{song.title || "Unknown Title"}</span>
-                                        {/* 显示艺人 */}
                                         <span className="truncate text-[10px] opacity-70">{song.artist || "Unknown Artist"}</span>
+                                    </div>
+
+                                    {/* Three dots menu button */}
+                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                        <MusicContextMenu
+                                            type="song"
+                                            variant="clean"
+                                            buttonClassName="w-6 h-6"
+                                            onPlay={() => handlePlay(song, index)}
+                                            onAddToQueue={() => addToNext(song)}
+                                            onAddToPlaylist={() => console.log('Add to playlist', song)}
+                                            onShowProperties={() => handleShowProperties(song)}
+                                            onShowAlbum={song.album ? () => handleShowAlbum(song) : undefined}
+                                            onShowArtist={song.artist ? () => handleShowArtist(song) : undefined}
+                                            onDelete={() => handleRemoveFromQueue(song)}
+                                            deleteText="从播放队列移除"
+                                            deleteIcon={IoRemoveCircleOutline}
+                                            deleteVariant="default"
+                                            hideSelect
+                                        />
                                     </div>
                                 </div>
                             );
@@ -79,6 +146,29 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                     </div>
                 )}
             </div>
+
+            {/* Right-click Context Menu */}
+            {contextMenu && (
+                <CursorContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    menuGroups={getMusicMenuGroups({
+                        type: 'song',
+                        onPlay: () => handlePlay(contextMenu.song, contextMenu.index),
+                        onAddToQueue: () => addToNext(contextMenu.song),
+                        onAddToPlaylist: () => console.log('Add to playlist', contextMenu.song),
+                        onShowProperties: () => handleShowProperties(contextMenu.song),
+                        onShowAlbum: contextMenu.song.album ? () => handleShowAlbum(contextMenu.song) : undefined,
+                        onShowArtist: contextMenu.song.artist ? () => handleShowArtist(contextMenu.song) : undefined,
+                        onDelete: () => handleRemoveFromQueue(contextMenu.song),
+                        deleteText: "从播放队列移除",
+                        deleteIcon: IoRemoveCircleOutline,
+                        deleteVariant: 'default',
+                        hideSelect: true
+                    })}
+                />
+            )}
         </div>
     );
 }

@@ -26,7 +26,7 @@ export default function OpenFileMenu({ onOpenFile, onOpenFolder }: OpenFileMenuP
 
             <MenuItems
                 transition
-                className="absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100 rounded-lg bg-white dark:bg-[#2c2c2c] shadow-xl ring-1 ring-black/5 focus:outline-none border border-neutral-200 dark:border-neutral-700 z-50 transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+                className="absolute right-0 mt-2 w-48 origin-top-right divide-y divide-gray-100/50 rounded-xl bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl shadow-2xl ring-1 ring-black/5 focus:outline-none border border-neutral-200/50 dark:border-neutral-700/50 z-50 transition duration-100 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
             >
                 <div className="p-1">
                     <MenuItem>

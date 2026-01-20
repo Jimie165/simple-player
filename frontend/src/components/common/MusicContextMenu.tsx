@@ -47,8 +47,7 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
             id: 'add-to',
             label: '添加到',
             icon: IoAdd,
-            onClick: props.onAddToPlaylist,
-            suffix: <span className="text-xs opacity-50">&gt;</span>
+            onClick: props.onAddToPlaylist
         });
     }
     if (group1.length > 0) groups.push(group1);
@@ -69,27 +68,34 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
     }
     if (group2.length > 0) groups.push(group2);
 
-    // Group 3: Danger
+    // Group 3: Delete / Remove
     const group3: MusicMenuItemData[] = [];
     if (props.onDelete) {
+        // Use custom icon if provided, otherwise default based on context
+        const deleteIcon = props.deleteIcon || IoTrash;
+        // Use custom variant if provided, default to 'danger' for delete, 'default' for remove
+        const deleteVariant = props.deleteVariant !== undefined ? props.deleteVariant : 'danger';
         group3.push({
             id: 'delete',
             label: props.deleteText || "删除",
-            icon: IoTrash,
+            icon: deleteIcon,
             onClick: props.onDelete,
-            variant: 'danger'
+            variant: deleteVariant
         });
     }
     if (group3.length > 0) groups.push(group3);
 
     // Group 4: Select
     // Always show Select if handler provided (User request: "Folder... Play, Queue, Delete, Select")
-    groups.push([{
-        id: 'select',
-        label: '选择',
-        icon: IoCheckboxOutline,
-        onClick: props.onSelect || (() => { })
-    }]);
+    // Unless hideSelect is true (e.g., in play queue)
+    if (!props.hideSelect) {
+        groups.push([{
+            id: 'select',
+            label: '选择',
+            icon: IoCheckboxOutline,
+            onClick: props.onSelect || (() => { })
+        }]);
+    }
 
     return groups;
 };
@@ -104,7 +110,10 @@ interface MusicContextMenuProps {
     onShowArtist?: () => void;
     onDelete?: () => void;
     deleteText?: string;
+    deleteIcon?: React.ElementType; // Custom icon for delete/remove
+    deleteVariant?: 'danger' | 'default'; // Style variant for delete button
     onSelect?: () => void;
+    hideSelect?: boolean; // Hide the Select option (e.g., in play queue)
     onOpen?: () => void; // New prop for notifying when menu is opened
     className?: string; // Wrapper class customization
     buttonClassName?: string; // Button class customization
@@ -132,7 +141,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                     transition
                     portal
                     anchor="bottom end"
-                    className="w-56 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[100] pointer-events-auto"
+                    className="w-56 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[100] pointer-events-auto"
                 >
                     {menuGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>

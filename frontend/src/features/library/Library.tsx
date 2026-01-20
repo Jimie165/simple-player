@@ -38,21 +38,28 @@ export default function Library() {
 
     // Sort logic
     const [albumSortKey, setAlbumSortKey] = useState<'name' | 'artist'>('name');
+    // Store Actions
+    // Store Actions
+    const { addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, libraryVersion } = useLibraryStore();
+    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { push } = useNavigationStore();
+
+    // Local State
     const [librarySongs, setLibrarySongs] = useState<SongMetadata[]>([]);
 
-    const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
-    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList } = useLibraryStore();
+    // Filtered & Sorted Logic
+    // ...
 
-
-    // Use Global Navigation Store for Details
-    const { push } = useNavigationStore();
+    useEffect(() => {
+        refreshLibrary();
+    }, [libraryVersion]);
 
     const refreshLibrary = async () => {
         try {
-            const songs = await libraryService.refreshLibrary();
+            const songs = await libraryService.getLibrarySongs();
             setLibrarySongs(songs);
-        } catch (e) {
-            console.error("Failed to scan library", e);
+        } catch (error) {
+            console.error('Failed to load library:', error);
         }
     };
 
@@ -336,7 +343,7 @@ export default function Library() {
                             </MenuButton>
                             <MenuItems
                                 anchor="bottom end"
-                                className="w-40 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white z-50 mt-2"
+                                className="w-40 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white z-50 mt-2"
                             >
                                 <MenuItem>
                                     <button onClick={() => setAlbumSortKey('name')} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">

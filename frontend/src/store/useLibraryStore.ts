@@ -32,6 +32,10 @@ interface LibraryState {
     addToPlaylist: (song: SongMetadata) => void;
     // Add to Next (Insert after current song)
     addToNext: (song: SongMetadata) => void;
+
+    // Library Version for Sync
+    libraryVersion: number;
+    triggerLibraryUpdate: () => void;
 }
 
 export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
@@ -202,6 +206,9 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             originalPlaylist: newOriginal
         };
     }),
+
+    libraryVersion: 0,
+    triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
 }), {
     name: 'library-store',
     partialize: (state) => ({ recentHistory: state.recentHistory }),

@@ -178,7 +178,7 @@ impl SongRepo {
 
     /// 获取所有活跃歌曲
     pub fn get_all(conn: &Connection) -> Result<Vec<Song>> {
-        let sql = format!("SELECT {} FROM songs WHERE status = 'active' ORDER BY title", Self::SELECT_COLUMNS);
+        let sql = format!("SELECT {} FROM songs WHERE status = 'active' ORDER BY created_at DESC", Self::SELECT_COLUMNS);
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
             .query_map([], Self::map_row)?
