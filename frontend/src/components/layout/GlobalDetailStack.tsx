@@ -12,7 +12,7 @@ import type { SongMetadata } from '../../types';
 import { useSelectionStore } from '../../store/useSelectionStore';
 
 export default function GlobalDetailStack() {
-    const { overlayStack, push } = useNavigationStore();
+    const { overlayStack, push, pop } = useNavigationStore();
     const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList, originalPlaylist, playlist } = useLibraryStore();
     const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
 
@@ -112,8 +112,8 @@ export default function GlobalDetailStack() {
                     case 'playlist_detail':
                         const plData = activeView.data as { id: number | 'favorites', name: string };
                         return (
-                            <div className="h-full bg-surface dark:bg-surface-container-low">
-                                <PlaylistDetail id={plData.id} name={plData.name} />
+                            <div className="h-full">
+                                <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
                             </div>
                         );
                     default:

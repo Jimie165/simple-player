@@ -24,7 +24,13 @@ import AddToPlaylistSheet from './features/playlists/components/AddToPlaylistShe
 
 function App() {
   useTheme();
-  const { hasOverlay, pop: storePop } = useNavigationStore();
+  const {
+    currentPage,
+    mainHistory,
+    hasOverlay,
+    navigate: storeNavigate,
+    goBack: storeGoBack
+  } = useNavigationStore();
 
   useEffect(() => {
     const handleContextMenu = (e: MouseEvent) => {
@@ -36,10 +42,8 @@ function App() {
     };
   }, []);
 
-  const [currentPage, setCurrentPage] = useState<PageId>('home');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
-  const [history, setHistory] = useState<PageId[]>([]);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -60,18 +64,10 @@ function App() {
 
   const handleNavigate = (page: string) => {
     const target = page as PageId;
-    if (target === currentPage) return;
-
-    setHistory((prev) => [...prev, currentPage]);
-    setCurrentPage(target);
+    storeNavigate(target);
 
     // Clear selection mode when switching pages
     useSelectionStore.getState().clearSelection();
-
-    // Clear Global Overlays when switching main tabs
-    if (hasOverlay) {
-      useNavigationStore.getState().reset();
-    }
 
     if (isFullScreen) setIsFullScreen(false);
   };
@@ -82,31 +78,21 @@ function App() {
   };
 
   const handleBack = () => {
-    // If in selection mode, the back button should cancel selection first
-    if (useSelectionStore.getState().isSelectionMode) {
-      useSelectionStore.getState().clearSelection();
-      return;
-    }
+    storeGoBack(() => {
+      // Priority 1: Selection Mode
+      if (useSelectionStore.getState().isSelectionMode) {
+        useSelectionStore.getState().clearSelection();
+        return true;
+      }
 
-    if (isFullScreen) {
-      setIsFullScreen(false);
-      return;
-    }
+      // Priority 2: Full Screen
+      if (isFullScreen) {
+        setIsFullScreen(false);
+        return true;
+      }
 
-    // Priority 1: Global Overlay Store (Album/Artist Details)
-    if (hasOverlay) {
-      storePop();
-      return;
-    }
-
-    // Priority 2: App Page History
-    if (history.length === 0) return;
-    const newHistory = [...history];
-    const prevPage = newHistory.pop();
-    if (prevPage) {
-      setHistory(newHistory);
-      setCurrentPage(prevPage);
-    }
+      return false; // Continue to pop overlays/history
+    });
   };
 
   const renderContent = () => {
@@ -155,7 +141,7 @@ function App() {
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-            canGoBack={history.length > 0 || hasOverlay}
+            canGoBack={mainHistory.length > 0 || hasOverlay || isFullScreen}
             onBack={handleBack}
             onSearch={handleSearch}
             isOverlay={isSidebarOverlay}

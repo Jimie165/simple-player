@@ -83,7 +83,7 @@ export default function SongListView({
     });
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, deselectItem } = useSelectionStore();
     const { toggleFavorite } = useLibraryStore();
 
     // Handle Select All Request
@@ -112,7 +112,10 @@ export default function SongListView({
         e.preventDefault();
 
         const id = song.id ? song.id.toString() : song.path;
-        const isMultiSelecting = isSelectionMode && id && selectedIds.has(id) && selectedIds.size > 1;
+        const isSelected = id ? selectedIds.has(id) : false;
+
+        // Multi-select context menu only if we clicked on one of the ALREADY selected items
+        const isMultiSelecting = isSelectionMode && isSelected && selectedIds.size > 1;
 
         if (isMultiSelecting) {
             // Get all selected songs
@@ -124,10 +127,6 @@ export default function SongListView({
 
             setContextMenu({ x: e.clientX, y: e.clientY, type: 'batch', songs: selectedSongs });
         } else {
-            // If clicking unselected item in selection mode, maybe we should select it? 
-            // Common behavior: Right click on unselected item selects it exclusively (or just operates on it).
-            // Since we want "operate on single", we just pass it as single. 
-            // Logic in MusicContextMenu ensures that if we are in Select Mode, we can also see Select options.
             setContextMenu({ x: e.clientX, y: e.clientY, type: 'single', song, index });
         }
     };
@@ -220,7 +219,13 @@ export default function SongListView({
             if (valB === undefined || valB === null) valB = '';
 
             if (typeof valA === 'string' && typeof valB === 'string') {
-                // Use zh-CN locale for proper Chinese character sorting
+                // Check if starts with English/Number (Ascii 0-127)
+                const isAsciiA = /^[\x00-\x7F]/.test(valA);
+                const isAsciiB = /^[\x00-\x7F]/.test(valB);
+
+                if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
+                if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;
+
                 return sortOrder === 'asc'
                     ? valA.localeCompare(valB, 'zh-CN', { numeric: true, sensitivity: 'base' })
                     : valB.localeCompare(valA, 'zh-CN', { numeric: true, sensitivity: 'base' });
@@ -294,6 +299,7 @@ export default function SongListView({
 
     const handleItemClick = (e: React.MouseEvent, song: SongMetadata) => {
         e.stopPropagation();
+        if (e.button !== 0) return; // Only allow left click
 
         // Use ID if available, else path
         const id = song.id ? song.id.toString() : song.path;
@@ -500,6 +506,7 @@ export default function SongListView({
                                     isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                                 )}
                                 onDoubleClick={(e) => e.stopPropagation()}
+                                onClick={(e) => e.stopPropagation()}
                             >
                                 <MusicContextMenu
                                     onOpen={() => setContextMenu(null)}
@@ -514,7 +521,15 @@ export default function SongListView({
                                     onShowArtist={onOpenArtist && song.artist ? () => onOpenArtist(song.artist!) : undefined}
                                     onDelete={enableDelete && onDelete ? () => handleDeleteClick(song) : undefined}
                                     deleteText="从音乐库删除"
-                                    onSelect={() => toggleSelectionMode({ id: id || '', type: 'song', data: song })}
+                                    onSelect={() => {
+                                        const songId = song.id ? song.id.toString() : song.path || '';
+                                        if (isSelectionMode) {
+                                            toggleSelection(songId, 'song', song);
+                                        } else {
+                                            toggleSelectionMode({ id: songId, type: 'song', data: song });
+                                        }
+                                    }}
+                                    selectText={selectedIds.has(id || '') ? "取消选择" : "选择"}
                                     // Favorites Support
                                     onFavorite={() => toggleFavorite(song)}
                                     isFavorite={song.is_favorite}
@@ -551,6 +566,13 @@ export default function SongListView({
                             onDelete: enableDelete ? () => setBatchConfirmOpen(true) : undefined,
                             deleteText: `从音乐库删除 (${contextMenu.songs.length})`,
                             onFavorite: () => handleBatchFavorite(contextMenu.songs!),
+                            onSelect: () => {
+                                contextMenu.songs?.forEach(s => {
+                                    const sId = s.id ? s.id.toString() : s.path;
+                                    if (sId) deselectItem(sId);
+                                });
+                            },
+                            selectText: `取消选择 (${contextMenu.songs.length})`
                         })
                         :
                         // SINGLE MODE
@@ -564,11 +586,15 @@ export default function SongListView({
                             onShowArtist: onOpenArtist && contextMenu.song!.artist ? () => onOpenArtist(contextMenu.song!.artist!) : undefined, // @ts-ignore
                             onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song!) : undefined,
                             deleteText: "从音乐库删除",
-                            onSelect: () => toggleSelectionMode({ // @ts-ignore
-                                id: contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '',
-                                type: 'song', // @ts-ignore
-                                data: contextMenu.song!
-                            }), // @ts-ignore
+                            onSelect: () => {
+                                const id = contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '';
+                                if (isSelectionMode) {
+                                    toggleSelection(id, 'song', contextMenu.song!); // @ts-ignore
+                                } else {
+                                    toggleSelectionMode({ id, type: 'song', data: contextMenu.song! }); // @ts-ignore
+                                }
+                            }, // @ts-ignore
+                            selectText: selectedIds.has(contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '') ? "取消选择" : "选择",
                             onFavorite: () => toggleFavorite(contextMenu.song!), // @ts-ignore
                             isFavorite: contextMenu.song!.is_favorite
                         })}

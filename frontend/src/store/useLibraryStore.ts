@@ -2,10 +2,18 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { RecentItem, SongMetadata } from '../types/index';
 
+type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
+type SortOrder = 'asc' | 'desc';
+
+interface PlaylistSettings {
+    sortKey: SortKey;
+    sortOrder: SortOrder;
+}
+
 interface LibraryState {
-    // ... 其他状态保持不变
     recentHistory: RecentItem[];
     playHistory: number[];
+    playlistSettings: Record<string, PlaylistSettings>;
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
     currentSongIndex: number;
@@ -39,14 +47,17 @@ interface LibraryState {
 
     // Favorites
     toggleFavorite: (song: SongMetadata) => Promise<void>;
+
+    setPlaylistSettings: (id: string, settings: PlaylistSettings) => void;
+    getPlaylistSettings: (id: string) => PlaylistSettings;
 }
 
 import { libraryService } from '../services/libraryService';
 import { usePlayerStore } from './usePlayerStore'; // Assuming we need to sync player metadata too
 
 export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
-    // ... 前面的状态和函数保持不变 ...
     recentHistory: [],
+    playlistSettings: {},
     playHistory: [],
     playlist: [],
     originalPlaylist: [],
@@ -247,8 +258,23 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         } catch (error) {
             console.error('Failed to toggle favorite', error);
         }
+    },
+
+    setPlaylistSettings: (id, settings) => set((state) => ({
+        playlistSettings: {
+            ...state.playlistSettings,
+            [id]: settings
+        }
+    })),
+
+    getPlaylistSettings: (id) => {
+        const { playlistSettings } = get();
+        return playlistSettings[id] || { sortKey: 'manual', sortOrder: 'asc' };
     }
 }), {
     name: 'library-store',
-    partialize: (state) => ({ recentHistory: state.recentHistory }),
+    partialize: (state) => ({
+        recentHistory: state.recentHistory,
+        playlistSettings: state.playlistSettings
+    }),
 }));

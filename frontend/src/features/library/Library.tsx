@@ -23,19 +23,24 @@ import { useSelectionStore } from '../../store/useSelectionStore';
 import type { SongMetadata } from '../../types';
 
 export default function Library() {
-    // Tab State: Local to Library View
-    // Tab State: Local to Library View, persistent via localStorage
-    const [currentTab, setCurrentTab] = useState<'songs' | 'albums' | 'artists'>(() => {
-        try {
-            const saved = localStorage.getItem('library_active_tab');
-            return (saved === 'songs' || saved === 'albums' || saved === 'artists') ? saved : 'songs';
-        } catch { return 'songs'; }
-    });
+    // Tab State: Synchronized with Navigation Store to support back navigation
+    const { currentTab, setTab } = useNavigationStore();
+
+    // Initial load: restore from localStorage if needed
+    useEffect(() => {
+        const saved = localStorage.getItem('library_active_tab');
+        if (saved && (saved === 'songs' || saved === 'albums' || saved === 'artists')) {
+            // Only set if different from default to avoid unnecessary history entry
+            if (saved !== currentTab && useNavigationStore.getState().mainHistory.length === 0) {
+                setTab(saved);
+            }
+        }
+    }, []);
 
     const handleTabChange = (tab: 'songs' | 'albums' | 'artists') => {
         // Switching tabs should exit selection mode immediately
         useSelectionStore.getState().clearSelection();
-        setCurrentTab(tab);
+        setTab(tab);
         try { localStorage.setItem('library_active_tab', tab); } catch { }
     };
 

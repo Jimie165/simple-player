@@ -35,7 +35,7 @@ export default function PlaylistList() {
     const { push } = useNavigationStore();
     const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToNext } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
-    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
 
     const loadPlaylists = async () => {
         try {
@@ -64,8 +64,8 @@ export default function PlaylistList() {
                 const bTime = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
                 return bTime - aTime;
             }
-            // recently_added (default desc)
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+            // recently_added (基于内容更新时间 desc)
+            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
         });
 
         return list;

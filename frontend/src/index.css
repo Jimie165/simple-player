@@ -102,7 +102,7 @@
   --md-sys-color-error: #FFB4AB;
   --md-sys-color-on-error: #690005;
 
-  --md-sys-color-surface: #111318;
+  --md-sys-color-surface: #09090b; /* Very dark grey, almost black */
   --md-sys-color-on-surface: #E2E2E6;
   --md-sys-color-surface-variant: #44474F;
   --md-sys-color-on-surface-variant: #C4C6D0;
@@ -111,9 +111,9 @@
   --md-sys-color-outline-variant: #44474F;
 
   /* Surface Containers */
-  --md-sys-color-surface-container-lowest: #0C0E13;
-  --md-sys-color-surface-container-low: #191C20;
-  --md-sys-color-surface-container: #1D2024; /* App Background */
+  --md-sys-color-surface-container-lowest: #000000;
+  --md-sys-color-surface-container-low: #101012; 
+  --md-sys-color-surface-container: #121212; /* Standard Material Dark Background */
   --md-sys-color-surface-container-high: #282A2F;
   --md-sys-color-surface-container-highest: #33353A;
 
@@ -172,6 +172,6 @@ body {
 
   /* Gaussian Blur Button Style */
   .btn-blur {
-    @apply bg-glass-surface backdrop-blur-md border border-glass-border shadow-lg active:scale-95 transition-all duration-200;
+    @apply bg-glass-surface backdrop-blur-md border border-glass-border active:scale-95 transition-all duration-200;
   }
 }

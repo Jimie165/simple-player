@@ -1,7 +1,7 @@
 
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
-import { IoPlay, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle, IoCheckboxOutline, IoShuffle, IoPencil, IoHeart, IoHeartOutline, IoRemoveCircleOutline } from 'react-icons/io5';
-import { MdPlaylistPlay } from 'react-icons/md';
+import { IoPlay, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle, IoCheckboxOutline, IoShuffle, IoPencil, IoHeart, IoHeartOutline } from 'react-icons/io5';
+import { MdPlaylistPlay, MdPlaylistRemove } from 'react-icons/md';
 import React from 'react';
 
 export type MusicItemType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'playlist';
@@ -22,9 +22,9 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
 
     // --- Logic Gates based on Type ---
     const showAddTo = ['song', 'album', 'artist', 'playlist'].includes(type);
-    const showProperties = ['song', 'file'].includes(type);
-    const showAlbum = ['song', 'album', 'file'].includes(type); // Also show for file type if handler provided
-    const showArtist = ['song', 'album', 'artist', 'file'].includes(type); // Also show for file type if handler provided
+    const showProperties = ['song', 'file', 'playlist'].includes(type);
+    const showAlbum = ['song', 'album', 'file', 'playlist'].includes(type); // Also show for file type if handler provided
+    const showArtist = ['song', 'album', 'artist', 'file', 'playlist'].includes(type); // Also show for file type if handler provided
     // Wait, user said for Artist: "reduce Properties, Show Album". So Artist maintains "Show Artist" (nav to detail?) 
     // Actually typically context menu on Artist might have "Go to Artist" if on a card.
     // Let's follow strict strict rules:
@@ -90,7 +90,7 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
         group3.push({
             id: 'remove',
             label: props.removeText || "移除",
-            icon: IoRemoveCircleOutline,
+            icon: MdPlaylistRemove,
             onClick: props.onRemove,
             variant: 'default'
         });
@@ -117,7 +117,7 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
     if (!props.hideSelect) {
         groups.push([{
             id: 'select',
-            label: '选择',
+            label: props.selectText || '选择',
             icon: IoCheckboxOutline,
             onClick: props.onSelect || (() => { })
         }]);
@@ -145,6 +145,7 @@ interface MusicContextMenuProps {
     deleteIcon?: React.ElementType; // Custom icon for delete/remove
     deleteVariant?: 'danger' | 'default'; // Style variant for delete button
     onSelect?: () => void;
+    selectText?: string;
     hideSelect?: boolean; // Hide the Select option (e.g., in play queue)
     onOpen?: () => void; // New prop for notifying when menu is opened
     className?: string; // Wrapper class customization
@@ -177,7 +178,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                 >
                     {menuGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>
-                            {groupIndex > 0 && <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />}
+                            {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
                             {group.map((item) => (
                                 <MenuItem key={item.id}>
                                     <button
