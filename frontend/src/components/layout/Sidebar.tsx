@@ -51,7 +51,7 @@ export default function Sidebar({
         // 1. Layout Placeholder (participates in Flex flow)
         <div
             className={clsx(
-                "relative z-50 shrink-0 h-full",
+                "relative z-80 shrink-0 h-full",
                 "transition-[width] duration-300 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
                 layoutWidth
             )}

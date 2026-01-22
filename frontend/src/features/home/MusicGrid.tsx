@@ -30,7 +30,7 @@ interface MusicGridProps {
 
 export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     // Store Actions
-    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList } = useLibraryStore();
+    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, toggleFavorite } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
     const { push } = useNavigationStore();
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
@@ -431,6 +431,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                                                     deleteText="删除"
                                                     onSelect={() => toggleSelectionMode({ id: item.id, type: item.type, data: item })}
                                                     onOpen={() => setContextMenu(null)}
+                                                    // Note: Favorites require song ID, which RecentItem (file) might not have. Disabling for now.
+                                                    onFavorite={undefined}
                                                 />
                                             </div>
                                         )}
@@ -470,7 +472,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                             onShowArtist: contextMenu.item.artist && (contextMenu.item.type === 'file' || contextMenu.item.type === 'album') ? () => handleNavigateToArtist(contextMenu.item) : undefined,
                             onDelete: () => handleDeleteClick(contextMenu.item),
                             deleteText: "删除",
-                            onSelect: () => toggleSelectionMode({ id: contextMenu.item.id, type: contextMenu.item.type, data: contextMenu.item })
+                            onSelect: () => toggleSelectionMode({ id: contextMenu.item.id, type: contextMenu.item.type, data: contextMenu.item }),
+                            onFavorite: undefined
                         })}
                     />
                 )}

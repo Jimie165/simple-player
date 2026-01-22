@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IoCheckbox, IoSquareOutline } from 'react-icons/io5';
 
 import CoverImage from '../../../components/common/CoverImage';
@@ -22,18 +22,31 @@ export interface AlbumData {
 interface AlbumGridViewProps {
     albums: AlbumData[];
     onPlayAlbum: (album: AlbumData) => void;
+    onShuffleAlbum?: (album: AlbumData) => void;
     onOpenAlbum: (album: AlbumData) => void;
     onOpenArtist?: (artistName: string) => void; // Add handler for Artist navigation
     onDeleteAlbum?: (album: AlbumData) => void;
     hideArtist?: boolean; // New prop: hide artist context
 }
 
-export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false }: AlbumGridViewProps) {
+export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false }: AlbumGridViewProps) {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+
+    // Handle Select All Request
+    useEffect(() => {
+        if (selectAllRequested && isSelectionMode) {
+            const items = albums.map(album => ({
+                id: `${album.name}-${album.artist}`,
+                data: album
+            }));
+            selectAll(items, 'album');
+            setSelectAllRequested(false);
+        }
+    }, [selectAllRequested, isSelectionMode, albums, selectAll, setSelectAllRequested]);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; album: AlbumData } | null>(null);
@@ -129,6 +142,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
                                             onPlay={() => onPlayAlbum(album)}
+                                            onShuffle={onShuffleAlbum ? () => onShuffleAlbum(album) : undefined}
                                             onAddToQueue={() => [...album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
                                             onAddToPlaylist={() => console.log('Add album to playlist', album)}
                                             onShowAlbum={() => onOpenAlbum(album)}
@@ -166,6 +180,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onOpenAlbum, onOpen
                     menuGroups={getMusicMenuGroups({
                         type: 'album',
                         onPlay: () => onPlayAlbum(contextMenu.album),
+                        onShuffle: onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined,
                         onAddToQueue: () => [...contextMenu.album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
                         onAddToPlaylist: () => console.log('Add album to playlist', contextMenu.album),
                         onShowAlbum: () => onOpenAlbum(contextMenu.album),

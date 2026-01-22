@@ -9,6 +9,7 @@ import PlaylistDetail from '../../features/playlists/components/PlaylistDetail';
 import type { AlbumData } from '../../features/library/components/AlbumGridView';
 import type { ArtistData } from '../../features/library/components/ArtistGridView';
 import type { SongMetadata } from '../../types';
+import { useSelectionStore } from '../../store/useSelectionStore';
 
 export default function GlobalDetailStack() {
     const { overlayStack, push } = useNavigationStore();
@@ -63,6 +64,7 @@ export default function GlobalDetailStack() {
                 count: artistSongs.length,
                 cover: artistSongs[0]?.cover || null
             };
+            useSelectionStore.getState().clearSelection();
             push({ type: 'artist_detail', data: artistData });
         } else {
             console.warn(`GlobalStack: Artist '${name}' not found.`);
@@ -77,7 +79,7 @@ export default function GlobalDetailStack() {
 
     return (
         <div className={overlayClass}>
-            <div data-tauri-drag-region className="h-6 w-full shrink-0 bg-transparent" />
+            <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-[100] bg-transparent" />
             {(() => {
                 switch (activeView.type) {
                     case 'album_detail':
@@ -194,6 +196,7 @@ function ArtistOverlay({ data: artistData, onPlaySong, addToRecent, setPlaylist,
     }, [artistData.songs]);
 
     const handleOpenAlbum = (album: AlbumData) => {
+        useSelectionStore.getState().clearSelection();
         push?.({ type: 'album_detail', data: album });
     };
 

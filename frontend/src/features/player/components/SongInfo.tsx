@@ -1,5 +1,7 @@
 import clsx from 'clsx';
 // IoMusicalNotes removed, used inside CoverImage
+import { IoHeart } from 'react-icons/io5';
+import { useLibraryStore } from '../../../store/useLibraryStore'; // Add this
 import type { SongMetadata } from '../../../types';
 import CoverImage from '../../../components/common/CoverImage';
 
@@ -10,6 +12,8 @@ interface SongInfoProps {
 }
 
 export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: SongInfoProps) {
+    const { toggleFavorite } = useLibraryStore();
+
     return (
         <div className="w-[30%] min-w-0 flex justify-start">
             <button
@@ -30,8 +34,9 @@ export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: S
                 </div>
 
                 <div className="min-w-0 flex-1 flex flex-col justify-center transition-all duration-500 pr-4">
-                    <div className="font-semibold text-sm truncate text-neutral-900 dark:text-neutral-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors w-full">
-                        {metadata?.title || "未播放音乐"}
+                    <div className="font-semibold text-sm truncate text-neutral-900 dark:text-neutral-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors w-full flex items-center gap-2">
+                        <span>{metadata?.title || "未播放音乐"}</span>
+                        {metadata?.is_favorite && <IoHeart className="text-red-500 text-xs shrink-0" />}
                     </div>
                     <div className="text-xs text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-neutral-300 transition-colors truncate w-full mt-0.5">
                         {metadata?.artist || "Simple Player"}

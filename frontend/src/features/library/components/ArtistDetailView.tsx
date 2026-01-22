@@ -9,6 +9,7 @@ import type { AlbumData } from './AlbumGridView';
 import SongListView from './SongListView';
 import AlbumGridView from './AlbumGridView';
 import type { SongMetadata } from '../../../types';
+import { useSelectionStore } from '../../../store/useSelectionStore';
 
 interface ArtistDetailViewProps {
     artist: ArtistData;
@@ -49,6 +50,7 @@ export default function ArtistDetailView({
     });
 
     const handleTabChange = (tab: 'albums' | 'songs') => {
+        useSelectionStore.getState().clearSelection();
         setActiveTab(tab);
         try {
             localStorage.setItem('artist_detail_active_tab', tab);
@@ -112,7 +114,7 @@ export default function ArtistDetailView({
                             className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary shadow-md transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
-                            <span className="font-medium">全部播放</span>
+                            <span className="font-medium">播放</span>
                         </button>
                         <button
                             onClick={onShuffle}

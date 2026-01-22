@@ -46,6 +46,10 @@ pub struct Song {
 pub struct Playlist {
     pub id: i64,
     pub name: String,
+    pub cover_path: Option<String>,
+    pub description: Option<String>,
+    pub song_count: i32,
+    pub last_played_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -516,15 +520,22 @@ impl PlaylistRepo {
     /// 获取所有播放列表
     pub fn get_all(conn: &Connection) -> Result<Vec<Playlist>> {
         let mut stmt = conn.prepare(
-            "SELECT id, name, created_at, updated_at FROM playlists ORDER BY created_at DESC"
+            "SELECT p.id, p.name, p.cover_path, p.description, p.last_played_at, p.created_at, p.updated_at,
+                    (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) as song_count
+             FROM playlists p
+             ORDER BY p.created_at DESC"
         )?;
         let playlists = stmt
             .query_map([], |row| {
                 Ok(Playlist {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    created_at: row.get(2)?,
-                    updated_at: row.get(3)?,
+                    cover_path: row.get(2)?,
+                    description: row.get(3)?,
+                    last_played_at: row.get(4)?,
+                    created_at: row.get(5)?,
+                    updated_at: row.get(6)?,
+                    song_count: row.get(7)?,
                 })
             })?
             .collect::<Result<Vec<_>>>()?;
@@ -540,14 +551,18 @@ impl PlaylistRepo {
         let id = conn.last_insert_rowid();
         
         let mut stmt = conn.prepare(
-            "SELECT id, name, created_at, updated_at FROM playlists WHERE id = ?1"
+            "SELECT id, name, cover_path, description, last_played_at, created_at, updated_at FROM playlists WHERE id = ?1"
         )?;
         stmt.query_row(params![id], |row| {
             Ok(Playlist {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                created_at: row.get(2)?,
-                updated_at: row.get(3)?,
+                cover_path: row.get(2)?,
+                description: row.get(3)?,
+                last_played_at: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                song_count: 0,
             })
         })
     }
@@ -556,14 +571,21 @@ impl PlaylistRepo {
     #[allow(dead_code)]
     pub fn get_by_id(conn: &Connection, id: i64) -> Result<Option<Playlist>> {
         let mut stmt = conn.prepare(
-            "SELECT id, name, created_at, updated_at FROM playlists WHERE id = ?1"
+            "SELECT p.id, p.name, p.cover_path, p.description, p.last_played_at, p.created_at, p.updated_at,
+                    (SELECT COUNT(*) FROM playlist_songs ps WHERE ps.playlist_id = p.id) as song_count
+             FROM playlists p
+             WHERE p.id = ?1"
         )?;
         let result = stmt.query_row(params![id], |row| {
             Ok(Playlist {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                created_at: row.get(2)?,
-                updated_at: row.get(3)?,
+                cover_path: row.get(2)?,
+                description: row.get(3)?,
+                last_played_at: row.get(4)?,
+                created_at: row.get(5)?,
+                updated_at: row.get(6)?,
+                song_count: row.get(7)?,
             })
         });
         match result {
@@ -573,11 +595,29 @@ impl PlaylistRepo {
         }
     }
 
-    /// 更新播放列表名称
-    pub fn update_name(conn: &Connection, id: i64, name: &str) -> Result<()> {
+    /// 更新播放列表基本信息
+    pub fn update_info(conn: &Connection, id: i64, name: &str, description: Option<&str>) -> Result<()> {
         conn.execute(
-            "UPDATE playlists SET name = ?1, updated_at = datetime('now') WHERE id = ?2",
-            params![name, id],
+            "UPDATE playlists SET name = ?1, description = ?2, updated_at = datetime('now') WHERE id = ?3",
+            params![name, description, id],
+        )?;
+        Ok(())
+    }
+
+    /// 更新播放列表封面
+    pub fn update_cover(conn: &Connection, id: i64, cover_path: Option<&str>) -> Result<()> {
+        conn.execute(
+            "UPDATE playlists SET cover_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![cover_path, id],
+        )?;
+        Ok(())
+    }
+
+    /// 更新播放列表最后播放时间
+    pub fn update_last_played(conn: &Connection, id: i64) -> Result<()> {
+        conn.execute(
+            "UPDATE playlists SET last_played_at = datetime('now'), updated_at = datetime('now') WHERE id = ?1",
+            params![id],
         )?;
         Ok(())
     }
@@ -672,6 +712,53 @@ impl PlaylistRepo {
             .query_map(params![playlist_id], SongRepo::map_row)?
             .collect::<Result<Vec<_>>>()?;
         Ok(songs)
+    }
+
+    /// 批量移除歌曲
+    pub fn batch_remove_songs(conn: &Connection, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
+        if song_ids.is_empty() {
+            return Ok(());
+        }
+        let placeholders: String = song_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "DELETE FROM playlist_songs WHERE playlist_id = ?1 AND song_id IN ({})",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&sql)?;
+        
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        params_vec.push(Box::new(playlist_id));
+        for id in song_ids {
+            params_vec.push(Box::new(*id));
+        }
+        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        stmt.execute(params_refs.as_slice())?;
+
+        conn.execute(
+            "UPDATE playlists SET updated_at = datetime('now') WHERE id = ?1",
+            params![playlist_id],
+        )?;
+
+        Ok(())
+    }
+
+    /// 重新排序歌曲
+    pub fn reorder_songs(conn: &Connection, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
+        // 使用事务确保原子性
+        let mut stmt = conn.prepare(
+            "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND song_id = ?3"
+        )?;
+
+        for (index, song_id) in song_ids.iter().enumerate() {
+            stmt.execute(params![index as i64, playlist_id, song_id])?;
+        }
+
+        conn.execute(
+            "UPDATE playlists SET updated_at = datetime('now') WHERE id = ?1",
+            params![playlist_id],
+        )?;
+
+        Ok(())
     }
 
     /// 更新歌曲在播放列表中的位置

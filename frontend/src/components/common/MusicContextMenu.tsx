@@ -1,10 +1,10 @@
 
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
-import { IoPlay, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle, IoCheckboxOutline } from 'react-icons/io5';
+import { IoPlay, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle, IoCheckboxOutline, IoShuffle, IoPencil, IoHeart, IoHeartOutline, IoRemoveCircleOutline } from 'react-icons/io5';
 import { MdPlaylistPlay } from 'react-icons/md';
 import React from 'react';
 
-export type MusicItemType = 'song' | 'album' | 'artist' | 'folder' | 'file';
+export type MusicItemType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'playlist';
 
 // Data Structure for Menu Items
 export interface MusicMenuItemData {
@@ -21,7 +21,7 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
     const groups: MusicMenuItemData[][] = [];
 
     // --- Logic Gates based on Type ---
-    const showAddTo = ['song', 'album', 'artist'].includes(type);
+    const showAddTo = ['song', 'album', 'artist', 'playlist'].includes(type);
     const showProperties = ['song', 'file'].includes(type);
     const showAlbum = ['song', 'album', 'file'].includes(type); // Also show for file type if handler provided
     const showArtist = ['song', 'album', 'artist', 'file'].includes(type); // Also show for file type if handler provided
@@ -38,6 +38,9 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
     if (props.onPlay) {
         group1.push({ id: 'play', label: '播放', icon: IoPlay, onClick: props.onPlay });
     }
+    if (props.onShuffle) {
+        group1.push({ id: 'shuffle', label: '随机播放', icon: IoShuffle, onClick: props.onShuffle });
+    }
     if (props.onAddToQueue) {
         group1.push({ id: 'queue', label: '加入播放队列', icon: MdPlaylistPlay, onClick: props.onAddToQueue });
     }
@@ -50,12 +53,24 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
             onClick: props.onAddToPlaylist
         });
     }
+    // Favorite
+    if (props.onFavorite) {
+        group1.push({
+            id: 'favorite',
+            label: props.isFavorite ? '取消喜爱' : '喜爱',
+            icon: props.isFavorite ? IoHeart : IoHeartOutline,
+            onClick: props.onFavorite
+        });
+    }
     if (group1.length > 0) groups.push(group1);
 
-    // Group 2: Info / Navigation
+    // Group 2: Info / Navigation / Edit
     // Access: Song(All), Album(Album/Artist), Artist(Artist), File(Props), Folder(None)
     const group2: MusicMenuItemData[] = [];
     if (!isFolder) {
+        if (props.onEdit) {
+            group2.push({ id: 'edit', label: '编辑', icon: IoPencil, onClick: props.onEdit });
+        }
         if (showProperties && props.onShowProperties) {
             group2.push({ id: 'properties', label: '属性', icon: IoInformationCircle, onClick: props.onShowProperties });
         }
@@ -68,8 +83,19 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
     }
     if (group2.length > 0) groups.push(group2);
 
-    // Group 3: Delete / Remove
+    // Group 3: Remove / Delete
     const group3: MusicMenuItemData[] = [];
+
+    if (props.onRemove) {
+        group3.push({
+            id: 'remove',
+            label: props.removeText || "移除",
+            icon: IoRemoveCircleOutline,
+            onClick: props.onRemove,
+            variant: 'default'
+        });
+    }
+
     if (props.onDelete) {
         // Use custom icon if provided, otherwise default based on context
         const deleteIcon = props.deleteIcon || IoTrash;
@@ -103,11 +129,17 @@ export const getMusicMenuGroups = (props: MusicContextMenuProps): MusicMenuItemD
 interface MusicContextMenuProps {
     type: MusicItemType;
     onPlay?: () => void;
+    onShuffle?: () => void;
     onAddToQueue?: () => void;
     onAddToPlaylist?: () => void; // Placeholder for "Add to..."
+    onFavorite?: () => void;
+    isFavorite?: boolean;
+    onEdit?: () => void;
     onShowProperties?: () => void;
     onShowAlbum?: () => void;
     onShowArtist?: () => void;
+    onRemove?: () => void; // New prop for Remove (e.g. from playlist)
+    removeText?: string;
     onDelete?: () => void;
     deleteText?: string;
     deleteIcon?: React.ElementType; // Custom icon for delete/remove

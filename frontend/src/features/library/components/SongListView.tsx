@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { MdAccessTime, MdPlayArrow, MdArrowDropUp, MdArrowDropDown } from 'react-icons/md';
-import { IoCheckbox, IoSquareOutline } from 'react-icons/io5';
+import { IoCheckbox, IoSquareOutline, IoHeart, IoHeartOutline } from 'react-icons/io5';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
 import InfoDialog from '../../../components/common/InfoDialog';
@@ -11,7 +11,12 @@ import CoverImage from '../../../components/common/CoverImage';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
 
-// Breakpoint for hiding album column (in pixels)
+import { libraryService } from '../../../services/libraryService';
+import { audioService } from '../../../services/audioService';
+import { usePlayerStore } from '../../../store/usePlayerStore';
+import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
+
+// ... (in MusicContextMenu props)
 const HIDE_ALBUM_BREAKPOINT = 900;
 
 interface SongListViewProps {
@@ -78,7 +83,11 @@ export default function SongListView({
     });
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
+    const { toggleFavorite } = useLibraryStore();
+
+    // Handle Select All Request
+
 
     // 属性模态框状态
     const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
@@ -89,11 +98,91 @@ export default function SongListView({
     const [songToDelete, setSongToDelete] = useState<SongMetadata | null>(null);
 
     // 右键菜单状态
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
+    type ContextMenuState = {
+        x: number;
+        y: number;
+        type: 'single' | 'batch';
+        song?: SongMetadata; // For single
+        index?: number; // For single
+        songs?: SongMetadata[]; // For batch
+    };
+    const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY, song, index });
+
+        const id = song.id ? song.id.toString() : song.path;
+        const isMultiSelecting = isSelectionMode && id && selectedIds.has(id) && selectedIds.size > 1;
+
+        if (isMultiSelecting) {
+            // Get all selected songs
+            // We iterate over sortedSongs to maintain order
+            const selectedSongs = sortedSongs.filter(s => {
+                const sId = s.id ? s.id.toString() : s.path;
+                return sId && selectedIds.has(sId);
+            });
+
+            setContextMenu({ x: e.clientX, y: e.clientY, type: 'batch', songs: selectedSongs });
+        } else {
+            // If clicking unselected item in selection mode, maybe we should select it? 
+            // Common behavior: Right click on unselected item selects it exclusively (or just operates on it).
+            // Since we want "operate on single", we just pass it as single. 
+            // Logic in MusicContextMenu ensures that if we are in Select Mode, we can also see Select options.
+            setContextMenu({ x: e.clientX, y: e.clientY, type: 'single', song, index });
+        }
+    };
+
+    // Batch Actions
+    const { setPlaylist, setCurrentSongIndex, addToNext } = useLibraryStore();
+    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+
+    const handleBatchPlay = async (songsToPlay: SongMetadata[]) => {
+        if (songsToPlay.length === 0) return;
+
+        setPlaylist(songsToPlay);
+        setShuffleState(false);
+        setCurrentSongIndex(0);
+
+        const first = songsToPlay[0];
+        if (first.path) {
+            setMetadata(first);
+            await audioService.play(first.path, first);
+            setIsPlaying(true);
+        }
+    };
+
+    const handleBatchAddToQueue = (songsToAdd: SongMetadata[]) => {
+        [...songsToAdd].reverse().forEach(s => addToNext(s));
+    };
+
+    const handleBatchFavorite = async (songsToFav: SongMetadata[]) => {
+        for (const s of songsToFav) {
+            if (s.id && !s.is_favorite) {
+                try {
+                    await libraryService.toggleFavorite(s.id);
+                } catch (e) { console.error(e); }
+            }
+        }
+        // Ideally we should trigger a UI update here, but toggleFavorite usually updates store via events or refetch
+        // Since we are in SongListView which takes props, parent might need update. 
+        // But libraryService events might handle it if subscribed.
+        // For now, simpler:
+        // Force update local state if possible or rely on parent re-render.
+    };
+
+    const [batchConfirmOpen, setBatchConfirmOpen] = useState(false);
+
+    const handleBatchDelete = async () => {
+        if (!contextMenu || contextMenu.type !== 'batch' || !contextMenu.songs) return;
+        const songsToDelete = contextMenu.songs;
+        const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
+
+        if (ids.length > 0) {
+            await libraryService.batchDeleteSongs(ids);
+            // Parent should handle refresh, or we trigger it via libraryService event but here we just close menu.
+        }
+        setBatchConfirmOpen(false);
+        setContextMenu(null);
     };
 
     // 打开删除确认框
@@ -141,6 +230,19 @@ export default function SongListView({
             return 0;
         });
     }, [songs, sortKey, sortOrder]);
+
+    // Handle Select All Request
+    useEffect(() => {
+        if (selectAllRequested && isSelectionMode) {
+            const items = sortedSongs.map(song => ({
+                id: song.id ? song.id.toString() : song.path || '',
+                data: song
+            })).filter(item => item.id !== '');
+
+            selectAll(items, 'song');
+            setSelectAllRequested(false);
+        }
+    }, [selectAllRequested, isSelectionMode, sortedSongs, selectAll, setSelectAllRequested]);
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -228,8 +330,12 @@ export default function SongListView({
 
     // Grid 定义
     const getGridCols = () => {
-        // Add Checkbox column
-        let cols = isSelectionMode ? "40px minmax(0,4fr)" : "3rem minmax(0,4fr)"; // Index/Check, Title
+        // Selection: Checkbox (40px)
+        // Normal: Heart (24px)
+        let cols = isSelectionMode
+            ? "40px 24px minmax(0,4fr)"
+            : "24px minmax(0,4fr)";
+
         if (!hideArtist) cols += " minmax(0,3fr)"; // Artist
         if (!effectiveHideAlbum) cols += " minmax(0,3fr)"; // Album
         cols += " 100px 40px"; // Time, Menu
@@ -260,16 +366,15 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky top-0 z-10 grid gap-4 py-3 px-4 border-b border-outline-variant/10",
-                    "text-[13px] text-on-surface-variant font-medium bg-surface/95 dark:bg-surface-container-low/95 backdrop-blur-md transition-colors"
+                    "sticky top-0 z-45 grid gap-4 pt-10 pb-3 px-4 border-b border-outline-variant/10",
+                    "text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl transition-colors"
                 )}>
-                <div className="text-center">
-                    {isSelectionMode ? (
-                        // Optional: Select All Checkbox
-                        // For now keep empty or #
+                {isSelectionMode && (
+                    <div className="text-center">
                         <span className="opacity-0">#</span>
-                    ) : '#'}
-                </div>
+                    </div>
+                )}
+                <div></div> {/* Heart header spacer */}
                 <HeaderCell label="标题" colKey="title" className="pl-0" allowSort={!disableSort} />
                 {!hideArtist && <HeaderCell label="艺人" colKey="artist" allowSort={!disableSort} />}
                 {!effectiveHideAlbum && <HeaderCell label="专辑" colKey="album" allowSort={!disableSort} />}
@@ -310,9 +415,9 @@ export default function SongListView({
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
                             )}
 
-                            {/* Checkbox / Index / Play */}
-                            <div className="flex justify-center w-full min-w-[24px]">
-                                {isSelectionMode ? (
+                            {/* Column 1: Checkbox (Selection Mode Only) */}
+                            {isSelectionMode && (
+                                <div className="flex justify-center w-full min-w-[24px]">
                                     <div
                                         onClick={(e) => handleCheckboxClick(e, song)}
                                         className="text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
@@ -322,25 +427,43 @@ export default function SongListView({
                                             : <IoSquareOutline />
                                         }
                                     </div>
-                                ) : (
-                                    <div className="text-neutral-400 font-medium text-[13px] relative w-full text-center group-hover:text-transparent">
-                                        <span className="group-hover:hidden">{index + 1}</span>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); onPlay(song, index); }}
-                                            onDoubleClick={(e) => e.stopPropagation()}
-                                            className="absolute inset-0 hidden group-hover:flex items-center justify-center text-neutral-800 dark:text-neutral-200"
-                                        >
-                                            <MdPlayArrow className="text-xl" />
-                                        </button>
-                                    </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
-                            {/* 标题 + 封面 */}
+                            {/* Column 2 (Now Col 1 in Normal): Heart Icon */}
+
+                            {/* Column 2: Heart Icon (Always shown) */}
+                            {(
+                                <div className="flex justify-center items-center">
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleFavorite(song);
+                                        }}
+                                        className={clsx(
+                                            "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
+                                            song.is_favorite
+                                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
+                                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                        )}
+                                        title={song.is_favorite ? "取消喜爱" : "喜爱"}
+                                    >
+                                        {song.is_favorite ? <IoHeart className="text-base" /> : <IoHeartOutline className="text-base" />}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Column 3: Title + Cover */}
                             <div className="flex items-center gap-3 overflow-hidden">
                                 {!hideCover && (
-                                    <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10">
+                                    <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                                         <CoverImage song={song} className="w-full h-full" />
+                                        <div
+                                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity"
+                                            onClick={(e) => { e.stopPropagation(); onPlay(song, index); }}
+                                        >
+                                            <MdPlayArrow className="text-white text-xl" />
+                                        </div>
                                     </div>
                                 )}
                                 <span className={clsx(
@@ -351,27 +474,26 @@ export default function SongListView({
                                 </span>
                             </div>
 
-
-                            {/* 艺人 */}
+                            {/* Column 4: Artist */}
                             {!hideArtist && (
                                 <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
                                     {song.artist}
                                 </div>
                             )}
 
-                            {/* 专辑 */}
+                            {/* Column 5: Album */}
                             {!effectiveHideAlbum && (
                                 <div className="text-neutral-500 dark:text-neutral-400 truncate">
                                     {song.album}
                                 </div>
                             )}
 
-                            {/* 时长 */}
+                            {/* Column 6: Duration */}
                             <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
                                 {formatDuration(song.duration)}
                             </div>
 
-                            {/* 菜单 - 三个点 */}
+                            {/* Column 7: Menu - Three Dots */}
                             <div
                                 className={clsx(
                                     "flex justify-end transition-opacity",
@@ -380,19 +502,22 @@ export default function SongListView({
                                 onDoubleClick={(e) => e.stopPropagation()}
                             >
                                 <MusicContextMenu
+                                    onOpen={() => setContextMenu(null)}
                                     type="song"
                                     variant="clean"
                                     onPlay={() => onPlay(song, index)}
                                     // Use addToNext for "Play Next" behavior
                                     onAddToQueue={() => useLibraryStore.getState().addToNext(song)}
-                                    onAddToPlaylist={() => console.log('Add to playlist', song)}
+                                    onAddToPlaylist={() => useAddToPlaylistStore.getState().open(song)}
                                     onShowProperties={() => handleOpenProperties(song)}
                                     onShowAlbum={onOpenAlbum && song.album ? () => onOpenAlbum(song.album!) : undefined}
                                     onShowArtist={onOpenArtist && song.artist ? () => onOpenArtist(song.artist!) : undefined}
                                     onDelete={enableDelete && onDelete ? () => handleDeleteClick(song) : undefined}
                                     deleteText="从音乐库删除"
                                     onSelect={() => toggleSelectionMode({ id: id || '', type: 'song', data: song })}
-                                    onOpen={() => setContextMenu(null)}
+                                    // Favorites Support
+                                    onFavorite={() => toggleFavorite(song)}
+                                    isFavorite={song.is_favorite}
                                 />
                             </div>
                         </div>
@@ -400,30 +525,56 @@ export default function SongListView({
                 })}
             </div>
 
+            {/* Batch Delete Confirm */}
+            <ConfirmDialog
+                isOpen={batchConfirmOpen}
+                onClose={() => setBatchConfirmOpen(false)}
+                onConfirm={handleBatchDelete}
+                title="删除选中项"
+                description={`确定要删除选中的 ${contextMenu?.type === 'batch' ? contextMenu.songs?.length : 0} 项吗？此操作将从音乐库中移除，不会删除本地文件。`}
+                type="danger"
+            />
+
             {/* Custom Context Menu */}
             {contextMenu && (
                 <CursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
                     onClose={() => setContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
-                        type: 'song',
-                        onPlay: () => onPlay(contextMenu.song, contextMenu.index),
-                        onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song),
-                        onAddToPlaylist: () => console.log('Add to playlist', contextMenu.song),
-                        onShowProperties: () => handleOpenProperties(contextMenu.song),
-                        onShowAlbum: onOpenAlbum && contextMenu.song.album ? () => onOpenAlbum(contextMenu.song.album!) : undefined,
-                        onShowArtist: onOpenArtist && contextMenu.song.artist ? () => onOpenArtist(contextMenu.song.artist!) : undefined,
-                        onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song) : undefined,
-                        deleteText: "从音乐库删除",
-                        onSelect: () => toggleSelectionMode({
-                            id: contextMenu.song.id ? contextMenu.song.id.toString() : contextMenu.song.path || '',
+                    menuGroups={contextMenu.type === 'batch' && contextMenu.songs ?
+                        // BATCH MODE
+                        getMusicMenuGroups({
                             type: 'song',
-                            data: contextMenu.song
+                            onPlay: () => handleBatchPlay(contextMenu.songs!),
+                            onAddToQueue: () => handleBatchAddToQueue(contextMenu.songs!),
+                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.songs!),
+                            onDelete: enableDelete ? () => setBatchConfirmOpen(true) : undefined,
+                            deleteText: `从音乐库删除 (${contextMenu.songs.length})`,
+                            onFavorite: () => handleBatchFavorite(contextMenu.songs!),
                         })
-                    })}
+                        :
+                        // SINGLE MODE
+                        getMusicMenuGroups({
+                            type: 'song', // @ts-ignore
+                            onPlay: () => onPlay(contextMenu.song!, contextMenu.index!), // @ts-ignore
+                            onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song!), // @ts-ignore
+                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.song!), // @ts-ignore
+                            onShowProperties: () => handleOpenProperties(contextMenu.song!), // @ts-ignore
+                            onShowAlbum: onOpenAlbum && contextMenu.song!.album ? () => onOpenAlbum(contextMenu.song!.album!) : undefined, // @ts-ignore
+                            onShowArtist: onOpenArtist && contextMenu.song!.artist ? () => onOpenArtist(contextMenu.song!.artist!) : undefined, // @ts-ignore
+                            onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song!) : undefined,
+                            deleteText: "从音乐库删除",
+                            onSelect: () => toggleSelectionMode({ // @ts-ignore
+                                id: contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '',
+                                type: 'song', // @ts-ignore
+                                data: contextMenu.song!
+                            }), // @ts-ignore
+                            onFavorite: () => toggleFavorite(contextMenu.song!), // @ts-ignore
+                            isFavorite: contextMenu.song!.is_favorite
+                        })}
                 />
             )}
-        </div >
+        </div>
     );
 }
+

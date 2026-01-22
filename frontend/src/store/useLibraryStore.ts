@@ -36,7 +36,13 @@ interface LibraryState {
     // Library Version for Sync
     libraryVersion: number;
     triggerLibraryUpdate: () => void;
+
+    // Favorites
+    toggleFavorite: (song: SongMetadata) => Promise<void>;
 }
+
+import { libraryService } from '../services/libraryService';
+import { usePlayerStore } from './usePlayerStore'; // Assuming we need to sync player metadata too
 
 export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     // ... 前面的状态和函数保持不变 ...
@@ -209,6 +215,39 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
     libraryVersion: 0,
     triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
+
+    toggleFavorite: async (song) => {
+        if (!song.id) return;
+        try {
+            const newStatus = await libraryService.toggleFavorite(song.id);
+
+            // 1. Update global library version to trigger refreshes in other components
+            get().triggerLibraryUpdate();
+
+            // 2. Update local playlist state if the song is present
+            const { playlist, originalPlaylist } = get();
+
+            const updateList = (list: SongMetadata[]) => list.map(s =>
+                (s.id === song.id || s.path === song.path)
+                    ? { ...s, is_favorite: newStatus }
+                    : s
+            );
+
+            set({
+                playlist: updateList(playlist),
+                originalPlaylist: updateList(originalPlaylist)
+            });
+
+            // 3. Update Player Store Metadata if it's the current song
+            const playerMetadata = usePlayerStore.getState().metadata;
+            if (playerMetadata && (playerMetadata.id === song.id || playerMetadata.path === song.path)) {
+                usePlayerStore.getState().setMetadata({ ...playerMetadata, is_favorite: newStatus });
+            }
+
+        } catch (error) {
+            console.error('Failed to toggle favorite', error);
+        }
+    }
 }), {
     name: 'library-store',
     partialize: (state) => ({ recentHistory: state.recentHistory }),

@@ -75,7 +75,12 @@ fn main() {
             commands::playlist::add_to_playlist,
             commands::playlist::batch_add_to_playlist,
             commands::playlist::remove_from_playlist,
+            commands::playlist::batch_remove_from_playlist,
+            commands::playlist::reorder_playlist_songs,
+            commands::playlist::update_playlist_info,
+            commands::playlist::update_playlist_cover,
             commands::playlist::get_playlist_songs,
+            commands::playlist::mark_playlist_as_played,
             // Queue commands
             commands::queue::save_play_queue,
             commands::queue::get_play_queue,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { IoCheckbox, IoSquareOutline, IoPlay } from 'react-icons/io5';
 
 import CoverImage from '../../../components/common/CoverImage';
@@ -21,16 +21,31 @@ export interface ArtistData {
 interface ArtistGridViewProps {
     artists: ArtistData[];
     onPlayArtist: (artist: ArtistData) => void;
+    onShuffleArtist?: (artist: ArtistData) => void;
     onOpenArtist: (artist: ArtistData) => void;
     onDeleteArtist?: (artist: ArtistData) => void;
 }
 
-export default function ArtistGridView({ artists, onPlayArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
+export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+
+
+
+    // Handle Select All Request
+    useEffect(() => {
+        if (selectAllRequested && isSelectionMode && selectionType === 'artist') {
+            const items = artists.map(artist => ({
+                id: artist.name,
+                data: artist
+            }));
+            selectAll(items, 'artist');
+            setSelectAllRequested(false);
+        }
+    }, [selectAllRequested, isSelectionMode, selectionType, artists, selectAll, setSelectAllRequested]);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; artist: ArtistData } | null>(null);
@@ -139,6 +154,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onOpenArtist, on
                                             className="absolute bottom-1 right-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity"
                                             buttonClassName="w-10 h-10"
                                             onPlay={() => onPlayArtist(artist)}
+                                            onShuffle={onShuffleArtist ? () => onShuffleArtist(artist) : undefined}
                                             onAddToQueue={() => [...artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
                                             onAddToPlaylist={() => console.log('Add artist to playlist', artist)}
                                             onShowArtist={() => onOpenArtist(artist)}
@@ -172,6 +188,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onOpenArtist, on
                     menuGroups={getMusicMenuGroups({
                         type: 'artist',
                         onPlay: () => onPlayArtist(contextMenu.artist),
+                        onShuffle: onShuffleArtist ? () => onShuffleArtist(contextMenu.artist) : undefined,
                         onAddToQueue: () => [...contextMenu.artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
                         onAddToPlaylist: () => console.log('Add artist to playlist', contextMenu.artist),
                         onShowArtist: () => onOpenArtist(contextMenu.artist),

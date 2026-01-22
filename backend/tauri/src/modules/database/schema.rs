@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 3;
+const SCHEMA_VERSION: i32 = 5;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -53,6 +53,16 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 3 {
         migrate_v3(conn)?;
+        set_db_version(conn, 3)?;
+    }
+
+    if current_version < 4 {
+        migrate_v4(conn)?;
+        set_db_version(conn, 4)?;
+    }
+
+    if current_version < 5 {
+        migrate_v5(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -243,3 +253,38 @@ fn migrate_v3(conn: &Connection) -> Result<()> {
 
     Ok(())
 }
+
+/// 版本 4: 播放列表扩展字段
+fn migrate_v4(conn: &Connection) -> Result<()> {
+    // 检查字段是否存在（防止重复运行出错）
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(playlists)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"cover_path".to_string()) {
+        conn.execute("ALTER TABLE playlists ADD COLUMN cover_path TEXT", [])?;
+    }
+    
+    if !columns.contains(&"description".to_string()) {
+        conn.execute("ALTER TABLE playlists ADD COLUMN description TEXT", [])?;
+    }
+
+    Ok(())
+}
+
+/// 版本 5: 播放列表增加 last_played_at 字段
+fn migrate_v5(conn: &Connection) -> Result<()> {
+    // 检查字段是否存在（防止重复运行出错）
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(playlists)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"last_played_at".to_string()) {
+        conn.execute("ALTER TABLE playlists ADD COLUMN last_played_at TEXT", [])?;
+    }
+
+    Ok(())
+}
+

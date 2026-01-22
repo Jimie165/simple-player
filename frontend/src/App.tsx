@@ -20,6 +20,7 @@ import SearchResultsView from './features/search/SearchResultsView';
 import PlaylistsRoot from './features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from './hooks/useQueuePersistence';
 import SelectionActionBar from './features/selection/SelectionActionBar';
+import AddToPlaylistSheet from './features/playlists/components/AddToPlaylistSheet';
 
 function App() {
   useTheme();
@@ -81,6 +82,12 @@ function App() {
   };
 
   const handleBack = () => {
+    // If in selection mode, the back button should cancel selection first
+    if (useSelectionStore.getState().isSelectionMode) {
+      useSelectionStore.getState().clearSelection();
+      return;
+    }
+
     if (isFullScreen) {
       setIsFullScreen(false);
       return;
@@ -115,10 +122,13 @@ function App() {
 
   const mainContent = (
     <div className="flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-[24px] border-l border-t border-outline-variant/20 overflow-hidden shadow-sm relative z-0 transition-colors duration-300">
-      {/* Drag Region matching main content background */}
-      <div data-tauri-drag-region className="h-6 w-full shrink-0 bg-transparent z-10" />
+      {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
+      <div
+        data-tauri-drag-region
+        className="absolute top-0 left-0 right-0 h-12 bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl z-40 border-b border-outline-variant/5"
+      />
 
-      <main className="flex-1 overflow-y-auto scroll-smooth relative no-scrollbar">
+      <main className="flex-1 overflow-y-auto pt-10 scroll-smooth relative no-scrollbar">
         {/* Simple Fade Transition for Page Switch */}
         <div key={currentPage} className="animate-in fade-in duration-300 slide-in-from-bottom-2 h-full">
           {renderContent()}
@@ -187,6 +197,7 @@ function App() {
           toggleFullScreen={() => setIsFullScreen(!isFullScreen)}
         />
       </div>
+      <AddToPlaylistSheet />
     </div>
   );
 }

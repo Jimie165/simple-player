@@ -37,6 +37,10 @@ export interface LibraryFolder {
 export interface Playlist {
     id: number;
     name: string;
+    cover_path?: string | null;
+    description?: string | null;
+    song_count?: number;
+    last_played_at?: string | null;
     created_at: string;
     updated_at: string;
 }

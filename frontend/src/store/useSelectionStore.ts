@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 
 // "recent" is a special type that allows mixing file, folder, album in Recently Used
-type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | null;
+type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'playlist' | null;
 
 interface SelectionState {
     isSelectionMode: boolean;
@@ -18,6 +18,10 @@ interface SelectionState {
     toggleSelection: (id: string, type: SelectionType, data: any) => void;
     clearSelection: () => void;
     selectAll: (items: { id: string, data: any }[], type: SelectionType) => void;
+
+    // Global Select All Request signal
+    selectAllRequested: boolean;
+    setSelectAllRequested: (requested: boolean) => void;
 }
 
 // Helper to check if types are compatible for mixed selection
@@ -139,5 +143,8 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             selectedItemsMap: map,
             selectionType: type
         });
-    }
+    },
+
+    selectAllRequested: false,
+    setSelectAllRequested: (requested) => set({ selectAllRequested: requested })
 }));

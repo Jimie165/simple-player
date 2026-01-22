@@ -19,6 +19,7 @@ import { audioService } from '../../services/audioService';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
+import { useSelectionStore } from '../../store/useSelectionStore';
 import type { SongMetadata } from '../../types';
 
 export default function Library() {
@@ -32,6 +33,8 @@ export default function Library() {
     });
 
     const handleTabChange = (tab: 'songs' | 'albums' | 'artists') => {
+        // Switching tabs should exit selection mode immediately
+        useSelectionStore.getState().clearSelection();
         setCurrentTab(tab);
         try { localStorage.setItem('library_active_tab', tab); } catch { }
     };
@@ -178,10 +181,12 @@ export default function Library() {
     // Navigation Handlers (Push to Global Stack)
     // --------------------------------------------------------
     const handleOpenArtist = (artist: ArtistData) => {
+        useSelectionStore.getState().clearSelection();
         push({ type: 'artist_detail', data: artist });
     };
 
     const handleOpenAlbum = (album: AlbumData) => {
+        useSelectionStore.getState().clearSelection();
         push({ type: 'album_detail', data: album });
     };
 

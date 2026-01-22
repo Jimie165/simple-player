@@ -98,8 +98,28 @@ export const libraryService = {
         return invoke('remove_from_playlist', { playlistId, songId });
     },
 
+    batchRemoveFromPlaylist: async (playlistId: number, songIds: number[]): Promise<void> => {
+        return invoke('batch_remove_from_playlist', { playlistId, songIds });
+    },
+
+    reorderPlaylistSongs: async (playlistId: number, songIds: number[]): Promise<void> => {
+        return invoke('reorder_playlist_songs', { playlistId, songIds });
+    },
+
+    updatePlaylistInfo: async (id: number, name: string, description?: string): Promise<void> => {
+        return invoke('update_playlist_info', { id, name, description });
+    },
+
+    updatePlaylistCover: async (id: number, coverPath: string): Promise<void> => {
+        return invoke('update_playlist_cover', { id, coverPath });
+    },
+
     getPlaylistSongs: async (playlistId: number): Promise<SongMetadata[]> => {
         return invoke('get_playlist_songs', { playlistId });
+    },
+
+    markPlaylistAsPlayed: async (playlistId: number): Promise<void> => {
+        return invoke('mark_playlist_as_played', { playlistId });
     },
 
     // ========== 播放队列持久化 ==========
