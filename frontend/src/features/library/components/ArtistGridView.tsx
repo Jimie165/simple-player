@@ -8,6 +8,7 @@ import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -156,7 +157,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                             onPlay={() => onPlayArtist(artist)}
                                             onShuffle={onShuffleArtist ? () => onShuffleArtist(artist) : undefined}
                                             onAddToQueue={() => [...artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
-                                            onAddToPlaylist={() => console.log('Add artist to playlist', artist)}
+                                            onAddToPlaylist={() => useAddToPlaylistStore.getState().open(artist.songs)}
                                             onShowArtist={() => onOpenArtist(artist)}
                                             onDelete={onDeleteArtist ? () => handleDeleteClick(artist) : undefined}
                                             deleteText="从音乐库删除"
@@ -190,7 +191,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                         onPlay: () => onPlayArtist(contextMenu.artist),
                         onShuffle: onShuffleArtist ? () => onShuffleArtist(contextMenu.artist) : undefined,
                         onAddToQueue: () => [...contextMenu.artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
-                        onAddToPlaylist: () => console.log('Add artist to playlist', contextMenu.artist),
+                        onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.artist.songs),
                         onShowArtist: () => onOpenArtist(contextMenu.artist),
                         onDelete: onDeleteArtist ? () => handleDeleteClick(contextMenu.artist) : undefined,
                         deleteText: "从音乐库删除",

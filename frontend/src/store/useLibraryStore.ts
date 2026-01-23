@@ -17,6 +17,10 @@ interface LibraryState {
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
     currentSongIndex: number;
+    favoriteSet: Set<number>;
+    pathMap: Map<string, number>; // Cache for path -> id
+    refreshFavorites: () => Promise<void>;
+    isFavorite: (song: SongMetadata | { id?: number | string, path?: string }) => boolean;
 
     addToRecent: (item: RecentItem) => void;
     removeFromRecent: (id: string) => void;
@@ -35,6 +39,8 @@ interface LibraryState {
 
     // 新增：从播放列表中移除特定歌曲（用于同步库删除操作）
     removeSongFromPlaylist: (path: string) => void;
+    // 新增：按索引从显示队列移除（支持重复歌曲的精确删除）
+    removeSongFromPlaylistByIndex: (index: number) => void;
 
     // Add to Queue (Add to end of playlist)
     addToPlaylist: (song: SongMetadata) => void;
@@ -62,6 +68,40 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     playlist: [],
     originalPlaylist: [],
     currentSongIndex: -1,
+
+    // Cache for favorites (Set of IDs)
+    favoriteSet: new Set<number>(),
+    pathMap: new Map<string, number>(),
+
+    isFavorite: (song) => {
+        const { favoriteSet, pathMap } = get();
+        if (song.id && typeof song.id === 'number') return favoriteSet.has(song.id);
+        if (song.path) {
+            const normPath = song.path.replace(/[\\/]/g, '/').toLowerCase();
+            const id = pathMap.get(normPath);
+            if (id) return favoriteSet.has(id);
+        }
+        return false;
+    },
+
+    refreshFavorites: async () => {
+        try {
+            const favs = await libraryService.getFavorites();
+            const ids = new Set(favs.map(s => s.id).filter((id): id is number => id !== undefined));
+
+            // Rebuild path map if empty
+            let currentPathMap = get().pathMap;
+            if (currentPathMap.size === 0) {
+                const all = await libraryService.getLibrarySongs();
+                currentPathMap = new Map<string, number>();
+                all.forEach(s => {
+                    if (s.path && s.id) currentPathMap.set(s.path.replace(/[\\/]/g, '/').toLowerCase(), s.id);
+                });
+            }
+
+            set({ favoriteSet: ids, pathMap: currentPathMap });
+        } catch (e) { console.error('Failed to refresh favorites', e); }
+    },
 
     addToRecent: (item) => set((state) => {
         // 使用 id 去重而不是 path，因为专辑的 id 是 album:name:artist 格式
@@ -97,7 +137,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         const currentSong = playlist[currentSongIndex];
 
         if (enable) {
-            if (originalPlaylist.length === 0) return;
+            if (!originalPlaylist || originalPlaylist.length === 0) return;
 
             // Fisher-Yates 洗牌
             let shuffled = [...originalPlaylist];
@@ -156,7 +196,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         return nextIndex; // 正常下一首
     },
 
-    removeSongFromPlaylist: (path) => {
+    removeSongFromPlaylist: (path: string) => {
         const { playlist, currentSongIndex, originalPlaylist } = get();
 
         // 1. 从播放列表移除
@@ -171,17 +211,12 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         const removingCurrent = playlist[currentSongIndex]?.path === path;
 
         if (removingCurrent) {
-            // 如果移除的是当前播放的歌，是否需要切歌由组件层决定，这里只保证索引指向合理位置
-            // 如果只有这一首，变成 -1
             if (newPlaylist.length === 0) {
                 newIndex = -1;
             } else if (newIndex >= newPlaylist.length) {
-                // 如果是最后一首，指向新的最后一首
                 newIndex = newPlaylist.length - 1;
             }
-            // 如果不是最后一首，索引不变，指向下一首（原 index 指向的位置现在是下一首了）
         } else {
-            // 如果移除的是当前之前的歌，索引减一
             const removedIndex = playlist.findIndex(s => s.path === path);
             if (removedIndex !== -1 && removedIndex < currentSongIndex) {
                 newIndex = currentSongIndex - 1;
@@ -192,7 +227,44 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             playlist: newPlaylist,
             originalPlaylist: newOriginalPlaylist,
             currentSongIndex: newIndex,
-            // 简单处理：清空播放历史，防止 history 指向错误的 index
+            playHistory: []
+        });
+    },
+
+    removeSongFromPlaylistByIndex: (index) => {
+        const { playlist, currentSongIndex, originalPlaylist } = get();
+        if (index < 0 || index >= playlist.length) return;
+
+        const removedSong = playlist[index];
+        const newPlaylist = [...playlist];
+        newPlaylist.splice(index, 1);
+
+        // 同步从 originalPlaylist 移除一首相同的歌 (尽量匹配移除)
+        // 注意：如果 original 也有重复，我们只移除第一首找到的
+        const newOriginalPlaylist = [...originalPlaylist];
+        const originalIdx = newOriginalPlaylist.findIndex(s => s.path === removedSong.path);
+        if (originalIdx !== -1) {
+            newOriginalPlaylist.splice(originalIdx, 1);
+        }
+
+        // 修正当前索引
+        let newIndex = currentSongIndex;
+        if (index === currentSongIndex) {
+            // 移除的是当前播放的
+            if (newPlaylist.length === 0) {
+                newIndex = -1;
+            } else if (newIndex >= newPlaylist.length) {
+                newIndex = newPlaylist.length - 1;
+            }
+        } else if (index < currentSongIndex) {
+            // 移除的是当前之前的
+            newIndex = currentSongIndex - 1;
+        }
+
+        set({
+            playlist: newPlaylist,
+            originalPlaylist: newOriginalPlaylist,
+            currentSongIndex: newIndex,
             playHistory: []
         });
     },
@@ -234,6 +306,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
             // 1. Update global library version to trigger refreshes in other components
             get().triggerLibraryUpdate();
+            get().refreshFavorites();
 
             // 2. Update local playlist state if the song is present
             const { playlist, originalPlaylist } = get();
@@ -260,15 +333,22 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         }
     },
 
-    setPlaylistSettings: (id, settings) => set((state) => ({
-        playlistSettings: {
-            ...state.playlistSettings,
-            [id]: settings
-        }
-    })),
+    setPlaylistSettings: (id, settings) => {
+        set((state) => ({
+            playlistSettings: {
+                ...state.playlistSettings,
+                [id]: settings
+            }
+        }));
+        get().triggerLibraryUpdate();
+    },
 
     getPlaylistSettings: (id) => {
         const { playlistSettings } = get();
+        // Default for Favorites should be 'manual' to respect added order (if backend supports it) or at least not random title sort
+        if (id === 'favorites' && !playlistSettings[id]) {
+            return { sortKey: 'manual', sortOrder: 'asc' };
+        }
         return playlistSettings[id] || { sortKey: 'manual', sortOrder: 'asc' };
     }
 }), {

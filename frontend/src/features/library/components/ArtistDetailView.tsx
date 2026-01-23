@@ -39,6 +39,19 @@ export default function ArtistDetailView({
     onDeleteAlbum,
     onOpenAlbumByName
 }: ArtistDetailViewProps) {
+    // Helper to robustly handle album opening by name
+    const handleOpenAlbumByName = (name: string) => {
+        if (onOpenAlbumByName) {
+            onOpenAlbumByName(name);
+            return;
+        }
+        // Fallback: search in local albums list
+        const found = albums.find(a => a.name === name);
+        if (found) {
+            onOpenAlbum(found);
+        }
+    };
+
     // 默认显示用户上次选择的视图，如果没有则默认为 'songs'
     const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
         try {
@@ -243,7 +256,7 @@ export default function ArtistDetailView({
                                         hideAlbum={true}
                                         disableSort={true}
                                         enableDelete={true}
-                                        onOpenAlbum={onOpenAlbumByName}
+                                        onOpenAlbum={handleOpenAlbumByName}
                                     />
                                 </div>
                             </div>

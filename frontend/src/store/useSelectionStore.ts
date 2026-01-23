@@ -26,8 +26,8 @@ interface SelectionState {
 
 // Helper to check if types are compatible for mixed selection
 const areTypesCompatible = (type1: SelectionType, type2: SelectionType): boolean => {
-    // 'recent' is compatible with file, folder, album (for Recently Used section)
-    const recentTypes: SelectionType[] = ['file', 'folder', 'album', 'recent'];
+    // 'recent' is compatible with file, folder, album, playlist (for Recently Used section)
+    const recentTypes: SelectionType[] = ['file', 'folder', 'album', 'recent', 'playlist'];
     if (recentTypes.includes(type1) && recentTypes.includes(type2)) {
         return true;
     }
@@ -86,8 +86,9 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             // If mixing file/folder/album, set to 'recent'
             let finalType = type;
             if (state.selectionType && areTypesCompatible(state.selectionType, type) && state.selectionType !== type) {
-                if (['file', 'folder', 'album', 'recent'].includes(state.selectionType as string) &&
-                    ['file', 'folder', 'album', 'recent'].includes(type as string)) {
+                const combinedTypes = ['file', 'folder', 'album', 'recent', 'playlist'];
+                if (combinedTypes.includes(state.selectionType as string) &&
+                    combinedTypes.includes(type as string)) {
                     finalType = 'recent';
                 }
             }

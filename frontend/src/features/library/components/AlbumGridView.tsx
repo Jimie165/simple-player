@@ -9,6 +9,7 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import CardPlayButton from '../../../components/common/CardPlayButton';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 
 // 定义专辑数据结构
 export interface AlbumData {
@@ -144,7 +145,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                             onPlay={() => onPlayAlbum(album)}
                                             onShuffle={onShuffleAlbum ? () => onShuffleAlbum(album) : undefined}
                                             onAddToQueue={() => [...album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
-                                            onAddToPlaylist={() => console.log('Add album to playlist', album)}
+                                            onAddToPlaylist={() => useAddToPlaylistStore.getState().open(album.songs)}
                                             onShowAlbum={() => onOpenAlbum(album)}
                                             onShowArtist={(!hideArtist && onOpenArtist && album.artist) ? () => onOpenArtist(album.artist) : undefined}
                                             onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
@@ -182,7 +183,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                         onPlay: () => onPlayAlbum(contextMenu.album),
                         onShuffle: onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined,
                         onAddToQueue: () => [...contextMenu.album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
-                        onAddToPlaylist: () => console.log('Add album to playlist', contextMenu.album),
+                        onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.album.songs),
                         onShowAlbum: () => onOpenAlbum(contextMenu.album),
                         onShowArtist: (!hideArtist && onOpenArtist && contextMenu.album.artist) ? () => onOpenArtist(contextMenu.album.artist) : undefined,
                         onDelete: onDeleteAlbum ? () => handleDeleteClick(contextMenu.album) : undefined,

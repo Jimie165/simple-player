@@ -1,6 +1,6 @@
 import { useState, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdAccessTime, MdPlayArrow } from 'react-icons/md';
+import { MdAccessTime } from 'react-icons/md';
 import { IoCheckbox, IoSquareOutline, IoHeart, IoHeartOutline } from 'react-icons/io5';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
@@ -8,7 +8,7 @@ import InfoDialog from '../../../components/common/InfoDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
-import CoverImage from '../../../components/common/CoverImage';
+import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
@@ -107,7 +107,18 @@ const SongListItem = memo(({
             )}
             onClick={(e) => handleItemClick && handleItemClick(e, song)}
             onDoubleClick={() => {
-                if (!isSelectionMode && onPlay) onPlay(song, index);
+                if (!isSelectionMode && onPlay) {
+                    const { metadata, togglePlay } = usePlayerStore.getState();
+                    const isCurrent = metadata && (
+                        (song.id !== undefined && song.id === metadata.id) ||
+                        (song.path === metadata.path)
+                    );
+                    if (isCurrent) {
+                        togglePlay();
+                    } else {
+                        onPlay(song, index);
+                    }
+                }
             }}
             onContextMenu={(e) => handleContextMenu && handleContextMenu(e, song, index)}
         >
@@ -121,7 +132,22 @@ const SongListItem = memo(({
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
             )}
 
-            {isSelectionMode && (
+            {!isSelectionMode ? (
+                <div className="flex justify-center w-full min-w-[24px]">
+                    <div className="w-6 h-6 flex items-center justify-center">
+                        <span className="text-neutral-500 text-xs font-medium group-hover:hidden">{index + 1}</span>
+                        <div
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (handleCheckboxClick) handleCheckboxClick(e, song);
+                            }}
+                            className="hidden group-hover:flex text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
+                        >
+                            <IoSquareOutline />
+                        </div>
+                    </div>
+                </div>
+            ) : (
                 <div className="flex justify-center w-full min-w-[24px]">
                     <div
                         onClick={(e) => {
@@ -161,15 +187,11 @@ const SongListItem = memo(({
 
             <div className="flex items-center gap-3 overflow-hidden">
                 <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
-                    <CoverImage song={song} className="w-full h-full" />
-                    {!isDragging && onPlay && (
-                        <div
-                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity"
-                            onClick={(e) => { e.stopPropagation(); onPlay(song, index); }}
-                        >
-                            <MdPlayArrow className="text-white text-xl" />
-                        </div>
-                    )}
+                    <SongCoverOverlay
+                        song={song}
+                        className="w-full h-full"
+                        onPlay={() => !isDragging && onPlay && onPlay(song, index)}
+                    />
                 </div>
                 <span className={clsx(
                     "font-medium truncate pr-4",
@@ -537,13 +559,7 @@ export default function SortableSongList({
     };
 
     const getGridCols = () => {
-        let cols = isSelectionMode ? "40px minmax(0,4fr)" : "24px minmax(0,4fr)"; // Selection (40px) or Heart (24px)
-        // Wait, if Selection Mode, we want BOTH.
-        if (isSelectionMode) {
-            cols = "40px 24px minmax(0,4fr)";
-        } else {
-            cols = "24px minmax(0,4fr)";
-        }
+        let cols = "40px 24px minmax(0,4fr)"; // Selection (#/Checkbox) (40px) + Heart (24px) + Title
         cols += " minmax(0,3fr)"; // Artist
         if (!shouldHideAlbum) cols += " minmax(0,3fr)"; // Album
         cols += " 100px 40px"; // Duration, Menu
@@ -666,7 +682,7 @@ export default function SortableSongList({
             />
 
             <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-outline-variant/10 text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl">
-                {isSelectionMode && <div className="text-center"></div>}{/* Selection */}
+                <div className="text-center font-bold">#</div>{/* Index/Checkbox */}
                 <div></div>{/* Heart */}
                 <HeaderCell label="标题" />
                 <HeaderCell label="艺人" />

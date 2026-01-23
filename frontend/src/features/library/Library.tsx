@@ -210,6 +210,18 @@ export default function Library() {
     const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = librarySongs, addToHistory = true) => {
         if (!song.path) return;
 
+        // Check if this is the currently playing song to avoid restart
+        const { metadata, togglePlay } = usePlayerStore.getState();
+        const isCurrent = metadata && (
+            (song.id !== undefined && song.id === metadata.id) ||
+            (song.path === metadata.path)
+        );
+
+        if (isCurrent) {
+            togglePlay();
+            return;
+        }
+
         await audioService.play(song.path, song);
         setMetadata(song);
         setIsPlaying(true);
@@ -403,6 +415,16 @@ export default function Library() {
                                     handlePlaySong(album.songs[0], 0, album.songs, false);
                                 }
                             }}
+                            onShuffleAlbum={(album) => {
+                                if (album.songs.length > 0) {
+                                    const randomIndex = Math.floor(Math.random() * album.songs.length);
+                                    setPlaylist(album.songs);
+                                    setCurrentSongIndex(randomIndex);
+                                    toggleShuffleList(true);
+                                    setShuffleState(true);
+                                    handlePlaySong(album.songs[randomIndex], 0, [], false);
+                                }
+                            }}
                             onOpenAlbum={handleOpenAlbum}
                             onOpenArtist={(artistName) => {
                                 // Find artist data by name
@@ -418,6 +440,16 @@ export default function Library() {
                             onPlayArtist={(artist) => {
                                 if (artist.songs.length > 0) {
                                     handlePlaySong(artist.songs[0], 0, artist.songs);
+                                }
+                            }}
+                            onShuffleArtist={(artist) => {
+                                if (artist.songs.length > 0) {
+                                    const randomIndex = Math.floor(Math.random() * artist.songs.length);
+                                    setPlaylist(artist.songs);
+                                    setCurrentSongIndex(randomIndex);
+                                    toggleShuffleList(true);
+                                    setShuffleState(true);
+                                    handlePlaySong(artist.songs[randomIndex], 0, [], false);
                                 }
                             }}
                             onOpenArtist={handleOpenArtist}

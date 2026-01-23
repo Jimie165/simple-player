@@ -20,8 +20,8 @@ pub struct Song {
     pub artist: String,
     pub album: String,
     pub duration: i64,
-    pub cover: Option<String>,        // 旧字段，保留兼容
-    pub cover_path: Option<String>,   // 新字段：封面文件路径
+    pub cover: Option<String>,      // 旧字段，保留兼容
+    pub cover_path: Option<String>, // 新字段：封面文件路径
     pub folder_id: Option<i64>,
     // 扩展元数据
     pub album_artist: Option<String>,
@@ -80,7 +80,8 @@ pub struct FolderRepo;
 impl FolderRepo {
     /// 获取所有文件夹
     pub fn get_all(conn: &Connection) -> Result<Vec<LibraryFolder>> {
-        let mut stmt = conn.prepare("SELECT id, path, created_at FROM library_folders ORDER BY created_at")?;
+        let mut stmt =
+            conn.prepare("SELECT id, path, created_at FROM library_folders ORDER BY created_at")?;
         let folders = stmt
             .query_map([], |row| {
                 Ok(LibraryFolder {
@@ -100,7 +101,8 @@ impl FolderRepo {
             params![path],
         )?;
 
-        let mut stmt = conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
+        let mut stmt =
+            conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
         stmt.query_row(params![path], |row| {
             Ok(LibraryFolder {
                 id: row.get(0)?,
@@ -123,7 +125,8 @@ impl FolderRepo {
     /// 根据路径获取文件夹
     #[allow(dead_code)]
     pub fn get_by_path(conn: &Connection, path: &str) -> Result<Option<LibraryFolder>> {
-        let mut stmt = conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
+        let mut stmt =
+            conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
         let result = stmt.query_row(params![path], |row| {
             Ok(LibraryFolder {
                 id: row.get(0)?,
@@ -169,20 +172,25 @@ impl SongRepo {
             last_played_at: row.get(17)?,
             is_favorite: row.get::<_, Option<i32>>(18)?.unwrap_or(0) != 0,
             rating: row.get(19)?,
-            status: row.get::<_, Option<String>>(20)?.unwrap_or("active".to_string()),
+            status: row
+                .get::<_, Option<String>>(20)?
+                .unwrap_or("active".to_string()),
             created_at: row.get(21)?,
             updated_at: row.get(22)?,
         })
     }
 
-    const SELECT_COLUMNS: &'static str = 
+    const SELECT_COLUMNS: &'static str =
         "id, path, title, artist, album, duration, cover, cover_path, folder_id, 
          album_artist, year, genre, track_number, track_total, disc_number, disc_total,
          play_count, last_played_at, is_favorite, rating, status, created_at, updated_at";
 
     /// 获取所有活跃歌曲
     pub fn get_all(conn: &Connection) -> Result<Vec<Song>> {
-        let sql = format!("SELECT {} FROM songs WHERE status = 'active' ORDER BY created_at DESC", Self::SELECT_COLUMNS);
+        let sql = format!(
+            "SELECT {} FROM songs WHERE status = 'active' ORDER BY created_at DESC",
+            Self::SELECT_COLUMNS
+        );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
             .query_map([], Self::map_row)?
@@ -192,7 +200,10 @@ impl SongRepo {
 
     /// 获取所有已归档歌曲
     pub fn get_archived(conn: &Connection) -> Result<Vec<Song>> {
-        let sql = format!("SELECT {} FROM songs WHERE status = 'archived' ORDER BY title", Self::SELECT_COLUMNS);
+        let sql = format!(
+            "SELECT {} FROM songs WHERE status = 'archived' ORDER BY title",
+            Self::SELECT_COLUMNS
+        );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
             .query_map([], Self::map_row)?
@@ -230,10 +241,7 @@ impl SongRepo {
 
     /// 根据路径获取歌曲（任意状态）
     pub fn get_by_path_any_status(conn: &Connection, path: &str) -> Result<Option<Song>> {
-        let sql = format!(
-            "SELECT {} FROM songs WHERE path = ?1",
-            Self::SELECT_COLUMNS
-        );
+        let sql = format!("SELECT {} FROM songs WHERE path = ?1", Self::SELECT_COLUMNS);
         let mut stmt = conn.prepare(&sql)?;
         let result = stmt.query_row(params![path], Self::map_row);
         match result {
@@ -246,10 +254,7 @@ impl SongRepo {
     /// 根据 ID 获取歌曲
     #[allow(dead_code)]
     pub fn get_by_id(conn: &Connection, id: i64) -> Result<Option<Song>> {
-        let sql = format!(
-            "SELECT {} FROM songs WHERE id = ?1",
-            Self::SELECT_COLUMNS
-        );
+        let sql = format!("SELECT {} FROM songs WHERE id = ?1", Self::SELECT_COLUMNS);
         let mut stmt = conn.prepare(&sql)?;
         let result = stmt.query_row(params![id], Self::map_row);
         match result {
@@ -312,8 +317,21 @@ impl SongRepo {
         conn.execute(
             sql,
             params![
-                path, title, artist, album, duration, cover, cover_path, folder_id,
-                album_artist, year, genre, track_number, track_total, disc_number, disc_total
+                path,
+                title,
+                artist,
+                album,
+                duration,
+                cover,
+                cover_path,
+                folder_id,
+                album_artist,
+                year,
+                genre,
+                track_number,
+                track_total,
+                disc_number,
+                disc_total
             ],
         )?;
         Ok(())
@@ -339,7 +357,8 @@ impl SongRepo {
             placeholders
         );
         let mut stmt = conn.prepare(&sql)?;
-        let params_refs: Vec<&dyn rusqlite::ToSql> = ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
         stmt.execute(params_refs.as_slice())?;
         Ok(())
     }
@@ -381,8 +400,19 @@ impl SongRepo {
                 updated_at = datetime('now')
             WHERE id = ?14",
             params![
-                title, artist, album, duration, cover, cover_path, album_artist,
-                year, genre, track_number, track_total, disc_number, disc_total,
+                title,
+                artist,
+                album,
+                duration,
+                cover,
+                cover_path,
+                album_artist,
+                year,
+                genre,
+                track_number,
+                track_total,
+                disc_number,
+                disc_total,
                 id
             ],
         )?;
@@ -403,26 +433,31 @@ impl SongRepo {
     }
 
     /// 获取不在给定路径列表中的歌曲
-    pub fn get_songs_not_in_paths(conn: &Connection, folder_id: i64, paths: &[String]) -> Result<Vec<Song>> {
+    pub fn get_songs_not_in_paths(
+        conn: &Connection,
+        folder_id: i64,
+        paths: &[String],
+    ) -> Result<Vec<Song>> {
         if paths.is_empty() {
             return Self::get_by_folder(conn, folder_id);
         }
-        
+
         let placeholders: String = paths.iter().map(|_| "?").collect::<Vec<_>>().join(",");
         let sql = format!(
             "SELECT {} FROM songs WHERE folder_id = ?1 AND path NOT IN ({})",
             Self::SELECT_COLUMNS,
             placeholders
         );
-        
+
         let mut stmt = conn.prepare(&sql)?;
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         params_vec.push(Box::new(folder_id));
         for path in paths {
             params_vec.push(Box::new(path.clone()));
         }
-        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
-        
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+
         let songs = stmt
             .query_map(params_refs.as_slice(), Self::map_row)?
             .collect::<Result<Vec<_>>>()?;
@@ -455,13 +490,13 @@ impl SongRepo {
             "UPDATE songs SET is_favorite = NOT is_favorite, updated_at = datetime('now') WHERE id = ?1",
             params![id],
         )?;
-        
+
         let is_favorite: i32 = conn.query_row(
             "SELECT is_favorite FROM songs WHERE id = ?1",
             params![id],
             |row| row.get(0),
         )?;
-        
+
         Ok(is_favorite != 0)
     }
 
@@ -476,22 +511,30 @@ impl SongRepo {
             placeholders
         );
         let mut stmt = conn.prepare(&sql)?;
-        
+
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         params_vec.push(Box::new(if is_favorite { 1i32 } else { 0i32 }));
         for id in ids {
             params_vec.push(Box::new(*id));
         }
-        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         stmt.execute(params_refs.as_slice())?;
         Ok(())
     }
 
     /// 获取所有收藏的歌曲
-    pub fn get_favorites(conn: &Connection) -> Result<Vec<Song>> {
+    /// sort_order: "asc" 表示升序（旧→新），"desc" 表示降序（新→旧）
+    pub fn get_favorites(conn: &Connection, sort_order: &str) -> Result<Vec<Song>> {
+        let order_clause = if sort_order == "desc" {
+            "updated_at DESC, id DESC"
+        } else {
+            "updated_at ASC, id ASC"
+        };
         let sql = format!(
-            "SELECT {} FROM songs WHERE is_favorite = 1 ORDER BY title",
-            Self::SELECT_COLUMNS
+            "SELECT {} FROM songs WHERE is_favorite = 1 ORDER BY {}",
+            Self::SELECT_COLUMNS,
+            order_clause
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
@@ -544,12 +587,9 @@ impl PlaylistRepo {
 
     /// 创建播放列表
     pub fn create(conn: &Connection, name: &str) -> Result<Playlist> {
-        conn.execute(
-            "INSERT INTO playlists (name) VALUES (?1)",
-            params![name],
-        )?;
+        conn.execute("INSERT INTO playlists (name) VALUES (?1)", params![name])?;
         let id = conn.last_insert_rowid();
-        
+
         let mut stmt = conn.prepare(
             "SELECT id, name, cover_path, description, last_played_at, created_at, updated_at FROM playlists WHERE id = ?1"
         )?;
@@ -596,7 +636,12 @@ impl PlaylistRepo {
     }
 
     /// 更新播放列表基本信息
-    pub fn update_info(conn: &Connection, id: i64, name: &str, description: Option<&str>) -> Result<()> {
+    pub fn update_info(
+        conn: &Connection,
+        id: i64,
+        name: &str,
+        description: Option<&str>,
+    ) -> Result<()> {
         conn.execute(
             "UPDATE playlists SET name = ?1, description = ?2, updated_at = datetime('now') WHERE id = ?3",
             params![name, description, id],
@@ -624,7 +669,10 @@ impl PlaylistRepo {
 
     /// 删除播放列表
     pub fn delete(conn: &Connection, id: i64) -> Result<()> {
-        conn.execute("DELETE FROM playlist_songs WHERE playlist_id = ?1", params![id])?;
+        conn.execute(
+            "DELETE FROM playlist_songs WHERE playlist_id = ?1",
+            params![id],
+        )?;
         conn.execute("DELETE FROM playlists WHERE id = ?1", params![id])?;
         Ok(())
     }
@@ -725,13 +773,14 @@ impl PlaylistRepo {
             placeholders
         );
         let mut stmt = conn.prepare(&sql)?;
-        
+
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         params_vec.push(Box::new(playlist_id));
         for id in song_ids {
             params_vec.push(Box::new(*id));
         }
-        let params_refs: Vec<&dyn rusqlite::ToSql> = params_vec.iter().map(|p| p.as_ref()).collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
         stmt.execute(params_refs.as_slice())?;
 
         conn.execute(
@@ -746,7 +795,7 @@ impl PlaylistRepo {
     pub fn reorder_songs(conn: &Connection, playlist_id: i64, song_ids: &[i64]) -> Result<()> {
         // 使用事务确保原子性
         let mut stmt = conn.prepare(
-            "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND song_id = ?3"
+            "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND song_id = ?3",
         )?;
 
         for (index, song_id) in song_ids.iter().enumerate() {
@@ -763,7 +812,12 @@ impl PlaylistRepo {
 
     /// 更新歌曲在播放列表中的位置
     #[allow(dead_code)]
-    pub fn update_song_position(conn: &Connection, playlist_id: i64, song_id: i64, new_position: i64) -> Result<()> {
+    pub fn update_song_position(
+        conn: &Connection,
+        playlist_id: i64,
+        song_id: i64,
+        new_position: i64,
+    ) -> Result<()> {
         conn.execute(
             "UPDATE playlist_songs SET position = ?1 WHERE playlist_id = ?2 AND song_id = ?3",
             params![new_position, playlist_id, song_id],
@@ -783,7 +837,7 @@ impl PlayQueueRepo {
     pub fn save(conn: &Connection, song_ids: &[i64]) -> Result<()> {
         // 清空现有队列
         conn.execute("DELETE FROM play_queue", [])?;
-        
+
         // 插入新队列
         for (position, song_id) in song_ids.iter().enumerate() {
             conn.execute(
@@ -791,7 +845,7 @@ impl PlayQueueRepo {
                 params![song_id, position as i64],
             )?;
         }
-        
+
         Ok(())
     }
 

@@ -25,6 +25,9 @@ interface PlayerState {
     toggleShuffle: () => void;
     toggleRepeat: () => void;
     togglePlay: () => Promise<void>;
+
+    restartTrigger: number;
+    restartSong: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set, get) => ({
@@ -76,12 +79,24 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     togglePlay: async () => {
         const { isPlaying } = get();
-        if (isPlaying) {
-            await audioService.pause();
-            set({ isPlaying: false });
-        } else {
-            await audioService.resume();
-            set({ isPlaying: true });
+        try {
+            if (isPlaying) {
+                await audioService.pause();
+                set({ isPlaying: false });
+            } else {
+                await audioService.resume();
+                set({ isPlaying: true });
+            }
+        } catch (error) {
+            console.error('Toggle play failed', error);
+            // If we failed to resume, ensure UI shows paused.
+            // If we failed to pause, well, UI probably should show paused to let user try again?
+            // Let's assume sync failed, maybe fetch status? For now, just ensure consistent internal state
+            // If exception, likely backend is unhappy, so default to not playing.
+            if (!isPlaying) set({ isPlaying: false });
         }
     },
+
+    restartTrigger: 0,
+    restartSong: () => set((state) => ({ restartTrigger: state.restartTrigger + 1 })),
 }));

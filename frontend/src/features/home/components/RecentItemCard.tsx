@@ -1,8 +1,13 @@
+import { useState, useEffect } from 'react';
 import { IoPlay, IoFolderOpen, IoMusicalNotes, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle } from 'react-icons/io5';
 import { MdQueueMusic } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import clsx from 'clsx';
-import type { RecentItem } from '../../../types';
+import type { RecentItem, SongMetadata } from '../../../types';
+import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
+import { libraryService } from '../../../services/libraryService';
+import { sortSongs } from '../../../utils/songSort';
+import { useLibraryStore } from '../../../store/useLibraryStore';
 
 interface RecentItemCardProps {
     item: RecentItem;
@@ -13,6 +18,32 @@ interface RecentItemCardProps {
 
 export default function RecentItemCard({ item, onClick, onDelete, onShowProperties }: RecentItemCardProps) {
     const isFile = item.type === 'file';
+    const isPlaylist = item.type === 'playlist';
+
+    // 只有当是 Playlist 且没有预设封面时，才需要动态加载歌曲里的封面
+    const [playlistSongs, setPlaylistSongs] = useState<SongMetadata[]>([]);
+    const { getPlaylistSettings } = useLibraryStore();
+
+    useEffect(() => {
+        if (isPlaylist && !item.cover && !item.cover_path) {
+            const loadSongs = async () => {
+                // Parse ID "playlist:123" -> 123
+                const plIdStr = item.id.replace('playlist:', '');
+                if (plIdStr === 'favorites') {
+                    const songs = await libraryService.getFavorites();
+                    setPlaylistSongs(songs);
+                } else {
+                    const plId = parseInt(plIdStr);
+                    if (!isNaN(plId)) {
+                        const songs = await libraryService.getPlaylistSongs(plId);
+                        const settings = getPlaylistSettings(plId.toString());
+                        setPlaylistSongs(sortSongs(songs, settings.sortKey, settings.sortOrder));
+                    }
+                }
+            };
+            loadSongs();
+        }
+    }, [item, isPlaylist, getPlaylistSettings]);
 
     return (
         <div
@@ -24,6 +55,8 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
             >
                 {item.cover ? (
                     <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
+                ) : isPlaylist ? (
+                    <PlaylistCoverCollage songs={playlistSongs} className="w-full h-full" />
                 ) : (
                     item.type === 'folder'
                         ? <IoFolderOpen className="text-5xl text-blue-400" />

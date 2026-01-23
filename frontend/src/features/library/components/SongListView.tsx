@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MdAccessTime, MdPlayArrow, MdArrowDropUp, MdArrowDropDown } from 'react-icons/md';
+import { MdAccessTime, MdArrowDropUp, MdArrowDropDown } from 'react-icons/md';
 import { IoCheckbox, IoSquareOutline, IoHeart, IoHeartOutline } from 'react-icons/io5';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
@@ -7,7 +7,7 @@ import InfoDialog from '../../../components/common/InfoDialog';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
-import CoverImage from '../../../components/common/CoverImage';
+import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
 
@@ -32,7 +32,7 @@ interface SongListViewProps {
     onOpenAlbum?: (album: string) => void;
 }
 
-type SortKey = 'title' | 'artist' | 'album' | 'duration' | null;
+type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration' | null;
 type SortOrder = 'asc' | 'desc';
 
 export default function SongListView({
@@ -211,7 +211,7 @@ export default function SongListView({
 
     // 排序逻辑
     const sortedSongs = useMemo(() => {
-        if (!sortKey) return songs;
+        if (!sortKey || sortKey === 'manual') return songs;
         return [...songs].sort((a, b) => {
             let valA = a[sortKey];
             let valB = b[sortKey];
@@ -403,7 +403,18 @@ export default function SongListView({
                         <div
                             key={id || index}
                             onDoubleClick={() => {
-                                if (!isSelectionMode) onPlay(song, index);
+                                if (!isSelectionMode) {
+                                    const { metadata, togglePlay } = usePlayerStore.getState();
+                                    const isCurrent = metadata && (
+                                        (song.id !== undefined && song.id === metadata.id) ||
+                                        (song.path === metadata.path)
+                                    );
+                                    if (isCurrent) {
+                                        togglePlay();
+                                    } else {
+                                        onPlay(song, index);
+                                    }
+                                }
                             }}
                             onClick={(e) => handleItemClick(e, song)}
                             onContextMenu={(e) => handleContextMenu(e, song, index)}
@@ -463,13 +474,11 @@ export default function SongListView({
                             <div className="flex items-center gap-3 overflow-hidden">
                                 {!hideCover && (
                                     <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
-                                        <CoverImage song={song} className="w-full h-full" />
-                                        <div
-                                            className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover/cover:opacity-100 transition-opacity"
-                                            onClick={(e) => { e.stopPropagation(); onPlay(song, index); }}
-                                        >
-                                            <MdPlayArrow className="text-white text-xl" />
-                                        </div>
+                                        <SongCoverOverlay
+                                            song={song}
+                                            className="w-full h-full"
+                                            onPlay={() => onPlay(song, index)}
+                                        />
                                     </div>
                                 )}
                                 <span className={clsx(
@@ -545,62 +554,64 @@ export default function SongListView({
                 isOpen={batchConfirmOpen}
                 onClose={() => setBatchConfirmOpen(false)}
                 onConfirm={handleBatchDelete}
-                title="删除选中项"
+                title="从音乐库删除"
                 description={`确定要删除选中的 ${contextMenu?.type === 'batch' ? contextMenu.songs?.length : 0} 项吗？此操作将从音乐库中移除，不会删除本地文件。`}
                 type="danger"
             />
 
             {/* Custom Context Menu */}
-            {contextMenu && (
-                <CursorContextMenu
-                    x={contextMenu.x}
-                    y={contextMenu.y}
-                    onClose={() => setContextMenu(null)}
-                    menuGroups={contextMenu.type === 'batch' && contextMenu.songs ?
-                        // BATCH MODE
-                        getMusicMenuGroups({
-                            type: 'song',
-                            onPlay: () => handleBatchPlay(contextMenu.songs!),
-                            onAddToQueue: () => handleBatchAddToQueue(contextMenu.songs!),
-                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.songs!),
-                            onDelete: enableDelete ? () => setBatchConfirmOpen(true) : undefined,
-                            deleteText: `从音乐库删除 (${contextMenu.songs.length})`,
-                            onFavorite: () => handleBatchFavorite(contextMenu.songs!),
-                            onSelect: () => {
-                                contextMenu.songs?.forEach(s => {
-                                    const sId = s.id ? s.id.toString() : s.path;
-                                    if (sId) deselectItem(sId);
-                                });
-                            },
-                            selectText: `取消选择 (${contextMenu.songs.length})`
-                        })
-                        :
-                        // SINGLE MODE
-                        getMusicMenuGroups({
-                            type: 'song', // @ts-ignore
-                            onPlay: () => onPlay(contextMenu.song!, contextMenu.index!), // @ts-ignore
-                            onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song!), // @ts-ignore
-                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.song!), // @ts-ignore
-                            onShowProperties: () => handleOpenProperties(contextMenu.song!), // @ts-ignore
-                            onShowAlbum: onOpenAlbum && contextMenu.song!.album ? () => onOpenAlbum(contextMenu.song!.album!) : undefined, // @ts-ignore
-                            onShowArtist: onOpenArtist && contextMenu.song!.artist ? () => onOpenArtist(contextMenu.song!.artist!) : undefined, // @ts-ignore
-                            onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song!) : undefined,
-                            deleteText: "从音乐库删除",
-                            onSelect: () => {
-                                const id = contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '';
-                                if (isSelectionMode) {
-                                    toggleSelection(id, 'song', contextMenu.song!); // @ts-ignore
-                                } else {
-                                    toggleSelectionMode({ id, type: 'song', data: contextMenu.song! }); // @ts-ignore
-                                }
-                            }, // @ts-ignore
-                            selectText: selectedIds.has(contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '') ? "取消选择" : "选择",
-                            onFavorite: () => toggleFavorite(contextMenu.song!), // @ts-ignore
-                            isFavorite: contextMenu.song!.is_favorite
-                        })}
-                />
-            )}
-        </div>
+            {
+                contextMenu && (
+                    <CursorContextMenu
+                        x={contextMenu.x}
+                        y={contextMenu.y}
+                        onClose={() => setContextMenu(null)}
+                        menuGroups={contextMenu.type === 'batch' && contextMenu.songs ?
+                            // BATCH MODE
+                            getMusicMenuGroups({
+                                type: 'song',
+                                onPlay: () => handleBatchPlay(contextMenu.songs!),
+                                onAddToQueue: () => handleBatchAddToQueue(contextMenu.songs!),
+                                onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.songs!),
+                                onDelete: enableDelete ? () => setBatchConfirmOpen(true) : undefined,
+                                deleteText: `从音乐库删除 (${contextMenu.songs.length})`,
+                                onFavorite: () => handleBatchFavorite(contextMenu.songs!),
+                                onSelect: () => {
+                                    contextMenu.songs?.forEach(s => {
+                                        const sId = s.id ? s.id.toString() : s.path;
+                                        if (sId) deselectItem(sId);
+                                    });
+                                },
+                                selectText: `取消选择 (${contextMenu.songs.length})`
+                            })
+                            :
+                            // SINGLE MODE
+                            getMusicMenuGroups({
+                                type: 'song', // @ts-ignore
+                                onPlay: () => onPlay(contextMenu.song!, contextMenu.index!), // @ts-ignore
+                                onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song!), // @ts-ignore
+                                onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.song!), // @ts-ignore
+                                onShowProperties: () => handleOpenProperties(contextMenu.song!), // @ts-ignore
+                                onShowAlbum: onOpenAlbum && contextMenu.song!.album ? () => onOpenAlbum(contextMenu.song!.album!) : undefined, // @ts-ignore
+                                onShowArtist: onOpenArtist && contextMenu.song!.artist ? () => onOpenArtist(contextMenu.song!.artist!) : undefined, // @ts-ignore
+                                onDelete: enableDelete && onDelete ? () => handleDeleteClick(contextMenu.song!) : undefined,
+                                deleteText: "从音乐库删除",
+                                onSelect: () => {
+                                    const id = contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '';
+                                    if (isSelectionMode) {
+                                        toggleSelection(id, 'song', contextMenu.song!); // @ts-ignore
+                                    } else {
+                                        toggleSelectionMode({ id, type: 'song', data: contextMenu.song! }); // @ts-ignore
+                                    }
+                                }, // @ts-ignore
+                                selectText: selectedIds.has(contextMenu.song!.id ? contextMenu.song!.id.toString() : contextMenu.song!.path || '') ? "取消选择" : "选择",
+                                onFavorite: () => toggleFavorite(contextMenu.song!), // @ts-ignore
+                                isFavorite: contextMenu.song!.is_favorite
+                            })}
+                    />
+                )
+            }
+        </div >
     );
 }
 

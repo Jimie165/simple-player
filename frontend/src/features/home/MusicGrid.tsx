@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
-import { IoFolderOpen, IoCheckbox, IoSquareOutline } from 'react-icons/io5';
+import { IoFolderOpen, IoCheckbox, IoSquareOutline, IoHeart } from 'react-icons/io5';
 import PageContainer from '../../components/layout/PageContainer';
 import OpenFileMenu from './components/OpenFileMenu';
 import EmptyState from './components/EmptyState';
@@ -21,6 +21,8 @@ import type { MusicItemType } from '../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../components/common/CursorContextMenu';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import CoverImage from '../../components/common/CoverImage';
+import PlaylistCoverCollage from '../../components/common/PlaylistCoverCollage';
+import { sortSongs } from '../../utils/songSort';
 
 import CardPlayButton from '../../components/common/CardPlayButton';
 
@@ -28,9 +30,38 @@ interface MusicGridProps {
     onNavigateToLibrary?: () => void;
 }
 
+/**
+ * 专门为最近播放列表定义的封面组件，负责内部加载歌曲数据以生成拼接封面
+ */
+function PlaylistGridCover({ item }: { item: RecentItem }) {
+    const [songs, setSongs] = useState<SongMetadata[]>([]);
+    const { getPlaylistSettings } = useLibraryStore();
+
+    useEffect(() => {
+        const load = async () => {
+            const plIdStr = item.id.replace('playlist:', '');
+            let plSongs: SongMetadata[] = [];
+            if (plIdStr === 'favorites') {
+                plSongs = await libraryService.getFavorites();
+            } else {
+                const plId = parseInt(plIdStr);
+                if (!isNaN(plId)) {
+                    const raw = await libraryService.getPlaylistSongs(plId);
+                    const settings = getPlaylistSettings(plIdStr);
+                    plSongs = sortSongs(raw, settings.sortKey, settings.sortOrder);
+                }
+            }
+            setSongs(plSongs);
+        };
+        load();
+    }, [item.id, getPlaylistSettings]);
+
+    return <PlaylistCoverCollage songs={songs} className="w-full h-full" />;
+}
+
 export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     // Store Actions
-    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, toggleFavorite } = useLibraryStore();
+    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, favoriteSet, refreshFavorites, libraryVersion } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
     const { push } = useNavigationStore();
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
@@ -45,10 +76,37 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
+    const [pathMap, setPathMap] = useState<Map<string, number>>(new Map()); // Path -> ID mapping for fast lookup
 
     const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, item });
+    };
+
+    // Sync Favorites & Path Map
+    useEffect(() => {
+        refreshFavorites();
+        async function buildPathMap() {
+            const all = await libraryService.scanLibrary();
+            const map = new Map<string, number>();
+            all.forEach(s => {
+                if (s.path && s.id) map.set(s.path.replace(/[\\/]/g, '/').toLowerCase(), s.id);
+            });
+            setPathMap(map);
+        }
+        buildPathMap();
+    }, [libraryVersion, refreshFavorites]);
+
+    // Fast Lookup Helper
+    const getLibraryId = (item: RecentItem): number | undefined => {
+        if (item.type !== 'file') return undefined;
+        const norm = item.path.replace(/[\\/]/g, '/').toLowerCase();
+        return pathMap.get(norm);
+    };
+
+    const isItemFavorite = (item: RecentItem): boolean => {
+        const id = getLibraryId(item);
+        return id !== undefined && favoriteSet.has(id);
     };
 
     // Helper: Play Single File
@@ -62,13 +120,23 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                 artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, path: path
             };
 
-            setPlaylist([safeMeta]);
-            setShuffleState(false);
-            toggleShuffleList(false);
-            setCurrentSongIndex(0);
-            setMetadata(safeMeta);
-            await audioService.play(path, safeMeta);
-            setIsPlaying(true);
+            // 重新开始播放逻辑：如果当前正在播放同一首，强制从头开始
+            const { metadata } = usePlayerStore.getState();
+            const isCurrent = metadata && metadata.path === path;
+
+            if (isCurrent) {
+                await audioService.seek(0);
+                await audioService.play(path, safeMeta);
+                setIsPlaying(true);
+            } else {
+                setPlaylist([safeMeta]);
+                setShuffleState(false);
+                toggleShuffleList(false);
+                setCurrentSongIndex(0);
+                setMetadata(safeMeta);
+                await audioService.play(path, safeMeta);
+                setIsPlaying(true);
+            }
 
             // Add to Recent (File Type)
             addToRecent({
@@ -139,8 +207,84 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
             } catch (err) {
                 console.error("Failed to play recent album", err);
             }
+        } else if (item.type === 'playlist') {
+            try {
+                // Parse ID "playlist:123" -> 123
+                const plIdStr = item.id.replace('playlist:', '');
+                let songs: SongMetadata[] = [];
+
+                if (plIdStr === 'favorites') {
+                    songs = await libraryService.getFavorites();
+                } else {
+                    const plId = parseInt(plIdStr);
+                    if (!isNaN(plId)) {
+                        const rawSongs = await libraryService.getPlaylistSongs(plId);
+                        const { getPlaylistSettings } = useLibraryStore.getState();
+                        const settings = getPlaylistSettings(plIdStr);
+                        songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
+                    }
+                }
+
+                if (songs.length > 0) {
+                    setPlaylist(songs);
+                    setShuffleState(false);
+                    toggleShuffleList(false);
+                    setCurrentSongIndex(0);
+                    const first = songs[0];
+                    if (first.path) {
+                        setMetadata(first);
+                        await audioService.play(first.path, first);
+                        setIsPlaying(true);
+                    }
+                    addToRecent({ ...item, lastPlayed: Date.now() });
+                }
+            } catch (err) {
+                console.error("Failed to play recent playlist", err);
+            }
         } else {
             playSingleFile(item.path, item.isLibraryItem);
+        }
+    };
+
+    // 随机播放逻辑
+    const handleShufflePlay = async (item: RecentItem) => {
+        let songs: SongMetadata[] = [];
+
+        if (item.type === 'playlist') {
+            const plIdStr = item.id.replace('playlist:', '');
+            if (plIdStr === 'favorites') {
+                songs = await libraryService.getFavorites();
+            } else {
+                const plId = parseInt(plIdStr);
+                if (!isNaN(plId)) {
+                    songs = await libraryService.getPlaylistSongs(plId);
+                }
+            }
+        } else if (item.type === 'album') {
+            const allSongs = await libraryService.scanLibrary();
+            songs = allSongs.filter(s => s.album === item.title && (item.artist ? s.artist === item.artist : true));
+        } else if (item.type === 'folder') {
+            songs = await fileService.readFolder(item.path);
+        }
+
+        if (songs.length > 0) {
+            setPlaylist(songs);
+            setShuffleState(true);
+            // 随机开始一首歌
+            const randomIndex = Math.floor(Math.random() * songs.length);
+            setCurrentSongIndex(randomIndex);
+            toggleShuffleList(true); // 开启随机模式（且会将当前 randomIndex 对应的歌放在物理列表第0位）
+
+            const shuffledPlaylist = useLibraryStore.getState().playlist;
+            const firstSong = shuffledPlaylist[0];
+            if (firstSong && firstSong.path) {
+                setMetadata(firstSong);
+                await audioService.play(firstSong.path, firstSong);
+                setIsPlaying(true);
+            }
+            addToRecent({ ...item, lastPlayed: Date.now() });
+        } else if (item.type === 'file') {
+            handleItemClick(item);
         }
     };
 
@@ -170,6 +314,14 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
         }
     };
 
+    // Favorite Logic for Recent Items
+    const handleToggleFavorite = async (item: RecentItem) => {
+        const id = getLibraryId(item);
+        if (id) {
+            await useLibraryStore.getState().toggleFavorite({ id } as SongMetadata);
+        }
+    };
+
     // Join Queue Wrapper in MusicGrid - Now "Play Next"
     const { addToNext } = useLibraryStore();
     const handleJoinQueue = async (item: RecentItem) => {
@@ -191,6 +343,23 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
             const allSongs = await libraryService.scanLibrary();
             const albumSongs = allSongs.filter(s => s.album === item.title && (item.artist ? s.artist === item.artist : true));
             [...albumSongs].reverse().forEach(s => addToNext(s));
+        } else if (item.type === 'playlist') {
+            // Parse ID "playlist:123" -> 123
+            const plIdStr = item.id.replace('playlist:', '');
+            let songs: SongMetadata[] = [];
+
+            if (plIdStr === 'favorites') {
+                songs = await libraryService.getFavorites();
+            } else {
+                const plId = parseInt(plIdStr);
+                if (!isNaN(plId)) {
+                    const rawSongs = await libraryService.getPlaylistSongs(plId);
+                    const { getPlaylistSettings } = useLibraryStore.getState();
+                    const settings = getPlaylistSettings(plIdStr);
+                    songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
+                }
+            }
+            [...songs].reverse().forEach(s => addToNext(s));
         }
     };
 
@@ -325,6 +494,7 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     };
 
     const getMusicType = (item: RecentItem): MusicItemType => {
+        if (item.type === 'playlist') return 'playlist';
         if (item.type === 'file') {
             // Distinguish between library songs and raw files
             return item.isLibraryItem ? 'song' : 'file';
@@ -349,8 +519,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                 isOpen={isDeleteConfirmOpen}
                 onClose={() => setIsDeleteConfirmOpen(false)}
                 onConfirm={confirmDelete}
-                title="删除记录"
-                description={`确定要删除 "${itemToDelete?.title}" 的播放记录吗？这将不会删除本地文件。`}
+                title="删除"
+                description={`确定要删除 "${itemToDelete?.title}" 吗？`}
                 confirmText="删除"
                 type="danger"
             />
@@ -377,6 +547,16 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
                                         {item.type === 'folder' ? (
                                             <IoFolderOpen className="text-6xl text-blue-400 opacity-80" />
+                                        ) : item.type === 'playlist' ? (
+                                            item.id === 'playlist:favorites' ? (
+                                                <div className="w-full h-full bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center">
+                                                    <IoHeart className="text-6xl text-white drop-shadow-md" />
+                                                </div>
+                                            ) : item.cover_path ? (
+                                                <CoverImage src={item.cover_path} className="w-full h-full" />
+                                            ) : (
+                                                <PlaylistGridCover item={item} />
+                                            )
                                         ) : (
                                             <CoverImage
                                                 // Construct a minimal SongMetadata for CoverImage
@@ -392,6 +572,11 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                                                 className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
                                                 iconClassName="text-6xl opacity-50"
                                             />
+                                        )}
+
+                                        {/* Selection Dimming Overlay */}
+                                        {isSelected && (
+                                            <div className="absolute inset-0 bg-black/40 z-10 transition-opacity duration-300" />
                                         )}
 
                                         {/* Selection Checkbox Overlay */}
@@ -421,6 +606,7 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                                                     buttonClassName="w-10 h-10"
                                                     type={getMusicType(item)}
                                                     onPlay={() => handleItemClick(item)}
+                                                    onShuffle={() => handleShufflePlay(item)}
                                                     onAddToQueue={() => handleJoinQueue(item)}
                                                     // Only show AddToPlaylist if it's a library item (Album or Song in Library)
                                                     onAddToPlaylist={(item.type === 'album' || (item.type === 'file' && item.isLibraryItem)) ? () => { console.log('Add to playlist', item) } : undefined}
@@ -432,7 +618,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                                                     onSelect={() => toggleSelectionMode({ id: item.id, type: item.type, data: item })}
                                                     onOpen={() => setContextMenu(null)}
                                                     // Note: Favorites require song ID, which RecentItem (file) might not have. Disabling for now.
-                                                    onFavorite={undefined}
+                                                    onFavorite={item.type === 'file' && item.isLibraryItem ? () => handleToggleFavorite(item) : undefined}
+                                                    isFavorite={isItemFavorite(item)}
                                                 />
                                             </div>
                                         )}
@@ -464,6 +651,7 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                         menuGroups={getMusicMenuGroups({
                             type: getMusicType(contextMenu.item),
                             onPlay: () => handleItemClick(contextMenu.item),
+                            onShuffle: () => handleShufflePlay(contextMenu.item),
                             onAddToQueue: () => handleJoinQueue(contextMenu.item),
                             // Only show AddToPlaylist if it's a library item (Album or Song in Library)
                             onAddToPlaylist: (contextMenu.item.type === 'album' || (contextMenu.item.type === 'file' && contextMenu.item.isLibraryItem)) ? () => { console.log('Add to playlist', contextMenu.item) } : undefined,
@@ -473,7 +661,8 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                             onDelete: () => handleDeleteClick(contextMenu.item),
                             deleteText: "删除",
                             onSelect: () => toggleSelectionMode({ id: contextMenu.item.id, type: contextMenu.item.type, data: contextMenu.item }),
-                            onFavorite: undefined
+                            onFavorite: contextMenu.item.type === 'file' && contextMenu.item.isLibraryItem ? () => handleToggleFavorite(contextMenu.item) : undefined,
+                            isFavorite: isItemFavorite(contextMenu.item)
                         })}
                     />
                 )}

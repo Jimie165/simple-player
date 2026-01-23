@@ -48,6 +48,19 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
 
     const handlePlay = async (song: SongMetadata, index: number) => {
         if (!song.path) return;
+
+        // Check if this is the currently playing song to avoid restart
+        const { metadata, togglePlay } = usePlayerStore.getState();
+        const isCurrent = metadata && (
+            (song.id !== undefined && song.id === metadata.id) ||
+            (song.path === metadata.path)
+        );
+
+        if (isCurrent) {
+            togglePlay();
+            return;
+        }
+
         await audioService.play(song.path, song);
         setMetadata(song);
         setIsPlaying(true);

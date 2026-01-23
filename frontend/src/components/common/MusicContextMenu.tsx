@@ -165,7 +165,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     };
 
     return (
-        <div className={className} onClick={(e) => { e.stopPropagation(); onOpen?.(); }}>
+        <div className={className} onClick={(e) => { e.stopPropagation(); onOpen?.(); }} onDoubleClick={(e) => e.stopPropagation()}>
             <Menu as="div" className="relative">
                 <MenuButton className={getButtonClass()}>
                     <IoEllipsisHorizontal />

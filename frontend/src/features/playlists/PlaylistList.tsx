@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { IoHeart, IoMusicalNotes, IoAdd, IoSearch } from 'react-icons/io5';
 import { MdSort, MdCheck } from 'react-icons/md';
+import clsx from 'clsx';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { useSelectionStore } from '../../store/useSelectionStore';
 
@@ -18,6 +19,7 @@ import EditPlaylistDialog from './components/EditPlaylistDialog';
 import CreatePlaylistDialog from './components/CreatePlaylistDialog';
 import CardPlayButton from '../../components/common/CardPlayButton';
 import PlaylistCoverCollage from '../../components/common/PlaylistCoverCollage';
+import { sortSongs } from '../../utils/songSort';
 
 type SortKey = 'name' | 'recently_added' | 'recently_played';
 
@@ -25,7 +27,15 @@ export default function PlaylistList() {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
     const [searchQuery, setSearchQuery] = useState('');
-    const [sortKey, setSortKey] = useState<SortKey>('recently_added');
+    const [sortKey, setSortKey] = useState<SortKey>(() => {
+        try {
+            const saved = localStorage.getItem('playlist_sort_key');
+            if (saved === 'name' || saved === 'recently_added' || saved === 'recently_played') {
+                return saved;
+            }
+        } catch { }
+        return 'recently_added';
+    });
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [deleteId, setDeleteId] = useState<number | null>(null);
     const [editPlaylist, setEditPlaylist] = useState<Playlist | null>(null);
@@ -33,9 +43,9 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToNext } = useLibraryStore();
+    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToNext, libraryVersion, getPlaylistSettings, addToRecent } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
-    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode } = useSelectionStore();
 
     const loadPlaylists = async () => {
         try {
@@ -46,7 +56,17 @@ export default function PlaylistList() {
         }
     };
 
-    useEffect(() => { loadPlaylists(); }, []);
+    useEffect(() => {
+        // Force refresh when library changes
+        setPlaylistSongs({});
+        loadPlaylists();
+    }, [libraryVersion]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem('playlist_sort_key', sortKey);
+        } catch { }
+    }, [sortKey]);
 
     // Filter & Sort
     const filteredPlaylists = useMemo(() => {
@@ -126,19 +146,49 @@ export default function PlaylistList() {
         const songs = await loadPlaylistSongs(pl.id);
         if (songs.length === 0) return;
 
+        // 记录到最近播放
+        addToRecent({
+            id: `playlist:${pl.id}`,
+            type: 'playlist',
+            title: pl.name,
+            description: `${songs.length} 首歌曲`,
+            cover: null, // Collage is generated dynamically
+            cover_path: pl.cover_path || null,
+            path: songs[0]?.path || "",
+            lastPlayed: Date.now(),
+            isLibraryItem: true
+        });
+
+        // 1. 设置完整列表
         setPlaylist(songs);
-        setShuffleState(shuffle);
-        toggleShuffleList(shuffle);
 
-        const startIndex = shuffle ? Math.floor(Math.random() * songs.length) : 0;
-        setCurrentSongIndex(startIndex);
+        if (shuffle) {
+            // 如果是随机播放：
+            // 选一个随机起始索引
+            const randomIndex = Math.floor(Math.random() * songs.length);
+            const song = songs[randomIndex];
 
-        const song = songs[startIndex];
-        if (!song.path) return;
+            // 设置当前索引并触发随机洗牌（toggleShuffleList 会把该位置的歌洗到第 0 位）
+            setCurrentSongIndex(randomIndex);
+            toggleShuffleList(true);
+            setShuffleState(true);
 
-        await audioService.play(song.path, song);
-        setMetadata(song);
-        setIsPlaying(true);
+            if (song.path) {
+                await audioService.play(song.path, song);
+                setMetadata(song);
+                setIsPlaying(true);
+            }
+        } else {
+            // 普通播放：从第 0 首开始
+            setShuffleState(false);
+            setCurrentSongIndex(0);
+            const song = songs[0];
+            if (song.path) {
+                await audioService.play(song.path, song);
+                setMetadata(song);
+                setIsPlaying(true);
+            }
+        }
 
         // 更新最近播放时间
         libraryService.markPlaylistAsPlayed(pl.id).catch(console.error);
@@ -156,19 +206,44 @@ export default function PlaylistList() {
             const songs = await libraryService.getFavorites();
             if (songs.length === 0) return;
 
+            // 记录到最近播放
+            addToRecent({
+                id: `playlist:favorites`,
+                type: 'playlist',
+                title: '喜爱歌曲',
+                description: `${songs.length} 首歌曲`,
+                cover: null,
+                cover_path: null,
+                path: songs[0]?.path || "",
+                lastPlayed: Date.now(),
+                isLibraryItem: true
+            });
+
             setPlaylist(songs);
-            setShuffleState(shuffle);
-            toggleShuffleList(shuffle);
 
-            const startIndex = shuffle ? Math.floor(Math.random() * songs.length) : 0;
-            setCurrentSongIndex(startIndex);
+            if (shuffle) {
+                const randomIndex = Math.floor(Math.random() * songs.length);
+                const song = songs[randomIndex];
 
-            const song = songs[startIndex];
-            if (!song.path) return;
+                setCurrentSongIndex(randomIndex);
+                toggleShuffleList(true);
+                setShuffleState(true);
 
-            await audioService.play(song.path, song);
-            setMetadata(song);
-            setIsPlaying(true);
+                if (song.path) {
+                    await audioService.play(song.path, song);
+                    setMetadata(song);
+                    setIsPlaying(true);
+                }
+            } else {
+                setShuffleState(false);
+                setCurrentSongIndex(0);
+                const song = songs[0];
+                if (song.path) {
+                    await audioService.play(song.path, song);
+                    setMetadata(song);
+                    setIsPlaying(true);
+                }
+            }
         } catch (error) {
             console.error('Failed to play favorites:', error);
         }
@@ -231,8 +306,9 @@ export default function PlaylistList() {
                 isOpen={!!deleteId}
                 onClose={() => setDeleteId(null)}
                 onConfirm={handleDelete}
-                title="删除播放列表"
-                description="确定要删除此播放列表吗？此操作不可恢复。"
+                title="删除"
+                description="确定要删除此播放列表吗？"
+                confirmText="删除"
                 type="danger"
             />
 
@@ -299,7 +375,7 @@ export default function PlaylistList() {
                             e.preventDefault();
                             setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
                         }}
-                        className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02]"
+                        className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02] rounded-2xl overflow-hidden"
                     >
                         <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
 
@@ -315,7 +391,7 @@ export default function PlaylistList() {
                         </div>
 
                         {/* Hover Overlay - Identical to AlbumGridView */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl">
                             {/* Play Button - Defaults to bottom-3 left-3 */}
                             <CardPlayButton
                                 onClick={(e) => {
@@ -332,6 +408,7 @@ export default function PlaylistList() {
                                 onShuffle={() => handlePlayFavorites(true)}
                                 onAddToQueue={() => handleAddFavoritesToQueue()}
                                 onOpen={() => setFavoritesContextMenu(null)}
+                                hideSelect={true}
                                 isFavorite={true}
                             />
                         </div>
@@ -358,13 +435,28 @@ export default function PlaylistList() {
                             {/* Artwork */}
                             <div className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-all">
                                 <PlaylistCoverCollage
-                                    songs={playlistSongs[pl.id] || []}
+                                    songs={(() => {
+                                        const rawSongs = playlistSongs[pl.id] || [];
+                                        const settings = getPlaylistSettings(pl.id.toString());
+                                        return sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
+                                    })()}
                                     className="transition-transform duration-500 group-hover:scale-105"
                                 />
 
                                 {/* Selection Checkbox */}
                                 {isSelectionMode && (
-                                    <div className={`absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md ${isSelected ? 'bg-primary text-on-primary' : 'bg-black/20 backdrop-blur-md text-white border border-white/30'}`}>
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSelection(pl.id.toString(), 'playlist', pl);
+                                        }}
+                                        className={clsx(
+                                            "absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer",
+                                            isSelected
+                                                ? "bg-primary text-on-primary opacity-100"
+                                                : "bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100"
+                                        )}
+                                    >
                                         {isSelected ? <MdCheck className="text-lg" /> : null}
                                     </div>
                                 )}
@@ -387,8 +479,15 @@ export default function PlaylistList() {
                                             onAddToQueue={() => handleAddToQueue(pl)}
                                             onEdit={() => setEditPlaylist(pl)}
                                             onDelete={() => setDeleteId(pl.id)}
+                                            deleteText="删除"
                                             onOpen={() => setContextMenu(null)}
-                                            onSelect={() => toggleSelection(pl.id.toString(), 'playlist', pl)}
+                                            onSelect={() => {
+                                                if (!isSelectionMode) {
+                                                    toggleSelectionMode({ id: pl.id.toString(), type: 'playlist', data: pl });
+                                                } else {
+                                                    toggleSelection(pl.id.toString(), 'playlist', pl);
+                                                }
+                                            }}
                                         />
                                     </div>
                                 )}
@@ -425,7 +524,14 @@ export default function PlaylistList() {
                         onAddToQueue: () => handleAddToQueue(contextMenu.playlist),
                         onEdit: () => setEditPlaylist(contextMenu.playlist),
                         onDelete: () => setDeleteId(contextMenu.playlist.id),
-                        onSelect: () => toggleSelection(contextMenu.playlist.id.toString(), 'playlist', contextMenu.playlist),
+                        deleteText: "删除",
+                        onSelect: () => {
+                            if (!isSelectionMode) {
+                                toggleSelectionMode({ id: contextMenu.playlist.id.toString(), type: 'playlist', data: contextMenu.playlist });
+                            } else {
+                                toggleSelection(contextMenu.playlist.id.toString(), 'playlist', contextMenu.playlist);
+                            }
+                        },
                     })}
                 />
             )}

@@ -5,7 +5,8 @@ import clsx from 'clsx';
 
 
 import SortableSongList from './SortableSongList';
-import type { SortKey, SortOrder } from './SortableSongList';
+import type { SortKey, SortOrder } from '../../../utils/songSort';
+import { sortSongs } from '../../../utils/songSort';
 import EditPlaylistDialog from './EditPlaylistDialog';
 import CoverImage from '../../../components/common/CoverImage';
 import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
@@ -66,7 +67,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     // Store Actions
     // Store Actions
     const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
-    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList, libraryVersion } = useLibraryStore();
+    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList, libraryVersion, triggerLibraryUpdate } = useLibraryStore();
 
     // Scroll Detection for Sticky Header
     const [isScrolled, setIsScrolled] = useState(false);
@@ -98,7 +99,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             // 1. Load Songs
             let list: SongMetadata[] = [];
             if (id === 'favorites') {
-                list = await libraryService.getFavorites();
+                list = await libraryService.getFavorites(sortKey === 'manual' ? (sortOrder as 'asc' | 'desc') : 'asc');
             } else {
                 list = await libraryService.getPlaylistSongs(id);
             }
@@ -116,7 +117,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             setLoading(false);
             initialLoadRef.current = false;
         }
-    }, [id, libraryVersion]);
+    }, [id, libraryVersion, sortKey, sortOrder]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -124,30 +125,56 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     const handlePlaySong = async (song: SongMetadata, index: number) => {
         if (!song.path) return;
 
-        await audioService.play(song.path, song);
-        setMetadata(song);
-        setIsPlaying(true);
-        setPlaylist(songs);
+        // Check if this is the currently playing song to avoid restart
+        const { metadata, togglePlay } = usePlayerStore.getState();
+        const isCurrent = metadata && (
+            (song.id !== undefined && song.id === metadata.id) ||
+            (song.path === metadata.path)
+        );
 
-        if (usePlayerStore.getState().isShuffling) {
-            setCurrentSongIndex(index);
-            toggleShuffleList(true);
-        } else {
-            setCurrentSongIndex(index);
+        if (isCurrent) {
+            togglePlay();
+            return;
         }
 
-        addToRecent({
-            id: song.path,
-            type: 'file',
-            title: song.title,
-            description: song.artist,
-            cover: song.cover,
-            cover_path: song.cover_path,
-            path: song.path,
-            lastPlayed: Date.now(),
-            artist: song.artist,
-            isLibraryItem: true
-        });
+        try {
+            // Optimistic update
+            setMetadata(song);
+            setIsPlaying(true);
+
+            // Core Logic
+            setPlaylist(songs); // Reset playlist to this list
+
+            // Handle Shuffle Mode
+            if (usePlayerStore.getState().isShuffling) {
+                // Determine the correct index in the new list (which is same as 'index')
+                setCurrentSongIndex(index);
+                // Trigger shuffle which will move this song to front of shuffled list
+                toggleShuffleList(true);
+            } else {
+                setCurrentSongIndex(index);
+            }
+
+            // Audio Play
+            await audioService.play(song.path, song);
+
+            addToRecent({
+                id: song.path,
+                type: 'file',
+                title: song.title,
+                description: song.artist,
+                cover: song.cover,
+                cover_path: song.cover_path,
+                path: song.path,
+                lastPlayed: Date.now(),
+                artist: song.artist,
+                isLibraryItem: true
+            });
+        } catch (err) {
+            console.error("Failed to play song:", err);
+            // Optional: Revert playing state if failed
+            setIsPlaying(false);
+        }
     };
 
     const handlePlayAll = async () => {
@@ -165,40 +192,52 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             const randomIndex = Math.floor(Math.random() * songs.length);
             const song = songs[randomIndex];
 
-            setPlaylist(songs);
-            setCurrentSongIndex(randomIndex);
-            toggleShuffleList(true);
-            setShuffleState(true);
+            try {
+                // 1. 设置完整播放列表
+                setPlaylist(songs);
+                // 2. 设置初始位置并开启洗牌（此操作会将该位置的歌曲洗到列表第 0 位）
+                setCurrentSongIndex(randomIndex);
+                toggleShuffleList(true);
+                setShuffleState(true);
 
-            if (!song.path) return;
-            await audioService.play(song.path, song);
-            setMetadata(song);
-            setIsPlaying(true);
+                if (!song.path) return;
+                // 3. 播放洗牌后的首曲
+                await audioService.play(song.path, song);
+                setMetadata(song);
+                setIsPlaying(true);
 
-            addToRecent({
-                id: song.path,
-                type: 'file',
-                title: song.title,
-                description: song.artist,
-                cover: song.cover,
-                path: song.path,
-                lastPlayed: Date.now(),
-                artist: song.artist
-            });
+                addToRecent({
+                    id: song.path,
+                    type: 'file',
+                    title: song.title,
+                    description: song.artist,
+                    cover: song.cover,
+                    cover_path: song.cover_path || null,
+                    path: song.path,
+                    lastPlayed: Date.now(),
+                    artist: song.artist,
+                    isLibraryItem: true
+                });
 
-            // Track playlist play time
-            if (id !== 'favorites' && typeof id === 'number') {
-                libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                // Track playlist play time
+                if (id !== 'favorites' && typeof id === 'number') {
+                    libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                }
+            } catch (err) {
+                console.error("Shuffle play failed:", err);
+                setIsPlaying(false);
             }
         }
     };
 
+    // Modification Actions
     // Modification Actions
     const handleReorder = async (newOrder: SongMetadata[]) => {
         setSongs(newOrder); // Optimistic update
         if (id !== 'favorites') {
             const songIds = newOrder.map(s => s.id!);
             await libraryService.reorderPlaylistSongs(id as number, songIds);
+            triggerLibraryUpdate();
         }
     };
 
@@ -209,6 +248,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         } else {
             await libraryService.removeFromPlaylist(id as number, song.id!);
             setSongs(prev => prev.filter(s => s.id !== song.id));
+            triggerLibraryUpdate();
         }
     };
 
@@ -254,7 +294,6 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         }
     };
 
-    // Derived State
     const totalDuration = songs.reduce((acc, curr) => acc + curr.duration, 0);
     const formatTotalDuration = (sec: number) => {
         const h = Math.floor(sec / 3600);
@@ -263,45 +302,17 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         return `${m} 分钟`;
     };
 
+    const isFavorites = id === 'favorites';
+
     // Sort & Filter Songs
     const sortedSongs = useMemo(() => {
-        if (sortKey === 'manual') {
-            return sortOrder === 'asc' ? songs : [...songs].reverse();
+        // 对于喜爱歌曲的"播放列表顺序"，后端已经返回了正确的顺序，不需要前端再排序
+        if (isFavorites && sortKey === 'manual') {
+            return songs;
         }
+        return sortSongs(songs, sortKey, sortOrder);
+    }, [songs, sortKey, sortOrder, isFavorites]);
 
-        return [...songs].sort((a, b) => {
-            let key = sortKey as keyof SongMetadata;
-            let valA = a[key];
-            let valB = b[key];
-
-            // Handle Duration separately
-            if (sortKey === 'duration') {
-                const numA = typeof valA === 'number' ? valA : 0;
-                const numB = typeof valB === 'number' ? valB : 0;
-                return sortOrder === 'asc' ? numA - numB : numB - numA;
-            }
-
-            if (valA === undefined || valA === null) valA = '';
-            if (valB === undefined || valB === null) valB = '';
-
-            if (typeof valA === 'string' && typeof valB === 'string') {
-                const isAsciiA = /^[\x00-\x7F]/.test(valA);
-                const isAsciiB = /^[\x00-\x7F]/.test(valB);
-
-                if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
-                if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;
-
-                return sortOrder === 'asc'
-                    ? valA.localeCompare(valB, 'zh-CN', { numeric: true, sensitivity: 'base' })
-                    : valB.localeCompare(valA, 'zh-CN', { numeric: true, sensitivity: 'base' });
-            }
-
-            // Default fallback
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
-    }, [songs, sortKey, sortOrder]);
 
     const filteredSongs = useMemo(() => {
         if (!searchQuery) return sortedSongs;
@@ -313,7 +324,6 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         );
     }, [sortedSongs, searchQuery]);
 
-    const isFavorites = id === 'favorites';
     const displayName = isFavorites ? '喜爱歌曲' : (playlistInfo?.name || initialName);
     const displayDesc = isFavorites ? undefined : playlistInfo?.description;
     const coverPath = isFavorites ? undefined : playlistInfo?.cover_path;

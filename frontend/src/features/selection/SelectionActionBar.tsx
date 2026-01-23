@@ -5,6 +5,7 @@ import { usePlayerStore } from '../../store/usePlayerStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { audioService } from '../../services/audioService';
 import { libraryService } from '../../services/libraryService';
+import { fileService } from '../../services/fileService';
 import { useAddToPlaylistStore } from '../../store/useAddToPlaylistStore';
 import { MdPlayArrow, MdPlaylistAdd, MdAdd, MdDelete, MdMoreHoriz, MdPlaylistRemove } from 'react-icons/md';
 import { IoClose, IoSquareOutline, IoCheckbox, IoHeart, IoHeartOutline } from 'react-icons/io5';
@@ -23,9 +24,9 @@ interface ActionItem {
 
 export default function SelectionActionBar() {
     const { isSelectionMode, selectedIds, selectionType, clearSelection, selectedItemsMap } = useSelectionStore();
-    const { setPlaylist, setCurrentSongIndex, addToNext, removeFromRecent, triggerLibraryUpdate } = useLibraryStore();
+    const { setPlaylist, setCurrentSongIndex, addToNext, removeFromRecent, triggerLibraryUpdate, isFavorite, refreshFavorites, libraryVersion, pathMap, toggleShuffleList } = useLibraryStore();
     const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
-    const { activeOverlay } = useNavigationStore();
+    const { activeOverlay, currentPage } = useNavigationStore();
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [visibleCount, setVisibleCount] = useState(4);
@@ -40,6 +41,20 @@ export default function SelectionActionBar() {
     useEffect(() => {
         if (selectedIds.size === 0) setJustClickedAll(false);
     }, [selectedIds.size]);
+
+    // Sync Favorites
+    useEffect(() => {
+        if (isSelectionMode) {
+            refreshFavorites();
+        }
+    }, [isSelectionMode, libraryVersion, refreshFavorites]);
+
+    // Cleanup selection on navigation
+    useEffect(() => {
+        if (isSelectionMode) {
+            clearSelection();
+        }
+    }, [activeOverlay, currentPage]);
 
     const handleToggleAll = () => {
         if (justClickedAll) {
@@ -91,130 +106,199 @@ export default function SelectionActionBar() {
         return Array.from(selectedIds).map(id => selectedItemsMap.get(id)).filter(Boolean);
     }, [selectedIds, selectedItemsMap]);
 
+    // Determine actual types of all selected items
+    const selectedItemTypes = useMemo(() => {
+        const types = new Set<string>();
+        selectedItems.forEach(item => {
+            if (item.type) {
+                types.add(item.type);
+            } else if (!item.type && (item.path || item.id)) {
+                // Default to 'song' if no type and has path/id
+                types.add('song');
+            }
+        });
+        return types;
+    }, [selectedItems]);
+
+    // Check if all selected items have songs
+
+
     const { syncSongs, hasAsyncItems } = useMemo(() => {
         const songs: SongMetadata[] = [];
         let hasAsync = false;
 
-        if (selectionType === 'song' || selectionType === 'file') {
-            songs.push(...selectedItems.filter(i => i.id && typeof i.id === 'number') as SongMetadata[]);
-        } else if (selectionType === 'playlist') {
-            hasAsync = true;
-        } else if (selectionType === 'album' || selectionType === 'artist') {
-            selectedItems.forEach(item => {
-                if (item.songs && Array.isArray(item.songs)) {
-                    songs.push(...item.songs.filter((s: SongMetadata) => typeof s.id === 'number'));
-                }
-            });
-        }
+        selectedItems.forEach(item => {
+            if (item.type === 'file' || item.type === 'song' || (!item.type && (item.path || item.id))) {
+                songs.push(item as SongMetadata);
+            } else if (item.songs && Array.isArray(item.songs)) {
+                songs.push(...item.songs);
+            } else if (item.type === 'playlist') {
+                hasAsync = true;
+            }
+        });
         return { syncSongs: songs, hasAsyncItems: hasAsync };
-    }, [selectedItems, selectionType]);
+    }, [selectedItems]);
 
-    const isAllFavorited = !hasAsyncItems && syncSongs.length > 0 && syncSongs.every(s => s.is_favorite);
+    const isAllFavorited = useMemo(() => {
+        return !hasAsyncItems && syncSongs.length > 0 && syncSongs.every(s => isFavorite(s));
+    }, [syncSongs, hasAsyncItems, isFavorite, libraryVersion]);
 
     const getSelectedItems = (): any[] => selectedItems;
+
+    const resolveSongsFromSelection = async (items: any[]): Promise<SongMetadata[]> => {
+        const songs: SongMetadata[] = [];
+
+        for (const item of items) {
+            if (item.type === 'playlist') { // Covers both Library Playlist and Recent Playlist
+                try {
+                    // Handle "playlist:123" format from Recent Items or just "123" from Library
+                    const idStr = String(item.id);
+                    const cleanId = idStr.replace('playlist:', '');
+
+                    if (cleanId === 'favorites') {
+                        const favs = await libraryService.getFavorites();
+                        songs.push(...favs);
+                    } else {
+                        const plId = parseInt(cleanId);
+                        if (!isNaN(plId)) {
+                            const plSongs = await libraryService.getPlaylistSongs(plId);
+                            // Apply sort settings if needed, but for playback raw order or default sort is usually fine
+                            // unless we want to match user's view. Getting raw is safer for now.
+                            songs.push(...plSongs);
+                        }
+                    }
+                } catch (e) {
+                    console.error("Failed to resolve playlist:", e);
+                }
+            } else if (item.type === 'album') {
+                // Recent Album or Library Album
+                if (item.songs && Array.isArray(item.songs) && item.songs.length > 0) {
+                    songs.push(...item.songs);
+                } else {
+                    // If no songs attached (e.g. from Recent Grid), scan library
+                    try {
+                        const all = await libraryService.scanLibrary();
+                        // Filter by Album Name and Artist (if available)
+                        const albumSongs = all.filter(s =>
+                            s.album === item.title &&
+                            (item.artist ? s.artist === item.artist : true)
+                        );
+                        songs.push(...albumSongs);
+                    } catch (e) { console.error(e); }
+                }
+            } else if (item.type === 'artist') {
+                if (item.songs && Array.isArray(item.songs) && item.songs.length > 0) {
+                    songs.push(...item.songs);
+                } else {
+                    try {
+                        const all = await libraryService.scanLibrary();
+                        const artistSongs = all.filter(s => s.artist === item.title); // item.title is artist name in Recent? Or item.artist?
+                        // In RecentItem for Artist: title is usually the Artist Name.
+                        songs.push(...artistSongs);
+                    } catch (e) { console.error(e); }
+                }
+            } else if (item.type === 'folder') {
+                if (item.path) {
+                    try {
+                        const folderSongs = await fileService.readFolder(item.path);
+                        songs.push(...folderSongs);
+                    } catch (e) { console.error(e); }
+                }
+            } else if (!item.type && item.songs && Array.isArray(item.songs)) {
+                // Library album/artist selections may not have a type but do have songs
+                songs.push(...item.songs);
+            } else if (item.type === 'file' || item.type === 'song' || item.type === 'recent' || !item.type) {
+                // Handle file, song, recent items, or items without type
+                if (item.path) {
+                    // For recent items (type='file'), we need to fetch full metadata
+                    // because RecentItem structure lacks complete SongMetadata fields
+                    if (item.type === 'file' && typeof item.id === 'string') {
+                        try {
+                            const meta = await fileService.getMetadata(item.path);
+                            if (meta) {
+                                songs.push(meta);
+                                continue;
+                            }
+                        } catch {
+                            // Fall through to use item data as fallback
+                        }
+                    }
+
+                    // For songs with numeric ID or as fallback
+                    const sanitizedId = typeof item.id === 'number' ? item.id : undefined;
+                    const meta: SongMetadata = {
+                        id: sanitizedId,
+                        path: item.path,
+                        title: item.title || item.path.split(/[\\/]/).pop() || 'Unknown',
+                        artist: item.artist || item.description || 'Unknown Artist',
+                        album: item.album || 'Unknown Album',
+                        duration: item.duration || 0,
+                        cover: item.cover || null,
+                        cover_path: item.cover_path || null,
+                    };
+                    songs.push(meta);
+                }
+            } else if (item.songs && Array.isArray(item.songs)) {
+                // Fallback for any other items with songs
+                songs.push(...item.songs);
+            }
+        }
+
+        return songs;
+    };
 
     if (!isSelectionMode) return null;
 
     const handlePlay = async () => {
-        const items = getSelectedItems();
-        if (items.length === 0) return;
+        try {
+            const items = getSelectedItems();
+            if (items.length === 0) return;
 
-        let songsToPlay: SongMetadata[] = [];
+            const songsToPlay = await resolveSongsFromSelection(items);
+            if (songsToPlay.length === 0) return;
 
-        for (const item of items) {
-            if (selectionType === 'song' || selectionType === 'file' || item.type === 'file') {
-                if (item.path) {
-                    songsToPlay.push(item as SongMetadata);
-                }
-            } else if (selectionType === 'album' || selectionType === 'artist' || item.type === 'album') {
-                if (item.songs && Array.isArray(item.songs)) {
-                    songsToPlay.push(...item.songs);
-                }
-            } else if (selectionType === 'recent') {
-                if (item.type === 'file' && item.path) {
-                    songsToPlay.push(item as SongMetadata);
-                } else if ((item.type === 'album' || item.type === 'folder') && item.songs) {
-                    songsToPlay.push(...item.songs);
-                }
-            }
-        }
-
-        if (songsToPlay.length > 0) {
-            setPlaylist(songsToPlay);
-            setShuffleState(false);
-            setCurrentSongIndex(0);
             const first = songsToPlay[0];
-            if (first.path) {
-                setMetadata(first);
-                await audioService.play(first.path, first);
-                setIsPlaying(true);
+            if (!first.path) return;
+
+            // 参考 PlaylistDetail 的正确播放逻辑：
+            // 1. 设置播放列表（这会更新 store 中的 playlist）
+            setPlaylist(songsToPlay);
+
+            // 2. 设置当前索引到第一首歌
+            setCurrentSongIndex(0);
+
+            // 3. 处理洗牌模式（选择播放通常关闭洗牌）
+            if (usePlayerStore.getState().isShuffling) {
+                // 如果当前是洗牌模式，保持洗牌并将第一首歌放到队列顶部
+                toggleShuffleList(true);
             }
+            setShuffleState(false);
+
+            // 4. 调用音频服务播放（这会加载音频）
+            await audioService.play(first.path, first);
+
+            // 5. 设置元数据和播放状态
+            setMetadata(first);
+            setIsPlaying(true);
+
+        } catch (error) {
+            console.error("Failed to play selection:", error);
+            setIsPlaying(false);
+        } finally {
             clearSelection();
-        } else if (selectionType === 'playlist') {
-            // Special async loading for playlists
-            const playlistSongs: SongMetadata[] = [];
-            for (const item of items) {
-                try {
-                    const songs = await libraryService.getPlaylistSongs(item.id);
-                    playlistSongs.push(...songs);
-                } catch (e) { console.error(e); }
-            }
-            if (playlistSongs.length > 0) {
-                setPlaylist(playlistSongs);
-                setShuffleState(false);
-                setCurrentSongIndex(0);
-                const first = playlistSongs[0];
-                if (first.path) {
-                    setMetadata(first);
-                    await audioService.play(first.path, first);
-                    setIsPlaying(true);
-                }
-                clearSelection();
-            }
         }
     };
 
     const handleAddToQueue = async () => {
         const items = getSelectedItems();
-        if (selectionType === 'playlist') {
-            for (const item of items) {
-                try {
-                    const songs = await libraryService.getPlaylistSongs(item.id);
-                    [...songs].reverse().forEach((s: SongMetadata) => addToNext(s));
-                } catch (e) { console.error(e); }
-            }
-        } else {
-            items.forEach(item => {
-                if (item.songs && Array.isArray(item.songs)) {
-                    [...item.songs].reverse().forEach((s: SongMetadata) => addToNext(s));
-                } else if (item.path) {
-                    addToNext(item as SongMetadata);
-                }
-            });
-        }
+        const songsToQueue = await resolveSongsFromSelection(items);
+        [...songsToQueue].reverse().forEach((s: SongMetadata) => addToNext(s));
         clearSelection();
     };
 
     const handleAddToPlaylist = async () => {
         const items = getSelectedItems();
-        let songsToAdd: SongMetadata[] = [];
-
-        if (selectionType === 'playlist') {
-            for (const item of items) {
-                try {
-                    const songs = await libraryService.getPlaylistSongs(item.id);
-                    songsToAdd.push(...songs);
-                } catch (e) { console.error(e); }
-            }
-        } else {
-            items.forEach(item => {
-                if (item.songs && Array.isArray(item.songs)) {
-                    songsToAdd.push(...item.songs);
-                } else if (item.path) {
-                    songsToAdd.push(item as SongMetadata);
-                }
-            });
-        }
+        const songsToAdd = await resolveSongsFromSelection(items);
 
         if (songsToAdd.length > 0) {
             useAddToPlaylistStore.getState().open(songsToAdd);
@@ -243,39 +327,51 @@ export default function SelectionActionBar() {
     const handleDelete = async () => {
         const items = getSelectedItems();
 
-        if (selectionType === 'song') {
-            const ids = items.map(i => i.id).filter(id => typeof id === 'number') as number[];
-            if (ids.length > 0) {
-                await libraryService.batchDeleteSongs(ids);
-                triggerLibraryUpdate();
-            }
-        } else if (selectionType === 'album' || selectionType === 'artist') {
-            const allSongIds: number[] = [];
-            items.forEach(item => {
+        // Handle mixed types - delete based on actual item type
+        const songIds: number[] = [];
+        const playlistIds: (string | number)[] = [];
+        const recentIds: string[] = [];
+
+        items.forEach(item => {
+            if (item.type === 'song' || item.type === 'file' || (!item.type && item.path && typeof item.id === 'number')) {
+                // Song
+                if (typeof item.id === 'number') songIds.push(item.id);
+            } else if (item.type === 'album' || item.type === 'artist') {
+                // Album or Artist - delete all songs
                 if (item.songs && Array.isArray(item.songs)) {
                     item.songs.forEach((s: SongMetadata) => {
-                        if (typeof s.id === 'number') allSongIds.push(s.id);
+                        if (typeof s.id === 'number') songIds.push(s.id);
                     });
                 }
-            });
+            } else if (item.type === 'playlist') {
+                // Playlist
+                if (item.id !== 'favorites') {
+                    playlistIds.push(item.id);
+                }
+            } else if (item.type === 'file' || item.type === 'folder' || item.type === 'recent') {
+                // Recent items
+                if (item.id) recentIds.push(item.id);
+            }
+        });
 
-            if (allSongIds.length > 0) {
-                await libraryService.batchDeleteSongs(allSongIds);
-                triggerLibraryUpdate();
-            }
-        } else if (selectionType === 'playlist') {
-            const ids = items.map(i => i.id).filter(id => id !== 'favorites');
-            for (const id of ids) {
-                try {
-                    await libraryService.deletePlaylist(Number(id));
-                } catch (e) { console.error(e); }
-            }
+        // Delete songs
+        if (songIds.length > 0) {
+            await libraryService.batchDeleteSongs(songIds);
             triggerLibraryUpdate();
-        } else if (selectionType === 'file' || selectionType === 'folder' || selectionType === 'recent') {
-            items.forEach(item => {
-                if (item.id) removeFromRecent(item.id);
-            });
         }
+
+        // Delete playlists
+        for (const id of playlistIds) {
+            try {
+                await libraryService.deletePlaylist(Number(id));
+            } catch (e) { console.error(e); }
+        }
+        if (playlistIds.length > 0) {
+            triggerLibraryUpdate();
+        }
+
+        // Remove recent items
+        recentIds.forEach(id => removeFromRecent(id));
 
         clearSelection();
         setShowDeleteConfirm(false);
@@ -283,44 +379,134 @@ export default function SelectionActionBar() {
 
     // Batch Favorite Handler
     const handleBatchFavorite = async () => {
-        let songsToProcess: SongMetadata[] = [...syncSongs];
-
-        if (selectionType === 'playlist') {
-            for (const item of selectedItems) {
-                try {
-                    const songs = await libraryService.getPlaylistSongs(item.id);
-                    songsToProcess.push(...songs);
-                } catch (e) { console.error(e); }
-            }
-        }
+        const items = getSelectedItems();
+        const songsToProcess = await resolveSongsFromSelection(items);
+        if (songsToProcess.length === 0) return;
 
         const targetIsFavorite = !isAllFavorited;
 
         for (const song of songsToProcess) {
-            if (song.id && !!song.is_favorite !== targetIsFavorite) {
-                try { await libraryService.toggleFavorite(song.id); } catch (e) { }
+            // Resolve effective numeric ID
+            let id = song.id;
+            if (typeof id !== 'number' && song.path) {
+                // Try to resolve from pathMap if ID is missing or string (RecentItem)
+                const normPath = song.path.replace(/[\\/]/g, '/').toLowerCase();
+                // Ensure pathMap exists and look it up
+                if (pathMap) {
+                    const found = pathMap.get(normPath);
+                    if (found) id = found;
+                }
+            }
+
+            // Must have a numeric ID to toggle favorite in Library
+            if (typeof id === 'number') {
+                // Check REAL-TIME status, not the stale status from the item object
+                // We construct a temporary object for isFavorite check if needed, or just leverage id
+                const currentStatus = isFavorite({ ...song, id });
+
+                if (currentStatus !== targetIsFavorite) {
+                    try { await libraryService.toggleFavorite(id); } catch (e) { }
+                }
             }
         }
 
+        // Wait for favorites to refresh before updating UI
+        await refreshFavorites();
         triggerLibraryUpdate();
         clearSelection();
     };
 
-    const allActions: ActionItem[] = [
-        { id: 'play', icon: MdPlayArrow, label: '播放', onClick: handlePlay, variant: 'primary' },
-        {
+    // Capabilities Intersection
+    // Determine which operations are common to all selected item types
+
+    // Allow play/queue for containers (playlist, album, artist, folder) even if songs aren't loaded locally yet
+    // because resolveSongsFromSelection will fetch them.
+    const hasPlayableTypes = selectedItems.length > 0 && selectedItems.every(item =>
+        item.type === 'file' || item.type === 'song' || item.type === 'playlist' ||
+        item.type === 'album' || item.type === 'artist' || item.type === 'folder' ||
+        item.type === 'recent' ||
+        (item.songs && Array.isArray(item.songs)) || item.path
+    );
+
+    const isPlaylistSelection = selectionType === 'playlist';
+
+    const canPlay = hasPlayableTypes;
+
+    // Only 'song' and 'file' types (or items with songs) can be favorited
+    // Explicitly exclude playlists/albums/artists as favorites logic for them is different or not implemented in batch
+    const canFavorite = selectedItems.length > 0 &&
+        !isPlaylistSelection &&
+        !selectedItemTypes.has('playlist') &&
+        !selectedItemTypes.has('folder') &&
+        !selectedItemTypes.has('album') &&
+        !selectedItemTypes.has('artist') &&
+        selectedItems.every(item => {
+            if ('isLibraryItem' in item) return !!item.isLibraryItem;
+            if ('id' in item && typeof item.id === 'number') return true;
+            if (item.type === 'song' || item.type === 'file') return true;
+            return false;
+        });
+
+    // All types can be added to queue
+    const canAddToQueue = hasPlayableTypes;
+
+    // All types can be added to playlist (except playlists themselves might not make sense, but actually we can flatten them)
+    // Let's allow adding playlist contents to another playlist
+    const canAddToPlaylist = hasPlayableTypes;
+
+    // All types can be deleted
+    const canDelete = true;
+
+    // Only remove from playlist when inside a playlist detail
+    const canRemoveFromPlaylist = activeOverlay?.type === 'playlist_detail' &&
+        !selectedItemTypes.has('playlist') && // Don't remove nested playlist objects? (not possible in UI yet)
+        selectedItems.every(i => i.type === 'song' || i.type === 'file'); // Only songs can be removed 
+
+
+    const isMusicLibraryContext = currentPage === 'library' || activeOverlay?.type === 'artist_detail' || activeOverlay?.type === 'album_detail' || activeOverlay?.type === 'playlist_detail';
+    const deleteLabel = isMusicLibraryContext ? '从音乐库删除' : '删除';
+
+    const allActions: ActionItem[] = [];
+
+    if (canPlay) {
+        allActions.push({
+            id: 'play',
+            icon: MdPlayArrow,
+            label: '播放',
+            onClick: handlePlay,
+            variant: 'primary'
+        });
+    }
+
+    if (canFavorite) {
+        allActions.push({
             id: 'favorite',
             icon: isAllFavorited ? IoHeart : IoHeartOutline,
             label: isAllFavorited ? '取消喜爱' : '喜爱',
             onClick: handleBatchFavorite,
             hideLabel: true
-        },
-        { id: 'queue', icon: MdPlaylistAdd, label: '加入播放队列', onClick: handleAddToQueue },
-        { id: 'add', icon: MdAdd, label: '添加到', onClick: handleAddToPlaylist },
-    ];
+        });
+    }
 
-    // Add "Remove from Playlist" if inside a playlist
-    if (activeOverlay?.type === 'playlist_detail') {
+    if (canAddToQueue) {
+        allActions.push({
+            id: 'queue',
+            icon: MdPlaylistAdd,
+            label: '加入播放队列',
+            onClick: handleAddToQueue
+        });
+    }
+
+    if (canAddToPlaylist) {
+        allActions.push({
+            id: 'add',
+            icon: MdAdd,
+            label: '添加到',
+            onClick: handleAddToPlaylist
+        });
+    }
+
+    if (canRemoveFromPlaylist) {
         allActions.push({
             id: 'remove-from-playlist',
             icon: MdPlaylistRemove,
@@ -329,13 +515,15 @@ export default function SelectionActionBar() {
         });
     }
 
-    allActions.push({
-        id: 'delete',
-        icon: MdDelete,
-        label: '从资料库删除',
-        onClick: () => setShowDeleteConfirm(true),
-        variant: 'danger'
-    });
+    if (canDelete) {
+        allActions.push({
+            id: 'delete',
+            icon: MdDelete,
+            label: deleteLabel,
+            onClick: () => setShowDeleteConfirm(true),
+            variant: 'danger'
+        });
+    }
 
     const visibleActions = allActions.slice(0, visibleCount);
     const overflowActions = allActions.slice(visibleCount);
@@ -346,8 +534,11 @@ export default function SelectionActionBar() {
                 isOpen={showDeleteConfirm}
                 onClose={() => setShowDeleteConfirm(false)}
                 onConfirm={handleDelete}
-                title="从资料库删除"
-                description={`确定要从资料库中删除选中的 ${count} 项吗？此操作将从资料库中移除，不会删除本地文件。`}
+                title={deleteLabel}
+                description={isMusicLibraryContext
+                    ? `确定要从音乐库中删除选中的 ${count} 项吗？此操作不可恢复。`
+                    : `确定要删除选中的 ${count} 项吗？`
+                }
                 confirmText="删除"
                 type="danger"
             />

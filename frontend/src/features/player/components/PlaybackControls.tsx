@@ -19,7 +19,8 @@ export default function PlaybackControls() {
         isShuffling, repeatMode,
         togglePlay, setIsPlaying,
         toggleShuffle, toggleRepeat,
-        setMetadata
+        setMetadata,
+        restartTrigger // Destructure trigger
     } = usePlayerStore();
 
     const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory, toggleShuffleList } = useLibraryStore();
@@ -30,14 +31,27 @@ export default function PlaybackControls() {
     // 防抖锁：防止自动播放时连续跳过
     const isAutoChanging = useRef(false);
 
+    // ... (keep playSongByIndex and others)
+
+    // --- 监听 Metadata 变化，添加到最近播放 ---
+    // 已移除：根据用户需求，仅手动点播（点击列表项）才加入最近播放。
+    // 自动切歌和播放器内的上一首/下一首按钮不再记录。
+
     // --- 核心修复：切歌/播放执行函数 ---
     const playSongByIndex = async (index: number, autoPlay: boolean = true) => {
-        if (index < 0 || index >= playlist.length) return;
+        // 增加安全校验：如果索引无效，解锁并退出
+        if (index < 0 || index >= playlist.length) {
+            isAutoChanging.current = false;
+            return;
+        }
+
         const song = playlist[index];
-        if (!song.path) return;
+        if (!song.path) {
+            isAutoChanging.current = false;
+            return;
+        }
 
         // 1. 【修复关键点】无论是不是切新歌，强制先把进度条归零
-        // 这样避免了"单曲循环时 metadata 没变导致 useEffect 不触发重置"的问题
         setCurrentTime(0);
 
         // 更新索引
@@ -53,8 +67,6 @@ export default function PlaybackControls() {
             if (autoPlay) {
                 setIsPlaying(true);
             } else {
-                // 如果不需要自动播放（例如列表结束回到第一首）
-                // 我们调用 pause 让后端停止，但此时后端已经加载了第一首的资源
                 await audioService.pause();
                 setIsPlaying(false);
             }
@@ -62,6 +74,7 @@ export default function PlaybackControls() {
         } catch (err) {
             console.error("Play failed", err);
         } finally {
+            // 确保在 500ms 后释放锁，防止连续触发
             setTimeout(() => {
                 isAutoChanging.current = false;
             }, 500);
@@ -101,43 +114,73 @@ export default function PlaybackControls() {
         }
     };
 
+    // --- 歌曲自然结束的处理逻辑 ---
+    const handleSongEnded = () => {
+        // 检查锁，防止重复触发
+        if (isAutoChanging.current) return;
+        isAutoChanging.current = true;
+
+        if (repeatMode === 'one') {
+            // 单曲循环：重播当前
+            playSongByIndex(currentSongIndex);
+        } else {
+            // 列表播放：切下一首
+            pushHistory(currentSongIndex);
+            const nextIdx = getNextIndex(repeatMode);
+
+            if (nextIdx === -1) {
+                console.log("Playlist ended, returning to start.");
+                playSongByIndex(0, false);
+            } else {
+                playSongByIndex(nextIdx);
+            }
+        }
+    };
+
     const handleBtnShuffle = () => {
         toggleShuffle();
         toggleShuffleList(!isShuffling);
     };
 
     const handleBtnRepeat = () => {
+        // Current: off -> all -> one -> off
+        // We need to know NEXT mode to apply side effects
+        let nextMode = 'off';
+        if (repeatMode === 'off') nextMode = 'all';
+        else if (repeatMode === 'all') nextMode = 'one';
+
+        // Apply side effects BEFORE state update to ensure clean render ?? 
+        // Or after? 
+        // Logic from store:
+        // 'all' -> 'one': isShuffling becomes false in Store.
+        // We also need to sync Library Store.
+
+        if (repeatMode === 'all') { // Transitioning to 'one'
+            // Disable shuffle LIST in library
+            toggleShuffleList(false);
+        }
+
         toggleRepeat();
     };
 
-    // --- 监听 Metadata 变化，添加到最近播放 ---
-    // 监听 Metadata 变化，添加到最近播放 - 移除此逻辑，改由触发播放的源头控制
-    /*
-    useEffect(() => {
-        // ... (removed)
-    }, [metadata, addToRecent]);
-    */
 
-    // 监听 repeatMode 变化，同步物理列表
-    useEffect(() => {
-        if (repeatMode === 'one' && isShuffling === false) {
-            toggleShuffleList(false);
-        }
-    }, [repeatMode]);
 
     // --- 监听 SMTC 事件（Windows 媒体控制按钮）---
     const handleNextRef = useRef(handleNext);
     const handlePrevRef = useRef(handlePrev);
+    const handleSongEndedRef = useRef(handleSongEnded);
 
     // 保持 ref 更新
     useEffect(() => {
         handleNextRef.current = handleNext;
         handlePrevRef.current = handlePrev;
+        handleSongEndedRef.current = handleSongEnded; // Keep ref updated
     });
 
     useEffect(() => {
         let unlistenNext: (() => void) | undefined;
         let unlistenPrev: (() => void) | undefined;
+        let unlistenEnded: (() => void) | undefined;
 
         const setupListeners = async () => {
             unlistenNext = await listen('smtc:next', () => {
@@ -145,6 +188,11 @@ export default function PlaybackControls() {
             });
             unlistenPrev = await listen('smtc:previous', () => {
                 handlePrevRef.current();
+            });
+            // --- 核心修复：监听后端发送的播放结束事件 ---
+            unlistenEnded = await listen('audio:ended', () => {
+                console.log("Audio ended event received from backend.");
+                handleSongEndedRef.current();
             });
         };
 
@@ -167,49 +215,27 @@ export default function PlaybackControls() {
             };
             safeUnlisten(unlistenNext);
             safeUnlisten(unlistenPrev);
+            safeUnlisten(unlistenEnded);
         };
-    }, []);
+    }, [currentSongIndex, repeatMode, playlist]); // 依赖项要完整，确保闭包能拿到最新状态
 
     // --- 自动播放监听 ---
+    // --- 进度条更新与兜底检测 ---
     useEffect(() => {
         let interval: number;
 
         if (isPlaying && !isDragging) {
+            // 改为 500ms 更新一次，响应更灵敏
             interval = window.setInterval(() => {
                 setCurrentTime((prev) => {
-                    // 检测歌曲结束 (留 0.5s buffer)
+                    // 兜底检测 (防止后端事件丢失)
                     if (metadata && metadata.duration > 0 && prev >= metadata.duration - 0.5) {
-
-                        // 检查锁
-                        if (isAutoChanging.current) return prev;
-
-                        // 上锁
-                        isAutoChanging.current = true;
-
-                        if (repeatMode === 'one') {
-                            // 单曲循环：重播当前 (调用 playSongByIndex 会处理重置时间和解锁)
-                            playSongByIndex(currentSongIndex);
-                        } else {
-                            // 列表播放：切下一首
-                            pushHistory(currentSongIndex);
-                            const nextIdx = getNextIndex(repeatMode);
-
-                            if (nextIdx === -1) {
-                                console.log("Playlist ended, returning to start.");
-                                // 1. 回到列表第一首 (Index 0)
-                                // 2. 传入 false，表示不自动播放，而是暂停
-                                playSongByIndex(0, false);
-                                return 0;
-                            }
-
-                            playSongByIndex(nextIdx);
-                        }
-
+                        handleSongEnded();
                         return 0;
                     }
-                    return prev + 1;
+                    return prev + 0.5;
                 });
-            }, 1000);
+            }, 500);
         }
         return () => clearInterval(interval);
     }, [isPlaying, isDragging, metadata, repeatMode, playlist, currentSongIndex]);
@@ -219,7 +245,7 @@ export default function PlaybackControls() {
         setCurrentTime(0);
         // 这里也加一道解锁保险
         isAutoChanging.current = false;
-    }, [metadata]);
+    }, [metadata, restartTrigger]);
 
     // 拖拽处理
     const handleSeekStart = () => setIsDragging(true);

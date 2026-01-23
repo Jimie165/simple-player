@@ -48,7 +48,7 @@ export interface Playlist {
 // 最近播放/历史记录项
 export interface RecentItem {
     id: string; // 通常是路径
-    type: 'file' | 'folder' | 'album';
+    type: 'file' | 'folder' | 'album' | 'artist' | 'playlist';
     title: string;
     description: string;
     cover?: string | null;

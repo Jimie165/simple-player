@@ -82,7 +82,9 @@ function App() {
       // Priority 1: Selection Mode
       if (useSelectionStore.getState().isSelectionMode) {
         useSelectionStore.getState().clearSelection();
-        return true;
+        // User Request: "I need to clear selection mode, AND ALSO return to previous level"
+        // So we return false here to allow the storeGoBack to proceed with popping history/overlay.
+        return false;
       }
 
       // Priority 2: Full Screen

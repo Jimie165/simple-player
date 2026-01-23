@@ -3,7 +3,8 @@ use windows::Foundation::Uri;
 use windows::Media::Core::MediaSource;
 use windows::Media::Playback::{MediaPlaybackItem, MediaPlayer};
 use windows::core::HSTRING;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
+use windows::Foundation::TypedEventHandler;
 
 use crate::modules::library::SongMetadata;
 use super::smtc;
@@ -39,17 +40,27 @@ impl AudioState {
         }
     }
 
-    /// 在应用启动后调用，注入 AppHandle
+    /// 在应用启动后调用，注入 AppHandle 并设置事件监听
     pub fn init_with_app_handle(&self, app_handle: AppHandle) {
         let mut handle_lock = self.app_handle.lock().unwrap();
-        *handle_lock = Some(app_handle);
+        *handle_lock = Some(app_handle.clone());
         
+        // 5. 【核心修复】监听媒体结束事件
+        if let Some(player) = self.player.lock().unwrap().as_ref() {
+            let app_handle_inner = app_handle.clone();
+            
+            // 我们捕捉 MediaEnded 事件并推送到前端
+            // 注意：TypedEventHandler 的闭包是 Send + Sync 的
+            let _ = player.MediaEnded(&TypedEventHandler::new(move |_, _| {
+                // 发送自定义事件到前端
+                let _ = app_handle_inner.emit("audio:ended", ());
+                Ok(())
+            }));
+        }
+
         // 注意：Windows MediaPlayer 的 CommandManager 已经启用，
         // 播放/暂停会自动工作。但上一首/下一首需要前端自行处理，
         // 因为 CommandManager 不会自动切歌。
-        // 
-        // 一个更好的解决方案是在前端使用 MediaSession API，
-        // 或者用户接受 SMTC 只能控制播放/暂停。
     }
 
     pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {

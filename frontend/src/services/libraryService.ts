@@ -60,8 +60,8 @@ export const libraryService = {
         return invoke('batch_toggle_favorite', { ids, isFavorite });
     },
 
-    getFavorites: async (): Promise<SongMetadata[]> => {
-        return invoke('get_favorites');
+    getFavorites: async (sortOrder?: 'asc' | 'desc'): Promise<SongMetadata[]> => {
+        return invoke('get_favorites', { sortOrder });
     },
 
     // ========== 播放统计 ==========

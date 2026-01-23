@@ -1,23 +1,34 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
-import { IoMusicalNotes, IoPlay, IoRemoveCircleOutline } from 'react-icons/io5';
+import { IoMusicalNotes, IoRemoveCircleOutline } from 'react-icons/io5';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useNavigationStore } from '../../../store/useNavigationStore';
 import { audioService } from '../../../services/audioService';
+import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import type { SongMetadata } from '../../../types';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
 import InfoDialog from '../../../components/common/InfoDialog';
+import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
+import { libraryService } from '../../../services/libraryService';
 
 interface PlayQueuePopupProps {
     show: boolean;
 }
 
 export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
-    const { playlist, currentSongIndex, setCurrentSongIndex, removeSongFromPlaylist, addToNext } = useLibraryStore();
-    const { setMetadata, setIsPlaying } = usePlayerStore();
+    const {
+        playlist,
+        currentSongIndex,
+        setCurrentSongIndex,
+        removeSongFromPlaylistByIndex,
+        addToNext,
+        toggleFavorite
+    } = useLibraryStore();
+    const { setMetadata, setIsPlaying, togglePlay, restartSong } = usePlayerStore();
     const { push } = useNavigationStore();
+    const addToPlaylistStore = useAddToPlaylistStore();
 
     // Context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
@@ -26,7 +37,29 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
     const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
     const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
 
+    const activeItemRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (show && activeItemRef.current) {
+            activeItemRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
+        // Auto-close context menu when popup closes
+        if (!show) {
+            setContextMenu(null);
+        }
+    }, [show, currentSongIndex]);
+
     const handlePlay = async (song: SongMetadata, index: number) => {
+        // In the play queue, we strictly use index to define the "current" playing item.
+        // This allows multiple instances of the same song to coexist and be handled separately.
+        if (index === currentSongIndex) {
+            togglePlay();
+            return;
+        }
+
+        // Always reset progress bar display even if metadata allows (for restart same song case)
+        restartSong();
+
         if (!song.path) return;
         setCurrentSongIndex(index);
         try {
@@ -38,15 +71,17 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         }
     };
 
-    const handleRemoveFromQueue = (song: SongMetadata) => {
-        if (song.path) {
-            removeSongFromPlaylist(song.path);
-        }
-    };
-
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
         e.stopPropagation();
+
+        // Simulate a mousedown to close other open menus
+        e.currentTarget.dispatchEvent(new MouseEvent('mousedown', {
+            bubbles: true,
+            cancelable: true,
+            view: window
+        }));
+
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
     };
 
@@ -55,15 +90,46 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         setIsPropertiesOpen(true);
     };
 
-    const handleShowAlbum = (song: SongMetadata) => {
-        if (song.album) {
-            push({ type: 'album_detail', data: { name: song.album } });
+    const handleShowAlbum = async (song: SongMetadata) => {
+        if (!song.album || !song.artist) return;
+
+        // Fetch full library to find the album and its songs to avoid white screen
+        const allSongs = await libraryService.getLibrarySongs();
+        const albumSongs = allSongs.filter(s => s.album === song.album && s.artist === song.artist);
+
+        if (albumSongs.length > 0) {
+            push({
+                type: 'album_detail',
+                data: {
+                    name: song.album,
+                    artist: song.artist,
+                    cover: albumSongs[0].cover || null,
+                    cover_path: albumSongs[0].cover_path || null,
+                    songs: albumSongs
+                }
+            });
         }
     };
 
-    const handleShowArtist = (song: SongMetadata) => {
-        if (song.artist) {
-            push({ type: 'artist_detail', data: { name: song.artist } });
+    const handleShowArtist = async (song: SongMetadata) => {
+        if (!song.artist) return;
+
+        // Fetch full library to find the artist and their songs/albums to avoid white screen
+        const allSongs = await libraryService.getLibrarySongs();
+        const artistSongs = allSongs.filter(s => s.artist === song.artist);
+
+        if (artistSongs.length > 0) {
+            const albums = new Set(artistSongs.map(s => s.album));
+            push({
+                type: 'artist_detail',
+                data: {
+                    name: song.artist,
+                    songs: artistSongs,
+                    albumCount: albums.size,
+                    count: artistSongs.length,
+                    cover: artistSongs[0]?.cover || null
+                }
+            });
         }
     };
 
@@ -103,6 +169,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                             return (
                                 <div
                                     key={index}
+                                    ref={isCurrent ? activeItemRef : null}
                                     onDoubleClick={() => handlePlay(song, index)}
                                     onContextMenu={(e) => handleContextMenu(e, song, index)}
                                     className={clsx(
@@ -112,11 +179,17 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                             : "hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-200"
                                     )}
                                 >
-                                    <div className="w-5 text-center shrink-0 font-medium opacity-60">
-                                        {isCurrent ? <IoPlay /> : index + 1}
+                                    <div className="w-10 h-10 shrink-0 rounded overflow-hidden bg-neutral-200 dark:bg-neutral-800">
+                                        <SongCoverOverlay
+                                            song={song}
+                                            className="w-full h-full"
+                                            onPlay={() => handlePlay(song, index)}
+                                            isActive={isCurrent}
+                                            iconClassName="text-neutral-400"
+                                        />
                                     </div>
 
-                                    <div className="flex-1 flex flex-col min-w-0">
+                                    <div className="flex-1 flex flex-col min-w-0 justify-center">
                                         <span className="truncate font-medium">{song.title || "Unknown Title"}</span>
                                         <span className="truncate text-[10px] opacity-70">{song.artist || "Unknown Artist"}</span>
                                     </div>
@@ -129,15 +202,18 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                             buttonClassName="w-6 h-6"
                                             onPlay={() => handlePlay(song, index)}
                                             onAddToQueue={() => addToNext(song)}
-                                            onAddToPlaylist={() => console.log('Add to playlist', song)}
+                                            onAddToPlaylist={() => addToPlaylistStore.open(song)}
                                             onShowProperties={() => handleShowProperties(song)}
                                             onShowAlbum={song.album ? () => handleShowAlbum(song) : undefined}
                                             onShowArtist={song.artist ? () => handleShowArtist(song) : undefined}
-                                            onDelete={() => handleRemoveFromQueue(song)}
+                                            onDelete={() => removeSongFromPlaylistByIndex(index)}
                                             deleteText="从播放队列移除"
                                             deleteIcon={IoRemoveCircleOutline}
                                             deleteVariant="default"
+                                            onFavorite={() => toggleFavorite(song)}
+                                            isFavorite={song.is_favorite}
                                             hideSelect
+                                            onOpen={() => setContextMenu(null)}
                                         />
                                     </div>
                                 </div>
@@ -157,14 +233,16 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                         type: 'song',
                         onPlay: () => handlePlay(contextMenu.song, contextMenu.index),
                         onAddToQueue: () => addToNext(contextMenu.song),
-                        onAddToPlaylist: () => console.log('Add to playlist', contextMenu.song),
+                        onAddToPlaylist: () => addToPlaylistStore.open(contextMenu.song),
                         onShowProperties: () => handleShowProperties(contextMenu.song),
                         onShowAlbum: contextMenu.song.album ? () => handleShowAlbum(contextMenu.song) : undefined,
                         onShowArtist: contextMenu.song.artist ? () => handleShowArtist(contextMenu.song) : undefined,
-                        onDelete: () => handleRemoveFromQueue(contextMenu.song),
+                        onDelete: () => removeSongFromPlaylistByIndex(contextMenu.index),
                         deleteText: "从播放队列移除",
                         deleteIcon: IoRemoveCircleOutline,
                         deleteVariant: 'default',
+                        onFavorite: () => toggleFavorite(contextMenu.song),
+                        isFavorite: contextMenu.song.is_favorite,
                         hideSelect: true
                     })}
                 />
