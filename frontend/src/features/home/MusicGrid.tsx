@@ -8,11 +8,10 @@ import EmptyState from './components/EmptyState';
 import InfoDialog from '../../components/common/InfoDialog';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useSelectionStore } from '../../store/useSelectionStore';
-import { usePlayerStore } from '../../store/usePlayerStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { fileService } from '../../services/fileService';
-import { audioService } from '../../services/audioService';
 import { libraryService } from '../../services/libraryService';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 
 import type { RecentItem } from '../../types';
 import type { SongMetadata } from '../../types';
@@ -61,8 +60,8 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
 
 export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     // Store Actions
-    const { recentHistory, addToRecent, removeFromRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, favoriteSet, refreshFavorites, libraryVersion } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { recentHistory, removeFromRecent, favoriteSet, refreshFavorites, libraryVersion } = useLibraryStore();
+    const { playSong, playList, shufflePlay } = usePlaybackActions();
     const { push } = useNavigationStore();
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection } = useSelectionStore();
 
@@ -110,7 +109,25 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
     };
 
     // Helper: Play Single File
-    const playSingleFile = async (path: string, isLibraryItem = false) => {
+    const buildRecentForFile = (path: string, meta: SongMetadata, isLibraryItem: boolean, existing?: RecentItem): RecentItem => {
+        if (existing) {
+            return { ...existing, lastPlayed: Date.now() };
+        }
+        return {
+            id: path,
+            type: 'file',
+            title: meta.title,
+            description: meta.artist,
+            cover: meta.cover || null,
+            cover_path: meta.cover_path || null,
+            path,
+            lastPlayed: Date.now(),
+            artist: meta.artist,
+            isLibraryItem
+        };
+    };
+
+    const playSingleFile = async (path: string, isLibraryItem = false, existingRecent?: RecentItem) => {
         try {
             let meta: SongMetadata | null = null;
             try { meta = await fileService.getMetadata(path); } catch { /* ignore metadata errors */ }
@@ -120,37 +137,16 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                 artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, path: path
             };
 
-            // 重新开始播放逻辑：如果当前正在播放同一首，强制从头开始
-            const { metadata } = usePlayerStore.getState();
-            const isCurrent = metadata && metadata.path === path;
-
-            if (isCurrent) {
-                await audioService.seek(0);
-                await audioService.play(path, safeMeta);
-                setIsPlaying(true);
-            } else {
-                setPlaylist([safeMeta]);
-                setShuffleState(false);
-                toggleShuffleList(false);
-                setCurrentSongIndex(0);
-                setMetadata(safeMeta);
-                await audioService.play(path, safeMeta);
-                setIsPlaying(true);
-            }
-
-            // Add to Recent (File Type)
-            addToRecent({
-                id: path,
-                type: 'file',
-                title: safeMeta.title,
-                description: safeMeta.artist,
-                cover: safeMeta.cover,
-                path: path,
-                lastPlayed: Date.now(),
-                artist: safeMeta.artist,
-                isLibraryItem: isLibraryItem
+            await playSong({
+                song: safeMeta,
+                index: 0,
+                playlist: [safeMeta],
+                options: {
+                    restartIfCurrent: true,
+                    recentItem: buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent)
+                }
             });
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error("Play single file failed", err); }
     };
 
     // Core: Handle Recent Item Click
@@ -164,22 +160,27 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
             return;
         }
 
+        // Helper to play a list
+        const playListHelper = async (songs: SongMetadata[]) => {
+            if (songs.length === 0) return;
+            const firstSong = songs[0];
+            if (!firstSong.path) return;
+
+            await playList({
+                songs,
+                startIndex: 0,
+                options: {
+                    restartIfCurrent: true,
+                    recentItem: { ...item, lastPlayed: Date.now() }
+                }
+            });
+        };
+
         // Normal Playback Logic
         if (item.type === 'folder') {
             try {
                 const songs = await fileService.readFolder(item.path);
-                if (songs.length === 0) return;
-                setPlaylist(songs);
-                setShuffleState(false);
-                toggleShuffleList(false);
-                setCurrentSongIndex(0);
-                const firstSong = songs[0];
-                if (firstSong.path) {
-                    setMetadata(firstSong);
-                    await audioService.play(firstSong.path, firstSong);
-                    setIsPlaying(true);
-                }
-                addToRecent({ ...item, lastPlayed: Date.now() });
+                await playListHelper(songs);
             } catch (e) {
                 console.error("Failed to play folder", e);
             }
@@ -190,20 +191,7 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                     s.album === item.title &&
                     (item.artist ? s.artist === item.artist : true)
                 );
-
-                if (albumSongs.length > 0) {
-                    setPlaylist(albumSongs);
-                    setShuffleState(false);
-                    toggleShuffleList(false);
-                    setCurrentSongIndex(0);
-                    const first = albumSongs[0];
-                    if (first.path) {
-                        setMetadata(first);
-                        await audioService.play(first.path, first);
-                        setIsPlaying(true);
-                    }
-                    addToRecent({ ...item, lastPlayed: Date.now() });
-                }
+                await playListHelper(albumSongs);
             } catch (err) {
                 console.error("Failed to play recent album", err);
             }
@@ -224,25 +212,12 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
                         songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
                     }
                 }
-
-                if (songs.length > 0) {
-                    setPlaylist(songs);
-                    setShuffleState(false);
-                    toggleShuffleList(false);
-                    setCurrentSongIndex(0);
-                    const first = songs[0];
-                    if (first.path) {
-                        setMetadata(first);
-                        await audioService.play(first.path, first);
-                        setIsPlaying(true);
-                    }
-                    addToRecent({ ...item, lastPlayed: Date.now() });
-                }
+                await playListHelper(songs);
             } catch (err) {
                 console.error("Failed to play recent playlist", err);
             }
         } else {
-            playSingleFile(item.path, item.isLibraryItem);
+            playSingleFile(item.path, item.isLibraryItem, item);
         }
     };
 
@@ -268,21 +243,10 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
         }
 
         if (songs.length > 0) {
-            setPlaylist(songs);
-            setShuffleState(true);
-            // 随机开始一首歌
-            const randomIndex = Math.floor(Math.random() * songs.length);
-            setCurrentSongIndex(randomIndex);
-            toggleShuffleList(true); // 开启随机模式（且会将当前 randomIndex 对应的歌放在物理列表第0位）
-
-            const shuffledPlaylist = useLibraryStore.getState().playlist;
-            const firstSong = shuffledPlaylist[0];
-            if (firstSong && firstSong.path) {
-                setMetadata(firstSong);
-                await audioService.play(firstSong.path, firstSong);
-                setIsPlaying(true);
-            }
-            addToRecent({ ...item, lastPlayed: Date.now() });
+            await shufflePlay({
+                songs,
+                options: { recentItem: { ...item, lastPlayed: Date.now() } }
+            });
         } else if (item.type === 'file') {
             handleItemClick(item);
         }
@@ -456,26 +420,23 @@ export default function MusicGrid({ onNavigateToLibrary }: MusicGridProps) {
             if (selected && typeof selected === 'string') {
                 const songs = await fileService.readFolder(selected);
                 if (songs.length === 0) return;
-                setPlaylist(songs);
-                setShuffleState(false);
-                toggleShuffleList(false);
-                setCurrentSongIndex(0);
-                const firstSong = songs[0];
-                if (firstSong.path) {
-                    setMetadata(firstSong);
-                    await audioService.play(firstSong.path, firstSong);
-                    setIsPlaying(true);
-                }
                 const folderName = selected.split(/[\\/]/).pop() || "Unknown Folder";
-                addToRecent({
-                    id: selected,
-                    type: 'folder',
-                    title: folderName,
-                    description: `${songs.length} 首歌曲`,
-                    cover: songs[0]?.cover || null,
-                    cover_path: songs[0]?.cover_path || null,
-                    path: selected,
-                    lastPlayed: Date.now()
+                await playList({
+                    songs,
+                    startIndex: 0,
+                    options: {
+                        restartIfCurrent: true,
+                        recentItem: {
+                            id: selected,
+                            type: 'folder',
+                            title: folderName,
+                            description: `${songs.length} 首歌曲`,
+                            cover: songs[0]?.cover || null,
+                            cover_path: songs[0]?.cover_path || null,
+                            path: selected,
+                            lastPlayed: Date.now()
+                        }
+                    }
                 });
             }
         } catch (err) {

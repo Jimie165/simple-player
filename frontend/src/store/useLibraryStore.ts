@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { RecentItem, SongMetadata } from '../types/index';
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
@@ -61,6 +61,42 @@ interface LibraryState {
 import { libraryService } from '../services/libraryService';
 import { usePlayerStore } from './usePlayerStore'; // Assuming we need to sync player metadata too
 
+const MAX_RECENT_ITEMS = 50;
+
+const sanitizeRecentItem = (item: RecentItem): RecentItem => {
+    if (typeof item.cover === 'string' && item.cover.length > 1024) {
+        return { ...item, cover: null };
+    }
+    return item;
+};
+
+const safeStorage = createJSONStorage(() => ({
+    getItem: (name) => localStorage.getItem(name),
+    setItem: (name, value) => {
+        try {
+            localStorage.setItem(name, value);
+        } catch (error) {
+            // Attempt to shrink payload on quota error
+            if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+                try {
+                    const parsed = JSON.parse(value);
+                    if (parsed?.state?.recentHistory?.length) {
+                        parsed.state.recentHistory = parsed.state.recentHistory
+                            .map((item: RecentItem) => sanitizeRecentItem(item))
+                            .slice(0, 20);
+                    }
+                    localStorage.setItem(name, JSON.stringify(parsed));
+                } catch (innerError) {
+                    console.error('Failed to shrink library-store payload', innerError);
+                }
+            } else {
+                console.error('Failed to persist library-store', error);
+            }
+        }
+    },
+    removeItem: (name) => localStorage.removeItem(name)
+}));
+
 export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     recentHistory: [],
     playlistSettings: {},
@@ -104,9 +140,10 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     },
 
     addToRecent: (item) => set((state) => {
+        const safeItem = sanitizeRecentItem(item);
         // 使用 id 去重而不是 path，因为专辑的 id 是 album:name:artist 格式
-        const filtered = state.recentHistory.filter(i => i.id !== item.id);
-        return { recentHistory: [item, ...filtered].slice(0, 100) };
+        const filtered = state.recentHistory.filter(i => i.id !== safeItem.id);
+        return { recentHistory: [safeItem, ...filtered].slice(0, MAX_RECENT_ITEMS) };
     }),
 
     removeFromRecent: (id) => set((state) => ({
@@ -353,6 +390,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     }
 }), {
     name: 'library-store',
+    storage: safeStorage,
     partialize: (state) => ({
         recentHistory: state.recentHistory,
         playlistSettings: state.playlistSettings

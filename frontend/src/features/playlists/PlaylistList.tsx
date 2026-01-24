@@ -7,12 +7,12 @@ import { useSelectionStore } from '../../store/useSelectionStore';
 
 import PageContainer from '../../components/layout/PageContainer';
 import { libraryService } from '../../services/libraryService';
-import { audioService } from '../../services/audioService';
 import type { Playlist, SongMetadata } from '../../types';
 import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 import CursorContextMenu from '../../components/common/CursorContextMenu';
 import MusicContextMenu, { getMusicMenuGroups } from '../../components/common/MusicContextMenu';
 import EditPlaylistDialog from './components/EditPlaylistDialog';
@@ -43,8 +43,9 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToNext, libraryVersion, getPlaylistSettings, addToRecent } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { addToNext, libraryVersion, getPlaylistSettings } = useLibraryStore();
+    const { setShuffleState } = usePlayerStore();
+    const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode } = useSelectionStore();
 
     const loadPlaylists = async () => {
@@ -145,49 +146,27 @@ export default function PlaylistList() {
     const handlePlayPlaylist = async (pl: Playlist, shuffle = false) => {
         const songs = await loadPlaylistSongs(pl.id);
         if (songs.length === 0) return;
-
-        // 记录到最近播放
-        addToRecent({
+        const recentItem = {
             id: `playlist:${pl.id}`,
-            type: 'playlist',
+            type: 'playlist' as const,
             title: pl.name,
             description: `${songs.length} 首歌曲`,
-            cover: null, // Collage is generated dynamically
+            cover: null,
             cover_path: pl.cover_path || null,
             path: songs[0]?.path || "",
             lastPlayed: Date.now(),
             isLibraryItem: true
-        });
-
-        // 1. 设置完整列表
-        setPlaylist(songs);
+        };
 
         if (shuffle) {
-            // 如果是随机播放：
-            // 选一个随机起始索引
-            const randomIndex = Math.floor(Math.random() * songs.length);
-            const song = songs[randomIndex];
-
-            // 设置当前索引并触发随机洗牌（toggleShuffleList 会把该位置的歌洗到第 0 位）
-            setCurrentSongIndex(randomIndex);
-            toggleShuffleList(true);
-            setShuffleState(true);
-
-            if (song.path) {
-                await audioService.play(song.path, song);
-                setMetadata(song);
-                setIsPlaying(true);
-            }
+            await shufflePlay({ songs, options: { recentItem } });
         } else {
-            // 普通播放：从第 0 首开始
             setShuffleState(false);
-            setCurrentSongIndex(0);
-            const song = songs[0];
-            if (song.path) {
-                await audioService.play(song.path, song);
-                setMetadata(song);
-                setIsPlaying(true);
-            }
+            await playList({
+                songs,
+                startIndex: 0,
+                options: { restartIfCurrent: true, recentItem }
+            });
         }
 
         // 更新最近播放时间
@@ -205,11 +184,9 @@ export default function PlaylistList() {
         try {
             const songs = await libraryService.getFavorites();
             if (songs.length === 0) return;
-
-            // 记录到最近播放
-            addToRecent({
+            const recentItem = {
                 id: `playlist:favorites`,
-                type: 'playlist',
+                type: 'playlist' as const,
                 title: '喜爱歌曲',
                 description: `${songs.length} 首歌曲`,
                 cover: null,
@@ -217,33 +194,19 @@ export default function PlaylistList() {
                 path: songs[0]?.path || "",
                 lastPlayed: Date.now(),
                 isLibraryItem: true
-            });
-
-            setPlaylist(songs);
+            };
 
             if (shuffle) {
-                const randomIndex = Math.floor(Math.random() * songs.length);
-                const song = songs[randomIndex];
-
-                setCurrentSongIndex(randomIndex);
-                toggleShuffleList(true);
-                setShuffleState(true);
-
-                if (song.path) {
-                    await audioService.play(song.path, song);
-                    setMetadata(song);
-                    setIsPlaying(true);
-                }
+                await shufflePlay({ songs, options: { recentItem } });
             } else {
                 setShuffleState(false);
-                setCurrentSongIndex(0);
-                const song = songs[0];
-                if (song.path) {
-                    await audioService.play(song.path, song);
-                    setMetadata(song);
-                    setIsPlaying(true);
-                }
+                await playList({
+                    songs,
+                    startIndex: 0,
+                    options: { restartIfCurrent: true, recentItem }
+                });
             }
+
         } catch (error) {
             console.error('Failed to play favorites:', error);
         }

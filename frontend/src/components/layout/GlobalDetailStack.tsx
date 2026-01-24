@@ -1,53 +1,46 @@
 import { useMemo } from 'react';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { audioService } from '../../services/audioService';
 import AlbumDetailView from '../../features/library/components/AlbumDetailView';
 import ArtistDetailView from '../../features/library/components/ArtistDetailView';
 import PlaylistDetail from '../../features/playlists/components/PlaylistDetail';
 import type { AlbumData } from '../../features/library/components/AlbumGridView';
 import type { ArtistData } from '../../features/library/components/ArtistGridView';
 import type { SongMetadata } from '../../types';
+import type { RecentItem } from '../../types';
 import { useSelectionStore } from '../../store/useSelectionStore';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 
 export default function GlobalDetailStack() {
     const { overlayStack, push, pop } = useNavigationStore();
-    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList, originalPlaylist, playlist } = useLibraryStore();
-    const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
+    const { addToRecent, originalPlaylist, playlist } = useLibraryStore();
+    const { playSong, shufflePlay } = usePlaybackActions();
 
     // Helper: Play Song Logic
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true) => {
-        if (!song.path) return;
+    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
+        id: song.path || '',
+        type: 'file',
+        title: song.title,
+        description: song.artist,
+        cover: song.cover || null,
+        cover_path: song.cover_path || null,
+        path: song.path || '',
+        lastPlayed: Date.now(),
+        isLibraryItem: true,
+        artist: song.artist
+    });
 
-        await audioService.play(song.path, song);
-        setMetadata(song);
-        setIsPlaying(true);
-
-        if (scopeSongs.length > 0) {
-            setPlaylist(scopeSongs);
-            if (usePlayerStore.getState().isShuffling) {
-                setCurrentSongIndex(index);
-                toggleShuffleList(true);
-            } else {
-                setCurrentSongIndex(index);
+    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean }) => {
+        await playSong({
+            song,
+            index,
+            playlist: scopeSongs,
+            options: {
+                ...options,
+                addToRecent: addToHistory,
+                recentItem: addToHistory ? buildRecentForSong(song) : undefined
             }
-        }
-
-        if (addToHistory) {
-            addToRecent({
-                id: song.path,
-                type: 'file',
-                title: song.title,
-                description: song.artist,
-                cover: song.cover,
-                cover_path: song.cover_path || null,
-                path: song.path,
-                lastPlayed: Date.now(),
-                isLibraryItem: true,
-                artist: song.artist
-            });
-        }
+        });
     };
 
     // Navigation Helpers
@@ -88,10 +81,6 @@ export default function GlobalDetailStack() {
                                 data={activeView.data as AlbumData}
                                 onPlaySong={handlePlaySong}
                                 addToRecent={addToRecent}
-                                setPlaylist={setPlaylist}
-                                setCurrentSongIndex={setCurrentSongIndex}
-                                toggleShuffleList={toggleShuffleList}
-                                setShuffleState={setShuffleState}
                                 onOpenArtistByName={handleOpenArtistByName}
                             />
                         );
@@ -101,10 +90,6 @@ export default function GlobalDetailStack() {
                                 data={activeView.data as ArtistData}
                                 onPlaySong={handlePlaySong}
                                 addToRecent={addToRecent}
-                                setPlaylist={setPlaylist}
-                                setCurrentSongIndex={setCurrentSongIndex}
-                                toggleShuffleList={toggleShuffleList}
-                                setShuffleState={setShuffleState}
                                 push={push}
                                 onOpenArtistByName={handleOpenArtistByName}
                             />
@@ -128,21 +113,17 @@ export default function GlobalDetailStack() {
 
 interface OverlayProps {
     data: any;
-    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean) => void;
+    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean }) => void;
     addToRecent: (item: any) => void;
-    setPlaylist: (songs: SongMetadata[]) => void;
-    setCurrentSongIndex: (index: number) => void;
-    toggleShuffleList: (enable: boolean) => void;
-    setShuffleState: (state: boolean) => void;
     push?: (view: any) => void;
     onOpenArtistByName: (name: string) => void;
 }
 
-function AlbumOverlay({ data: albumData, onPlaySong, addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, setShuffleState, onOpenArtistByName }: OverlayProps) {
+function AlbumOverlay({ data: albumData, onPlaySong, addToRecent, onOpenArtistByName }: OverlayProps) {
     return (
         <AlbumDetailView
             album={albumData}
-            onPlay={(song, idx) => onPlaySong(song, idx, albumData.songs)}
+            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs, true, options)}
             onPlayAll={() => {
                 addToRecent({
                     id: `album:${albumData.name}:${albumData.artist}`,
@@ -156,16 +137,11 @@ function AlbumOverlay({ data: albumData, onPlaySong, addToRecent, setPlaylist, s
                     lastPlayed: Date.now(),
                     isLibraryItem: true
                 });
-                if (albumData.songs.length > 0) onPlaySong(albumData.songs[0], 0, albumData.songs, false);
+                if (albumData.songs.length > 0) onPlaySong(albumData.songs[0], 0, albumData.songs, false, { restartIfCurrent: true });
             }}
             onShuffle={() => {
                 if (albumData.songs.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * albumData.songs.length);
-                    setPlaylist(albumData.songs);
-                    setCurrentSongIndex(randomIndex);
-                    toggleShuffleList(true);
-                    setShuffleState(true);
-                    onPlaySong(albumData.songs[randomIndex], 0, [], false);
+                    shufflePlay({ songs: albumData.songs });
                 }
             }}
             onDeleteSong={() => { }} // TODO: Global Delete
@@ -175,7 +151,7 @@ function AlbumOverlay({ data: albumData, onPlaySong, addToRecent, setPlaylist, s
     );
 }
 
-function ArtistOverlay({ data: artistData, onPlaySong, addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, setShuffleState, push, onOpenArtistByName }: OverlayProps) {
+function ArtistOverlay({ data: artistData, onPlaySong, addToRecent, push, onOpenArtistByName }: OverlayProps) {
     // Correct usage of useMemo: It is now at the top level of this component
     const artistAlbums = useMemo(() => {
         const map = new Map<string, AlbumData>();
@@ -218,21 +194,16 @@ function ArtistOverlay({ data: artistData, onPlaySong, addToRecent, setPlaylist,
                     lastPlayed: Date.now(),
                     isLibraryItem: true
                 });
-                if (artistData.songs.length > 0) onPlaySong(artistData.songs[0], 0, artistData.songs, false);
+                if (artistData.songs.length > 0) onPlaySong(artistData.songs[0], 0, artistData.songs, false, { restartIfCurrent: true });
             }}
             onShuffle={() => {
                 if (artistData.songs.length > 0) {
-                    const randomIndex = Math.floor(Math.random() * artistData.songs.length);
-                    setPlaylist(artistData.songs);
-                    setCurrentSongIndex(randomIndex);
-                    toggleShuffleList(true);
-                    setShuffleState(true);
-                    onPlaySong(artistData.songs[randomIndex], 0, [], false);
+                    shufflePlay({ songs: artistData.songs });
                 }
             }}
             onPlayAlbum={handleOpenAlbum}
             onOpenAlbum={handleOpenAlbum}
-            onPlaySong={(song, idx) => onPlaySong(song, idx, artistData.songs)}
+            onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options)}
             onDeleteSong={() => { }}
             onDeleteAlbum={() => { }}
             onOpenArtistByName={onOpenArtistByName}

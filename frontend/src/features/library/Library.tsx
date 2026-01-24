@@ -15,12 +15,13 @@ import type { AlbumData } from './components/AlbumGridView';
 import type { ArtistData } from './components/ArtistGridView';
 
 import { libraryService } from '../../services/libraryService';
-import { audioService } from '../../services/audioService';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { useSelectionStore } from '../../store/useSelectionStore';
 import type { SongMetadata } from '../../types';
+import type { RecentItem } from '../../types';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
@@ -49,7 +50,8 @@ export default function Library() {
     // Store Actions
     // Store Actions
     const { addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, libraryVersion } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { setShuffleState } = usePlayerStore();
+    const { playSong, shufflePlay } = usePlaybackActions();
     const { push } = useNavigationStore();
 
     // Local State
@@ -207,55 +209,36 @@ export default function Library() {
         if (found) handleOpenAlbum(found);
     };
 
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = librarySongs, addToHistory = true) => {
-        if (!song.path) return;
+    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
+        id: song.path || '',
+        type: 'file',
+        title: song.title,
+        description: song.artist,
+        cover: song.cover || null,
+        cover_path: song.cover_path || null,
+        path: song.path || '',
+        lastPlayed: Date.now(),
+        artist: song.artist,
+        isLibraryItem: true
+    });
 
-        // Check if this is the currently playing song to avoid restart
-        const { metadata, togglePlay } = usePlayerStore.getState();
-        const isCurrent = metadata && (
-            (song.id !== undefined && song.id === metadata.id) ||
-            (song.path === metadata.path)
-        );
-
-        if (isCurrent) {
-            togglePlay();
-            return;
-        }
-
-        await audioService.play(song.path, song);
-        setMetadata(song);
-        setIsPlaying(true);
-
-        // 只有当传入了 scopeSongs 时才重置列表
-        // 如果我们已经手动设置了洗牌后的列表（传入空数组），就跳过这一步
-        if (scopeSongs.length > 0) {
-            setPlaylist(scopeSongs);
-            // 关键修复：检查当前的随机状态，如果是开启的，则立即对新列表进行洗牌
-            if (usePlayerStore.getState().isShuffling) {
-                // 先设置索引到目标歌曲（在原始列表中）
-                setCurrentSongIndex(index);
-                // 执行洗牌，并把这首歌置顶
-                toggleShuffleList(true);
-            } else {
-                setCurrentSongIndex(index);
+    const handlePlaySong = async (
+        song: SongMetadata,
+        index: number,
+        scopeSongs: SongMetadata[] = librarySongs,
+        addToHistory = true,
+        options?: { restartIfCurrent?: boolean }
+    ) => {
+        await playSong({
+            song,
+            index,
+            playlist: scopeSongs,
+            options: {
+                ...options,
+                addToRecent: addToHistory,
+                recentItem: addToHistory ? buildRecentForSong(song) : undefined
             }
-        }
-
-        if (addToHistory) {
-
-            addToRecent({
-                id: song.path,
-                type: 'file',
-                title: song.title,
-                description: song.artist,
-                cover: song.cover,
-                cover_path: song.cover_path || null,
-                path: song.path,
-                lastPlayed: Date.now(),
-                isLibraryItem: true,
-                artist: song.artist
-            });
-        }
+        });
     };
 
     // --------------------------------------------------------
@@ -389,7 +372,7 @@ export default function Library() {
                     {currentTab === 'songs' && (
                         <SongListView
                             songs={librarySongs}
-                            onPlay={(song) => handlePlaySong(song, librarySongs.indexOf(song))}
+                            onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
                             onDelete={deleteSong}
                             onOpenArtist={handleOpenArtistByName}
                             onOpenAlbum={handleOpenAlbumByName}
@@ -412,17 +395,12 @@ export default function Library() {
                                     isLibraryItem: true
                                 });
                                 if (album.songs.length > 0) {
-                                    handlePlaySong(album.songs[0], 0, album.songs, false);
+                                    handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true });
                                 }
                             }}
                             onShuffleAlbum={(album) => {
                                 if (album.songs.length > 0) {
-                                    const randomIndex = Math.floor(Math.random() * album.songs.length);
-                                    setPlaylist(album.songs);
-                                    setCurrentSongIndex(randomIndex);
-                                    toggleShuffleList(true);
-                                    setShuffleState(true);
-                                    handlePlaySong(album.songs[randomIndex], 0, [], false);
+                                    shufflePlay({ songs: album.songs });
                                 }
                             }}
                             onOpenAlbum={handleOpenAlbum}
@@ -439,17 +417,12 @@ export default function Library() {
                             artists={artists}
                             onPlayArtist={(artist) => {
                                 if (artist.songs.length > 0) {
-                                    handlePlaySong(artist.songs[0], 0, artist.songs);
+                                    handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true });
                                 }
                             }}
                             onShuffleArtist={(artist) => {
                                 if (artist.songs.length > 0) {
-                                    const randomIndex = Math.floor(Math.random() * artist.songs.length);
-                                    setPlaylist(artist.songs);
-                                    setCurrentSongIndex(randomIndex);
-                                    toggleShuffleList(true);
-                                    setShuffleState(true);
-                                    handlePlaySong(artist.songs[randomIndex], 0, [], false);
+                                    shufflePlay({ songs: artist.songs });
                                 }
                             }}
                             onOpenArtist={handleOpenArtist}

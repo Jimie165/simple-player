@@ -3,7 +3,7 @@ import { useSelectionStore } from '../../store/useSelectionStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
-import { audioService } from '../../services/audioService';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 import { libraryService } from '../../services/libraryService';
 import { fileService } from '../../services/fileService';
 import { useAddToPlaylistStore } from '../../store/useAddToPlaylistStore';
@@ -24,8 +24,9 @@ interface ActionItem {
 
 export default function SelectionActionBar() {
     const { isSelectionMode, selectedIds, selectionType, clearSelection, selectedItemsMap } = useSelectionStore();
-    const { setPlaylist, setCurrentSongIndex, addToNext, removeFromRecent, triggerLibraryUpdate, isFavorite, refreshFavorites, libraryVersion, pathMap, toggleShuffleList } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { addToNext, removeFromRecent, triggerLibraryUpdate, isFavorite, refreshFavorites, libraryVersion, pathMap, toggleShuffleList } = useLibraryStore();
+    const { setShuffleState } = usePlayerStore();
+    const { playList } = usePlaybackActions();
     const { activeOverlay, currentPage } = useNavigationStore();
 
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -257,33 +258,21 @@ export default function SelectionActionBar() {
             const songsToPlay = await resolveSongsFromSelection(items);
             if (songsToPlay.length === 0) return;
 
-            const first = songsToPlay[0];
-            if (!first.path) return;
-
-            // 参考 PlaylistDetail 的正确播放逻辑：
-            // 1. 设置播放列表（这会更新 store 中的 playlist）
-            setPlaylist(songsToPlay);
-
-            // 2. 设置当前索引到第一首歌
-            setCurrentSongIndex(0);
-
-            // 3. 处理洗牌模式（选择播放通常关闭洗牌）
+            // 处理洗牌模式（选择播放通常关闭洗牌）
             if (usePlayerStore.getState().isShuffling) {
                 // 如果当前是洗牌模式，保持洗牌并将第一首歌放到队列顶部
                 toggleShuffleList(true);
             }
             setShuffleState(false);
 
-            // 4. 调用音频服务播放（这会加载音频）
-            await audioService.play(first.path, first);
-
-            // 5. 设置元数据和播放状态
-            setMetadata(first);
-            setIsPlaying(true);
+            await playList({
+                songs: songsToPlay,
+                startIndex: 0,
+                options: { restartIfCurrent: true, addToRecent: false }
+            });
 
         } catch (error) {
             console.error("Failed to play selection:", error);
-            setIsPlaying(false);
         } finally {
             clearSelection();
         }

@@ -19,7 +19,7 @@ interface ArtistDetailViewProps {
     onShuffle: () => void;
     onPlayAlbum: (album: AlbumData) => void;
     onOpenAlbum: (album: AlbumData) => void;
-    onPlaySong: (song: SongMetadata, index: number) => void;
+    onPlaySong: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     onDeleteSong?: (song: SongMetadata) => void;
     onDeleteAlbum?: (album: AlbumData) => void;
     onOpenArtistByName?: (name: string) => void;
@@ -241,13 +241,13 @@ export default function ArtistDetailView({
                                 <div className="flex-1 min-w-0 bg-neutral-50/50 dark:bg-white/5 rounded-2xl p-2 md:p-4">
                                     <SongListView
                                         songs={album.songs}
-                                        onPlay={(song) => {
+                                        onPlay={(song, _index, options) => {
                                             // We need to play from the context of "All Artist Songs" because the parent
                                             // handler expects an index into `artist.songs`.
                                             // Find the index of this song in the full artist list
                                             const globalIndex = allArtistSongs.findIndex(s => s.path === song.path);
                                             if (globalIndex !== -1) {
-                                                onPlaySong(song, globalIndex);
+                                                onPlaySong(song, globalIndex, options);
                                             }
                                         }}
                                         onDelete={onDeleteSong}

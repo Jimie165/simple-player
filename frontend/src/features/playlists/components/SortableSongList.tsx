@@ -14,8 +14,8 @@ import CursorContextMenu from '../../../components/common/CursorContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import { useNavigationStore } from '../../../store/useNavigationStore';
 import { libraryService } from '../../../services/libraryService';
-import { audioService } from '../../../services/audioService';
 import { usePlayerStore } from '../../../store/usePlayerStore';
+import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 
 import {
     DndContext,
@@ -45,7 +45,7 @@ const HIDE_ALBUM_BREAKPOINT = 900;
 
 interface SortableSongListProps {
     songs: SongMetadata[];
-    onPlay: (song: SongMetadata, index: number) => void;
+    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     onRemoveFromPlaylist: (song: SongMetadata) => void;
     onReorder: (newOrder: SongMetadata[]) => void;
     onToggleFavorite?: (song: SongMetadata) => void;
@@ -190,7 +190,8 @@ const SongListItem = memo(({
                     <SongCoverOverlay
                         song={song}
                         className="w-full h-full"
-                        onPlay={() => !isDragging && onPlay && onPlay(song, index)}
+                        onPlay={() => !isDragging && onPlay && onPlay(song, index, { restartIfCurrent: true })}
+                        restartOnPlay
                     />
                 </div>
                 <span className={clsx(
@@ -228,7 +229,7 @@ const SongListItem = memo(({
                         onOpen={onMenuOpen} // Pass handler
                         type="playlist"
                         variant="clean"
-                        onPlay={() => onPlay && onPlay(song, index)}
+                        onPlay={() => onPlay && onPlay(song, index, { restartIfCurrent: true })}
                         onAddToQueue={onAddQueue ? () => onAddQueue(song) : undefined}
                         onAddToPlaylist={onAddToPlaylist ? () => onAddToPlaylist(song) : undefined}
                         onShowProperties={onShowProperties ? () => onShowProperties(song) : undefined}
@@ -510,22 +511,23 @@ export default function SortableSongList({
     };
 
     // Batch Actions Helpers
-    const { setCurrentSongIndex, addToNext, setPlaylist, toggleFavorite: storeToggleFavorite } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { addToNext, toggleFavorite: storeToggleFavorite } = useLibraryStore();
+    const { setShuffleState } = usePlayerStore();
+    const { playList } = usePlaybackActions();
 
     // Prefer props callback (optimistic), fallback to store (global async)
     const handleFavorite = onToggleFavorite || storeToggleFavorite;
 
     const handleBatchPlay = async (songsToPlay: SongMetadata[]) => {
         if (songsToPlay.length === 0) return;
-        setPlaylist(songsToPlay);
-        setShuffleState(false);
-        setCurrentSongIndex(0);
         const first = songsToPlay[0];
         if (first.path) {
-            setMetadata(first);
-            await audioService.play(first.path, first);
-            setIsPlaying(true);
+            setShuffleState(false);
+            await playList({
+                songs: songsToPlay,
+                startIndex: 0,
+                options: { restartIfCurrent: true }
+            });
         }
     };
 

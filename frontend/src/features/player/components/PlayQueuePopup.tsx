@@ -4,7 +4,7 @@ import { IoMusicalNotes, IoRemoveCircleOutline } from 'react-icons/io5';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useNavigationStore } from '../../../store/useNavigationStore';
-import { audioService } from '../../../services/audioService';
+import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import type { SongMetadata } from '../../../types';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
@@ -21,12 +21,12 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
     const {
         playlist,
         currentSongIndex,
-        setCurrentSongIndex,
         removeSongFromPlaylistByIndex,
         addToNext,
         toggleFavorite
     } = useLibraryStore();
-    const { setMetadata, setIsPlaying, togglePlay, restartSong } = usePlayerStore();
+    const { togglePlay, restartSong } = usePlayerStore();
+    const { playQueueItem } = usePlaybackActions();
     const { push } = useNavigationStore();
     const addToPlaylistStore = useAddToPlaylistStore();
 
@@ -49,10 +49,10 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         }
     }, [show, currentSongIndex]);
 
-    const handlePlay = async (song: SongMetadata, index: number) => {
+    const handlePlay = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         // In the play queue, we strictly use index to define the "current" playing item.
         // This allows multiple instances of the same song to coexist and be handled separately.
-        if (index === currentSongIndex) {
+        if (index === currentSongIndex && !options?.restartIfCurrent) {
             togglePlay();
             return;
         }
@@ -60,15 +60,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         // Always reset progress bar display even if metadata allows (for restart same song case)
         restartSong();
 
-        if (!song.path) return;
-        setCurrentSongIndex(index);
-        try {
-            setMetadata(song);
-            await audioService.play(song.path, song);
-            setIsPlaying(true);
-        } catch (error) {
-            console.error(error);
-        }
+        await playQueueItem({ song, index, restartIfCurrent: options?.restartIfCurrent });
     };
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
@@ -183,9 +175,10 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                         <SongCoverOverlay
                                             song={song}
                                             className="w-full h-full"
-                                            onPlay={() => handlePlay(song, index)}
+                                            onPlay={() => handlePlay(song, index, { restartIfCurrent: true })}
                                             isActive={isCurrent}
                                             iconClassName="text-neutral-400"
+                                            restartOnPlay
                                         />
                                     </div>
 
@@ -200,7 +193,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                             type="song"
                                             variant="clean"
                                             buttonClassName="w-6 h-6"
-                                            onPlay={() => handlePlay(song, index)}
+                                            onPlay={() => handlePlay(song, index, { restartIfCurrent: true })}
                                             onAddToQueue={() => addToNext(song)}
                                             onAddToPlaylist={() => addToPlaylistStore.open(song)}
                                             onShowProperties={() => handleShowProperties(song)}
@@ -231,7 +224,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                     onClose={() => setContextMenu(null)}
                     menuGroups={getMusicMenuGroups({
                         type: 'song',
-                        onPlay: () => handlePlay(contextMenu.song, contextMenu.index),
+                        onPlay: () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }),
                         onAddToQueue: () => addToNext(contextMenu.song),
                         onAddToPlaylist: () => addToPlaylistStore.open(contextMenu.song),
                         onShowProperties: () => handleShowProperties(contextMenu.song),

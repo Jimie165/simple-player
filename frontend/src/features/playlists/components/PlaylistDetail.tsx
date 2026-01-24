@@ -12,10 +12,9 @@ import CoverImage from '../../../components/common/CoverImage';
 import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
 
 import { libraryService } from '../../../services/libraryService';
-import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useLibraryStore } from '../../../store/useLibraryStore';
-import { audioService } from '../../../services/audioService';
-import type { SongMetadata, Playlist } from '../../../types';
+import type { RecentItem, SongMetadata, Playlist } from '../../../types';
+import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 
 interface PlaylistDetailProps {
     id: number | 'favorites';
@@ -66,8 +65,8 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Store Actions
     // Store Actions
-    const { setMetadata, setIsPlaying, setShuffleState } = usePlayerStore();
-    const { setPlaylist, setCurrentSongIndex, addToRecent, toggleShuffleList, libraryVersion, triggerLibraryUpdate } = useLibraryStore();
+    const { libraryVersion, triggerLibraryUpdate } = useLibraryStore();
+    const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header
     const [isScrolled, setIsScrolled] = useState(false);
@@ -122,64 +121,41 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     useEffect(() => { loadData(); }, [loadData]);
 
     // Actions
-    const handlePlaySong = async (song: SongMetadata, index: number) => {
-        if (!song.path) return;
+    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
+        id: song.path || '',
+        type: 'file',
+        title: song.title,
+        description: song.artist,
+        cover: song.cover || null,
+        cover_path: song.cover_path || null,
+        path: song.path || '',
+        lastPlayed: Date.now(),
+        artist: song.artist,
+        isLibraryItem: true
+    });
 
-        // Check if this is the currently playing song to avoid restart
-        const { metadata, togglePlay } = usePlayerStore.getState();
-        const isCurrent = metadata && (
-            (song.id !== undefined && song.id === metadata.id) ||
-            (song.path === metadata.path)
-        );
-
-        if (isCurrent) {
-            togglePlay();
-            return;
-        }
-
-        try {
-            // Optimistic update
-            setMetadata(song);
-            setIsPlaying(true);
-
-            // Core Logic
-            setPlaylist(songs); // Reset playlist to this list
-
-            // Handle Shuffle Mode
-            if (usePlayerStore.getState().isShuffling) {
-                // Determine the correct index in the new list (which is same as 'index')
-                setCurrentSongIndex(index);
-                // Trigger shuffle which will move this song to front of shuffled list
-                toggleShuffleList(true);
-            } else {
-                setCurrentSongIndex(index);
+    const handlePlaySong = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
+        await playSong({
+            song,
+            index,
+            playlist: songs,
+            options: {
+                ...options,
+                buildRecentItem: buildRecentForSong
             }
-
-            // Audio Play
-            await audioService.play(song.path, song);
-
-            addToRecent({
-                id: song.path,
-                type: 'file',
-                title: song.title,
-                description: song.artist,
-                cover: song.cover,
-                cover_path: song.cover_path,
-                path: song.path,
-                lastPlayed: Date.now(),
-                artist: song.artist,
-                isLibraryItem: true
-            });
-        } catch (err) {
-            console.error("Failed to play song:", err);
-            // Optional: Revert playing state if failed
-            setIsPlaying(false);
-        }
+        });
     };
 
     const handlePlayAll = async () => {
         if (songs.length > 0) {
-            handlePlaySong(songs[0], 0);
+            await playList({
+                songs,
+                startIndex: 0,
+                options: {
+                    restartIfCurrent: true,
+                    buildRecentItem: buildRecentForSong
+                }
+            });
             // Track playlist play time
             if (id !== 'favorites' && typeof id === 'number') {
                 libraryService.markPlaylistAsPlayed(id).catch(console.error);
@@ -189,43 +165,16 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     const handleShuffle = async () => {
         if (songs.length > 0) {
-            const randomIndex = Math.floor(Math.random() * songs.length);
-            const song = songs[randomIndex];
-
-            try {
-                // 1. 设置完整播放列表
-                setPlaylist(songs);
-                // 2. 设置初始位置并开启洗牌（此操作会将该位置的歌曲洗到列表第 0 位）
-                setCurrentSongIndex(randomIndex);
-                toggleShuffleList(true);
-                setShuffleState(true);
-
-                if (!song.path) return;
-                // 3. 播放洗牌后的首曲
-                await audioService.play(song.path, song);
-                setMetadata(song);
-                setIsPlaying(true);
-
-                addToRecent({
-                    id: song.path,
-                    type: 'file',
-                    title: song.title,
-                    description: song.artist,
-                    cover: song.cover,
-                    cover_path: song.cover_path || null,
-                    path: song.path,
-                    lastPlayed: Date.now(),
-                    artist: song.artist,
-                    isLibraryItem: true
-                });
-
-                // Track playlist play time
-                if (id !== 'favorites' && typeof id === 'number') {
-                    libraryService.markPlaylistAsPlayed(id).catch(console.error);
+            await shufflePlay({
+                songs,
+                options: {
+                    buildRecentItem: buildRecentForSong
                 }
-            } catch (err) {
-                console.error("Shuffle play failed:", err);
-                setIsPlaying(false);
+            });
+
+            // Track playlist play time
+            if (id !== 'favorites' && typeof id === 'number') {
+                libraryService.markPlaylistAsPlayed(id).catch(console.error);
             }
         }
     };

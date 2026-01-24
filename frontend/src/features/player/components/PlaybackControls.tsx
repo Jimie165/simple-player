@@ -51,28 +51,32 @@ export default function PlaybackControls() {
             return;
         }
 
-        // 1. 【修复关键点】无论是不是切新歌，强制先把进度条归零
-        setCurrentTime(0);
-
-        // 更新索引
-        setCurrentSongIndex(index);
-
         try {
+            // 1. 先播放 (Play First)
+            if (autoPlay) {
+                await audioService.play(song.path, song);
+            } else {
+                // 如果不自动播放（例如列表播完回到开头暂停），只需设置 Metadata
+                // 但为了保险，还是加载但不播？或者只设置 UI
+                // 这里假设不自动播放意味着停止
+            }
+
+            // 2. 成功后更新 UI (Update UI Later)
             setMetadata(song);
+            setCurrentSongIndex(index);
+            setCurrentTime(0); // 放在成功后，避免视觉跳动
 
-            // 调用后端播放
-            await audioService.play(song.path, song);
-
-            // 根据 autoPlay 参数决定是继续播放还是立即暂停
             if (autoPlay) {
                 setIsPlaying(true);
             } else {
-                await audioService.pause();
                 setIsPlaying(false);
+                // 如果不播，可能需要通知后端暂停或停止
+                await audioService.pause();
             }
 
         } catch (err) {
             console.error("Play failed", err);
+            // 播放失败，不更新 UI，保持在上一首 (或者显示错误 toast)
         } finally {
             // 确保在 500ms 后释放锁，防止连续触发
             setTimeout(() => {
@@ -85,17 +89,19 @@ export default function PlaybackControls() {
     const handleNext = async () => {
         // 手动点击：无视锁，直接切
         pushHistory(currentSongIndex);
+        const len = playlist.length;
+        if (len === 0) return;
 
         // 逻辑：手动点击下一首，即使是单曲循环，也切到下一首
-        const len = playlist.length;
-        // 使用简单的取模计算下一首，确保能跳出单曲循环
         const nextIdx = (currentSongIndex + 1) % len;
-
         playSongByIndex(nextIdx);
     };
 
     // --- 按钮逻辑：上一首 ---
     const handlePrev = async () => {
+        const len = playlist.length;
+        if (len === 0) return;
+
         // 3秒规则
         if (currentTime > 3) {
             await audioService.seek(0);
@@ -105,10 +111,16 @@ export default function PlaybackControls() {
 
         const historyIndex = popHistory();
         if (historyIndex !== undefined) {
-            playSongByIndex(historyIndex);
+            // 历史记录中的索引对应的歌可能已经不在列表里了（如果被删），但通常还在
+            // 加一个边界检查
+            if (historyIndex >= 0 && historyIndex < len) {
+                playSongByIndex(historyIndex);
+            } else {
+                // Fallback
+                const prevIdx = (currentSongIndex - 1 + len) % len;
+                playSongByIndex(prevIdx);
+            }
         } else {
-            const len = playlist.length;
-            if (len === 0) return;
             const prevIdx = (currentSongIndex - 1 + len) % len;
             playSongByIndex(prevIdx);
         }
@@ -139,28 +151,28 @@ export default function PlaybackControls() {
 
     const handleBtnShuffle = () => {
         toggleShuffle();
+        // 这里的 toggleShuffleList 需要传入新的状态
+        // Store update 可能是异步的，所以这里取反当前状态
         toggleShuffleList(!isShuffling);
     };
 
     const handleBtnRepeat = () => {
         // Current: off -> all -> one -> off
-        // We need to know NEXT mode to apply side effects
-        let nextMode = 'off';
-        if (repeatMode === 'off') nextMode = 'all';
-        else if (repeatMode === 'all') nextMode = 'one';
+        // 状态流转完全由 Store 控制
+        toggleRepeat();
 
-        // Apply side effects BEFORE state update to ensure clean render ?? 
-        // Or after? 
-        // Logic from store:
-        // 'all' -> 'one': isShuffling becomes false in Store.
-        // We also need to sync Library Store.
+        // 副作用：如果我们要进入 'one' 模式，Store 内部会处理关闭 Shuffle
+        // 这里不需要手动干预，唯一的问题是 Library Store 的 Shuffle List 状态
+        // 我们在 Store 的 toggleRepeat 中没有联动 Library Store，这里补一下？
+        // 或者更好的是，component不做逻辑，只调用 store
 
-        if (repeatMode === 'all') { // Transitioning to 'one'
-            // Disable shuffle LIST in library
+        // 检查 Store 实现：usePlayerStore 的 toggleRepeat 会 set({ repeatMode: 'one', isShuffling: false })
+        // 但它没有直接调用 useLibraryStore.toggleShuffleList(false)
+        // 所以这里需要手动同步
+
+        if (repeatMode === 'all') { // Next is 'one'
             toggleShuffleList(false);
         }
-
-        toggleRepeat();
     };
 
 

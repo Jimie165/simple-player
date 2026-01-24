@@ -17,15 +17,18 @@ export const audioService = {
         let resolvedMetadata = metadata;
         if (metadata?.cover_path) {
             try {
-                const dataDir = await getAppDataDir();
-                // 使用简单字符串拼接，确保路径分隔符正确
-                const normalizedDir = dataDir.replace(/\\/g, '/').replace(/\/$/, '');
-                const normalizedPath = metadata.cover_path.replace(/\\/g, '/').replace(/^\//, '');
-                const fullCoverPath = `${normalizedDir}/${normalizedPath}`;
-                resolvedMetadata = { ...metadata, cover_path: fullCoverPath };
+                // 如果是绝对路径（包含 : 或以 / 开头），直接使用
+                // 否则假设是相对于 AppData 的路径
+                const isAbsolute = metadata.cover_path.includes(':') || metadata.cover_path.startsWith('/');
+                if (!isAbsolute) {
+                    const dataDir = await getAppDataDir();
+                    const normalizedDir = dataDir.replace(/\\/g, '/').replace(/\/$/, '');
+                    const normalizedPath = metadata.cover_path.replace(/\\/g, '/').replace(/^\//, '');
+                    const fullCoverPath = `${normalizedDir}/${normalizedPath}`;
+                    resolvedMetadata = { ...metadata, cover_path: fullCoverPath };
+                }
             } catch (e) {
                 console.error('Failed to resolve cover path:', e);
-                // 继续使用原始 metadata，不要阻止播放
             }
         }
         return invoke('play_audio', { path, metadata: resolvedMetadata });

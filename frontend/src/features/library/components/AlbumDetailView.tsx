@@ -7,7 +7,7 @@ import type { SongMetadata } from '../../../types';
 
 interface AlbumDetailViewProps {
     album: AlbumData;
-    onPlay: (song: SongMetadata, index: number) => void;
+    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     onPlayAll: () => void;
     onShuffle: () => void;
     onDeleteSong?: (song: SongMetadata) => void;

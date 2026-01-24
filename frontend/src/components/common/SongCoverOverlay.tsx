@@ -1,6 +1,7 @@
 import clsx from 'clsx';
 import { IoPlay, IoPause } from 'react-icons/io5';
 import { usePlayerStore } from '../../store/usePlayerStore';
+import { audioService } from '../../services/audioService';
 import type { SongMetadata } from '../../types';
 import CoverImage from './CoverImage';
 import Equalizer from './Equalizer';
@@ -12,6 +13,7 @@ interface SongCoverOverlayProps {
     onPlay: () => void; // Action to play this song (if not current)
     iconClassName?: string; // Fallback icon color
     isActive?: boolean; // Manual override for current playing status (useful for duplicates in queue)
+    restartOnPlay?: boolean; // If true, clicking current song restarts instead of toggling pause
 }
 
 export default function SongCoverOverlay({
@@ -20,9 +22,10 @@ export default function SongCoverOverlay({
     coverClassName,
     onPlay,
     iconClassName,
-    isActive
+    isActive,
+    restartOnPlay = false
 }: SongCoverOverlayProps) {
-    const { metadata, isPlaying, togglePlay } = usePlayerStore();
+    const { metadata, isPlaying, togglePlay, setIsPlaying } = usePlayerStore();
 
     // Determine if this is the currently active song
     // Prioritize manual isActive prop, then ID match, fallback to path match
@@ -33,12 +36,22 @@ export default function SongCoverOverlay({
         )
     );
 
-    const handleContainerClick = (e: React.MouseEvent) => {
+    const handleContainerClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (isCurrent) {
-            // If it's already the current song, just toggle play/pause
-            // This prevents the "restart from beginning" issue caused by parent's onPlay handling
-            togglePlay();
+            if (restartOnPlay && song.path) {
+                try {
+                    await audioService.seek(0);
+                    await audioService.play(song.path, song);
+                    setIsPlaying(true);
+                } catch (error) {
+                    console.error('Restart play failed', error);
+                }
+            } else {
+                // If it's already the current song, just toggle play/pause
+                // This prevents the "restart from beginning" issue caused by parent's onPlay handling
+                togglePlay();
+            }
         } else {
             // New song, call parent handler
             onPlay();

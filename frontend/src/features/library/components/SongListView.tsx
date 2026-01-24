@@ -12,16 +12,16 @@ import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common
 import CursorContextMenu from '../../../components/common/CursorContextMenu';
 
 import { libraryService } from '../../../services/libraryService';
-import { audioService } from '../../../services/audioService';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
+import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 
 // ... (in MusicContextMenu props)
 const HIDE_ALBUM_BREAKPOINT = 900;
 
 interface SongListViewProps {
     songs: SongMetadata[];
-    onPlay: (song: SongMetadata, index: number) => void;
+    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     onDelete?: (song: SongMetadata) => void;
     hideCover?: boolean; // 新增：是否隐藏封面
     enableDelete?: boolean; // 新增：是否启用删除功能 (默认 true)
@@ -132,21 +132,20 @@ export default function SongListView({
     };
 
     // Batch Actions
-    const { setPlaylist, setCurrentSongIndex, addToNext } = useLibraryStore();
-    const { setIsPlaying, setMetadata, setShuffleState } = usePlayerStore();
+    const { addToNext } = useLibraryStore();
+    const { setShuffleState } = usePlayerStore();
+    const { playList } = usePlaybackActions();
 
     const handleBatchPlay = async (songsToPlay: SongMetadata[]) => {
         if (songsToPlay.length === 0) return;
-
-        setPlaylist(songsToPlay);
-        setShuffleState(false);
-        setCurrentSongIndex(0);
-
         const first = songsToPlay[0];
         if (first.path) {
-            setMetadata(first);
-            await audioService.play(first.path, first);
-            setIsPlaying(true);
+            setShuffleState(false);
+            await playList({
+                songs: songsToPlay,
+                startIndex: 0,
+                options: { restartIfCurrent: true }
+            });
         }
     };
 
@@ -477,7 +476,8 @@ export default function SongListView({
                                         <SongCoverOverlay
                                             song={song}
                                             className="w-full h-full"
-                                            onPlay={() => onPlay(song, index)}
+                                            onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
+                                            restartOnPlay
                                         />
                                     </div>
                                 )}
@@ -521,7 +521,7 @@ export default function SongListView({
                                     onOpen={() => setContextMenu(null)}
                                     type="song"
                                     variant="clean"
-                                    onPlay={() => onPlay(song, index)}
+                                    onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                                     // Use addToNext for "Play Next" behavior
                                     onAddToQueue={() => useLibraryStore.getState().addToNext(song)}
                                     onAddToPlaylist={() => useAddToPlaylistStore.getState().open(song)}

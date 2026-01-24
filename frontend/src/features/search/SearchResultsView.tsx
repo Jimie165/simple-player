@@ -4,9 +4,7 @@ import { libraryService } from '../../services/libraryService';
 import PageContainer from '../../components/layout/PageContainer';
 import SongListView from '../library/components/SongListView';
 import { IoSearch } from 'react-icons/io5';
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { audioService } from '../../services/audioService';
+import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 
 interface SearchResultsViewProps {
     query: string;
@@ -17,9 +15,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [loading, setLoading] = useState(false);
 
     // Player controls
-    const setMetadata = usePlayerStore((s) => s.setMetadata);
-    const setIsPlaying = usePlayerStore((s) => s.setIsPlaying);
-    const { setPlaylist, setCurrentSongIndex, addToRecent } = useLibraryStore();
+    const { playSong } = usePlaybackActions();
 
     useEffect(() => {
         const performSearch = async () => {
@@ -46,36 +42,24 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         return () => clearTimeout(timer);
     }, [query]);
 
-    const handlePlay = async (song: SongMetadata, index: number) => {
-        if (!song.path) return;
-
-        // Check if this is the currently playing song to avoid restart
-        const { metadata, togglePlay } = usePlayerStore.getState();
-        const isCurrent = metadata && (
-            (song.id !== undefined && song.id === metadata.id) ||
-            (song.path === metadata.path)
-        );
-
-        if (isCurrent) {
-            togglePlay();
-            return;
-        }
-
-        await audioService.play(song.path, song);
-        setMetadata(song);
-        setIsPlaying(true);
-
-        setPlaylist(results);
-        setCurrentSongIndex(index);
-        addToRecent({
-            id: song.path,
-            type: 'file',
-            title: song.title,
-            description: song.artist,
-            cover: song.cover,
-            path: song.path,
-            lastPlayed: Date.now(),
-            artist: song.artist
+    const handlePlay = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
+        await playSong({
+            song,
+            index,
+            playlist: results,
+            options: {
+                ...options,
+                recentItem: {
+                    id: song.path || '',
+                    type: 'file',
+                    title: song.title,
+                    description: song.artist,
+                    cover: song.cover || null,
+                    path: song.path || '',
+                    lastPlayed: Date.now(),
+                    artist: song.artist
+                }
+            }
         });
     };
 
