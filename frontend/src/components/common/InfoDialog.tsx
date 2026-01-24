@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle, DialogBackdrop } from '@headlessui/react';
-import { IoClose, IoMusicalNotes } from 'react-icons/io5';
+import { MdClose, MdMusicNote } from 'react-icons/md';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { fileService } from '../../services/fileService';
 import { formatTime } from '../../utils/time';
@@ -80,7 +80,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                             属性
                         </DialogTitle>
                         <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-700">
-                            <IoClose className="text-2xl" />
+                            <MdClose className="text-2xl" />
                         </button>
                     </div>
 
@@ -92,7 +92,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                                     <img src={displayMeta.cover} alt="Cover" className="w-full h-full object-cover" />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                        <IoMusicalNotes className="text-5xl" />
+                                        <MdMusicNote className="text-5xl" />
                                     </div>
                                 )}
                             </div>

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { MusicMenuItemData } from './MusicContextMenu';
+import type { MenuItemData } from '../../hooks/useSongOperations';
 
 interface CursorContextMenuProps {
     x: number;
     y: number;
-    menuGroups: MusicMenuItemData[][];
+    menuGroups: MenuItemData[][];
     onClose: () => void;
 }
 

@@ -1,7 +1,7 @@
 import { Fragment, useState, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { MdPlaylistAdd } from 'react-icons/md';
-import { IoAdd } from 'react-icons/io5';
+import { MdAdd } from 'react-icons/md';
 
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import { libraryService } from '../../../services/libraryService';
@@ -99,23 +99,16 @@ export default function AddToPlaylistSheet() {
     };
 
     return (
-        <Transition appear show={isOpen} as={Fragment}>
+        <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-[200]" onClose={close}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
-                </Transition.Child>
+                <DialogBackdrop
+                    transition
+                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                />
 
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-center justify-center p-4 text-center">
-                        <Transition.Child
+                        <TransitionChild
                             as={Fragment}
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
@@ -124,14 +117,14 @@ export default function AddToPlaylistSheet() {
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
-                                <Dialog.Title
+                            <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
+                                <DialogTitle
                                     as="h3"
                                     className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2"
                                 >
                                     <MdPlaylistAdd className="text-xl" />
                                     添加到播放列表
-                                </Dialog.Title>
+                                </DialogTitle>
 
                                 <div className="mt-2 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
                                     <button
@@ -139,7 +132,7 @@ export default function AddToPlaylistSheet() {
                                         className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left group"
                                     >
                                         <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-500 group-hover:text-primary transition-colors">
-                                            <IoAdd className="text-2xl" />
+                                            <MdAdd className="text-2xl" />
                                         </div>
                                         <span className="font-medium text-primary">新建播放列表</span>
                                     </button>
@@ -171,8 +164,8 @@ export default function AddToPlaylistSheet() {
                                         ))
                                     )}
                                 </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
+                            </DialogPanel>
+                        </TransitionChild>
                     </div>
                 </div>
             </Dialog>

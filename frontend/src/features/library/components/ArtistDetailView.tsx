@@ -1,6 +1,5 @@
 import { useState, useMemo } from 'react';
-import { MdPlayArrow, MdShuffle } from 'react-icons/md';
-import { IoPerson } from 'react-icons/io5';
+import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import CardPlayButton from '../../../components/common/CardPlayButton';
 import CoverImage from '../../../components/common/CoverImage';
 import clsx from 'clsx';
@@ -100,7 +99,7 @@ export default function ArtistDetailView({
                         />
                     ) : (
                         <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                            <IoPerson className="text-6xl" />
+                            <MdPerson className="text-6xl" />
                         </div>
                     )}
                 </div>
@@ -201,7 +200,7 @@ export default function ArtistDetailView({
                                             />
                                         ) : (
                                             <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                                <IoPerson className="text-6xl" />
+                                                <MdPerson className="text-6xl" />
                                             </div>
                                         )}
                                         <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

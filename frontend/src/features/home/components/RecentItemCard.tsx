@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IoPlay, IoFolderOpen, IoMusicalNotes, IoEllipsisHorizontal, IoAdd, IoPerson, IoDisc, IoTrash, IoInformationCircle } from 'react-icons/io5';
-import { MdQueueMusic } from 'react-icons/md';
+import { MdPlayArrow, MdFolder, MdMusicNote, MdMoreHoriz, MdAdd, MdPerson, MdAlbum, MdDelete, MdInfo, MdQueueMusic } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import clsx from 'clsx';
 import type { RecentItem, SongMetadata } from '../../../types';
@@ -59,14 +58,14 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                     <PlaylistCoverCollage songs={playlistSongs} className="w-full h-full" />
                 ) : (
                     item.type === 'folder'
-                        ? <IoFolderOpen className="text-5xl text-blue-400" />
-                        : <IoMusicalNotes className="text-5xl text-neutral-400" />
+                        ? <MdFolder className="text-5xl text-blue-400" />
+                        : <MdMusicNote className="text-5xl text-neutral-400" />
                 )}
 
                 {/* 播放遮罩 */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/10">
                     <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center shadow-lg text-white translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
-                        <IoPlay className="ml-1" />
+                        <MdPlayArrow className="ml-1" />
                     </div>
                 </div>
 
@@ -78,7 +77,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                 >
                     <Menu as="div" className="relative">
                         <MenuButton className="w-8 h-8 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center text-white hover:bg-black/70 transition-colors">
-                            <IoEllipsisHorizontal />
+                            <MdMoreHoriz />
                         </MenuButton>
                         <MenuItems
                             transition
@@ -95,7 +94,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                         )}
                                     >
-                                        <IoPlay className="text-lg opacity-70" />
+                                        <MdPlayArrow className="text-lg opacity-70" />
                                         播放
                                     </button>
                                 )}
@@ -125,7 +124,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                         )}
                                     >
-                                        <IoAdd className="text-lg opacity-70" />
+                                        <MdAdd className="text-lg opacity-70" />
                                         添加到
                                     </button>
                                 )}
@@ -143,7 +142,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                         )}
                                     >
-                                        <IoTrash className="text-lg opacity-70" />
+                                        <MdDelete className="text-lg opacity-70" />
                                         删除
                                     </button>
                                 )}
@@ -160,7 +159,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                                 focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                             )}
                                         >
-                                            <IoInformationCircle className="text-lg opacity-70" />
+                                            <MdInfo className="text-lg opacity-70" />
                                             属性
                                         </button>
                                     )}
@@ -178,7 +177,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                         )}
                                     >
-                                        <IoDisc className="text-lg opacity-70" />
+                                        <MdAlbum className="text-lg opacity-70" />
                                         显示专辑
                                     </button>
                                 )}
@@ -193,7 +192,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             focus ? "bg-neutral-100 dark:bg-white/10" : ""
                                         )}
                                     >
-                                        <IoPerson className="text-lg opacity-70" />
+                                        <MdPerson className="text-lg opacity-70" />
                                         显示艺术家
                                     </button>
                                 )}

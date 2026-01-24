@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IoCheckbox, IoSquareOutline } from 'react-icons/io5';
+import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
 
 import CoverImage from '../../../components/common/CoverImage';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -7,8 +7,8 @@ import { useSelectionStore } from '../../../store/useSelectionStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import CardPlayButton from '../../../components/common/CardPlayButton';
-import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
-import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
+import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 
 // 定义专辑数据结构
@@ -35,7 +35,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
 
     // Handle Select All Request
     useEffect(() => {
@@ -54,6 +54,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
 
     const handleContextMenu = (e: React.MouseEvent, album: AlbumData) => {
         e.preventDefault();
+        document.body.click();
         setContextMenu({ x: e.clientX, y: e.clientY, album });
     };
 
@@ -123,8 +124,8 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                             className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                                         >
                                             {isSelected
-                                                ? <IoCheckbox className="text-primary text-xl" />
-                                                : <IoSquareOutline className="text-neutral-700 text-xl" />
+                                                ? <MdCheckBox className="text-primary text-xl" />
+                                                : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                                             }
                                         </div>
                                     </div>
@@ -138,20 +139,21 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                         <CardPlayButton onClick={() => onPlayAlbum(album)} title="播放专辑" />
 
                                         {/* 右下角：更多菜单 (M3 风格) */}
-                                        <MusicContextMenu
-                                            type="album"
+                                        {/* 右下角：更多菜单 (M3 风格) */}
+                                        <SmartMusicContextMenu
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
+                                            items={album}
+                                            context="library"
                                             onPlay={() => onPlayAlbum(album)}
                                             onShuffle={onShuffleAlbum ? () => onShuffleAlbum(album) : undefined}
-                                            onAddToQueue={() => [...album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
-                                            onAddToPlaylist={() => useAddToPlaylistStore.getState().open(album.songs)}
-                                            onShowAlbum={() => onOpenAlbum(album)}
-                                            onShowArtist={(!hideArtist && onOpenArtist && album.artist) ? () => onOpenArtist(album.artist) : undefined}
                                             onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
-                                            deleteText="从音乐库删除"
-                                            onSelect={() => toggleSelectionMode({ id, type: 'album', data: album })}
                                             onOpen={() => setContextMenu(null)}
+                                            isSelected={isSelected}
+                                            onSelect={() => isSelectionMode
+                                                ? toggleSelection(id, 'album', album)
+                                                : toggleSelectionMode({ id, type: 'album', data: album })
+                                            }
                                         />
                                     </div>
                                 )}
@@ -174,22 +176,15 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             </div>
             {/* Cursor Context Menu */}
             {contextMenu && (
-                <CursorContextMenu
+                <SmartCursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
+                    item={contextMenu.album}
+                    context="library"
                     onClose={() => setContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
-                        type: 'album',
-                        onPlay: () => onPlayAlbum(contextMenu.album),
-                        onShuffle: onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined,
-                        onAddToQueue: () => [...contextMenu.album.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
-                        onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.album.songs),
-                        onShowAlbum: () => onOpenAlbum(contextMenu.album),
-                        onShowArtist: (!hideArtist && onOpenArtist && contextMenu.album.artist) ? () => onOpenArtist(contextMenu.album.artist) : undefined,
-                        onDelete: onDeleteAlbum ? () => handleDeleteClick(contextMenu.album) : undefined,
-                        deleteText: "从音乐库删除",
-                        onSelect: () => toggleSelectionMode({ id: getAlbumId(contextMenu.album), type: 'album', data: contextMenu.album })
-                    })}
+                    onPlay={() => onPlayAlbum(contextMenu.album)}
+                    onShuffle={onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined}
+                    onDelete={onDeleteAlbum ? () => handleDeleteClick(contextMenu.album) : undefined}
                 />
             )}
         </>

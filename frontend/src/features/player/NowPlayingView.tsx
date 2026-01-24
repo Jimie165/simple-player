@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
-import { IoMusicalNotes } from 'react-icons/io5';
+import { MdMusicNote } from 'react-icons/md';
 import type { SongMetadata } from '../../types';
 import { resolveCover } from '../../utils/cover';
 
@@ -67,7 +67,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
                         {hasCover ? (
                             <img src={coverUrl!} alt="Album Art" className="w-full h-full object-cover" />
                         ) : (
-                            <IoMusicalNotes className="text-6xl text-neutral-400" />
+                            <MdMusicNote className="text-6xl text-neutral-400" />
                         )}
                     </div>
                 </div>

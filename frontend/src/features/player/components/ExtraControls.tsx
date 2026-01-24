@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { IoVolumeMedium, IoVolumeMute, IoInformationCircleOutline, IoList } from 'react-icons/io5'; // 引入 IoList
+import { MdVolumeUp, MdVolumeOff, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
 import clsx from 'clsx';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import VolumePopup from '../../../components/common/VolumePopup';
@@ -48,7 +48,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                                 : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
                         )}
                     >
-                        <IoList className="text-xl" />
+                        <MdQueueMusic className="text-xl" />
                     </button>
                 </CustomTooltip>
             </div>
@@ -64,7 +64,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                             showVolumePopup ? "bg-neutral-100 text-blue-600 dark:bg-white/10 dark:text-blue-400" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
                         )}
                     >
-                        {volume === 0 ? <IoVolumeMute className="text-xl" /> : <IoVolumeMedium className="text-xl" />}
+                        {volume === 0 ? <MdVolumeOff className="text-xl" /> : <MdVolumeUp className="text-xl" />}
                     </button>
                 </CustomTooltip>
             </div>
@@ -75,7 +75,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                     onClick={onInfoClick}
                     className="p-2 rounded-lg text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200 transition-colors"
                 >
-                    <IoInformationCircleOutline className="text-xl" />
+                    <MdInfoOutline className="text-xl" />
                 </button>
             </CustomTooltip>
         </div>

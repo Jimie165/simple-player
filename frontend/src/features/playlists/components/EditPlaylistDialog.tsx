@@ -1,5 +1,5 @@
 import { Fragment, useState, useEffect } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { MdEdit, MdImage } from 'react-icons/md';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -73,23 +73,16 @@ export default function EditPlaylistDialog({
     };
 
     return (
-        <Transition appear show={isOpen} as={Fragment}>
+        <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-50" onClose={onClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
-                </Transition.Child>
+                <DialogBackdrop
+                    transition
+                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                />
 
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-center justify-center p-4 text-center">
-                        <Transition.Child
+                        <TransitionChild
                             as={Fragment}
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
@@ -98,17 +91,17 @@ export default function EditPlaylistDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-md max-h-[calc(100vh-200px)] overflow-y-auto transform rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
+                            <DialogPanel className="w-full max-w-md max-h-[calc(100vh-200px)] overflow-y-auto transform rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
                                 <div className="flex items-center gap-3 mb-6">
                                     <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                         <MdEdit className="text-2xl text-primary" />
                                     </div>
-                                    <Dialog.Title
+                                    <DialogTitle
                                         as="h3"
                                         className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100"
                                     >
                                         编辑播放列表
-                                    </Dialog.Title>
+                                    </DialogTitle>
                                 </div>
 
                                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -180,8 +173,8 @@ export default function EditPlaylistDialog({
                                         </button>
                                     </div>
                                 </form>
-                            </Dialog.Panel>
-                        </Transition.Child>
+                            </DialogPanel>
+                        </TransitionChild>
                     </div>
                 </div>
             </Dialog>

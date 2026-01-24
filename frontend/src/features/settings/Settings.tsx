@@ -1,6 +1,6 @@
 import PageContainer from '../../components/layout/PageContainer';
 import { useTheme } from '../../hooks/useTheme';
-import { VscColorMode } from 'react-icons/vsc';
+import { MdBrightness6 } from 'react-icons/md';
 
 export default function Settings() {
     const { theme, setTheme } = useTheme();
@@ -29,7 +29,7 @@ export default function Settings() {
                 {/* 外观设置组 */}
                 <section className="space-y-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-neutral-500 dark:text-neutral-400 uppercase tracking-wider">
-                        <VscColorMode className="text-lg" />
+                        <MdBrightness6 className="text-lg" />
                         <span>外观与主题</span>
                     </div>
 

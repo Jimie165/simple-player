@@ -19,8 +19,9 @@ import type { PageId } from './types/index';
 import SearchResultsView from './features/search/SearchResultsView';
 import PlaylistsRoot from './features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from './hooks/useQueuePersistence';
-import SelectionActionBar from './features/selection/SelectionActionBar';
+import SelectionMenuBar from './components/common/SelectionMenuBar';
 import AddToPlaylistSheet from './features/playlists/components/AddToPlaylistSheet';
+import GlobalDialogLayer from './components/common/GlobalDialogLayer';
 
 function App() {
   useTheme();
@@ -179,13 +180,14 @@ function App() {
 
       {/* 4. 底部播放控制 - M3 Surface Container */}
       <div className="bg-surface-container-high border-t border-outline-variant/10 z-[70] relative">
-        <SelectionActionBar />
+        <SelectionMenuBar />
         <PlayerControl
           isFullScreen={isFullScreen}
           toggleFullScreen={() => setIsFullScreen(!isFullScreen)}
         />
       </div>
       <AddToPlaylistSheet />
+      <GlobalDialogLayer />
     </div>
   );
 }

@@ -25,8 +25,11 @@ export default function AlbumDetailView({
 }: AlbumDetailViewProps) {
 
     const totalDuration = useMemo(() => {
+        if (!album || !album.songs) return 0;
         return album.songs.reduce((acc, song) => acc + song.duration, 0);
     }, [album]);
+
+    if (!album) return null;
 
     const formatDuration = (sec: number) => {
         const h = Math.floor(sec / 3600);

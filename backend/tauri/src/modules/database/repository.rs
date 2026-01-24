@@ -199,6 +199,7 @@ impl SongRepo {
     }
 
     /// 获取所有已归档歌曲
+    #[allow(dead_code)]
     pub fn get_archived(conn: &Connection) -> Result<Vec<Song>> {
         let sql = format!(
             "SELECT {} FROM songs WHERE status = 'archived' ORDER BY title",
@@ -427,6 +428,7 @@ impl SongRepo {
     }
 
     /// 删除文件夹下所有歌曲
+    #[allow(dead_code)]
     pub fn delete_by_folder(conn: &Connection, folder_id: i64) -> Result<()> {
         conn.execute("DELETE FROM songs WHERE folder_id = ?1", params![folder_id])?;
         Ok(())

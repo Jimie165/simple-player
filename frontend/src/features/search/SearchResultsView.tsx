@@ -3,7 +3,7 @@ import type { SongMetadata } from '../../types';
 import { libraryService } from '../../services/libraryService';
 import PageContainer from '../../components/layout/PageContainer';
 import SongListView from '../library/components/SongListView';
-import { IoSearch } from 'react-icons/io5';
+import { MdSearch } from 'react-icons/md';
 import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 
 interface SearchResultsViewProps {
@@ -78,7 +78,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 </div>
             ) : (
                 <div className="flex flex-col h-full items-center justify-center text-neutral-400 pb-20">
-                    <IoSearch className="text-6xl mb-4 opacity-20" />
+                    <MdSearch className="text-6xl mb-4 opacity-20" />
                     <p className="text-lg font-medium">没有找到相关结果</p>
                     <p className="text-sm opacity-60 mt-1">尝试搜索歌曲、艺人或专辑名称</p>
                 </div>

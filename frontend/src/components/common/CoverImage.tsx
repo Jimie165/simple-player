@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IoMusicalNotes } from 'react-icons/io5';
+import { MdMusicNote } from 'react-icons/md';
 import clsx from 'clsx';
 import { resolveCover } from '../../utils/cover';
 import type { SongMetadata } from '../../types';
@@ -54,7 +54,7 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
 
     return (
         <div className={clsx("w-full h-full flex items-center justify-center text-neutral-400 bg-neutral-200 dark:bg-neutral-800", className)}>
-            <IoMusicalNotes className={clsx("text-2xl", iconClassName)} />
+            <MdMusicNote className={clsx("text-2xl", iconClassName)} />
         </div>
     );
 }

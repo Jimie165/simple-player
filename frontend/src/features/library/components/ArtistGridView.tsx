@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IoCheckbox, IoSquareOutline, IoPlay } from 'react-icons/io5';
+import { MdCheckBox, MdCheckBoxOutlineBlank, MdPlayArrow } from 'react-icons/md';
 
 import CoverImage from '../../../components/common/CoverImage';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -7,7 +7,8 @@ import { useSelectionStore } from '../../../store/useSelectionStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
-import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
+import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 
 // 定义艺人数据结构
@@ -53,6 +54,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
 
     const handleContextMenu = (e: React.MouseEvent, artist: ArtistData) => {
         e.preventDefault();
+        document.body.click();
         setContextMenu({ x: e.clientX, y: e.clientY, artist });
     };
 
@@ -125,8 +127,8 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                             className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shadow-sm"
                                         >
                                             {isSelected
-                                                ? <IoCheckbox className="text-primary text-xl" />
-                                                : <IoSquareOutline className="text-white text-xl" />
+                                                ? <MdCheckBox className="text-primary text-xl" />
+                                                : <MdCheckBoxOutlineBlank className="text-white text-xl" />
                                             }
                                         </div>
                                     </div>
@@ -145,24 +147,25 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                                 className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white hover:bg-white/30 hover:scale-105 transition-all"
                                                 title="播放艺人"
                                             >
-                                                <IoPlay className="translate-x-0.5 text-xl" />
+                                                <MdPlayArrow className="translate-x-0.5 text-xl" />
                                             </button>
                                         </div>
 
                                         {/* Menu Button - Bottom Right */}
-                                        <MusicContextMenu
-                                            type="artist"
+                                        <SmartMusicContextMenu
                                             className="absolute bottom-1 right-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity"
                                             buttonClassName="w-10 h-10"
+                                            items={artist}
+                                            context="library"
                                             onPlay={() => onPlayArtist(artist)}
                                             onShuffle={onShuffleArtist ? () => onShuffleArtist(artist) : undefined}
-                                            onAddToQueue={() => [...artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song))}
-                                            onAddToPlaylist={() => useAddToPlaylistStore.getState().open(artist.songs)}
-                                            onShowArtist={() => onOpenArtist(artist)}
                                             onDelete={onDeleteArtist ? () => handleDeleteClick(artist) : undefined}
-                                            deleteText="从音乐库删除"
-                                            onSelect={() => toggleSelectionMode({ id: artist.name, type: 'artist', data: artist })}
                                             onOpen={() => setContextMenu(null)}
+                                            isSelected={isSelected}
+                                            onSelect={() => isSelectionMode
+                                                ? toggleSelection(artist.name, 'artist', artist)
+                                                : toggleSelectionMode({ id: artist.name, type: 'artist', data: artist })
+                                            }
                                         />
                                     </div>
                                 )}
@@ -182,21 +185,15 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
             </div >
             {/* Cursor Context Menu */}
             {contextMenu && (
-                <CursorContextMenu
+                <SmartCursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
+                    item={contextMenu.artist}
+                    context="library"
                     onClose={() => setContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
-                        type: 'artist',
-                        onPlay: () => onPlayArtist(contextMenu.artist),
-                        onShuffle: onShuffleArtist ? () => onShuffleArtist(contextMenu.artist) : undefined,
-                        onAddToQueue: () => [...contextMenu.artist.songs].reverse().forEach(song => useLibraryStore.getState().addToNext(song)),
-                        onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.artist.songs),
-                        onShowArtist: () => onOpenArtist(contextMenu.artist),
-                        onDelete: onDeleteArtist ? () => handleDeleteClick(contextMenu.artist) : undefined,
-                        deleteText: "从音乐库删除",
-                        onSelect: () => toggleSelectionMode({ id: contextMenu.artist.name, type: 'artist', data: contextMenu.artist })
-                    })}
+                    onPlay={() => onPlayArtist(contextMenu.artist)}
+                    onShuffle={onShuffleArtist ? () => onShuffleArtist(contextMenu.artist) : undefined}
+                    onDelete={onDeleteArtist ? () => handleDeleteClick(contextMenu.artist) : undefined}
                 />
             )}
         </>

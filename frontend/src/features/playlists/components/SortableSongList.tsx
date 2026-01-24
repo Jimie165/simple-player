@@ -1,21 +1,17 @@
-import { useState, useEffect, memo } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdAccessTime } from 'react-icons/md';
-import { IoCheckbox, IoSquareOutline, IoHeart, IoHeartOutline } from 'react-icons/io5';
+import { MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdFavoriteBorder, MdAccessTime } from 'react-icons/md';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
-import InfoDialog from '../../../components/common/InfoDialog';
-import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
 import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
-import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
-import CursorContextMenu from '../../../components/common/CursorContextMenu';
+import MusicContextMenu from '../../../components/common/MusicContextMenu';
+import { useSongOperations } from '../../../hooks/useSongOperations';
+import type { MusicMenuContext } from '../../../hooks/useSongOperations';
+import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
-import { useNavigationStore } from '../../../store/useNavigationStore';
-import { libraryService } from '../../../services/libraryService';
 import { usePlayerStore } from '../../../store/usePlayerStore';
-import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 
 import {
     DndContext,
@@ -46,9 +42,7 @@ const HIDE_ALBUM_BREAKPOINT = 900;
 interface SortableSongListProps {
     songs: SongMetadata[];
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
-    onRemoveFromPlaylist: (song: SongMetadata) => void;
     onReorder: (newOrder: SongMetadata[]) => void;
-    onToggleFavorite?: (song: SongMetadata) => void;
     disableReorder?: boolean;
     sortKey?: SortKey;
     sortOrder?: SortOrder;
@@ -74,21 +68,15 @@ const SongListItem = memo(({
     handleContextMenu,
     hideAlbum,
     formatDuration,
-    onRemove, // Remapped to onRemove (Remove from Playlist)
-    onDelete, // New prop (Delete from Library)
     toggleFavorite,
     isDragging,
     isOverlay,
     dragCount,
-    // Context Menu
-    onShowProperties,
-    onShowAlbum, // New
-    onShowArtist, // New
     onSelect,
-    onAddQueue,
-    onAddToPlaylist,
     onMenuOpen,
-    toggleSelection  // Added
+    toggleSelection,
+    playlistId,
+    context // Added
 }: any) => {
     return (
         <div
@@ -143,7 +131,7 @@ const SongListItem = memo(({
                             }}
                             className="hidden group-hover:flex text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
                         >
-                            <IoSquareOutline />
+                            <MdCheckBoxOutlineBlank />
                         </div>
                     </div>
                 </div>
@@ -157,8 +145,8 @@ const SongListItem = memo(({
                         className="text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
                     >
                         {selected
-                            ? <IoCheckbox className="text-primary" />
-                            : <IoSquareOutline />
+                            ? <MdCheckBox className="text-primary" />
+                            : <MdCheckBoxOutlineBlank />
                         }
                     </div>
                 </div>
@@ -180,7 +168,7 @@ const SongListItem = memo(({
                         )}
                         title={song.is_favorite ? "取消喜爱" : "喜爱"}
                     >
-                        {song.is_favorite ? <IoHeart className="text-base" /> : <IoHeartOutline className="text-base" />}
+                        {song.is_favorite ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
                     </button>
                 </div>
             )}
@@ -224,40 +212,19 @@ const SongListItem = memo(({
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >
-                {!isDragging && (
-                    <MusicContextMenu
-                        onOpen={onMenuOpen} // Pass handler
-                        type="playlist"
-                        variant="clean"
-                        onPlay={() => onPlay && onPlay(song, index, { restartIfCurrent: true })}
-                        onAddToQueue={onAddQueue ? () => onAddQueue(song) : undefined}
-                        onAddToPlaylist={onAddToPlaylist ? () => onAddToPlaylist(song) : undefined}
-                        onShowProperties={onShowProperties ? () => onShowProperties(song) : undefined}
-                        onShowAlbum={onShowAlbum ? () => onShowAlbum(song) : undefined}
-                        onShowArtist={onShowArtist ? () => onShowArtist(song) : undefined}
-
-                        // onRemove: Remove from Playlist (Default style)
-                        onRemove={() => onRemove && onRemove(song)}
-                        removeText="从播放列表移除"
-
-                        // onDelete: Delete from Library (Danger style)
-                        onDelete={() => onDelete && onDelete(song)}
-                        deleteText="从音乐库删除"
-
-                        // Select logic
-                        onSelect={onSelect ? () => {
-                            if (isSelectionMode) {
-                                toggleSelection(getSongId(song, index), 'song', song);
-                            } else {
-                                onSelect(song);
-                            }
-                        } : undefined}
-                        selectText={selected ? "取消选择" : "选择"}
-                        // Favorites Support
-                        onFavorite={() => toggleFavorite && toggleFavorite(song)}
-                        isFavorite={song.is_favorite}
-                    />
-                )}
+                <SongListItemMenu
+                    song={song}
+                    index={index}
+                    onPlay={onPlay}
+                    // onRemove/onDelete handled automatically by hook if playlistId is correct or context is generic
+                    onMenuOpen={onMenuOpen}
+                    isSelectionMode={isSelectionMode}
+                    toggleSelection={toggleSelection}
+                    onSelect={onSelect}
+                    selected={selected}
+                    playlistId={playlistId} // Pass down
+                    context={context} // Pass down
+                />
             </div>
         </div>
     );
@@ -299,17 +266,103 @@ const SortableItem = memo((props: any) => {
     );
 });
 
+const SongListItemMenu = memo(({
+    song,
+    index,
+    onPlay,
+    onMenuOpen,
+    isSelectionMode,
+    toggleSelection,
+    onSelect,
+    selected,
+    playlistId,
+    context = 'playlist' // Accept Context
+}: any) => {
+    const { menuItems } = useSongOperations({
+        items: [song],
+        context, // Use correct context
+        playlistId,
+        onPlay: onPlay ? () => onPlay(song, index, { restartIfCurrent: true }) : undefined,
+        // ...
+        onSelect: onSelect ? () => {
+            if (isSelectionMode && toggleSelection) {
+                toggleSelection(getSongId(song, index), 'song', song);
+            } else if (onSelect) {
+                onSelect(song);
+            }
+        } : undefined,
+        isSelected: selected,
+    });
+
+    return (
+        <MusicContextMenu
+            groups={menuItems}
+            onOpen={onMenuOpen}
+            variant="clean"
+        />
+    );
+});
+
+const ContextMenuResolver = memo(({
+    contextMenu,
+    onClose,
+    toggleSelection,
+    toggleSelectionMode,
+    isSelectionMode,
+    selectedIds,
+    playlistId,
+    context = 'playlist' // Accept Context
+}: any) => {
+    const items = useMemo(() => {
+        if (!contextMenu) return [];
+        if (contextMenu.type === 'batch') return contextMenu.songs || [];
+        return contextMenu.song ? [contextMenu.song] : [];
+    }, [contextMenu]);
+
+    const { menuItems } = useSongOperations({
+        items,
+        context,
+        playlistId,
+        isSelected: contextMenu?.type !== 'batch' && contextMenu?.song ? selectedIds.has(contextMenu.song.id?.toString() || contextMenu.song.path || '') : false,
+        onSelect: () => {
+            if (contextMenu?.type === 'batch') {
+                items.forEach((s: SongMetadata) => {
+                    const id = s.id ? s.id.toString() : s.path;
+                    if (id) toggleSelection(id, 'song', s);
+                });
+            } else if (contextMenu?.song) {
+                const id = contextMenu.song.id ? contextMenu.song.id.toString() : (contextMenu.song.path || '');
+                if (!isSelectionMode) {
+                    toggleSelectionMode({ id, type: 'song', data: contextMenu.song });
+                } else {
+                    toggleSelection(id, 'song', contextMenu.song);
+                }
+            }
+        },
+    });
+
+    return (
+        <SmartCursorContextMenu
+            x={contextMenu.x}
+            y={contextMenu.y}
+            onClose={onClose}
+            menuGroups={menuItems}
+        />
+    );
+});
+
 export default function SortableSongList({
     songs,
     onPlay,
-    onRemoveFromPlaylist,
     onReorder,
-    onToggleFavorite,
     disableReorder = false,
     sortKey = 'manual',
-    sortOrder: _sortOrder = 'asc'
-}: SortableSongListProps) {
+    sortOrder: _3 = 'asc',
+    playlistId,
+    context = 'playlist' // Default to playlist
+}: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
     const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
+
 
     // Use the songs prop directly as sorting is now handled by the parent component
     const displaySongs = songs;
@@ -345,7 +398,6 @@ export default function SortableSongList({
         selectAllRequested,
         setSelectAllRequested,
         selectAll,
-        deselectItem
     } = useSelectionStore();
 
     // Handle Select All Request
@@ -371,28 +423,13 @@ export default function SortableSongList({
     };
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-    const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-    const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
-
-    const [confirmDelete, setConfirmDelete] = useState<{ open: boolean; song: SongMetadata | null }>({ open: false, song: null });
-    const [confirmLibraryDelete, setConfirmLibraryDelete] = useState<{ open: boolean; song: SongMetadata | null }>({ open: false, song: null });
-
-    const [batchRemoveConfirmOpen, setBatchRemoveConfirmOpen] = useState(false);
-    const [batchLibraryDeleteConfirmOpen, setBatchLibraryDeleteConfirmOpen] = useState(false);
-
     const [activeId, setActiveId] = useState<string | null>(null);
 
-    const handleOpenProperties = (song: SongMetadata) => {
-        setPropertySong(song);
-        setIsPropertiesOpen(true);
-    };
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
         useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
     );
-
-
 
     const handleDragStart = (event: DragStartEvent) => {
         setActiveId(event.active.id.toString());
@@ -434,22 +471,14 @@ export default function SortableSongList({
                 // 2. Find insertion point in the unselected array
                 // We use the 'over' item (which is unselected) as the reference
                 let insertAtIndex = unselectedItems.findIndex((s) => {
-                    // We need to find the specific item by ID, index 'i' here is just for local array
-                    // But getSongId might rely on original index if path missing? 
-                    // To be safe, we match by ID comparison since unselected items are subsets
                     const originalIndex = songs.indexOf(s);
                     return getSongId(s, originalIndex) === overIdStr;
                 });
 
                 if (insertAtIndex !== -1) {
-                    // Determine if we insert before or after based on drag direction relative to original list
                     if (activeIndex < overIndex) {
-                        // Dragging Down -> Insert After
                         insertAtIndex += 1;
                     }
-                    // Dragging Up -> Insert Before (keep index)
-
-                    // 3. Construct new array
                     const newSongs = [...unselectedItems];
                     newSongs.splice(insertAtIndex, 0, ...selectedItems);
                     onReorder(newSongs);
@@ -484,8 +513,8 @@ export default function SortableSongList({
         }
     };
 
-    const handleCheckboxClick = (e: React.MouseEvent, song: SongMetadata) => {
-        e.stopPropagation();
+    const handleCheckboxClick = (e: React.MouseEvent | null, song: SongMetadata) => {
+        if (e) e.stopPropagation();
         const id = song.id ? song.id.toString() : song.path;
         if (!id) return;
         if (!isSelectionMode) {
@@ -497,6 +526,8 @@ export default function SortableSongList({
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
+        // Close other menus (HeadlessUI)
+        document.body.click();
 
         const id = getSongId(song, index);
         const isSelected = id ? selectedIds.has(id) : false;
@@ -508,56 +539,6 @@ export default function SortableSongList({
         } else {
             setContextMenu({ x: e.clientX, y: e.clientY, type: 'single', song, index });
         }
-    };
-
-    // Batch Actions Helpers
-    const { addToNext, toggleFavorite: storeToggleFavorite } = useLibraryStore();
-    const { setShuffleState } = usePlayerStore();
-    const { playList } = usePlaybackActions();
-
-    // Prefer props callback (optimistic), fallback to store (global async)
-    const handleFavorite = onToggleFavorite || storeToggleFavorite;
-
-    const handleBatchPlay = async (songsToPlay: SongMetadata[]) => {
-        if (songsToPlay.length === 0) return;
-        const first = songsToPlay[0];
-        if (first.path) {
-            setShuffleState(false);
-            await playList({
-                songs: songsToPlay,
-                startIndex: 0,
-                options: { restartIfCurrent: true }
-            });
-        }
-    };
-
-    const handleBatchAddToQueue = (songsToAdd: SongMetadata[]) => {
-        [...songsToAdd].reverse().forEach(s => addToNext(s));
-    };
-
-    const handleBatchFavorite = async (songsToFav: SongMetadata[]) => {
-        for (const s of songsToFav) {
-            if (s.id && !s.is_favorite) {
-                try { await libraryService.toggleFavorite(s.id); } catch (e) { }
-            }
-        }
-    };
-
-    const handleBatchRemoveFromPlaylist = async () => {
-        if (contextMenu?.type === 'batch' && contextMenu.songs) {
-            contextMenu.songs.forEach(s => onRemoveFromPlaylist(s));
-        }
-        setBatchRemoveConfirmOpen(false);
-        setContextMenu(null);
-    };
-
-    const handleBatchDeleteFromLibrary = async () => {
-        if (contextMenu?.type === 'batch' && contextMenu.songs) {
-            const ids = contextMenu.songs.map(s => s.id).filter(id => typeof id === 'number') as number[];
-            if (ids.length > 0) await libraryService.batchDeleteSongs(ids);
-        }
-        setBatchLibraryDeleteConfirmOpen(false);
-        setContextMenu(null);
     };
 
     const getGridCols = () => {
@@ -577,112 +558,8 @@ export default function SortableSongList({
     // Derived state for dragging to show proper visuals
     const isDraggingSelection = !!(activeId && selectedIds.has(activeId));
 
-    // Navigation for Context Menu
-    const { push } = useNavigationStore();
-
-    const handleShowAlbum = async (song: SongMetadata) => {
-        if (!song.album || !song.artist) return;
-
-        // Fetch full library to find the album and its songs
-        const allSongs = await libraryService.getLibrarySongs();
-        const albumSongs = allSongs.filter(s => s.album === song.album && s.artist === song.artist);
-
-        if (albumSongs.length > 0) {
-            push({
-                type: 'album_detail',
-                data: {
-                    name: song.album,
-                    artist: song.artist,
-                    cover: albumSongs[0].cover || null,
-                    cover_path: albumSongs[0].cover_path || null,
-                    songs: albumSongs
-                }
-            });
-        }
-    };
-
-    const handleShowArtist = async (song: SongMetadata) => {
-        if (!song.artist) return;
-
-        // Fetch full library to find the artist and their songs/albums
-        const allSongs = await libraryService.getLibrarySongs();
-        const artistSongs = allSongs.filter(s => s.artist === song.artist);
-
-        if (artistSongs.length > 0) {
-            // Reconstruct ArtistData
-            const artistAlbumsMap = new Map<string, any>();
-            artistSongs.forEach(s => {
-                const key = s.album || "Unknown Album";
-                if (!artistAlbumsMap.has(key)) {
-                    artistAlbumsMap.set(key, {
-                        name: key,
-                        artist: s.artist,
-                        cover: s.cover || null,
-                        cover_path: s.cover_path || null,
-                        songs: []
-                    });
-                }
-                artistAlbumsMap.get(key).songs.push(s);
-            });
-
-            const artistAlbums = Array.from(artistAlbumsMap.values());
-
-            push({
-                type: 'artist_detail',
-                data: {
-                    name: song.artist,
-                    cover: artistSongs[0].cover || null,
-                    count: artistSongs.length,
-                    albumCount: artistAlbums.length,
-                    songs: artistSongs,
-                    // Note: ArtistDetailView also expects 'albums' and 'allArtistSongs' as separate props 
-                    // in some usages, but when pushed via navigation, data is the data object.
-                    // Wait, let's check GlobalDetailStack.tsx again.
-                }
-            });
-        }
-    };
-
-    // Delete from Library
-    const handleDeleteFromLibrary = async (song: SongMetadata) => {
-        if (song.id) {
-            await libraryService.deleteSong(song.id);
-            // Optionally trigger library update or UI refresh? 
-            // The list might not auto-update if it relies on playlist data not library data directly on delete event.
-            // But usually parent components handle refresh.
-        }
-    };
-
-
-
     return (
         <div className="w-full relative select-none">
-            <InfoDialog isOpen={isPropertiesOpen} onClose={() => setIsPropertiesOpen(false)} song={propertySong} />
-
-            {/* Confirm Remove from Playlist */}
-            <ConfirmDialog
-                isOpen={confirmDelete.open}
-                onClose={() => setConfirmDelete({ open: false, song: null })}
-                onConfirm={() => {
-                    if (confirmDelete.song) onRemoveFromPlaylist(confirmDelete.song);
-                }}
-                title="移除歌曲"
-                description={`确定要从播放列表中移除 "${confirmDelete.song?.title}" 吗？`}
-                type="danger"
-            />
-
-            {/* Confirm Delete from Library */}
-            <ConfirmDialog
-                isOpen={confirmLibraryDelete.open}
-                onClose={() => setConfirmLibraryDelete({ open: false, song: null })}
-                onConfirm={() => {
-                    if (confirmLibraryDelete.song) handleDeleteFromLibrary(confirmLibraryDelete.song);
-                }}
-                title="从音乐库删除"
-                description={`确定要将 "${confirmLibraryDelete.song?.title}" 从音乐库中删除吗？此操作不可恢复。`}
-                type="danger"
-            />
-
             <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-outline-variant/10 text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl">
                 <div className="text-center font-bold">#</div>{/* Index/Checkbox */}
                 <div></div>{/* Heart */}
@@ -715,36 +592,19 @@ export default function SortableSongList({
                                     style={gridStyle}
                                     isSelectionMode={isSelectionMode}
                                     selected={isSelected(uniqueId)}
-                                    // ... check selection by ID
                                     onPlay={onPlay}
                                     handleItemClick={handleItemClick}
                                     handleCheckboxClick={handleCheckboxClick}
                                     handleContextMenu={handleContextMenu}
                                     hideAlbum={shouldHideAlbum}
                                     formatDuration={formatDuration}
-                                    isDraggingGroup={isDraggingSelection && isSelected(uniqueId) && activeId !== uniqueId}
-                                    // Context Menu Pass-through
-                                    onMenuOpen={() => setContextMenu(null)}
-                                    onShowProperties={handleOpenProperties}
-                                    onSelect={(song: SongMetadata) => toggleSelectionMode({
-                                        id: song.id ? song.id.toString() : song.path || '',
-                                        type: 'song',
-                                        data: song
-                                    })}
-                                    onAddQueue={(song: SongMetadata) => useLibraryStore.getState().addToNext(song)}
+                                    onSelect={(s: SongMetadata) => handleCheckboxClick(null, s)}
                                     onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
                                     toggleFavorite={toggleFavorite}
-
-                                    // New Menu Items
-                                    onShowAlbum={() => handleShowAlbum(song)}
-                                    onShowArtist={() => handleShowArtist(song)}
-                                    // onRemove is passed as the "Remove from Playlist" action (default style)
-                                    onRemove={() => setConfirmDelete({ open: true, song })}
-                                    removeText="从播放列表移除"
-                                    // onDelete is "Delete from Library" (danger style)
-                                    onDelete={() => setConfirmLibraryDelete({ open: true, song })}
-                                    deleteText="从音乐库删除"
                                     toggleSelection={toggleSelection}
+                                    onMenuOpen={() => setContextMenu(null)}
+                                    playlistId={playlistId} // Pass down
+                                    context={context}
                                 />
                             );
                         })}
@@ -783,89 +643,16 @@ export default function SortableSongList({
                 )}
             </DndContext>
 
-            {/* Batch Remove from Playlist Confirm */}
-            <ConfirmDialog
-                isOpen={batchRemoveConfirmOpen}
-                onClose={() => setBatchRemoveConfirmOpen(false)}
-                onConfirm={handleBatchRemoveFromPlaylist}
-                title="从播放列表移除"
-                description={`确定要从播放列表中移除选中的 ${contextMenu?.type === 'batch' ? contextMenu.songs?.length : 0} 项吗？`}
-                type="danger" // Or default? Playlist removal is usually safe.
-            />
-
-            {/* Batch Delete from Library Confirm */}
-            <ConfirmDialog
-                isOpen={batchLibraryDeleteConfirmOpen}
-                onClose={() => setBatchLibraryDeleteConfirmOpen(false)}
-                onConfirm={handleBatchDeleteFromLibrary}
-                title="从音乐库删除"
-                description={`确定要删除选中的 ${contextMenu?.type === 'batch' ? contextMenu.songs?.length : 0} 项吗？此操作将从音乐库中移除，不会删除本地文件。`}
-                type="danger"
-            />
-
             {contextMenu && (
-                <CursorContextMenu
-                    x={contextMenu.x}
-                    y={contextMenu.y}
+                <ContextMenuResolver
+                    contextMenu={contextMenu}
                     onClose={() => setContextMenu(null)}
-                    menuGroups={contextMenu.type === 'batch' && contextMenu.songs ?
-                        // BATCH
-                        getMusicMenuGroups({
-                            type: 'song', // or playlist-batch
-                            onPlay: () => handleBatchPlay(contextMenu.songs!),
-                            onAddToQueue: () => handleBatchAddToQueue(contextMenu.songs!),
-                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.songs!),
-                            // Remove from Playlsit
-                            onRemove: () => setBatchRemoveConfirmOpen(true),
-                            removeText: `从播放列表移除 (${contextMenu.songs.length})`,
-                            // Delete from Library
-                            onDelete: () => setBatchLibraryDeleteConfirmOpen(true),
-                            deleteText: `从音乐库删除 (${contextMenu.songs.length})`,
-                            onFavorite: () => handleBatchFavorite(contextMenu.songs!),
-                            onSelect: () => {
-                                contextMenu.songs?.forEach((s) => {
-                                    // We need the index for getSongId but index in batch doesn't map to original index directly easily.
-                                    // HOWEVER, in SortableSongList, songs have stable paths or IDs. 
-                                    // The getSongId logic in this context:
-                                    const sId = s.id ? s.id.toString() : s.path;
-                                    if (sId) deselectItem(sId);
-                                });
-                            },
-                            selectText: `取消选择 (${contextMenu.songs.length})`
-                        })
-                        :
-                        // SINGLE
-                        getMusicMenuGroups({
-                            type: 'playlist', // Use playlist type context logic
-                            onPlay: () => onPlay(contextMenu.song!, contextMenu.index!), // @ts-ignore
-                            onAddToQueue: () => useLibraryStore.getState().addToNext(contextMenu.song!), // @ts-ignore
-                            onAddToPlaylist: () => useAddToPlaylistStore.getState().open(contextMenu.song!), // @ts-ignore
-
-                            // New Items
-                            onShowProperties: () => { setPropertySong(contextMenu.song!); setIsPropertiesOpen(true); }, // @ts-ignore
-                            onShowAlbum: () => handleShowAlbum(contextMenu.song!), // @ts-ignore
-                            onShowArtist: () => handleShowArtist(contextMenu.song!), // @ts-ignore
-
-                            // Remove from playlist (Default style, above delete)
-                            onRemove: () => setConfirmDelete({ open: true, song: contextMenu.song! }),
-                            removeText: "从播放列表移除",
-
-                            // Delete from library(Danger style)
-                            onDelete: () => setConfirmLibraryDelete({ open: true, song: contextMenu.song! }),
-                            deleteText: "从音乐库删除",
-
-                            onSelect: () => {
-                                const id = contextMenu.song!.id ? contextMenu.song!.id.toString() : (contextMenu.song!.path || '');
-                                if (isSelectionMode) {
-                                    toggleSelection(id, 'song', contextMenu.song!); // @ts-ignore
-                                } else {
-                                    toggleSelectionMode({ id, type: 'song', data: contextMenu.song! }); // @ts-ignore
-                                }
-                            }, // @ts-ignore
-                            selectText: selectedIds.has(contextMenu.song!.id ? contextMenu.song!.id.toString() : (contextMenu.song!.path || '')) ? "取消选择" : "选择",
-                            onFavorite: () => handleFavorite(contextMenu.song!), // @ts-ignore
-                            isFavorite: contextMenu.song!.is_favorite
-                        })}
+                    toggleSelection={toggleSelection}
+                    toggleSelectionMode={toggleSelectionMode}
+                    isSelectionMode={isSelectionMode}
+                    selectedIds={selectedIds}
+                    playlistId={playlistId} // Pass down
+                    context={context}
                 />
             )}
         </div>

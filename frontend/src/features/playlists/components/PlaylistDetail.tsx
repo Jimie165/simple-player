@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { MdPlayArrow, MdShuffle, MdEdit, MdSort, MdCheck, MdSearch, MdClose } from 'react-icons/md';
-import { IoHeart } from 'react-icons/io5';
+import { MdPlayArrow, MdShuffle, MdEdit, MdSort, MdCheck, MdSearch, MdClose, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
 
 
@@ -190,16 +189,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         }
     };
 
-    const handleRemove = async (song: SongMetadata) => {
-        if (id === 'favorites') {
-            await libraryService.toggleFavorite(song.id!);
-            loadData();
-        } else {
-            await libraryService.removeFromPlaylist(id as number, song.id!);
-            setSongs(prev => prev.filter(s => s.id !== song.id));
-            triggerLibraryUpdate();
-        }
-    };
+
 
     const handleUpdateInfo = async (name: string, description: string | undefined, coverPath: string | undefined) => {
         if (id !== 'favorites') {
@@ -209,37 +199,6 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 await libraryService.updatePlaylistCover(id as number, coverPath || "");
             }
             loadData();
-        }
-    };
-
-    const handleToggleFavorite = async (song: SongMetadata) => {
-        if (!song.id) return;
-
-        // 1. Optimistic Update (Immediate Feedback)
-        setSongs(prev => prev.map(s =>
-            s.id === song.id ? { ...s, is_favorite: !s.is_favorite } : s
-        ));
-
-        try {
-            // 2. API Call (Silent)
-            await libraryService.toggleFavorite(song.id);
-            // We consciously DO NOT call triggeringLibraryUpdate() or loadData() here 
-            // to avoid full re-render flickering.
-
-            // If we are in 'favorites' playlist and un-favoriting, we might want to remove it visually
-            // but usually it's better to let it stay until refresh or navigate away, 
-            // or we could remove it locally if that's the desired UX.
-            if (id === 'favorites') {
-                // If the user wants realtime removal for Favorites list:
-                setSongs(prev => prev.filter(s => s.id !== song.id));
-            }
-
-        } catch (e) {
-            console.error(e);
-            // Revert on error
-            setSongs(prev => prev.map(s =>
-                s.id === song.id ? { ...s, is_favorite: !s.is_favorite } : s
-            ));
         }
     };
 
@@ -438,7 +397,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                             isFavorites ? "bg-gradient-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
-                                <IoHeart className="text-8xl text-white drop-shadow-md" />
+                                <MdFavorite className="text-8xl text-white drop-shadow-md" />
                             ) : coverPath ? (
                                 <CoverImage src={coverPath} className="w-full h-full object-cover" />
                             ) : (
@@ -513,12 +472,12 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     <SortableSongList
                         songs={filteredSongs}
                         onPlay={handlePlaySong}
-                        onRemoveFromPlaylist={handleRemove}
                         onReorder={handleReorder}
-                        onToggleFavorite={handleToggleFavorite}
-                        disableReorder={id === 'favorites' || !!searchQuery}
+                        disableReorder={(id !== 'favorites' && typeof id !== 'number') || !!searchQuery}
                         sortKey={sortKey}
                         sortOrder={sortOrder}
+                        playlistId={typeof id === 'number' ? id : undefined}
+                        context={id === 'favorites' ? 'library' : 'playlist'}
                     />
                 </div>
             )}

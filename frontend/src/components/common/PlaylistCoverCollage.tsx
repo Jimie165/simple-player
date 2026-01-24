@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { IoMusicalNotes } from 'react-icons/io5';
+import { MdMusicNote } from 'react-icons/md';
 import clsx from 'clsx';
 import { resolveCover } from '../../utils/cover';
 import type { SongMetadata } from '../../types';
@@ -64,7 +64,7 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
     if (coverUrls.length === 0) {
         return (
             <div className={clsx("w-full h-full flex items-center justify-center bg-neutral-200 dark:bg-neutral-800", className)}>
-                <IoMusicalNotes className={clsx("text-4xl text-neutral-400", iconClassName)} />
+                <MdMusicNote className={clsx("text-4xl text-neutral-400", iconClassName)} />
             </div>
         );
     }
@@ -88,7 +88,7 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
                     <img key={index} src={url} className="w-full h-full object-cover" alt="" />
                 ) : (
                     <div key={index} className="w-full h-full bg-neutral-300 dark:bg-neutral-700 flex items-center justify-center">
-                        <IoMusicalNotes className="text-neutral-400" />
+                        <MdMusicNote className="text-neutral-400" />
                     </div>
                 )
             ))}

@@ -1,5 +1,5 @@
 import { Fragment } from 'react';
-import { Dialog, Transition } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import clsx from 'clsx';
 import { MdWarningAmber } from 'react-icons/md';
 
@@ -25,23 +25,16 @@ export default function ConfirmDialog({
     type = 'danger'
 }: ConfirmDialogProps) {
     return (
-        <Transition appear show={isOpen} as={Fragment}>
+        <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-50" onClose={onClose}>
-                <Transition.Child
-                    as={Fragment}
-                    enter="ease-out duration-300"
-                    enterFrom="opacity-0"
-                    enterTo="opacity-100"
-                    leave="ease-in duration-200"
-                    leaveFrom="opacity-100"
-                    leaveTo="opacity-0"
-                >
-                    <div className="fixed inset-0 bg-black/25 backdrop-blur-sm" />
-                </Transition.Child>
+                <DialogBackdrop
+                    transition
+                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                />
 
                 <div className="fixed inset-0 overflow-y-auto">
                     <div className="flex min-h-full items-center justify-center p-4 text-center">
-                        <Transition.Child
+                        <TransitionChild
                             as={Fragment}
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
@@ -50,19 +43,19 @@ export default function ConfirmDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <Dialog.Panel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
+                            <DialogPanel className="w-full max-w-sm transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
                                 <div className="flex items-center gap-3 mb-4">
                                     {type === 'danger' && (
                                         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                                             <MdWarningAmber className="text-2xl text-red-600 dark:text-red-400" />
                                         </div>
                                     )}
-                                    <Dialog.Title
+                                    <DialogTitle
                                         as="h3"
                                         className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100"
                                     >
                                         {title}
-                                    </Dialog.Title>
+                                    </DialogTitle>
                                 </div>
 
                                 <div className="mt-2">
@@ -95,8 +88,8 @@ export default function ConfirmDialog({
                                         {confirmText}
                                     </button>
                                 </div>
-                            </Dialog.Panel>
-                        </Transition.Child>
+                            </DialogPanel>
+                        </TransitionChild>
                     </div>
                 </div>
             </Dialog>

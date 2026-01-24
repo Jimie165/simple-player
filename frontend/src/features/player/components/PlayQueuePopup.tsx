@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
-import { IoMusicalNotes, IoRemoveCircleOutline } from 'react-icons/io5';
+import { MdMusicNote, MdRemoveCircle } from 'react-icons/md';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useNavigationStore } from '../../../store/useNavigationStore';
@@ -151,7 +151,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
             <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
                 {playlist.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 text-neutral-400 text-xs">
-                        <IoMusicalNotes className="text-3xl mb-2 opacity-20" />
+                        <MdMusicNote className="text-3xl mb-2 opacity-20" />
                         <span>队列为空</span>
                     </div>
                 ) : (
@@ -201,7 +201,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                             onShowArtist={song.artist ? () => handleShowArtist(song) : undefined}
                                             onDelete={() => removeSongFromPlaylistByIndex(index)}
                                             deleteText="从播放队列移除"
-                                            deleteIcon={IoRemoveCircleOutline}
+                                            deleteIcon={MdRemoveCircle}
                                             deleteVariant="default"
                                             onFavorite={() => toggleFavorite(song)}
                                             isFavorite={song.is_favorite}
@@ -232,7 +232,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                         onShowArtist: contextMenu.song.artist ? () => handleShowArtist(contextMenu.song) : undefined,
                         onDelete: () => removeSongFromPlaylistByIndex(contextMenu.index),
                         deleteText: "从播放队列移除",
-                        deleteIcon: IoRemoveCircleOutline,
+                        deleteIcon: MdRemoveCircle,
                         deleteVariant: 'default',
                         onFavorite: () => toggleFavorite(contextMenu.song),
                         isFavorite: contextMenu.song.is_favorite,

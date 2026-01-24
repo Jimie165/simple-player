@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { IoHeart, IoMusicalNotes, IoAdd, IoSearch } from 'react-icons/io5';
-import { MdSort, MdCheck } from 'react-icons/md';
+import { MdFavorite, MdMusicNote, MdAdd, MdSearch, MdSort, MdCheck } from 'react-icons/md';
 import clsx from 'clsx';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { useSelectionStore } from '../../store/useSelectionStore';
@@ -8,13 +7,13 @@ import { useSelectionStore } from '../../store/useSelectionStore';
 import PageContainer from '../../components/layout/PageContainer';
 import { libraryService } from '../../services/libraryService';
 import type { Playlist, SongMetadata } from '../../types';
-import ConfirmDialog from '../../components/common/ConfirmDialog';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import CursorContextMenu from '../../components/common/CursorContextMenu';
-import MusicContextMenu, { getMusicMenuGroups } from '../../components/common/MusicContextMenu';
+import SmartCursorContextMenu from '../../components/common/SmartCursorContextMenu';
+import MusicContextMenu from '../../components/common/MusicContextMenu';
+import { useSongOperations } from '../../hooks/useSongOperations';
 import EditPlaylistDialog from './components/EditPlaylistDialog';
 import CreatePlaylistDialog from './components/CreatePlaylistDialog';
 import CardPlayButton from '../../components/common/CardPlayButton';
@@ -26,6 +25,7 @@ type SortKey = 'name' | 'recently_added' | 'recently_played';
 export default function PlaylistList() {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
+    const [favoritesCount, setFavoritesCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<SortKey>(() => {
         try {
@@ -37,7 +37,6 @@ export default function PlaylistList() {
         return 'recently_added';
     });
     const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [deleteId, setDeleteId] = useState<number | null>(null);
     const [editPlaylist, setEditPlaylist] = useState<Playlist | null>(null);
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null);
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -61,6 +60,7 @@ export default function PlaylistList() {
         // Force refresh when library changes
         setPlaylistSongs({});
         loadPlaylists();
+        libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
     }, [libraryVersion]);
 
     useEffect(() => {
@@ -72,9 +72,30 @@ export default function PlaylistList() {
     // Filter & Sort
     const filteredPlaylists = useMemo(() => {
         let list = [...playlists];
+
+        // Construct Favorites Pseudo-Playlist
+        const favoritesItem: any = {
+            id: 'favorites',
+            name: '喜爱歌曲',
+            description: null,
+            cover_path: null,
+            created_at: '',
+            updated_at: new Date().toISOString(),
+            last_played_at: null,
+            song_count: favoritesCount
+        };
+
         if (searchQuery) {
             const lowerJson = searchQuery.toLowerCase();
             list = list.filter(p => p.name.toLowerCase().includes(lowerJson));
+
+            // Check if favorites matches
+            if (favoritesItem.name.includes(searchQuery) || 'favorites'.includes(lowerJson)) {
+                // We will unshift it later
+            } else {
+                // Mark as null to exclude? No, just don't add
+                favoritesItem.hidden = true;
+            }
         }
 
         list.sort((a, b) => {
@@ -89,8 +110,13 @@ export default function PlaylistList() {
             return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
         });
 
+        // Always prepend Favorites if not hidden
+        if (!(favoritesItem as any).hidden) {
+            list.unshift(favoritesItem);
+        }
+
         return list;
-    }, [playlists, searchQuery, sortKey]);
+    }, [playlists, searchQuery, sortKey, favoritesCount]);
 
     // Handle Select All Request
     useEffect(() => {
@@ -104,13 +130,7 @@ export default function PlaylistList() {
         }
     }, [selectAllRequested, isSelectionMode, filteredPlaylists, selectAll, setSelectAllRequested]);
 
-    const handleDelete = async () => {
-        if (deleteId) {
-            await libraryService.deletePlaylist(deleteId);
-            setDeleteId(null);
-            loadPlaylists();
-        }
-    };
+    // Removal of handleDelete since we use hook's global confirm now
 
     const handleCreate = async (name: string, _description?: string) => {
         await libraryService.createPlaylist(name);
@@ -235,7 +255,19 @@ export default function PlaylistList() {
     // 右键菜单处理
     const handleContextMenu = (e: React.MouseEvent, playlist: Playlist) => {
         e.preventDefault();
+        // 触发一个全屏点击来关闭任何打开的 HeadlessUI 菜单（三个点菜单）
+        document.body.click();
+
+        setFavoritesContextMenu(null);
         setContextMenu({ x: e.clientX, y: e.clientY, playlist });
+    };
+
+    const handleFavoritesContextMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        document.body.click();
+
+        setContextMenu(null);
+        setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
     };
 
 
@@ -245,7 +277,7 @@ export default function PlaylistList() {
             actions={
                 <div className="flex items-center gap-2">
                     <div className="relative group">
-                        <IoSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-primary transition-colors" />
+                        <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-primary transition-colors" />
                         <input
                             type="text"
                             placeholder="搜索..."
@@ -259,21 +291,13 @@ export default function PlaylistList() {
                         onClick={() => setIsCreateOpen(true)}
                         className="flex items-center gap-1 bg-primary text-on-primary px-4 py-1.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-all shadow-sm active:scale-95"
                     >
-                        <IoAdd className="text-lg" />
+                        <MdAdd className="text-lg" />
                         新建
                     </button>
                 </div>
             }
         >
-            <ConfirmDialog
-                isOpen={!!deleteId}
-                onClose={() => setDeleteId(null)}
-                onConfirm={handleDelete}
-                title="删除"
-                description="确定要删除此播放列表吗？"
-                confirmText="删除"
-                type="danger"
-            />
+            {/* confirm dialog removed, handled by useSongOperations globally */}
 
             <CreatePlaylistDialog
                 isOpen={isCreateOpen}
@@ -330,57 +354,88 @@ export default function PlaylistList() {
             </div>
 
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pb-8">
-                {/* 1. Favorites Card - Special Style */}
-                {!searchQuery && (
-                    <div
-                        onClick={() => push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } })}
-                        onContextMenu={(e) => {
-                            e.preventDefault();
-                            setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
-                        }}
-                        className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02] rounded-2xl overflow-hidden"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
-
-                        <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                            <div className="flex justify-end">
-                                <div className="bg-white/20 p-2.5 rounded-full backdrop-blur-sm">
-                                    <IoHeart className="text-white text-xl" />
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="text-white font-bold text-2xl tracking-tight">喜爱歌曲</h3>
-                            </div>
-                        </div>
-
-                        {/* Hover Overlay - Identical to AlbumGridView */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-2xl">
-                            {/* Play Button - Defaults to bottom-3 left-3 */}
-                            <CardPlayButton
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handlePlayFavorites();
-                                }}
-                            />
-                            {/* More Button - Defaults to bottom-3 right-3 */}
-                            <MusicContextMenu
-                                type="playlist"
-                                className="absolute bottom-3 right-3"
-                                buttonClassName="w-10 h-10"
-                                onPlay={() => handlePlayFavorites()}
-                                onShuffle={() => handlePlayFavorites(true)}
-                                onAddToQueue={() => handleAddFavoritesToQueue()}
-                                onOpen={() => setFavoritesContextMenu(null)}
-                                hideSelect={true}
-                                isFavorite={true}
-                            />
-                        </div>
-                    </div>
-                )}
-
-
-                {/* 2. User Playlists */}
                 {filteredPlaylists.map(pl => {
+                    // Check if it's the favorites item
+                    if (pl.id === 'favorites' as any) {
+                        const isSelected = selectedIds.has('favorites');
+                        return (
+                            <div
+                                key="favorites"
+                                onClick={() => {
+                                    if (isSelectionMode) {
+                                        toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' } as any);
+                                    } else {
+                                        push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } });
+                                    }
+                                }}
+                                onContextMenu={handleFavoritesContextMenu}
+                                className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02] rounded-2xl overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
+
+                                <div className="absolute inset-0 p-5 flex flex-col justify-between">
+                                    <div className="flex justify-end">
+                                        <div className="bg-white/20 p-2.5 rounded-full backdrop-blur-sm">
+                                            <MdFavorite className="text-white text-xl" />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <h3 className="text-white font-bold text-2xl tracking-tight">喜爱歌曲</h3>
+                                        <p className="text-white/80 text-sm mt-1 font-medium">{favoritesCount} 首歌曲</p>
+                                    </div>
+                                </div>
+
+                                {/* Selection Checkbox */}
+                                {isSelectionMode && (
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' } as any);
+                                        }}
+                                        className={clsx(
+                                            "absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer",
+                                            isSelected
+                                                ? "bg-white text-primary opacity-100"
+                                                : "bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100"
+                                        )}
+                                    >
+                                        {isSelected ? <MdCheck className="text-lg" /> : null}
+                                    </div>
+                                )}
+
+                                {/* Hover Overlay */}
+                                <div className={clsx(
+                                    "absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 rounded-2xl",
+                                    !isSelectionMode ? "opacity-0 group-hover:opacity-100" : "opacity-0"
+                                )}>
+                                    {!isSelectionMode && (
+                                        <>
+                                            <CardPlayButton
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handlePlayFavorites();
+                                                }}
+                                            />
+                                            <FavoritesCardMenu
+                                                handlePlayFavorites={handlePlayFavorites}
+                                                handleAddFavoritesToQueue={handleAddFavoritesToQueue}
+                                                setFavoritesContextMenu={setFavoritesContextMenu}
+                                                setContextMenu={setContextMenu}
+                                                toggleSelectionMode={toggleSelectionMode}
+                                                toggleSelection={toggleSelection}
+                                                isSelectionMode={isSelectionMode}
+                                                isSelected={selectedIds.has('favorites')}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                                {isSelectionMode && (
+                                    <div className="absolute inset-0 bg-black/10 transition-opacity pointer-events-none" />
+                                )}
+                            </div>
+                        );
+                    }
+
                     const isSelected = selectedIds.has(pl.id.toString());
                     return (
                         <div
@@ -433,24 +488,17 @@ export default function PlaylistList() {
                                                 handlePlayPlaylist(pl);
                                             }}
                                         />
-                                        <MusicContextMenu
-                                            type="playlist"
-                                            className="absolute bottom-3 right-3"
-                                            buttonClassName="w-10 h-10"
-                                            onPlay={() => handlePlayPlaylist(pl)}
-                                            onShuffle={() => handlePlayPlaylist(pl, true)}
-                                            onAddToQueue={() => handleAddToQueue(pl)}
-                                            onEdit={() => setEditPlaylist(pl)}
-                                            onDelete={() => setDeleteId(pl.id)}
-                                            deleteText="删除"
-                                            onOpen={() => setContextMenu(null)}
-                                            onSelect={() => {
-                                                if (!isSelectionMode) {
-                                                    toggleSelectionMode({ id: pl.id.toString(), type: 'playlist', data: pl });
-                                                } else {
-                                                    toggleSelection(pl.id.toString(), 'playlist', pl);
-                                                }
-                                            }}
+                                        <PlaylistCardMenu
+                                            pl={pl}
+                                            handlePlayPlaylist={handlePlayPlaylist}
+                                            handleAddToQueue={handleAddToQueue}
+                                            setEditPlaylist={setEditPlaylist}
+                                            setContextMenu={setContextMenu}
+                                            setFavoritesContextMenu={setFavoritesContextMenu}
+                                            toggleSelectionMode={toggleSelectionMode}
+                                            toggleSelection={toggleSelection}
+                                            isSelectionMode={isSelectionMode}
+                                            isSelected={selectedIds.has(pl.id.toString())}
                                         />
                                     </div>
                                 )}
@@ -476,53 +524,135 @@ export default function PlaylistList() {
 
             {/* Context Menu */}
             {contextMenu && (
-                <CursorContextMenu
+                <SmartCursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
+                    item={contextMenu.playlist}
+                    context="playlist_list"
                     onClose={() => setContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
-                        type: 'playlist',
-                        onPlay: () => handlePlayPlaylist(contextMenu.playlist),
-                        onShuffle: () => handlePlayPlaylist(contextMenu.playlist, true),
-                        onAddToQueue: () => handleAddToQueue(contextMenu.playlist),
-                        onEdit: () => setEditPlaylist(contextMenu.playlist),
-                        onDelete: () => setDeleteId(contextMenu.playlist.id),
-                        deleteText: "删除",
-                        onSelect: () => {
-                            if (!isSelectionMode) {
-                                toggleSelectionMode({ id: contextMenu.playlist.id.toString(), type: 'playlist', data: contextMenu.playlist });
-                            } else {
-                                toggleSelection(contextMenu.playlist.id.toString(), 'playlist', contextMenu.playlist);
-                            }
-                        },
-                    })}
+                    onEdit={() => setEditPlaylist(contextMenu.playlist)}
+                    onShuffle={() => handlePlayPlaylist(contextMenu.playlist, true)}
                 />
             )}
 
             {/* Favorites Context Menu */}
             {favoritesContextMenu && (
-                <CursorContextMenu
+                <SmartCursorContextMenu
                     x={favoritesContextMenu.x}
                     y={favoritesContextMenu.y}
-                    onClose={() => setFavoritesContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
+                    item={{
+                        id: 'favorites',
                         type: 'playlist',
-                        onPlay: () => handlePlayFavorites(),
-                        onShuffle: () => handlePlayFavorites(true),
-                        onAddToQueue: () => handleAddFavoritesToQueue(),
-                        hideSelect: true,
-                    })}
+                        name: '喜爱歌曲',
+                        title: '喜爱歌曲'
+                    } as any}
+                    context="playlist_list"
+                    onClose={() => setFavoritesContextMenu(null)}
+                    onShuffle={() => handlePlayFavorites(true)}
                 />
             )}
 
             {filteredPlaylists.length === 0 && !searchQuery && (
                 <div className="flex flex-col items-center justify-center py-20 text-neutral-400">
                     <div className="w-16 h-16 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mb-4">
-                        <IoMusicalNotes className="text-3xl" />
+                        <MdMusicNote className="text-3xl" />
                     </div>
                     <p className="text-base font-medium">暂无播放列表</p>
                 </div>
             )}
         </PageContainer>
+    );
+}
+
+/**
+ * 喜爱歌曲磁贴的统一菜单
+ */
+function FavoritesCardMenu({
+    handlePlayFavorites,
+    handleAddFavoritesToQueue,
+    setFavoritesContextMenu,
+    setContextMenu,
+    toggleSelectionMode,
+    toggleSelection,
+    isSelectionMode,
+    isSelected
+}: any) {
+    const { menuItems } = useSongOperations({
+        items: [{
+            id: 'favorites',
+            type: 'playlist',
+            name: '喜爱歌曲',
+            title: '喜爱歌曲'
+        } as any],
+        context: 'playlist_list',
+        onPlay: () => handlePlayFavorites(),
+        onShuffle: () => handlePlayFavorites(true),
+        onAddToQueue: () => handleAddFavoritesToQueue(),
+        onDelete: () => { }, // Disable delete for Favorites tile
+        onSelect: () => {
+            if (!isSelectionMode) {
+                toggleSelectionMode({ id: 'favorites', type: 'playlist', data: { id: 'favorites', name: '喜爱歌曲' } });
+            } else {
+                toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' });
+            }
+        },
+        isSelected
+    });
+
+    return (
+        <MusicContextMenu
+            className="absolute bottom-3 right-3"
+            buttonClassName="w-10 h-10"
+            groups={menuItems}
+            onOpen={() => {
+                setFavoritesContextMenu(null);
+                setContextMenu(null);
+            }}
+        />
+    );
+}
+
+/**
+ * 用户播放列表磁贴的统一菜单
+ */
+function PlaylistCardMenu({
+    pl,
+    handlePlayPlaylist,
+    handleAddToQueue,
+    setEditPlaylist,
+    setContextMenu,
+    setFavoritesContextMenu,
+    toggleSelectionMode,
+    toggleSelection,
+    isSelectionMode,
+    isSelected
+}: any) {
+    const { menuItems } = useSongOperations({
+        items: [pl],
+        context: 'playlist_list',
+        onPlay: () => handlePlayPlaylist(pl),
+        onShuffle: () => handlePlayPlaylist(pl, true),
+        onAddToQueue: () => handleAddToQueue(pl),
+        onEdit: () => setEditPlaylist(pl),
+        onSelect: () => {
+            if (!isSelectionMode) {
+                toggleSelectionMode({ id: pl.id.toString(), type: 'playlist', data: pl });
+            } else {
+                toggleSelection(pl.id.toString(), 'playlist', pl);
+            }
+        },
+        isSelected
+    });
+
+    return (
+        <MusicContextMenu
+            className="absolute bottom-3 right-3"
+            buttonClassName="w-10 h-10"
+            groups={menuItems}
+            onOpen={() => {
+                setContextMenu(null);
+                setFavoritesContextMenu(null);
+            }}
+        />
     );
 }

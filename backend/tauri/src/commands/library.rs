@@ -204,6 +204,7 @@ pub fn get_library_songs(db: State<'_, DbState>) -> Result<Vec<SongMetadata>, St
 
 /// 获取所有已归档歌曲
 #[tauri::command]
+#[allow(dead_code)]
 pub fn get_archived_songs(db: State<'_, DbState>) -> Result<Vec<SongMetadata>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let songs = SongRepo::get_archived(&conn).map_err(|e| e.to_string())?;
@@ -230,6 +231,7 @@ pub fn delete_song(db: State<'_, DbState>, id: i64) -> Result<(), String> {
 
 /// 恢复已归档的歌曲
 #[tauri::command]
+#[allow(dead_code)]
 pub fn restore_song(db: State<'_, DbState>, id: i64) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     SongRepo::restore(&conn, id).map_err(|e| e.to_string())?;

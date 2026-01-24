@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import {
-    IoPlayCircle, IoPauseCircle, IoPlaySkipBack, IoPlaySkipForward,
-} from 'react-icons/io5';
-import { MdShuffle, MdRepeat } from 'react-icons/md';
+    MdPlayCircle, MdPauseCircle, MdSkipPrevious, MdSkipNext, MdShuffle, MdRepeat
+} from 'react-icons/md';
 import clsx from 'clsx';
 import { listen } from '@tauri-apps/api/event';
 // Store & Services
@@ -193,30 +192,52 @@ export default function PlaybackControls() {
         let unlistenNext: (() => void) | undefined;
         let unlistenPrev: (() => void) | undefined;
         let unlistenEnded: (() => void) | undefined;
+        let isMounted = true;
 
         const setupListeners = async () => {
-            unlistenNext = await listen('smtc:next', () => {
-                handleNextRef.current();
-            });
-            unlistenPrev = await listen('smtc:previous', () => {
-                handlePrevRef.current();
-            });
-            // --- 核心修复：监听后端发送的播放结束事件 ---
-            unlistenEnded = await listen('audio:ended', () => {
-                console.log("Audio ended event received from backend.");
-                handleSongEndedRef.current();
-            });
+            try {
+                const nextFn = await listen('smtc:next', () => {
+                    handleNextRef.current();
+                });
+                if (isMounted) {
+                    unlistenNext = nextFn;
+                } else {
+                    nextFn();
+                }
+
+                const prevFn = await listen('smtc:previous', () => {
+                    handlePrevRef.current();
+                });
+                if (isMounted) {
+                    unlistenPrev = prevFn;
+                } else {
+                    prevFn();
+                }
+
+                // --- 核心修复：监听后端发送的播放结束事件 ---
+                const endedFn = await listen('audio:ended', () => {
+                    console.log("Audio ended event received from backend.");
+                    handleSongEndedRef.current();
+                });
+                if (isMounted) {
+                    unlistenEnded = endedFn;
+                } else {
+                    endedFn();
+                }
+            } catch (err) {
+                console.error("Error setting up listeners:", err);
+            }
         };
 
         setupListeners();
 
         return () => {
-            // Safely unlisten (Handle Promise rejection properly for Tauri events)
+            isMounted = false;
+            // Safely unlisten
             const safeUnlisten = (fn: (() => void) | undefined) => {
                 if (fn) {
                     try {
                         const result = fn() as any;
-                        // If it returns a promise (Tauri V2), catch it.
                         if (result instanceof Promise) {
                             result.catch((e: any) => console.warn("Failed to unlisten (async)", e));
                         }
@@ -229,7 +250,7 @@ export default function PlaybackControls() {
             safeUnlisten(unlistenPrev);
             safeUnlisten(unlistenEnded);
         };
-    }, [currentSongIndex, repeatMode, playlist]); // 依赖项要完整，确保闭包能拿到最新状态
+    }, []); // 依赖项始终为空，只在挂载/卸载时执行
 
     // --- 自动播放监听 ---
     // --- 进度条更新与兜底检测 ---
@@ -292,7 +313,7 @@ export default function PlaybackControls() {
                 {/* 上一首 */}
                 <CustomTooltip text="上一首">
                     <button onClick={handlePrev} className="text-2xl text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white p-1">
-                        <IoPlaySkipBack />
+                        <MdSkipPrevious />
                     </button>
                 </CustomTooltip>
 
@@ -308,14 +329,14 @@ export default function PlaybackControls() {
                                 : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
                         )}
                     >
-                        {isPlaying ? <IoPauseCircle /> : <IoPlayCircle />}
+                        {isPlaying ? <MdPauseCircle /> : <MdPlayCircle />}
                     </button>
                 </CustomTooltip>
 
                 {/* 下一首 */}
                 <CustomTooltip text="下一首">
                     <button onClick={handleNext} className="text-2xl text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white p-1">
-                        <IoPlaySkipForward />
+                        <MdSkipNext />
                     </button>
                 </CustomTooltip>
 

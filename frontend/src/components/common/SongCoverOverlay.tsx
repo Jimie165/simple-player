@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { IoPlay, IoPause } from 'react-icons/io5';
+import { MdPlayArrow, MdPause } from 'react-icons/md';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { audioService } from '../../services/audioService';
 import type { SongMetadata } from '../../types';
@@ -92,9 +92,9 @@ export default function SongCoverOverlay({
                         {/* Current & Hovered: Control Button */}
                         <div className="hidden group-hover/overlay:flex items-center justify-center">
                             {isPlaying ? (
-                                <IoPause className="text-white text-xl drop-shadow-md" />
+                                <MdPause className="text-white text-xl drop-shadow-md" />
                             ) : (
-                                <IoPlay className="text-white text-xl drop-shadow-md ml-0.5" />
+                                <MdPlayArrow className="text-white text-xl drop-shadow-md ml-0.5" />
                             )}
                         </div>
 
@@ -109,7 +109,7 @@ export default function SongCoverOverlay({
                 ) : (
                     /* Not Current: Only show Play icon on hover */
                     <div className="hidden group-hover/overlay:flex items-center justify-center">
-                        <IoPlay className="text-white text-xl drop-shadow-md ml-0.5 animate-in fade-in duration-200" />
+                        <MdPlayArrow className="text-white text-xl drop-shadow-md ml-0.5 animate-in fade-in duration-200" />
                     </div>
                 )}
             </div>
