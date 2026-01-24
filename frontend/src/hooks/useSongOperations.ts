@@ -56,7 +56,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     } = options;
 
     // Stores
-    const { addToNext, isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion } = useLibraryStore();
+    const { addToNext, isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { setShuffleState, isShuffling } = usePlayerStore();
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
@@ -76,13 +76,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         if (!isSingle || !firstItem) return false;
         // 专门针对 SongMetadata 或带有完整 ID/Path 的项目进行检查
         return isFavorite(firstItem as any);
-    }, [isSingle, firstItem, isFavorite, libraryVersion]); // 监听 libraryVersion 确保状态同步
+    }, [isSingle, firstItem, isFavorite, libraryVersion, favoriteSet]); // 监听 favoriteSet 确保状态同步
 
     const isAllFavorited = useMemo(() => {
         if (!items.length) return false;
         if (isSingle) return singleIsFavorite;
         return items.every(i => isFavorite(i as any));
-    }, [items, isSingle, singleIsFavorite, isFavorite, libraryVersion]);
+    }, [items, isSingle, singleIsFavorite, isFavorite, libraryVersion, favoriteSet]);
 
     // --- Actions ---
 
@@ -389,8 +389,8 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 group2.push({ id: 'properties', label: '属性', icon: MdInfo, onClick: handleProperties });
             }
 
-            const showAlbum = context !== 'playlist' && context !== 'playlist_list' && context !== 'album_detail';
-            const showArtist = context !== 'playlist' && context !== 'playlist_list' && context !== 'artist_detail';
+            const showAlbum = context !== 'playlist_list' && context !== 'album_detail';
+            const showArtist = context !== 'playlist_list' && context !== 'artist_detail';
 
             const albumValue = item?.album || (type === 'album' ? (item?.name || item?.title) : undefined);
             const artistValue = item?.artist || (type === 'artist' ? item?.name : undefined) || (type === 'album' ? item?.artist : undefined);

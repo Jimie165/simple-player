@@ -2,14 +2,12 @@ import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank, MdPlayArrow } from 'react-icons/md';
 
 import CoverImage from '../../../components/common/CoverImage';
-import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
-import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
-import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
+import { getMusicItemId } from '../../../utils/musicItemUtils';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -41,7 +39,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
     useEffect(() => {
         if (selectAllRequested && isSelectionMode && selectionType === 'artist') {
             const items = artists.map(artist => ({
-                id: artist.name,
+                id: getMusicItemId(artist),
                 data: artist
             }));
             selectAll(items, 'artist');
@@ -74,7 +72,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
     const handleItemClick = (artist: ArtistData, e: React.MouseEvent) => {
         if (isSelectionMode) {
             e.stopPropagation();
-            toggleSelection(artist.name, 'artist', artist);
+            toggleSelection(getMusicItemId(artist), 'artist', artist);
             return;
         }
         onOpenArtist(artist);
@@ -94,10 +92,11 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
 
             <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-2">
                 {artists.map((artist) => {
-                    const isSelected = selectedIds.has(artist.name);
+                    const id = getMusicItemId(artist);
+                    const isSelected = selectedIds.has(id);
                     return (
                         <div
-                            key={artist.name}
+                            key={id}
                             className="group relative flex flex-col items-center gap-4 p-4 rounded-xl bg-neutral-50 hover:bg-neutral-100 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
                             onClick={(e) => handleItemClick(artist, e)}
                             onContextMenu={(e) => handleContextMenu(e, artist)}
@@ -123,7 +122,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                 {(isSelectionMode || isSelected) && (
                                     <div className="absolute top-0 left-0 z-20 transition-opacity duration-300">
                                         <div
-                                            onClick={(e) => { e.stopPropagation(); toggleSelection(artist.name, 'artist', artist); }}
+                                            onClick={(e) => { e.stopPropagation(); toggleSelection(id, 'artist', artist); }}
                                             className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shadow-sm"
                                         >
                                             {isSelected
@@ -163,8 +162,8 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                             onOpen={() => setContextMenu(null)}
                                             isSelected={isSelected}
                                             onSelect={() => isSelectionMode
-                                                ? toggleSelection(artist.name, 'artist', artist)
-                                                : toggleSelectionMode({ id: artist.name, type: 'artist', data: artist })
+                                                ? toggleSelection(id, 'artist', artist)
+                                                : toggleSelectionMode({ id, type: 'artist', data: artist })
                                             }
                                         />
                                     </div>

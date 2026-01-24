@@ -229,7 +229,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
     // Correct usage of useMemo: It is now at the top level of this component
     const artistAlbums = useMemo(() => {
         const map = new Map<string, AlbumData>();
-        artistData.songs.forEach((song: SongMetadata) => {
+        (artistData.songs || []).forEach((song: SongMetadata) => {
             const key = (song.album || "Unknown Album") + (song.artist || "Unknown Artist");
             if (!map.has(key)) {
                 map.set(key, {
@@ -254,7 +254,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
         <ArtistDetailView
             artist={artistData}
             albums={artistAlbums}
-            allArtistSongs={artistData.songs}
+            allArtistSongs={artistData.songs || []}
             onPlayAll={() => {
                 addToRecent({
                     id: `artist:${artistData.name}`,

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { systemService } from '../../services/systemService'; // 确保 systemService 已创建
-import { MdMinimize, MdCropSquare, MdFilterNone, MdClose } from 'react-icons/md';
+import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
 
 export default function TitleBar() {
     const [isMaximized, setIsMaximized] = useState(false);
@@ -33,12 +33,9 @@ export default function TitleBar() {
             {/* 最小化 */}
             <button
                 onClick={systemService.minimize}
-                // 修改点 2: 
-                // - w-8 h-8: 固定正方形尺寸，小于标题栏高度(h-10)，实现垂直居中
-                // - rounded-full: Material 3 标志性的圆形按钮 (或者改为 rounded-lg 变成圆角矩形)
                 className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
             >
-                <MdMinimize className="text-sm text-neutral-900 dark:text-neutral-100" />
+                <VscChromeMinimize className="text-lg text-neutral-900 dark:text-neutral-100" />
             </button>
 
             {/* 最大化/还原 */}
@@ -47,9 +44,9 @@ export default function TitleBar() {
                 className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
             >
                 {isMaximized ? (
-                    <MdFilterNone className="text-sm text-neutral-900 dark:text-neutral-100" />
+                    <VscChromeRestore className="text-lg text-neutral-900 dark:text-neutral-100" />
                 ) : (
-                    <MdCropSquare className="text-sm text-neutral-900 dark:text-neutral-100" />
+                    <VscChromeMaximize className="text-lg text-neutral-900 dark:text-neutral-100" />
                 )}
             </button>
 
@@ -60,7 +57,7 @@ export default function TitleBar() {
                 className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-red-500 hover:text-white"
             >
                 {/* 图标在 group-hover 时变白 */}
-                <MdClose className="text-base text-neutral-900 dark:text-neutral-100 group-hover:text-white" />
+                <VscChromeClose className="text-lg text-neutral-900 dark:text-neutral-100 group-hover:text-white" />
             </button>
 
         </div>

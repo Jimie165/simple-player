@@ -337,13 +337,24 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
 
     toggleFavorite: async (song) => {
-        if (!song.id) return;
+        if (!song.id || typeof song.id !== 'number') return;
         try {
-            const newStatus = await libraryService.toggleFavorite(song.id);
+            const songId = song.id; // Ensure songId is number
+            const newStatus = await libraryService.toggleFavorite(songId);
+
+            // Update favoriteSet immediately for reactive UI
+            set((state) => {
+                const newFavoriteSet = new Set(state.favoriteSet);
+                if (newStatus) {
+                    newFavoriteSet.add(songId);
+                } else {
+                    newFavoriteSet.delete(songId);
+                }
+                return { favoriteSet: newFavoriteSet };
+            });
 
             // 1. Update global library version to trigger refreshes in other components
             get().triggerLibraryUpdate();
-            get().refreshFavorites();
 
             // 2. Update local playlist state if the song is present
             const { playlist, originalPlaylist } = get();
@@ -364,6 +375,9 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             if (playerMetadata && (playerMetadata.id === song.id || playerMetadata.path === song.path)) {
                 usePlayerStore.getState().setMetadata({ ...playerMetadata, is_favorite: newStatus });
             }
+
+            // 4. Refresh from backend as backup (non-blocking)
+            get().refreshFavorites();
 
         } catch (error) {
             console.error('Failed to toggle favorite', error);

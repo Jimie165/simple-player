@@ -256,6 +256,7 @@ export default function ArtistDetailView({
                                         disableSort={true}
                                         enableDelete={true}
                                         onOpenAlbum={handleOpenAlbumByName}
+                                        context="artist_detail"
                                     />
                                 </div>
                             </div>

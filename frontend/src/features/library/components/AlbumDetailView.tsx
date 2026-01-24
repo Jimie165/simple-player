@@ -108,6 +108,7 @@ export default function AlbumDetailView({
                     hideAlbum={true}
                     disableSort={true}
                     onOpenArtist={onOpenArtistByName}
+                    context="album_detail"
                 />
             </div>
         </div>

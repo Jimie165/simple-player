@@ -13,7 +13,14 @@ export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | Albu
  */
 export function getMusicItemId(item: any): string {
     if (!item) return '';
-    if ((item as any).name && (item as any).songs) return (item as any).name; // Artist or Album name as ID
+    if ((item as any).name && (item as any).songs) {
+        // ID for Album (must match AlbumGridView logic)
+        if ((item as any).artist) {
+            return `${item.name}-${item.artist}`;
+        }
+        // ID for Artist
+        return (item as any).name;
+    }
     if (typeof item.id === 'number') return item.id.toString();
     if (typeof item.id === 'string') return item.id;
     if (item.path) return item.path;

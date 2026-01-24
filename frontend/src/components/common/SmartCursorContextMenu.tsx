@@ -13,7 +13,9 @@ interface SmartCursorContextMenuProps {
     context?: MusicMenuContext;
     playlistId?: number;
     onClose: () => void;
+    onPlay?: () => void;
     onEdit?: () => void;
+    onDelete?: () => void;
     onShuffle?: () => void;
     onSelect?: () => void;
     isSelected?: boolean;
@@ -29,7 +31,7 @@ interface SmartCursorContextMenuProps {
  * Uses Portal and viewport boundary detection.
  */
 export default function SmartCursorContextMenu(props: SmartCursorContextMenuProps) {
-    const { x, y, item, context = 'other', playlistId, onClose, onEdit, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, menuGroups, extraGroups } = props;
+    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, menuGroups, extraGroups } = props;
 
     // Store
     const { selectedIds, toggleSelectionMode, clearSelection } = useSelectionStore();
@@ -64,7 +66,9 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         items: targetItems,
         context,
         playlistId,
+        onPlay,
         onEdit,
+        onDelete,
         onShuffle,
         isSelected,
         onSelect: onSelectProp ? onSelectProp : () => {

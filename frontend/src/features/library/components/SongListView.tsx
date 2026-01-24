@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { MdAccessTime, MdArrowDropUp, MdArrowDropDown, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
+import { MdAccessTime, MdArrowDropUp, MdArrowDropDown, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -8,6 +8,7 @@ import { usePlayerStore } from '../../../store/usePlayerStore';
 import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
+import type { MusicMenuContext } from '../../../hooks/useSongOperations';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 
@@ -22,6 +23,7 @@ interface SongListViewProps {
     disableSort?: boolean; // 新增：禁用排序点击
     onOpenArtist?: (artist: string) => void;
     onOpenAlbum?: (album: string) => void;
+    context?: MusicMenuContext;
 }
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration' | null;
@@ -37,7 +39,8 @@ export default function SongListView({
     hideAlbum = false,
     disableSort = false,
     onOpenArtist,
-    onOpenAlbum
+    onOpenAlbum,
+    context = 'library'
 }: SongListViewProps) {
     // Responsive: auto-hide album column on narrow windows
     const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
@@ -217,13 +220,12 @@ export default function SongListView({
             toggleSelection(id, 'song', song);
         }
     };
+
+
     // Grid 定义
     const getGridCols = () => {
-        // Selection: Checkbox (40px)
         // Normal: Heart (24px)
-        let cols = isSelectionMode
-            ? "40px 24px minmax(0,4fr)"
-            : "24px minmax(0,4fr)";
+        let cols = "24px minmax(0,4fr)";
 
         if (!hideArtist) cols += " minmax(0,3fr)"; // Artist
         if (!effectiveHideAlbum) cols += " minmax(0,3fr)"; // Album
@@ -242,11 +244,7 @@ export default function SongListView({
                     "sticky top-0 z-45 grid gap-4 pt-10 pb-3 px-4 border-b border-outline-variant/10",
                     "text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl transition-colors"
                 )}>
-                {isSelectionMode && (
-                    <div className="text-center">
-                        <span className="opacity-0">#</span>
-                    </div>
-                )}
+                {/* Selection header removed */}
                 <div></div> {/* Heart header spacer */}
                 <HeaderCell label="标题" colKey="title" className="pl-0" allowSort={!disableSort} />
                 {!hideArtist && <HeaderCell label="艺人" colKey="artist" allowSort={!disableSort} />}
@@ -299,20 +297,7 @@ export default function SongListView({
                                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
                             )}
 
-                            {/* Column 1: Checkbox (Selection Mode Only) */}
-                            {isSelectionMode && (
-                                <div className="flex justify-center w-full min-w-[24px]">
-                                    <div
-                                        onClick={(e) => handleCheckboxClick(e, song)}
-                                        className="text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                                    >
-                                        {selected
-                                            ? <MdCheckBox className="text-primary" />
-                                            : <MdCheckBoxOutlineBlank />
-                                        }
-                                    </div>
-                                </div>
-                            )}
+                            {/* Column 1: Checkbox Removed */}
 
                             {/* Column 2: Heart Icon (Always shown) */}
                             {(
@@ -360,9 +345,10 @@ export default function SongListView({
                                 <div
                                     className={clsx(
                                         "text-neutral-500 dark:text-neutral-400 truncate font-medium transition-colors",
-                                        onOpenArtist && song.artist && "hover:text-primary cursor-pointer hover:underline"
+                                        !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
                                     )}
                                     onClick={(e) => {
+                                        if (isSelectionMode) return;
                                         if (onOpenArtist && song.artist) {
                                             e.stopPropagation();
                                             onOpenArtist(song.artist);
@@ -378,9 +364,10 @@ export default function SongListView({
                                 <div
                                     className={clsx(
                                         "text-neutral-500 dark:text-neutral-400 truncate transition-colors",
-                                        onOpenAlbum && song.album && "hover:text-primary cursor-pointer hover:underline"
+                                        !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
                                     )}
                                     onClick={(e) => {
+                                        if (isSelectionMode) return;
                                         if (onOpenAlbum && song.album) {
                                             e.stopPropagation();
                                             onOpenAlbum(song.album);
@@ -407,7 +394,7 @@ export default function SongListView({
                                 <SmartMusicContextMenu
                                     onOpen={() => setContextMenu(null)}
                                     items={song}
-                                    context="library"
+                                    context={context}
                                     variant="clean"
                                     onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                                     onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
@@ -418,14 +405,14 @@ export default function SongListView({
                         </div>
                     );
                 })}
-            </div>
+            </div >
 
             {contextMenu && (
                 <SmartCursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
                     item={contextMenu.song}
-                    context="library"
+                    context={context}
                     onClose={() => setContextMenu(null)}
                     isSelected={selectedIds.has(contextMenu.song.id?.toString() || contextMenu.song.path || '')}
                     onSelect={() => {
@@ -434,7 +421,7 @@ export default function SongListView({
                     }}
                 />
             )}
-        </div>
+        </div >
     );
 }
 

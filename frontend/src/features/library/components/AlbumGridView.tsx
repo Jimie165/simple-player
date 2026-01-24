@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
+import clsx from 'clsx';
 
 import CoverImage from '../../../components/common/CoverImage';
-import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
 import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import CardPlayButton from '../../../components/common/CardPlayButton';
 import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
-import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
+import { getMusicItemId } from '../../../utils/musicItemUtils';
 
 // 定义专辑数据结构
 export interface AlbumData {
@@ -35,13 +35,13 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
 
     // Handle Select All Request
     useEffect(() => {
-        if (selectAllRequested && isSelectionMode) {
+        if (selectAllRequested && isSelectionMode && (selectionType === 'album' || !selectionType)) {
             const items = albums.map(album => ({
-                id: `${album.name}-${album.artist}`,
+                id: getMusicItemId(album),
                 data: album
             }));
             selectAll(items, 'album');
@@ -72,7 +72,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     };
 
     // Helper key for selection (Album Name + Artist as specific ID)
-    const getAlbumId = (album: AlbumData) => `${album.name}-${album.artist}`;
+    const getAlbumId = (album: AlbumData) => getMusicItemId(album);
 
     const handleItemClick = (album: AlbumData, e: React.MouseEvent) => {
         if (isSelectionMode) {
@@ -144,7 +144,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
                                             items={album}
-                                            context="library"
+                                            context={hideArtist ? 'artist_detail' : 'library'}
                                             onPlay={() => onPlayAlbum(album)}
                                             onShuffle={onShuffleAlbum ? () => onShuffleAlbum(album) : undefined}
                                             onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
@@ -163,9 +163,23 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                 <span className="truncate text-base font-semibold text-neutral-900 dark:text-neutral-50" title={album.name}>
                                     {album.name}
                                 </span>
-                                <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={album.artist}>
-                                    {album.artist}
-                                </span>
+                                {!hideArtist && (
+                                    <span
+                                        className={clsx(
+                                            "truncate text-sm text-neutral-500 dark:text-neutral-400",
+                                            onOpenArtist && "hover:text-primary transition-colors"
+                                        )}
+                                        title={album.artist}
+                                        onClick={(e) => {
+                                            if (onOpenArtist) {
+                                                e.stopPropagation();
+                                                onOpenArtist(album.artist);
+                                            }
+                                        }}
+                                    >
+                                        {album.artist}
+                                    </span>
+                                )}
                                 <span className="truncate text-xs text-neutral-400 dark:text-neutral-500">
                                     {album.songs[0]?.year || "Unknown Year"}
                                 </span>
@@ -180,7 +194,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                     x={contextMenu.x}
                     y={contextMenu.y}
                     item={contextMenu.album}
-                    context="library"
+                    context={hideArtist ? 'artist_detail' : 'library'}
                     onClose={() => setContextMenu(null)}
                     onPlay={() => onPlayAlbum(contextMenu.album)}
                     onShuffle={onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined}

@@ -1,6 +1,6 @@
 import { useState, useEffect, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdFavoriteBorder, MdAccessTime } from 'react-icons/md';
+import { MdAccessTime, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 import type { SongMetadata } from '../../../types';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -12,6 +12,7 @@ import type { MusicMenuContext } from '../../../hooks/useSongOperations';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
+import { useNavigationStore } from '../../../store/useNavigationStore';
 
 import {
     DndContext,
@@ -64,7 +65,6 @@ const SongListItem = memo(({
     selected,
     onPlay,
     handleItemClick,
-    handleCheckboxClick,
     handleContextMenu,
     hideAlbum,
     formatDuration,
@@ -78,6 +78,7 @@ const SongListItem = memo(({
     playlistId,
     context // Added
 }: any) => {
+    const { push } = useNavigationStore();
     return (
         <div
             style={gridStyle}
@@ -120,37 +121,7 @@ const SongListItem = memo(({
                 <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
             )}
 
-            {!isSelectionMode ? (
-                <div className="flex justify-center w-full min-w-[24px]">
-                    <div className="w-6 h-6 flex items-center justify-center">
-                        <span className="text-neutral-500 text-xs font-medium group-hover:hidden">{index + 1}</span>
-                        <div
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                if (handleCheckboxClick) handleCheckboxClick(e, song);
-                            }}
-                            className="hidden group-hover:flex text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                        >
-                            <MdCheckBoxOutlineBlank />
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex justify-center w-full min-w-[24px]">
-                    <div
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            if (handleCheckboxClick) handleCheckboxClick(e, song);
-                        }}
-                        className="text-xl cursor-pointer text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200"
-                    >
-                        {selected
-                            ? <MdCheckBox className="text-primary" />
-                            : <MdCheckBoxOutlineBlank />
-                        }
-                    </div>
-                </div>
-            )}
+            {/* Removed Index/Checkbox Column */}
 
             {/* Heart Icon Column */}
             {(
@@ -191,12 +162,55 @@ const SongListItem = memo(({
             </div>
 
             <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
-                {song.artist}
+                <span
+                    className={clsx(
+                        "transition-colors cursor-pointer",
+                        !isSelectionMode && "hover:text-primary"
+                    )}
+                    onClick={(e) => {
+                        if (isSelectionMode) return; // Allow selection to happen via row click
+                        e.stopPropagation();
+                        // Navigation logic here if needed?
+                        // Wait, I need the navigation store instance
+                        // It is a hook, so I must call it at the top of the component
+                    }}
+                >
+                    {/* Actually, I need to call the hook inside the component. I will add the hook call at the top of SongListItem first. */}
+                    {/* Since I can't split the replacement easily for the hook call, I'll do it in a separate chunk or careful ordering */}
+                    {/* Let's redo this part. I'll add the hook call in a separate chunk at the top of SongListItem, and then use 'push' here. */}
+                    {/* But wait, I can just use useNavigationStore.getState().push if I don't want to re-render? No, use the hook for consistency. */}
+                    {/* I will assume I add `const { push } = useNavigationStore()` at the top of SongListItem. */}
+                    <span
+                        className={clsx(
+                            "transition-colors",
+                            !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
+                        )}
+                        onClick={(e) => {
+                            if (isSelectionMode) return;
+                            e.stopPropagation();
+                            push({ type: 'artist_detail', data: { name: song.artist } });
+                        }}
+                    >
+                        {song.artist}
+                    </span>
+                </span>
             </div>
 
             {!hideAlbum && (
                 <div className="text-neutral-500 dark:text-neutral-400 truncate">
-                    {song.album}
+                    <span
+                        className={clsx(
+                            "transition-colors",
+                            !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
+                        )}
+                        onClick={(e) => {
+                            if (isSelectionMode) return;
+                            e.stopPropagation();
+                            push({ type: 'album_detail', data: { name: song.album, artist: song.artist } });
+                        }}
+                    >
+                        {song.album}
+                    </span>
                 </div>
             )}
 
@@ -542,7 +556,7 @@ export default function SortableSongList({
     };
 
     const getGridCols = () => {
-        let cols = "40px 24px minmax(0,4fr)"; // Selection (#/Checkbox) (40px) + Heart (24px) + Title
+        let cols = "24px minmax(0,4fr)"; // Heart (24px) + Title
         cols += " minmax(0,3fr)"; // Artist
         if (!shouldHideAlbum) cols += " minmax(0,3fr)"; // Album
         cols += " 100px 40px"; // Duration, Menu
@@ -561,7 +575,7 @@ export default function SortableSongList({
     return (
         <div className="w-full relative select-none">
             <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-outline-variant/10 text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl">
-                <div className="text-center font-bold">#</div>{/* Index/Checkbox */}
+                {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 <HeaderCell label="标题" />
                 <HeaderCell label="艺人" />
