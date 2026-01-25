@@ -45,7 +45,7 @@ const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
 
 export function usePlaybackActions() {
     const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent } = useLibraryStore();
-    const { setMetadata, setIsPlaying, setShuffleState, togglePlay, restartSong } = usePlayerStore();
+    const { setMetadata, setIsPlaying, setShuffleState, setRepeatState, togglePlay, restartSong } = usePlayerStore();
 
     const playSong = async ({ song, index, playlist, options }: PlaySongParams) => {
         if (!song.path) return;
@@ -114,6 +114,11 @@ export function usePlaybackActions() {
         const randomIndex = Math.floor(Math.random() * songs.length);
         const song = songs[randomIndex];
         if (!song?.path) return;
+
+        const { repeatMode } = usePlayerStore.getState();
+        if (repeatMode === 'one') {
+            setRepeatState('off');
+        }
 
         setPlaylist(songs);
         setCurrentSongIndex(randomIndex);

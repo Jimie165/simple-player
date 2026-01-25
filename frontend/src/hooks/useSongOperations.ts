@@ -6,6 +6,7 @@ import { useAddToPlaylistStore } from '../store/useAddToPlaylistStore';
 import { useDialogStore } from '../store/useDialogStore';
 import { usePlayerStore } from '../store/usePlayerStore';
 import { useNavigationStore } from '../store/useNavigationStore';
+import { useSelectionStore } from '../store/useSelectionStore';
 import { libraryService } from '../services/libraryService';
 import { fileService } from '../services/fileService';
 import { resolveSongsFromItems, getMusicItemId, getMusicItemType } from '../utils/musicItemUtils';
@@ -62,6 +63,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
     const { openDeleteConfirm, openProperties } = useDialogStore();
     const { push } = useNavigationStore();
+    const { clearSelection } = useSelectionStore();
 
     // 派生状态
     const count = items.length;
@@ -146,12 +148,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
         // Check if ALL are currently favorites
         // We check realtime status via store helper if possible
-        const allAreFav = songs.every(s => {
-            if (s.id && typeof s.id === 'number') {
-                return isFavorite(s);
-            }
-            return !!(s as any).is_favorite;
-        });
+        const allAreFav = songs.every(s => isFavorite(s as any));
 
         // If all are favorite, we want to UN-favorite them.
         // If not all are favorite (mixed or none), we want to FAVORITE them.
@@ -165,6 +162,26 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         }
         triggerLibraryUpdate();
     }, [items, isFavorite, triggerLibraryUpdate]);
+
+    // 5. 删除或从音乐库删除
+    const handleDeleteFromLibrary = useCallback(async () => {
+        if (items.length === 0) return;
+        openDeleteConfirm(
+            items,
+            async () => {
+                clearSelection();
+                const songsToDelete = await resolveSongsFromItems(items);
+                const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
+                if (ids.length > 0) {
+                    await libraryService.batchDeleteSongs(ids);
+                    triggerLibraryUpdate();
+                }
+            },
+            `确定要从音乐库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`,
+            '从音乐库删除',
+            '删除'
+        );
+    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection]);
 
     // 5. 删除或从播放列表移除
     const handleDeleteOrRemove = useCallback(async () => {
@@ -185,6 +202,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             openDeleteConfirm(
                 items,
                 async () => {
+                    clearSelection();
                     for (const item of items) {
                         const id = (item as any).id;
                         if (typeof id === 'number') {
@@ -202,6 +220,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             openDeleteConfirm(
                 items,
                 async () => {
+                    clearSelection();
                     const songIds = items.map(i => (i as any).id).filter(id => typeof id === 'number') as number[];
                     if (songIds.length > 0) {
                         try {
@@ -221,6 +240,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             openDeleteConfirm(
                 items,
                 () => {
+                    clearSelection();
                     items.forEach(item => {
                         const id = getMusicItemId(item);
                         if (id) removeFromRecent(id);
@@ -233,33 +253,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         } else {
             // 默认：从库中删除 (仅对 Song / Album / Artist 有效，对 File/Folder 暂时视为 Recent? 不，File 可以删库)
             // 我们约定：在 Library Context 下，都是删库引用。
-            openDeleteConfirm(
-                items,
-                async () => {
-                    // 解析出所有需要删除的 Song IDs
-                    // 如果选中了 Album/Artist，需要找出其下的 Songs
-                    const songsToDelete = await resolveSongsFromItems(items);
-                    const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
-
-                    if (ids.length > 0) {
-                        await libraryService.batchDeleteSongs(ids);
-                        triggerLibraryUpdate();
-                    }
-
-                    // 如果也是 Recent Items (比如在主页删除)，也要清理 Recent
-                    items.forEach(item => {
-                        // 简单的清理 Recent
-                        if ((item as any).lastPlayed) {
-                            removeFromRecent(getMusicItemId(item));
-                        }
-                    });
-                },
-                `确定要从音乐库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`,
-                '从音乐库删除',
-                '删除'
-            );
+            handleDeleteFromLibrary();
         }
-    }, [context, playlistId, items, count, onDelete, openDeleteConfirm, triggerLibraryUpdate, removeFromRecent]);
+    }, [context, playlistId, items, count, onDelete, openDeleteConfirm, triggerLibraryUpdate, removeFromRecent, handleDeleteFromLibrary, clearSelection]);
 
     const handleShowAlbum = useCallback(async () => {
         if (!isSingle) return;
@@ -279,6 +275,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         }
 
         if (albumName) {
+            clearSelection();
             push({
                 type: 'album_detail', // Force full data structure to prevent crash in Overlay
                 data: {
@@ -290,7 +287,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 }
             });
         }
-    }, [isSingle, firstItem, push]);
+    }, [isSingle, firstItem, push, clearSelection]);
 
     const handleShowArtist = useCallback(() => {
         if (!isSingle) return;
@@ -298,9 +295,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         const type = getMusicItemType(firstItem);
         const artist = item?.artist || (type === 'artist' ? item?.name : undefined);
         if (artist) {
+            clearSelection();
             push({ type: 'artist_detail', data: { name: artist, count: 0, albumCount: 0, songs: [], cover: null } });
         }
-    }, [isSingle, firstItem, push]);
+    }, [isSingle, firstItem, push, clearSelection]);
 
 
 
@@ -414,6 +412,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         if (context === 'playlist') {
             const label = count > 1 ? `从播放列表移除 ${count} 项` : '从播放列表移除';
             group3.push({ id: 'remove', label, icon: MdPlaylistRemove, onClick: handleDeleteOrRemove, variant: 'default' });
+
+            // 增加从音乐库中删除
+            const deleteLabel = count > 1 ? `从音乐库删除 ${count} 项` : '从音乐库删除';
+            group3.push({ id: 'delete', label: deleteLabel, icon: MdDelete, onClick: handleDeleteFromLibrary, variant: 'danger' });
         } else {
             // Delete
             let label = count > 1 ? `从音乐库删除 ${count} 项` : '从音乐库删除';
@@ -438,12 +440,11 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         if (context === 'playlist_list' && items.some(i => (i as any).id === 'favorites' || (i as any).id === 'playlist:favorites')) {
             return groups.filter(g => !g.some(m => m.id === 'delete'));
         }
-
         return groups;
     }, [
         handlePlay, handleShufflePlay, handleAddToQueue, handleAddToPlaylist, handleFavorite,
         handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, onSelect, onEdit,
-        isSingle, singleIsFavorite, isAllFavorited, firstItem, context, hideSelect, selectText
+        isSingle, singleIsFavorite, isAllFavorited, firstItem, context, hideSelect, selectText, isSelected
     ]);
 
     return {

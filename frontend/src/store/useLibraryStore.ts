@@ -337,9 +337,37 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
 
     toggleFavorite: async (song) => {
-        if (!song.id || typeof song.id !== 'number') return;
+        let songId: number | undefined;
+        const songPath = song.path;
+
+        if (song.id && typeof song.id === 'number') {
+            songId = song.id;
+        } else if (songPath) {
+            const normPath = songPath.replace(/[\\/]/g, '/').toLowerCase();
+            songId = get().pathMap.get(normPath);
+
+            if (!songId) {
+                try {
+                    const all = await libraryService.getLibrarySongs();
+                    const found = all.find(s => {
+                        if (!s.path) return false;
+                        const p = s.path.replace(/[\\/]/g, '/').toLowerCase();
+                        return p === normPath && typeof s.id === 'number';
+                    });
+                    if (found?.id && typeof found.id === 'number') {
+                        songId = found.id;
+                        set((state) => {
+                            const newMap = new Map(state.pathMap);
+                            newMap.set(normPath, found.id as number);
+                            return { pathMap: newMap };
+                        });
+                    }
+                } catch { }
+            }
+        }
+
+        if (!songId) return;
         try {
-            const songId = song.id; // Ensure songId is number
             const newStatus = await libraryService.toggleFavorite(songId);
 
             // Update favoriteSet immediately for reactive UI
@@ -360,7 +388,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             const { playlist, originalPlaylist } = get();
 
             const updateList = (list: SongMetadata[]) => list.map(s =>
-                (s.id === song.id || s.path === song.path)
+                (s.id === songId || (songPath && s.path === songPath))
                     ? { ...s, is_favorite: newStatus }
                     : s
             );
@@ -372,7 +400,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
             // 3. Update Player Store Metadata if it's the current song
             const playerMetadata = usePlayerStore.getState().metadata;
-            if (playerMetadata && (playerMetadata.id === song.id || playerMetadata.path === song.path)) {
+            if (playerMetadata && (playerMetadata.id === songId || (songPath && playerMetadata.path === songPath))) {
                 usePlayerStore.getState().setMetadata({ ...playerMetadata, is_favorite: newStatus });
             }
 

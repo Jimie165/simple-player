@@ -31,7 +31,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds } = useSelectionStore();
 
 
 
@@ -46,6 +46,11 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
             setSelectAllRequested(false);
         }
     }, [selectAllRequested, isSelectionMode, selectionType, artists, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectableIds(artists.map(artist => getMusicItemId(artist)).filter(id => id !== ''));
+    }, [isSelectionMode, artists, setSelectableIds]);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; artist: ArtistData } | null>(null);

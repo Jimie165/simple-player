@@ -4,12 +4,14 @@ import { MdPlaylistAdd } from 'react-icons/md';
 import { MdAdd } from 'react-icons/md';
 
 import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
+import { useSelectionStore } from '../../../store/useSelectionStore';
 import { libraryService } from '../../../services/libraryService';
 import type { Playlist, SongMetadata } from '../../../types';
 import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
 
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();
+    const { clearSelection } = useSelectionStore();
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
     const [loading, setLoading] = useState(false);
@@ -90,6 +92,7 @@ export default function AddToPlaylistSheet() {
                 }
             }
 
+            clearSelection();
             close();
             // TODO: Toast Success
         } catch (error) {

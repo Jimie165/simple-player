@@ -333,19 +333,25 @@ const ContextMenuResolver = memo(({
         return contextMenu.song ? [contextMenu.song] : [];
     }, [contextMenu]);
 
+    const getSelectionId = (song: SongMetadata) => {
+        return song.id ? song.id.toString() : (song.path || '');
+    };
+
     const { menuItems } = useSongOperations({
         items,
         context,
         playlistId,
-        isSelected: contextMenu?.type !== 'batch' && contextMenu?.song ? selectedIds.has(contextMenu.song.id?.toString() || contextMenu.song.path || '') : false,
+        isSelected: contextMenu?.type === 'batch'
+            ? true
+            : (contextMenu?.song ? selectedIds.has(getSelectionId(contextMenu.song)) : false),
         onSelect: () => {
             if (contextMenu?.type === 'batch') {
                 items.forEach((s: SongMetadata) => {
-                    const id = s.id ? s.id.toString() : s.path;
+                    const id = getSelectionId(s);
                     if (id) toggleSelection(id, 'song', s);
                 });
             } else if (contextMenu?.song) {
-                const id = contextMenu.song.id ? contextMenu.song.id.toString() : (contextMenu.song.path || '');
+                const id = getSelectionId(contextMenu.song);
                 if (!isSelectionMode) {
                     toggleSelectionMode({ id, type: 'song', data: contextMenu.song });
                 } else {
@@ -412,6 +418,7 @@ export default function SortableSongList({
         selectAllRequested,
         setSelectAllRequested,
         selectAll,
+        setSelectableIds,
     } = useSelectionStore();
 
     // Handle Select All Request
@@ -426,6 +433,12 @@ export default function SortableSongList({
             setSelectAllRequested(false);
         }
     }, [selectAllRequested, isSelectionMode, songs, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        const ids = songs.map((song, index) => getSongId(song, index)).filter(id => id !== '');
+        setSelectableIds(ids);
+    }, [isSelectionMode, songs, setSelectableIds]);
 
     type ContextMenuState = {
         x: number;

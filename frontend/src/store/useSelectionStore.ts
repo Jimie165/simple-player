@@ -9,6 +9,7 @@ interface SelectionState {
     selectedIds: Set<string>; // Use IDs or unique identifiers (like path for files)
     selectedItemsMap: Map<string, any>; // Store actual objects
     selectionType: SelectionType;
+    selectableIds: Set<string>;
 
     // Actions
     toggleSelectionMode: (initialItem?: { id: string, type: SelectionType, data: any }) => void;
@@ -18,6 +19,7 @@ interface SelectionState {
     toggleSelection: (id: string, type: SelectionType, data: any) => void;
     clearSelection: () => void;
     selectAll: (items: { id: string, data: any }[], type: SelectionType) => void;
+    setSelectableIds: (ids: string[]) => void;
 
     // Global Select All Request signal
     selectAllRequested: boolean;
@@ -40,6 +42,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     selectedIds: new Set(),
     selectedItemsMap: new Map(),
     selectionType: null,
+    selectableIds: new Set(),
 
     toggleSelectionMode: (initialItem) => {
         const { isSelectionMode, clearSelection } = get();
@@ -132,7 +135,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
     },
 
     clearSelection: () => {
-        set({ selectedIds: new Set(), selectedItemsMap: new Map(), selectionType: null, isSelectionMode: false });
+        set({ selectedIds: new Set(), selectedItemsMap: new Map(), selectionType: null, isSelectionMode: false, selectableIds: new Set() });
     },
 
     selectAll: (items, type) => {
@@ -144,6 +147,10 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             selectedItemsMap: map,
             selectionType: type
         });
+    },
+
+    setSelectableIds: (ids) => {
+        set({ selectableIds: new Set(ids) });
     },
 
     selectAllRequested: false,

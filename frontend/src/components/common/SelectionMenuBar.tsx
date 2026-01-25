@@ -9,12 +9,11 @@ import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
 export default function SelectionMenuBar() {
     // Integration
-    const { isSelectionMode, selectedIds, clearSelection, selectedItemsMap, setSelectAllRequested, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, selectableIds, clearSelection, selectedItemsMap, setSelectAllRequested, selectionType } = useSelectionStore();
     const { activeOverlay, currentPage } = useNavigationStore();
 
     const [visibleCount, setVisibleCount] = useState(4);
     const containerRef = useRef<HTMLDivElement>(null);
-    const [justClickedAll, setJustClickedAll] = useState(false);
 
     // Auto-clean
     useEffect(() => {
@@ -28,9 +27,14 @@ export default function SelectionMenuBar() {
         // If it is Global, we should listen to page changes.
     }, [activeOverlay, currentPage]); // Need careful dependency here.
 
-    useEffect(() => {
-        if (selectedIds.size === 0) setJustClickedAll(false);
-    }, [selectedIds.size]);
+    const allSelected = useMemo(() => {
+        if (!isSelectionMode) return false;
+        if (selectableIds.size === 0) return false;
+        for (const id of selectableIds) {
+            if (!selectedIds.has(id)) return false;
+        }
+        return true;
+    }, [isSelectionMode, selectableIds, selectedIds]);
 
 
     // Determine Context
@@ -38,7 +42,7 @@ export default function SelectionMenuBar() {
         // Preference 1: Explicit selection type from store
         if (selectionType === 'playlist') {
             // Check if it's the special favorites playlist
-            if (Array.from(selectedIds).includes('favorites')) return 'playlist_list';
+            if (Array.from(selectedIds).includes('playlist:favorites')) return 'playlist_list';
             return 'playlist_list';
         }
 
@@ -85,13 +89,16 @@ export default function SelectionMenuBar() {
     // UI Responsiveness
     useEffect(() => {
         const calculateVisibleCount = () => {
-            const maxContainerWidth = Math.min(window.innerWidth * 0.9, 800);
-            const leftContentWidth = 200;
+            // 使用父容器宽度作为参考
+            const parentWidth = containerRef.current?.parentElement?.clientWidth || window.innerWidth;
+            const maxContainerWidth = Math.min(parentWidth * 0.9, 800);
+            const leftContentWidth = 180;
             const availableForActions = maxContainerWidth - leftContentWidth;
             if (availableForActions < 50) { setVisibleCount(0); return; }
-            const buttonAverageWidth = 110;
+            const buttonAverageWidth = 100;
             let count = Math.floor(availableForActions / buttonAverageWidth);
-            count = Math.max(0, Math.min(count, 5));
+            // 按照用户要求，最多显示 4 个动作（通常是：播放、下一首、添加到、喜爱）
+            count = Math.max(0, Math.min(count, 4));
             setVisibleCount(count);
         };
         calculateVisibleCount();
@@ -106,25 +113,23 @@ export default function SelectionMenuBar() {
     const overflowActions = flattenedActions.slice(visibleCount);
 
     return (
-        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 max-w-[90vw]" ref={containerRef}>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-max max-w-[calc(100%-48px)] transition-all duration-300 pointer-events-auto" ref={containerRef}>
             <div className="flex items-center gap-3 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-2 pl-3 pr-3 rounded-2xl shadow-2xl border border-neutral-200/50 dark:border-neutral-700/50">
                 {/* Select All Toggle */}
                 <button
                     onClick={() => {
-                        if (justClickedAll) {
+                        if (allSelected) {
                             clearSelection();
-                            setJustClickedAll(false);
                         } else {
                             setSelectAllRequested(true);
-                            setJustClickedAll(true);
                         }
                     }}
-                    className={`p-1.5 rounded-xl transition-all active:scale-90 flex items-center justify-center ${justClickedAll
+                    className={`p-1.5 rounded-xl transition-all active:scale-90 flex items-center justify-center ${allSelected
                         ? 'text-primary'
                         : 'text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200'
                         }`}
                 >
-                    {justClickedAll ? <MdCheckBox className="text-[22px]" /> : <MdCheckBoxOutlineBlank className="text-[22px]" />}
+                    {allSelected ? <MdCheckBox className="text-[22px]" /> : <MdCheckBoxOutlineBlank className="text-[22px]" />}
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -163,7 +168,7 @@ export default function SelectionMenuBar() {
 
                     {overflowActions.length > 0 && (
                         <Menu as="div" className="relative">
-                            <MenuButton className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors">
+                            <MenuButton className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors shrink-0">
                                 <MdMoreHoriz className="text-xl text-neutral-600 dark:text-neutral-300" />
                             </MenuButton>
                             <MenuItems

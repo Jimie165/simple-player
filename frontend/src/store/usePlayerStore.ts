@@ -67,8 +67,8 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
                 set({ repeatMode: 'all' });
                 break;
             case 'all':
-                // 变为单曲循环 (同时关闭随机，遵循你的需求)
-                set({ repeatMode: 'one', isShuffling: false });
+                // 变为单曲循环
+                set({ repeatMode: 'one' });
                 break;
             case 'one':
                 // 关闭循环

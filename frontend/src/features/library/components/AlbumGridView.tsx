@@ -35,7 +35,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds } = useSelectionStore();
 
     // Handle Select All Request
     useEffect(() => {
@@ -48,6 +48,11 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             setSelectAllRequested(false);
         }
     }, [selectAllRequested, isSelectionMode, albums, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectableIds(albums.map(album => getMusicItemId(album)).filter(id => id !== ''));
+    }, [isSelectionMode, albums, setSelectableIds]);
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; album: AlbumData } | null>(null);

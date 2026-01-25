@@ -159,19 +159,6 @@ export default function PlaybackControls() {
         // Current: off -> all -> one -> off
         // 状态流转完全由 Store 控制
         toggleRepeat();
-
-        // 副作用：如果我们要进入 'one' 模式，Store 内部会处理关闭 Shuffle
-        // 这里不需要手动干预，唯一的问题是 Library Store 的 Shuffle List 状态
-        // 我们在 Store 的 toggleRepeat 中没有联动 Library Store，这里补一下？
-        // 或者更好的是，component不做逻辑，只调用 store
-
-        // 检查 Store 实现：usePlayerStore 的 toggleRepeat 会 set({ repeatMode: 'one', isShuffling: false })
-        // 但它没有直接调用 useLibraryStore.toggleShuffleList(false)
-        // 所以这里需要手动同步
-
-        if (repeatMode === 'all') { // Next is 'one'
-            toggleShuffleList(false);
-        }
     };
 
 

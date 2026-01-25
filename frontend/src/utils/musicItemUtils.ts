@@ -13,17 +13,26 @@ export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | Albu
  */
 export function getMusicItemId(item: any): string {
     if (!item) return '';
-    if ((item as any).name && (item as any).songs) {
-        // ID for Album (must match AlbumGridView logic)
-        if ((item as any).artist) {
-            return `${item.name}-${item.artist}`;
+
+    // If it's a playlist item
+    if (typeof item.id === 'string' && item.id.startsWith('playlist:')) return item.id;
+    if (item.song_count !== undefined && item.updated_at !== undefined) return `playlist:${item.id}`;
+
+    // If it's an Artist or Album object (has name and songs array)
+    if (item.name && item.songs && Array.isArray(item.songs)) {
+        if (item.artist && item.albumCount === undefined) {
+            // Album
+            return `album:${item.name}:${item.artist}`;
         }
-        // ID for Artist
-        return (item as any).name;
+        // Artist
+        return `artist:${item.name}`;
     }
-    if (typeof item.id === 'number') return item.id.toString();
-    if (typeof item.id === 'string') return item.id;
+
+    // Default for Song/File: Path is the best unique ID
     if (item.path) return item.path;
+
+    // Fallback
+    if (item.id !== undefined) return String(item.id);
     return '';
 }
 

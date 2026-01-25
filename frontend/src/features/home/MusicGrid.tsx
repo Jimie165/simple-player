@@ -58,7 +58,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
     // Store Actions
     const { recentHistory } = useLibraryStore();
     const { playSong, playList } = usePlaybackActions();
-    const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
@@ -68,6 +68,19 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         document.body.click();
         setContextMenu({ x: e.clientX, y: e.clientY, item });
     };
+
+    useEffect(() => {
+        if (selectAllRequested && isSelectionMode) {
+            const items = recentHistory.map(item => ({ id: item.id, data: item }));
+            selectAll(items, 'recent');
+            setSelectAllRequested(false);
+        }
+    }, [selectAllRequested, isSelectionMode, recentHistory, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectableIds(recentHistory.map(item => item.id));
+    }, [isSelectionMode, recentHistory, setSelectableIds]);
 
     // Helper: Play Single File
     const buildRecentForFile = (path: string, meta: SongMetadata, isLibraryItem: boolean, existing?: RecentItem): RecentItem => {

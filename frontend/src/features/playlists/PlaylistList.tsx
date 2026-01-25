@@ -3,6 +3,7 @@ import { MdFavorite, MdMusicNote, MdAdd, MdSearch, MdSort, MdCheck } from 'react
 import clsx from 'clsx';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { useSelectionStore } from '../../store/useSelectionStore';
+import { getMusicItemId } from '../../utils/musicItemUtils';
 
 import PageContainer from '../../components/layout/PageContainer';
 import { libraryService } from '../../services/libraryService';
@@ -45,7 +46,7 @@ export default function PlaylistList() {
     const { addToNext, libraryVersion, getPlaylistSettings } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
-    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode } = useSelectionStore();
+    const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
 
     const loadPlaylists = async () => {
         try {
@@ -122,13 +123,18 @@ export default function PlaylistList() {
     useEffect(() => {
         if (selectAllRequested && isSelectionMode) {
             const items = filteredPlaylists.map(pl => ({
-                id: pl.id.toString(),
+                id: getMusicItemId(pl),
                 data: pl
-            }));
+            })).filter(i => i.id !== '');
             selectAll(items, 'playlist');
             setSelectAllRequested(false);
         }
     }, [selectAllRequested, isSelectionMode, filteredPlaylists, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectableIds(filteredPlaylists.map(pl => getMusicItemId(pl)).filter(id => id !== ''));
+    }, [isSelectionMode, filteredPlaylists, setSelectableIds]);
 
     // Removal of handleDelete since we use hook's global confirm now
 
@@ -357,13 +363,14 @@ export default function PlaylistList() {
                 {filteredPlaylists.map(pl => {
                     // Check if it's the favorites item
                     if (pl.id === 'favorites' as any) {
-                        const isSelected = selectedIds.has('favorites');
+                        const favoritesSelectionId = getMusicItemId(pl);
+                        const isSelected = selectedIds.has(favoritesSelectionId);
                         return (
                             <div
                                 key="favorites"
                                 onClick={() => {
                                     if (isSelectionMode) {
-                                        toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' } as any);
+                                        toggleSelection(favoritesSelectionId, 'playlist', pl);
                                     } else {
                                         push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } });
                                     }
@@ -390,7 +397,7 @@ export default function PlaylistList() {
                                     <div
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' } as any);
+                                            toggleSelection(favoritesSelectionId, 'playlist', pl);
                                         }}
                                         className={clsx(
                                             "absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer",
@@ -424,7 +431,7 @@ export default function PlaylistList() {
                                                 toggleSelectionMode={toggleSelectionMode}
                                                 toggleSelection={toggleSelection}
                                                 isSelectionMode={isSelectionMode}
-                                                isSelected={selectedIds.has('favorites')}
+                                                isSelected={isSelected}
                                             />
                                         </>
                                     )}
@@ -436,13 +443,14 @@ export default function PlaylistList() {
                         );
                     }
 
-                    const isSelected = selectedIds.has(pl.id.toString());
+                    const id = getMusicItemId(pl);
+                    const isSelected = selectedIds.has(id);
                     return (
                         <div
                             key={pl.id}
                             onClick={() => {
                                 if (isSelectionMode) {
-                                    toggleSelection(pl.id.toString(), 'playlist', pl);
+                                    toggleSelection(id, 'playlist', pl);
                                 } else {
                                     push({ type: 'playlist_detail', data: pl });
                                 }
@@ -466,7 +474,7 @@ export default function PlaylistList() {
                                     <div
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            toggleSelection(pl.id.toString(), 'playlist', pl);
+                                            toggleSelection(id, 'playlist', pl);
                                         }}
                                         className={clsx(
                                             "absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer",
@@ -498,7 +506,7 @@ export default function PlaylistList() {
                                             toggleSelectionMode={toggleSelectionMode}
                                             toggleSelection={toggleSelection}
                                             isSelectionMode={isSelectionMode}
-                                            isSelected={selectedIds.has(pl.id.toString())}
+                                            isSelected={isSelected}
                                         />
                                     </div>
                                 )}
@@ -541,7 +549,7 @@ export default function PlaylistList() {
                     x={favoritesContextMenu.x}
                     y={favoritesContextMenu.y}
                     item={{
-                        id: 'favorites',
+                        id: 'playlist:favorites',
                         type: 'playlist',
                         name: '喜爱歌曲',
                         title: '喜爱歌曲'
@@ -579,7 +587,7 @@ function FavoritesCardMenu({
 }: any) {
     const { menuItems } = useSongOperations({
         items: [{
-            id: 'favorites',
+            id: 'playlist:favorites',
             type: 'playlist',
             name: '喜爱歌曲',
             title: '喜爱歌曲'
@@ -591,9 +599,9 @@ function FavoritesCardMenu({
         onDelete: () => { }, // Disable delete for Favorites tile
         onSelect: () => {
             if (!isSelectionMode) {
-                toggleSelectionMode({ id: 'favorites', type: 'playlist', data: { id: 'favorites', name: '喜爱歌曲' } });
+                toggleSelectionMode({ id: 'playlist:favorites', type: 'playlist', data: { id: 'playlist:favorites', type: 'playlist', name: '喜爱歌曲', title: '喜爱歌曲' } });
             } else {
-                toggleSelection('favorites', 'playlist', { id: 'favorites', name: '喜爱歌曲' });
+                toggleSelection('playlist:favorites', 'playlist', { id: 'playlist:favorites', type: 'playlist', name: '喜爱歌曲', title: '喜爱歌曲' });
             }
         },
         isSelected
@@ -627,6 +635,7 @@ function PlaylistCardMenu({
     isSelectionMode,
     isSelected
 }: any) {
+    const selectionId = getMusicItemId(pl);
     const { menuItems } = useSongOperations({
         items: [pl],
         context: 'playlist_list',
@@ -636,9 +645,9 @@ function PlaylistCardMenu({
         onEdit: () => setEditPlaylist(pl),
         onSelect: () => {
             if (!isSelectionMode) {
-                toggleSelectionMode({ id: pl.id.toString(), type: 'playlist', data: pl });
+                toggleSelectionMode({ id: selectionId, type: 'playlist', data: pl });
             } else {
-                toggleSelection(pl.id.toString(), 'playlist', pl);
+                toggleSelection(selectionId, 'playlist', pl);
             }
         },
         isSelected

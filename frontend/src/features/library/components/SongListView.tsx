@@ -10,6 +10,8 @@ import SmartCursorContextMenu from '../../../components/common/SmartCursorContex
 import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
 import type { MusicMenuContext } from '../../../hooks/useSongOperations';
 
+import { getMusicItemId } from '../../../utils/musicItemUtils';
+
 const HIDE_ALBUM_BREAKPOINT = 900;
 
 interface SongListViewProps {
@@ -78,8 +80,8 @@ export default function SongListView({
     });
 
     // Selection Store
-    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll } = useSelectionStore();
-    const { toggleFavorite } = useLibraryStore();
+    const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, clearSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
+    const { toggleFavorite, isFavorite, favoriteSet } = useLibraryStore();
 
     // 右键菜单状态
     type ContextMenuState = {
@@ -133,7 +135,7 @@ export default function SongListView({
     useEffect(() => {
         if (selectAllRequested && isSelectionMode) {
             const items = sortedSongs.map(song => ({
-                id: song.id ? song.id.toString() : song.path || '',
+                id: getMusicItemId(song),
                 data: song
             })).filter(item => item.id !== '');
 
@@ -141,6 +143,11 @@ export default function SongListView({
             setSelectAllRequested(false);
         }
     }, [selectAllRequested, isSelectionMode, sortedSongs, selectAll, setSelectAllRequested]);
+
+    useEffect(() => {
+        if (!isSelectionMode) return;
+        setSelectableIds(sortedSongs.map(song => getMusicItemId(song)).filter(id => id !== ''));
+    }, [isSelectionMode, sortedSongs, setSelectableIds]);
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -194,8 +201,8 @@ export default function SongListView({
         e.stopPropagation();
         if (e.button !== 0) return; // Only allow left click
 
-        // Use ID if available, else path
-        const id = song.id ? song.id.toString() : song.path;
+        // Use standardized ID
+        const id = getMusicItemId(song);
         if (!id) return;
 
         if (isSelectionMode) {
@@ -212,7 +219,7 @@ export default function SongListView({
 
     const handleCheckboxClick = (e: React.MouseEvent | null, song: SongMetadata) => {
         if (e) e.stopPropagation();
-        const id = song.id ? song.id.toString() : song.path;
+        const id = getMusicItemId(song);
         if (!id) return;
         if (!isSelectionMode) {
             toggleSelectionMode({ id, type: 'song', data: song });
@@ -261,8 +268,11 @@ export default function SongListView({
             {/* 列表内容 */}
             <div className="flex flex-col">
                 {sortedSongs.map((song, index) => {
-                    const id = song.id ? song.id.toString() : song.path;
+                    const id = getMusicItemId(song);
                     const selected = isSelected(id);
+                    const isFav = (song.id !== undefined && typeof song.id === 'number')
+                        ? favoriteSet.has(song.id)
+                        : isFavorite(song as any);
 
                     return (
                         <div
@@ -309,13 +319,13 @@ export default function SongListView({
                                         }}
                                         className={clsx(
                                             "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
-                                            song.is_favorite
+                                            isFav
                                                 ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
                                                 : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
                                         )}
-                                        title={song.is_favorite ? "取消喜爱" : "喜爱"}
+                                        title={isFav ? "取消喜爱" : "喜爱"}
                                     >
-                                        {song.is_favorite ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
+                                        {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
                                     </button>
                                 </div>
                             )}
@@ -414,9 +424,13 @@ export default function SongListView({
                     item={contextMenu.song}
                     context={context}
                     onClose={() => setContextMenu(null)}
-                    isSelected={selectedIds.has(contextMenu.song.id?.toString() || contextMenu.song.path || '')}
+                    isSelected={selectedIds.has(getMusicItemId(contextMenu.song))}
                     onSelect={() => {
-                        handleCheckboxClick(null, contextMenu.song);
+                        if (isSelectionMode && selectedIds.size > 1 && selectedIds.has(getMusicItemId(contextMenu.song))) {
+                            clearSelection();
+                        } else {
+                            handleCheckboxClick(null, contextMenu.song);
+                        }
                         setContextMenu(null);
                     }}
                 />
@@ -424,4 +438,3 @@ export default function SongListView({
         </div >
     );
 }
-

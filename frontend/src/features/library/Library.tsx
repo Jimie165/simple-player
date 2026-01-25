@@ -15,7 +15,6 @@ import type { AlbumData } from './components/AlbumGridView';
 import type { ArtistData } from './components/ArtistGridView';
 
 import { libraryService } from '../../services/libraryService';
-import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useNavigationStore } from '../../store/useNavigationStore';
 import { useSelectionStore } from '../../store/useSelectionStore';
@@ -49,8 +48,7 @@ export default function Library() {
     const [albumSortKey, setAlbumSortKey] = useState<'name' | 'artist'>('name');
     // Store Actions
     // Store Actions
-    const { addToRecent, setPlaylist, setCurrentSongIndex, toggleShuffleList, libraryVersion } = useLibraryStore();
-    const { setShuffleState } = usePlayerStore();
+    const { addToRecent, libraryVersion } = useLibraryStore();
     const { playSong, shufflePlay } = usePlaybackActions();
     const { push } = useNavigationStore();
 
@@ -315,19 +313,13 @@ export default function Library() {
                             }
 
                             if (songsToPlay.length > 0) {
-                                // 1. 随机选一首
-                                const randomIndex = Math.floor(Math.random() * songsToPlay.length);
-                                const song = songsToPlay[randomIndex];
-
-                                // 2. 同步更新 Store
-                                setPlaylist(songsToPlay);
-                                setCurrentSongIndex(randomIndex);
-                                toggleShuffleList(true); // 洗牌并把选中的歌置顶 (Index becomes 0)
-                                setShuffleState(true);
-
-                                // 3. 播放 (禁止 handlePlaySong 重置列表)
-                                // 传入 index 0，因为在洗牌后的列表中它就是第 0 个
-                                handlePlaySong(song, 0, [], true);
+                                shufflePlay({
+                                    songs: songsToPlay,
+                                    options: {
+                                        addToRecent: true,
+                                        buildRecentItem: buildRecentForSong
+                                    }
+                                });
                             }
                         }}
 

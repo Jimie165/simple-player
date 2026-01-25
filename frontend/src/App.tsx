@@ -126,6 +126,9 @@ function App() {
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
       <GlobalDetailStack />
+
+      {/* 选择操作栏 - 现在放在这里，使用 absolute 定位 */}
+      <SelectionMenuBar />
     </div>
   );
 
@@ -180,7 +183,6 @@ function App() {
 
       {/* 4. 底部播放控制 - M3 Surface Container */}
       <div className="bg-surface-container-high border-t border-outline-variant/10 z-[70] relative">
-        <SelectionMenuBar />
         <PlayerControl
           isFullScreen={isFullScreen}
           toggleFullScreen={() => setIsFullScreen(!isFullScreen)}
