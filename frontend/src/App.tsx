@@ -3,6 +3,7 @@ import { useThemeStore } from './store/useThemeStore';
 import clsx from 'clsx';
 import { useNavigationStore } from './store/useNavigationStore';
 import { useSelectionStore } from './store/useSelectionStore';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import TitleBar from './components/layout/TitleBar';
 import Sidebar from './components/layout/Sidebar';
@@ -120,10 +121,18 @@ function App() {
       />
 
       <main className="flex-1 overflow-y-auto pt-10 scroll-smooth relative no-scrollbar">
-        {/* Simple Fade Transition for Page Switch */}
-        <div key={currentPage} className="animate-in fade-in duration-300 slide-in-from-bottom-2 h-full">
-          {renderContent()}
-        </div>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPage}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="h-full"
+          >
+            {renderContent()}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}

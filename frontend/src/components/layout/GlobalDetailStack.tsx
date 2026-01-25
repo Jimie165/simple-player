@@ -12,6 +12,7 @@ import type { RecentItem } from '../../types';
 import { useSelectionStore } from '../../store/useSelectionStore';
 import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 import { ErrorBoundary } from '../common/ErrorBoundary';
+import { AnimatePresence, motion } from 'framer-motion';
 
 export default function GlobalDetailStack() {
     const { overlayStack, push, pop } = useNavigationStore();
@@ -74,54 +75,65 @@ export default function GlobalDetailStack() {
 
 
     // Render the stack
-    if (overlayStack.length === 0) return null;
-
-    const activeView = overlayStack[overlayStack.length - 1];
-    const overlayClass = "absolute inset-0 z-50 bg-surface dark:bg-surface-container-low transition-transform duration-300 ease-out transform translate-y-0 overflow-y-auto";
-
     return (
-        <div className={overlayClass}>
-            <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-[100] bg-transparent" />
+        <AnimatePresence>
+            {overlayStack.map((activeView, index) => {
+                let key = `${activeView.type}-${index}`;
+                if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
+                if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
+                if (activeView.type === 'playlist_detail') key += `-${(activeView.data as any).id}`;
 
-
-
-            <ErrorBoundary>
-                {(() => {
-                    switch (activeView.type) {
-                        case 'album_detail':
-                            return (
-                                <AlbumOverlay
-                                    data={activeView.data as AlbumData}
-                                    onPlaySong={handlePlaySong}
-                                    onShuffle={shufflePlay}
-                                    addToRecent={addToRecent}
-                                    onOpenArtistByName={handleOpenArtistByName}
-                                />
-                            );
-                        case 'artist_detail':
-                            return (
-                                <ArtistOverlay
-                                    data={activeView.data as ArtistData}
-                                    onPlaySong={handlePlaySong}
-                                    onShuffle={shufflePlay}
-                                    addToRecent={addToRecent}
-                                    push={push}
-                                    onOpenArtistByName={handleOpenArtistByName}
-                                />
-                            );
-                        case 'playlist_detail':
-                            const plData = activeView.data as { id: number | 'favorites', name: string };
-                            return (
-                                <div className="h-full">
-                                    <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
-                                </div>
-                            );
-                        default:
-                            return null;
-                    }
-                })()}
-            </ErrorBoundary>
-        </div>
+                return (
+                    <motion.div
+                        key={key}
+                        initial={{ x: '100%' }}
+                        animate={{ x: 0 }}
+                        exit={{ x: '100%' }}
+                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        className="absolute inset-0 bg-surface dark:bg-surface-container-low overflow-y-auto shadow-xl"
+                        style={{ zIndex: 50 + index }}
+                    >
+                        <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-[100] bg-transparent" />
+                        <ErrorBoundary>
+                            {(() => {
+                                switch (activeView.type) {
+                                    case 'album_detail':
+                                        return (
+                                            <AlbumOverlay
+                                                data={activeView.data as AlbumData}
+                                                onPlaySong={handlePlaySong}
+                                                onShuffle={shufflePlay}
+                                                addToRecent={addToRecent}
+                                                onOpenArtistByName={handleOpenArtistByName}
+                                            />
+                                        );
+                                    case 'artist_detail':
+                                        return (
+                                            <ArtistOverlay
+                                                data={activeView.data as ArtistData}
+                                                onPlaySong={handlePlaySong}
+                                                onShuffle={shufflePlay}
+                                                addToRecent={addToRecent}
+                                                push={push}
+                                                onOpenArtistByName={handleOpenArtistByName}
+                                            />
+                                        );
+                                    case 'playlist_detail':
+                                        const plData = activeView.data as { id: number | 'favorites', name: string };
+                                        return (
+                                            <div className="h-full">
+                                                <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
+                                            </div>
+                                        );
+                                    default:
+                                        return null;
+                                }
+                            })()}
+                        </ErrorBoundary>
+                    </motion.div>
+                );
+            })}
+        </AnimatePresence>
     );
 }
 

@@ -2,24 +2,24 @@ import { useState } from 'react';
 import PageContainer from '../../components/layout/PageContainer';
 import { useTheme } from '../../hooks/useTheme';
 import { libraryService } from '../../services/libraryService';
-import { 
-    MdBrightness6, 
-    MdRefresh, 
-    MdColorLens, 
-    MdCheck, 
+import {
+    MdBrightness6,
+    MdRefresh,
+    MdColorLens,
+    MdCheck,
     MdAdd,
     MdLibraryMusic
 } from 'react-icons/md';
 import clsx from 'clsx';
 
 export default function Settings() {
-    const { 
-        theme, 
-        setTheme, 
-        sourceColor, 
-        setSourceColor, 
-        presetColors, 
-        isCustomColor 
+    const {
+        theme,
+        setTheme,
+        sourceColor,
+        setSourceColor,
+        presetColors,
+        isCustomColor
     } = useTheme();
 
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -63,7 +63,7 @@ export default function Settings() {
                         <MdLibraryMusic className="text-lg" />
                         <span>常规设置</span>
                     </div>
-                    
+
                     <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 overflow-hidden">
                         <div className="flex items-center justify-between p-4 hover:bg-surface-container-highest transition-colors">
                             <div className="flex flex-col gap-1">
@@ -75,8 +75,8 @@ export default function Settings() {
                                 disabled={isRefreshing}
                                 className={clsx(
                                     "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
-                                    isRefreshing 
-                                        ? "bg-surface-container-highest text-on-surface-variant cursor-wait" 
+                                    isRefreshing
+                                        ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
                                         : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
                                 )}
                             >
@@ -110,7 +110,7 @@ export default function Settings() {
                             <h4 className="text-sm font-medium text-on-surface">应用配色</h4>
                             <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 px-2 py-1 rounded-md">
                                 <MdColorLens />
-                                <span>Material 3 动态取色</span>
+                                <span>主题颜色</span>
                             </div>
                         </div>
 
@@ -126,7 +126,7 @@ export default function Settings() {
                                             className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
                                             title={color.name}
                                         >
-                                            <div 
+                                            <div
                                                 className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
                                                 style={{ backgroundColor: color.value }}
                                             />
@@ -142,23 +142,23 @@ export default function Settings() {
 
                                 {/* Custom Picker */}
                                 <div className="relative group">
-                                    <div 
+                                    <div
                                         className={clsx(
                                             "w-12 h-12 rounded-full flex items-center justify-center border transition-all cursor-pointer overflow-hidden",
-                                            isCustomColor 
-                                                ? "border-primary ring-2 ring-primary/30" 
+                                            isCustomColor
+                                                ? "border-primary ring-2 ring-primary/30"
                                                 : "border-outline-variant/50 border-dashed hover:border-primary/50"
                                         )}
                                     >
                                         {isCustomColor ? (
-                                            <div 
+                                            <div
                                                 className="w-full h-full"
                                                 style={{ backgroundColor: sourceColor }}
                                             />
                                         ) : (
                                             <MdAdd className="text-2xl text-on-surface-variant" />
                                         )}
-                                        
+
                                         {/* Invisible Color Input covering the button */}
                                         <input
                                             type="color"
@@ -184,12 +184,12 @@ export default function Settings() {
                 <section className="rounded-2xl bg-surface-container-high p-6 border border-outline-variant/30">
                     <h3 className="text-lg font-semibold mb-2 text-on-surface">关于 Simple Player</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed">
-                        这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器，遵循 Material Design 3 设计规范。
+                        这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器 (其实并不高效)，(大概) 遵循 Material Design 3 设计规范。
                     </p>
                     <div className="mt-4 flex gap-4 text-xs text-on-surface-variant/70">
                         <span>Version 0.1.0 (Alpha)</span>
                         <span>•</span>
-                        <span>Made with ❤️ by You</span>
+                        <span>Made by Jimie165</span>
                     </div>
                 </section>
             </div>

@@ -12,6 +12,7 @@ export interface ViewState {
 interface MainState {
     page: PageId;
     tab?: string;
+    overlayStack?: ViewState[];
 }
 
 interface NavigationState {
@@ -51,7 +52,14 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             return state;
         }
 
-        const newHistory = [...state.mainHistory, { page: state.currentPage, tab: state.currentTab }];
+        const newHistory = [
+            ...state.mainHistory,
+            {
+                page: state.currentPage,
+                tab: state.currentTab,
+                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined
+            }
+        ];
 
         return {
             currentPage: page,
@@ -66,7 +74,14 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
     setTab: (tab) => set((state) => {
         if (state.currentTab === tab) return state;
-        const newHistory = [...state.mainHistory, { page: state.currentPage, tab: state.currentTab }];
+        const newHistory = [
+            ...state.mainHistory,
+            {
+                page: state.currentPage,
+                tab: state.currentTab,
+                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined
+            }
+        ];
         return {
             currentTab: tab,
             mainHistory: newHistory
@@ -112,7 +127,12 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
                 set({
                     currentPage: prevState.page,
                     currentTab: prevState.tab || 'songs',
-                    mainHistory: newHistory
+                    mainHistory: newHistory,
+                    overlayStack: prevState.overlayStack ?? [],
+                    activeOverlay: prevState.overlayStack && prevState.overlayStack.length > 0
+                        ? prevState.overlayStack[prevState.overlayStack.length - 1]
+                        : null,
+                    hasOverlay: !!(prevState.overlayStack && prevState.overlayStack.length > 0)
                 });
             }
         }

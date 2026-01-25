@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
 import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdShuffle } from 'react-icons/md';
+import { AnimatePresence, motion } from 'framer-motion';
 
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
@@ -344,67 +345,96 @@ export default function Library() {
                 )}
 
                 {/* Views */}
-                <div className="flex-1 min-h-0">
-                    {currentTab === 'songs' && (
-                        <SongListView
-                            songs={librarySongs}
-                            onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
-                            onDelete={deleteSong}
-                            onOpenArtist={handleOpenArtistByName}
-                            onOpenAlbum={handleOpenAlbumByName}
-                        />
-                    )}
-                    {currentTab === 'albums' && (
-                        <AlbumGridView
-                            albums={albums}
-                            onPlayAlbum={(album) => {
-                                addToRecent({
-                                    id: `album:${album.name}:${album.artist}`,
-                                    type: 'album',
-                                    title: album.name,
-                                    artist: album.artist,
-                                    description: `${album.songs.length} 首歌曲`,
-                                    cover: album.cover,
-                                    cover_path: album.cover_path || null,
-                                    path: album.songs[0]?.path || '',
-                                    lastPlayed: Date.now(),
-                                    isLibraryItem: true
-                                });
-                                if (album.songs.length > 0) {
-                                    handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true });
-                                }
-                            }}
-                            onShuffleAlbum={(album) => {
-                                if (album.songs.length > 0) {
-                                    shufflePlay({ songs: album.songs });
-                                }
-                            }}
-                            onOpenAlbum={handleOpenAlbum}
-                            onOpenArtist={(artistName) => {
-                                // Find artist data by name
-                                const found = artists.find(a => a.name === artistName);
-                                if (found) handleOpenArtist(found);
-                            }}
-                            onDeleteAlbum={deleteAlbum}
-                        />
-                    )}
-                    {currentTab === 'artists' && (
-                        <ArtistGridView
-                            artists={artists}
-                            onPlayArtist={(artist) => {
-                                if (artist.songs.length > 0) {
-                                    handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true });
-                                }
-                            }}
-                            onShuffleArtist={(artist) => {
-                                if (artist.songs.length > 0) {
-                                    shufflePlay({ songs: artist.songs });
-                                }
-                            }}
-                            onOpenArtist={handleOpenArtist}
-                            onDeleteArtist={deleteArtist}
-                        />
-                    )}
+                <div className="flex-1 min-h-0 relative">
+                    <AnimatePresence mode="wait">
+                        {currentTab === 'songs' && (
+                            <motion.div
+                                key="songs"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="h-full"
+                            >
+                                <SongListView
+                                    songs={librarySongs}
+                                    onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
+                                    onDelete={deleteSong}
+                                    onOpenArtist={handleOpenArtistByName}
+                                    onOpenAlbum={handleOpenAlbumByName}
+                                />
+                            </motion.div>
+                        )}
+                        {currentTab === 'albums' && (
+                            <motion.div
+                                key="albums"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="h-full"
+                            >
+                                <AlbumGridView
+                                    albums={albums}
+                                    onPlayAlbum={(album) => {
+                                        addToRecent({
+                                            id: `album:${album.name}:${album.artist}`,
+                                            type: 'album',
+                                            title: album.name,
+                                            artist: album.artist,
+                                            description: `${album.songs.length} 首歌曲`,
+                                            cover: album.cover,
+                                            cover_path: album.cover_path || null,
+                                            path: album.songs[0]?.path || '',
+                                            lastPlayed: Date.now(),
+                                            isLibraryItem: true
+                                        });
+                                        if (album.songs.length > 0) {
+                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true });
+                                        }
+                                    }}
+                                    onShuffleAlbum={(album) => {
+                                        if (album.songs.length > 0) {
+                                            shufflePlay({ songs: album.songs });
+                                        }
+                                    }}
+                                    onOpenAlbum={handleOpenAlbum}
+                                    onOpenArtist={(artistName) => {
+                                        // Find artist data by name
+                                        const found = artists.find(a => a.name === artistName);
+                                        if (found) handleOpenArtist(found);
+                                    }}
+                                    onDeleteAlbum={deleteAlbum}
+                                />
+                            </motion.div>
+                        )}
+                        {currentTab === 'artists' && (
+                            <motion.div
+                                key="artists"
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.2 }}
+                                className="h-full"
+                            >
+                                <ArtistGridView
+                                    artists={artists}
+                                    onPlayArtist={(artist) => {
+                                        if (artist.songs.length > 0) {
+                                            handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true });
+                                        }
+                                    }}
+                                    onShuffleArtist={(artist) => {
+                                        if (artist.songs.length > 0) {
+                                            shufflePlay({ songs: artist.songs });
+                                        }
+                                    }}
+                                    onOpenArtist={handleOpenArtist}
+                                    onDeleteArtist={deleteArtist}
+                                />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
         </PageContainer>
