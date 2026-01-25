@@ -135,7 +135,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                     <div className="mt-8 flex justify-end">
                         <button
                             type="button"
-                            className="inline-flex justify-center rounded-md border border-transparent bg-blue-100 px-6 py-2 text-sm font-medium text-blue-900 hover:bg-blue-200 focus:outline-none dark:bg-blue-600 dark:text-white dark:hover:bg-blue-700 transition-colors shadow-sm"
+                            className="w-full inline-flex justify-center rounded-xl px-4 py-2 text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 dark:bg-primary/20 dark:text-primary dark:hover:bg-primary/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                             onClick={onClose}
                         >
                             关闭

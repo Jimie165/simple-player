@@ -1,49 +1,33 @@
-import { useEffect, useState } from 'react';
+import { useThemeStore } from '../store/useThemeStore';
+import { PRESET_COLORS } from '../utils/themeColors';
 
-type Theme = 'light' | 'dark' | 'system';
-
+/**
+ * Facade Hook for Theme Store
+ * 保持简单的 API 供 UI 组件使用
+ */
 export function useTheme() {
-    const [theme, setTheme] = useState<Theme>(() => {
-        if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('theme') as Theme;
-            // 默认跟随系统
-            return saved || 'system';
-        }
-        return 'system';
-    });
+    const themeMode = useThemeStore((state) => state.themeMode);
+    const setThemeMode = useThemeStore((state) => state.setThemeMode);
+    
+    const sourceColor = useThemeStore((state) => state.sourceColor);
+    const setSourceColor = useThemeStore((state) => state.setSourceColor);
+    
+    const isCustomColor = useThemeStore((state) => state.isCustomColor);
+    const isDark = useThemeStore((state) => state.isDark);
 
-    useEffect(() => {
-        const root = window.document.documentElement;
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-
-        const applyTheme = () => {
-            if (theme === 'dark') {
-                root.classList.add('dark');
-            } else if (theme === 'light') {
-                root.classList.remove('dark');
-            } else {
-                // System 模式：根据系统当前状态决定
-                if (mediaQuery.matches) {
-                    root.classList.add('dark');
-                } else {
-                    root.classList.remove('dark');
-                }
-            }
-        };
-
-        applyTheme();
-        localStorage.setItem('theme', theme);
-
-        // 监听系统变化（仅在 system 模式下生效）
-        const handleChange = () => {
-            if (theme === 'system') {
-                applyTheme();
-            }
-        };
-
-        mediaQuery.addEventListener('change', handleChange);
-        return () => mediaQuery.removeEventListener('change', handleChange);
-    }, [theme]);
-
-    return { theme, setTheme };
+    return {
+        theme: themeMode,
+        setTheme: setThemeMode, // Alias for compatibility
+        
+        themeMode,
+        setThemeMode,
+        
+        sourceColor,
+        setSourceColor,
+        
+        isCustomColor,
+        isDark,
+        
+        presetColors: PRESET_COLORS
+    };
 }

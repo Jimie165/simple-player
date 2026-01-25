@@ -9,6 +9,7 @@ import SmartMusicContextMenu from '../../../components/common/SmartMusicContextM
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
 import type { MusicMenuContext } from '../../../hooks/useSongOperations';
+import CustomTooltip from '../../../components/common/CustomTooltip';
 
 import { getMusicItemId } from '../../../utils/musicItemUtils';
 
@@ -44,6 +45,14 @@ export default function SongListView({
     onOpenAlbum,
     context = 'library'
 }: SongListViewProps) {
+    const isLibraryContext = context === 'library';
+    const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
+    const headerPaddingClass = isLibraryContext ? "px-2" : "px-4";
+    const rowPaddingClass = isLibraryContext ? "px-2" : "px-4";
+    // 表头在不同上下文下的背景/模糊效果
+    const headerBgClass = context === 'artist_detail'
+        ? "text-[13px] text-on-surface-variant font-medium bg-surface/60 dark:bg-black/30 backdrop-blur-md transition-colors"
+        : "text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl transition-colors";
     // Responsive: auto-hide album column on narrow windows
     const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
     useEffect(() => {
@@ -248,8 +257,10 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky top-0 z-45 grid gap-4 pt-10 pb-3 px-4 border-b border-outline-variant/10",
-                    "text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl transition-colors"
+                    "sticky top-0 z-45 grid pt-10 pb-3 border-b border-outline-variant/10",
+                    gridGapClass,
+                    headerPaddingClass,
+                    headerBgClass
                 )}>
                 {/* Selection header removed */}
                 <div></div> {/* Heart header spacer */}
@@ -295,7 +306,9 @@ export default function SongListView({
                             onContextMenu={(e) => handleContextMenu(e, song, index)}
                             style={gridStyle}
                             className={clsx(
-                                "group grid gap-4 px-4 py-2 items-center rounded-lg transition-colors relative",
+                                "group grid py-2 items-center rounded-lg transition-colors relative",
+                                gridGapClass,
+                                rowPaddingClass,
                                 selected
                                     ? "bg-primary/10 hover:bg-primary/15"
                                     : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
@@ -312,21 +325,22 @@ export default function SongListView({
                             {/* Column 2: Heart Icon (Always shown) */}
                             {(
                                 <div className="flex justify-center items-center">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            toggleFavorite(song);
-                                        }}
-                                        className={clsx(
-                                            "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
-                                            isFav
-                                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
-                                        )}
-                                        title={isFav ? "取消喜爱" : "喜爱"}
-                                    >
-                                        {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
-                                    </button>
+                                    <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleFavorite(song);
+                                            }}
+                                            className={clsx(
+                                                "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
+                                                isFav
+                                                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
+                                                    : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                            )}
+                                        >
+                                            {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
+                                        </button>
+                                    </CustomTooltip>
                                 </div>
                             )}
 

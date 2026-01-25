@@ -29,21 +29,21 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
         <div className="px-3 mt-1">
             <CustomTooltip
                 text="搜索"
-                // 只有折叠时显示 Tooltip (以免遮挡输入框)，如果你想展开也显示，去掉这行即可
+                // 只有折叠时显示 Tooltip (以免遮挡输入框)
                 disabled={!collapsed}
                 placement="bottom" // 文字在下方
                 className="w-full" // 确保外层容器撑满
             >
                 <div
                     onClick={handleSearchClick}
-                    className="group relative flex items-center w-full min-h-[48px] cursor-pointer"
+                    className="relative flex items-center w-full min-h-[48px] cursor-pointer"
                 >
                     {/* 背景层 */}
                     <div className={clsx(
                         "absolute top-1/2 -translate-y-1/2 h-12 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                         "left-0",
                         collapsed
-                            ? "w-12 rounded-full bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-neutral-800"
+                            ? "w-12 rounded-full bg-transparent group-hover/tooltip:bg-neutral-100 dark:group-hover/tooltip:bg-neutral-800"
                             : "w-full rounded-full bg-neutral-100 dark:bg-neutral-800"
                     )} />
 

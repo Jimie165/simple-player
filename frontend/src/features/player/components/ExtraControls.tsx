@@ -44,7 +44,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                         className={clsx(
                             "p-2 rounded-lg transition-colors",
                             showQueuePopup
-                                ? "bg-neutral-100 text-blue-600 dark:bg-white/10 dark:text-blue-400"
+                                ? "bg-neutral-100 text-primary dark:bg-white/10"
                                 : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
                         )}
                     >
@@ -61,7 +61,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                         onClick={() => setShowVolumePopup(!showVolumePopup)}
                         className={clsx(
                             "p-2 rounded-lg transition-colors",
-                            showVolumePopup ? "bg-neutral-100 text-blue-600 dark:bg-white/10 dark:text-blue-400" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
+                            showVolumePopup ? "bg-neutral-100 text-primary dark:bg-white/10" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
                         )}
                     >
                         {volume === 0 ? <MdVolumeOff className="text-xl" /> : <MdVolumeUp className="text-xl" />}

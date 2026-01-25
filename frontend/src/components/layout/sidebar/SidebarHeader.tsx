@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { MdArrowBack, MdMenu } from 'react-icons/md';
 import CustomTooltip from '../../common/CustomTooltip';
 // 注意路径
-import appLogo from '../../../assets/logo.png'; 
+import appLogo from '../../../assets/logo.png';
 
 interface SidebarHeaderProps {
   collapsed: boolean;
@@ -55,28 +55,28 @@ export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }
       {/* 汉堡菜单 (重点修改) */}
       <div className="px-3 mt-1 flex">
         {/* Tooltip 只包裹按钮本身，不占满整行，这样 tooltip 会出现在图标下方 */}
-        <CustomTooltip 
-            text={collapsed ? "展开菜单" : "收起菜单"} 
-            placement="bottom"
-            // 移除 w-full，让 tooltip 只包裹按钮本身
+        <CustomTooltip
+          text={collapsed ? "展开菜单" : "收起菜单"}
+          placement="bottom"
+        // 移除 w-full，让 tooltip 只包裹按钮本身
         >
-            <button
-              onClick={onToggle}
-              // 关键：固定 w-12，这样它永远靠左，背景色也永远只包住图标
-              className="group relative flex items-center justify-center w-12 min-h-[56px]"
-            >
-                {/* 背景层：固定 w-12，只在 hover 时出现 */}
-                <div className={clsx(
-                  "absolute top-1/2 -translate-y-1/2 h-10 rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
-                  "left-0 w-12", // 始终固定宽度和位置
-                  "bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-white/5"
-                )} />
+          <button
+            onClick={onToggle}
+            // 关键：固定 w-12，这样它永远靠左，背景色也永远只包住图标
+            className="group relative flex items-center justify-center w-12 min-h-[56px]"
+          >
+            {/* 背景层：固定 w-12，只在 hover 时出现 */}
+            <div className={clsx(
+              "absolute top-1/2 -translate-y-1/2 h-10 rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+              "left-0 w-12", // 始终固定宽度和位置
+              "bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-white/5"
+            )} />
 
-                {/* 图标 */}
-                <div className="relative z-10 w-12 h-12 flex items-center justify-center shrink-0">
-                    <MdMenu className="text-[24px] text-neutral-600 dark:text-neutral-300" />
-                </div>
-            </button>
+            {/* 图标 */}
+            <div className="relative z-10 w-12 h-12 flex items-center justify-center shrink-0">
+              <MdMenu className="text-[24px] text-neutral-600 dark:text-neutral-300" />
+            </div>
+          </button>
         </CustomTooltip>
       </div>
     </>

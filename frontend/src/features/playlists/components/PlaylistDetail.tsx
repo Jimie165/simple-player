@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MdPlayArrow, MdShuffle, MdEdit, MdSort, MdCheck, MdSearch, MdClose, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
+import CustomTooltip from '../../../components/common/CustomTooltip';
+import { useScrollBlur } from '../../../hooks/useScrollBlur';
 
 
 import SortableSongList from './SortableSongList';
@@ -61,30 +63,17 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     // Search State
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    // 当用户通过点击 × 关闭搜索时，短暂抑制 Tooltip 显示，直到鼠标移出搜索按钮区域
+    const [suppressTooltip, setSuppressTooltip] = useState(false);
+    const [suppressSortTooltip, setSuppressSortTooltip] = useState(false);
 
     // Store Actions
     // Store Actions
     const { libraryVersion, triggerLibraryUpdate } = useLibraryStore();
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
-    // Scroll Detection for Sticky Header
-    const [isScrolled, setIsScrolled] = useState(false);
-    const topSentinelRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const observer = new IntersectionObserver(
-            ([entry]) => {
-                setIsScrolled(!entry.isIntersecting);
-            },
-            { threshold: [0] }
-        );
-
-        if (topSentinelRef.current) {
-            observer.observe(topSentinelRef.current);
-        }
-
-        return () => observer.disconnect();
-    }, []);
+    // Scroll Detection for Sticky Header (reusable)
+    const { isScrolled, topSentinelRef } = useScrollBlur();
 
     // Load Data
 
@@ -278,23 +267,35 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             {/* Header Section */}
             <div className="relative w-full z-20 -mt-10">
 
-                {/* Top Right Controls (Search & Sort) */}
                 <div className="absolute top-16 right-6 z-50 flex items-center gap-1">
-                    {/* Search Input/Button */}
-                    <div className={clsx(
-                        "flex items-center transition-all duration-300 overflow-hidden rounded-full",
-                        isSearchOpen ? "w-64 bg-surface-container-highest/50 backdrop-blur-md border border-outline-variant/20 mr-2" : "w-10"
-                    )}>
-                        {isSearchOpen ? (
-                            <div className="flex items-center w-full px-3 py-1.5">
-                                <MdSearch className="text-xl text-on-surface-variant shrink-0" />
+                    {/* Search Input/Button Container - Restored Animation */}
+                    <CustomTooltip text="搜索" placement="bottom" show={suppressTooltip ? false : undefined}>
+                        <div
+                            onMouseLeave={() => setSuppressTooltip(false)}
+                            className={clsx(
+                                "flex items-center transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full",
+                                isSearchOpen
+                                    ? "w-64 bg-surface-container-highest/50 backdrop-blur-md border border-outline-variant/20 mr-2"
+                                    : "w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-highest cursor-pointer"
+                            )}
+                            onClick={() => !isSearchOpen && setIsSearchOpen(true)}
+                        >
+                            <div className="flex items-center w-full px-3 py-1.5 h-10">
+                                <MdSearch className={clsx(
+                                    "text-xl shrink-0 transition-colors transform",
+                                    // 折叠时微向左偏移，使放大镜的圈与把手连接处视觉上居中
+                                    isSearchOpen ? "text-on-surface-variant translate-x-0" : "-translate-x-[3px]"
+                                )} />
                                 <input
-                                    autoFocus
+                                    autoFocus={isSearchOpen}
                                     type="text"
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     placeholder="搜索歌单内..."
-                                    className="w-full bg-transparent border-none focus:outline-none text-sm text-on-surface ml-2 placeholder:text-on-surface-variant/50"
+                                    className={clsx(
+                                        "bg-transparent border-none focus:outline-none text-sm text-on-surface ml-2 placeholder:text-on-surface-variant/50 transition-all duration-300",
+                                        isSearchOpen ? "w-full opacity-100" : "w-0 opacity-0 pointer-events-none"
+                                    )}
                                     onKeyDown={(e) => {
                                         if (e.key === 'Escape') {
                                             setSearchQuery('');
@@ -302,48 +303,57 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                         }
                                     }}
                                 />
-                                <button
-                                    onClick={() => {
-                                        setSearchQuery('');
-                                        setIsSearchOpen(false);
-                                    }}
-                                    className="p-1 hover:bg-on-surface/10 rounded-full text-on-surface-variant transition-colors"
-                                >
-                                    <MdClose />
-                                </button>
+                                {isSearchOpen && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSearchQuery('');
+                                            setIsSearchOpen(false);
+                                            // 点击 × 后抑制 tooltip，直到鼠标离开图标区域再恢复
+                                            setSuppressTooltip(true);
+                                        }}
+                                        className="p-1 hover:bg-on-surface/10 rounded-full text-on-surface-variant transition-colors shrink-0"
+                                    >
+                                        <MdClose />
+                                    </button>
+                                )}
                             </div>
-                        ) : (
-                            <button
-                                onClick={() => setIsSearchOpen(true)}
-                                className="w-10 h-10 flex items-center justify-center rounded-full btn-blur text-on-surface-variant hover:bg-surface-container-highest transition-colors"
-                                title="搜索列表"
-                            >
-                                <MdSearch className="text-xl" />
-                            </button>
-                        )}
-                    </div>
+                        </div>
+                    </CustomTooltip>
 
                     {/* Sort Button */}
                     <div className="relative">
-                        <button
-                            onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                            className={clsx(
-                                "w-10 h-10 flex items-center justify-center rounded-full transition-colors",
-                                isSortMenuOpen ? "bg-primary text-on-primary shadow-lg" : "btn-blur text-on-surface-variant hover:bg-surface-container-highest"
-                            )}
-                            title="排序方式"
-                        >
-                            <MdSort className="text-xl" />
-                        </button>
+                        <CustomTooltip text="排序方式" placement="bottom" show={suppressSortTooltip ? false : undefined}>
+                            <button
+                                onMouseLeave={() => setSuppressSortTooltip(false)}
+                                onClick={() => {
+                                    if (isSortMenuOpen) {
+                                        setIsSortMenuOpen(false);
+                                        setSuppressSortTooltip(true);
+                                    } else {
+                                        setIsSortMenuOpen(true);
+                                    }
+                                }}
+                                className={clsx(
+                                    "w-10 h-10 flex items-center justify-center rounded-full transition-colors",
+                                    isSortMenuOpen ? "bg-primary text-on-primary shadow-lg" : "btn-blur text-on-surface-variant hover:bg-surface-container-highest"
+                                )}
+                            >
+                                <MdSort className="text-xl" />
+                            </button>
+                        </CustomTooltip>
 
                         {isSortMenuOpen && (
                             <>
                                 {/* Backdrop to close menu */}
                                 <div
                                     className="fixed inset-0 z-50"
-                                    onClick={() => setIsSortMenuOpen(false)}
+                                    onClick={() => {
+                                        setIsSortMenuOpen(false);
+                                        setSuppressSortTooltip(true);
+                                    }}
                                 />
-                                <div className="absolute right-0 mt-2 w-56 bg-surface-container-high border border-outline-variant/20 rounded-xl shadow-2xl py-2 z-[70] backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
+                                <div className="absolute right-0 mt-2 w-56 bg-white/60 dark:bg-primary/10 border border-primary/10 rounded-xl shadow-2xl py-2 z-[70] backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
                                     <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-wider">排序依据</div>
                                     {[
                                         { label: '播放列表顺序', key: 'manual' as SortKey },
@@ -357,6 +367,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                             onClick={() => {
                                                 updateSortKey(item.key);
                                                 setIsSortMenuOpen(false);
+                                                setSuppressSortTooltip(true);
                                             }}
                                             className="w-full flex items-center justify-between px-4 py-2 text-sm text-on-surface hover:bg-primary/10 transition-colors"
                                         >
@@ -376,6 +387,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                             onClick={() => {
                                                 updateSortOrder(item.order);
                                                 setIsSortMenuOpen(false);
+                                                setSuppressSortTooltip(true);
                                             }}
                                             className="w-full flex items-center justify-between px-4 py-2 text-sm text-on-surface hover:bg-primary/10 transition-colors"
                                         >
@@ -411,13 +423,14 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         {/* Edit Button Overlay */}
                         {!isFavorites && (
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
-                                <button
-                                    onClick={() => setIsEditOpen(true)}
-                                    className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all transform hover:scale-105"
-                                    title="编辑信息"
-                                >
-                                    <MdEdit className="text-2xl" />
-                                </button>
+                                <CustomTooltip text="编辑信息" placement="top">
+                                    <button
+                                        onClick={() => setIsEditOpen(true)}
+                                        className="p-3 rounded-full bg-white/20 backdrop-blur-md text-white hover:bg-white/30 transition-all transform hover:scale-105"
+                                    >
+                                        <MdEdit className="text-2xl" />
+                                    </button>
+                                </CustomTooltip>
                             </div>
                         )}
                     </div>

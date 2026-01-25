@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
-import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdRefresh, MdShuffle } from 'react-icons/md';
+import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdShuffle } from 'react-icons/md';
 
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
@@ -244,28 +244,12 @@ export default function Library() {
     // --------------------------------------------------------
     // We strictly render the List View here. Detail views are handled by GlobalDetailStack.
 
-    const handleRefresh = async () => {
-        try {
-            const songs = await libraryService.refreshLibrary();
-            setLibrarySongs(songs);
-        } catch (e) {
-            console.error("Failed to refresh library", e);
-        }
-    };
-
     return (
         <PageContainer
             title="音乐"
             hideHeader={false}
             actions={
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={handleRefresh}
-                        className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-all"
-                        title="刷新音乐库"
-                    >
-                        <MdRefresh className="text-xl" />
-                    </button>
                     <LibraryHeaderButton onClick={handleAddFolder} />
                 </div>
             }

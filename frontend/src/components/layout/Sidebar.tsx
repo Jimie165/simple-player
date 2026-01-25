@@ -59,21 +59,17 @@ export default function Sidebar({
             {/* 2. Visual Sidebar Container */}
             <div
                 className={clsx(
-                    "flex flex-col h-full overflow-hidden",
-                    "bg-surface-container border-r border-transparent dark:border-outline-variant/10",
-                    "transition-all duration-300 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
-                    "py-2",
+                    "flex flex-col h-full overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "bg-primary/5 dark:bg-black/20 border-r border-transparent dark:border-outline-variant/10 py-2",
 
-                    // Overlay Expanded Mode: Break out of layout
-                    (isOverlay && !collapsed) ? [
-                        "absolute left-0 top-0 bottom-0 w-[280px]", // Floating
-                        "rounded-r-[24px]", // Rounded corners for floating feel
-                        "shadow-2xl", // Shadow for elevation
-                        "bg-white/70 dark:bg-neutral-900/70 backdrop-blur-xl", // Glassmorphism
-                        "border-neutral-200/50 dark:border-neutral-700/50" // Border adjustment
+                    // 核心修复：Overlay 模式下保持定位一致，只改变宽度和样式
+                    isOverlay ? [
+                        "absolute left-0 top-0 bottom-0 z-50 shadow-2xl rounded-r-[24px]",
+                        collapsed
+                            ? "w-[72px] bg-transparent backdrop-blur-0"
+                            : "w-[280px] bg-surface-container/80 dark:bg-surface-container-low/80 backdrop-blur-xl"
                     ] : [
-                        "w-full", // Fill placeholder
-                        "relative" // Stay in flow
+                        "relative w-full"
                     ]
                 )}
             >
@@ -103,6 +99,7 @@ export default function Sidebar({
                                 item={item}
                                 isActive={activeId === item.id}
                                 collapsed={collapsed}
+                                isOverlay={isOverlay}
                                 onClick={() => handleNavigate(item.id)}
                             />
                         ))}
@@ -115,6 +112,7 @@ export default function Sidebar({
                             item={{ id: 'settings', icon: MdSettings, label: '设置' }}
                             isActive={activeId === 'settings'}
                             collapsed={collapsed}
+                            isOverlay={isOverlay}
                             onClick={() => handleNavigate('settings')}
                         />
                     </div>

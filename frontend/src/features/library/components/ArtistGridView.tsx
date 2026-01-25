@@ -95,19 +95,19 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 type="danger"
             />
 
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-2">
+            <div className="grid grid-cols-2 gap-4 md:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-4 pb-8">
                 {artists.map((artist) => {
                     const id = getMusicItemId(artist);
                     const isSelected = selectedIds.has(id);
                     return (
                         <div
                             key={id}
-                            className="group relative flex flex-col items-center gap-4 p-4 rounded-xl bg-neutral-50 hover:bg-neutral-100 dark:bg-white/5 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                            className="group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                             onClick={(e) => handleItemClick(artist, e)}
                             onContextMenu={(e) => handleContextMenu(e, artist)}
                         >
-                            {/* Wrapper for Image + Overlays */}
-                            <div className="relative w-32 h-32 md:w-40 md:h-40 shrink-0">
+                            {/* Wrapper for Image + Overlays - Changed to responsive w-full with limit */}
+                            <div className="relative w-full aspect-square max-w-[160px] shrink-0">
                                 {/* The Circle Image (Clipped) */}
                                 <div className="w-full h-full rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative z-10 border border-black/5 dark:border-white/5">
                                     <CoverImage

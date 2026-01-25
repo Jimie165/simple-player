@@ -18,7 +18,7 @@ export default function OpenFileMenu({ onOpenFile, onOpenFolder }: OpenFileMenuP
                 "hover:bg-neutral-100 dark:hover:bg-neutral-700",
                 "shadow-sm"
             )}>
-                <MdFileOpen className="text-lg text-blue-600 dark:text-blue-400" />
+                <MdFileOpen className="text-lg text-primary" />
                 <span>打开</span>
                 <div className="w-px h-4 bg-neutral-300 dark:bg-neutral-600 mx-0.5" />
                 <MdKeyboardArrowDown className="text-lg opacity-70" />

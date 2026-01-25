@@ -289,7 +289,7 @@ export default function PlaybackControls() {
                         className={clsx(
                             "text-xl transition-colors p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10",
                             isShuffling
-                                ? "text-blue-600 dark:text-blue-400"
+                                ? "text-primary"
                                 : "text-neutral-400 dark:text-neutral-500"
                         )}
                     >
@@ -312,7 +312,7 @@ export default function PlaybackControls() {
                         className={clsx(
                             "text-5xl transition-transform drop-shadow-md",
                             metadata
-                                ? "text-blue-600 hover:scale-105 active:scale-95 cursor-pointer"
+                                ? "text-primary hover:scale-105 active:scale-95 cursor-pointer"
                                 : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
                         )}
                     >
@@ -337,7 +337,7 @@ export default function PlaybackControls() {
                         className={clsx(
                             "text-xl transition-colors relative p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10",
                             repeatMode !== 'off'
-                                ? "text-blue-600 dark:text-blue-400"
+                                ? "text-primary"
                                 : "text-neutral-400 dark:text-neutral-500"
                         )}
                     >
@@ -354,8 +354,14 @@ export default function PlaybackControls() {
                 <span className="w-8 text-right tabular-nums">{formatTime(currentTime)}</span>
                 <div className="flex-1 relative h-4 group flex items-center">
                     <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-all group-hover:h-1.5"></div>
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-blue-600 rounded-full pointer-events-none transition-all group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
-                    <div className="absolute top-1/2 -ml-1.5 h-3 w-3 bg-blue-600 rounded-full shadow-sm pointer-events-none transition-transform group-hover:scale-125 -translate-y-1/2" style={{ left: `${progressPercent}%` }} />
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-all group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
+                    <div
+                        className={clsx(
+                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
+                            isDragging && "opacity-100 scale-125"
+                        )}
+                        style={{ left: `${progressPercent}%`, marginLeft: '-6px' }}
+                    />
                     {/* 只有在有歌曲时才允许拖动进度条 */}
                     {metadata && (
                         <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />

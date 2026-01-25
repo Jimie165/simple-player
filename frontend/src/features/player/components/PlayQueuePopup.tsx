@@ -167,9 +167,9 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                     className={clsx(
                                         "group flex items-center gap-3 p-2 rounded-lg text-xs cursor-default transition-colors",
                                         isCurrent
-                                            ? "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400"
-                                            : "hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-200"
-                                    )}
+                                        ? "bg-primary/10 text-primary"
+                                        : "hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-200"
+                                )}
                                 >
                                     <div className="w-10 h-10 shrink-0 rounded overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                                         <SongCoverOverlay

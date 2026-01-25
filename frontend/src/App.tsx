@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useTheme } from './hooks/useTheme';
+import { useThemeStore } from './store/useThemeStore';
 import clsx from 'clsx';
 import { useNavigationStore } from './store/useNavigationStore';
 import { useSelectionStore } from './store/useSelectionStore';
@@ -24,7 +24,9 @@ import AddToPlaylistSheet from './features/playlists/components/AddToPlaylistShe
 import GlobalDialogLayer from './components/common/GlobalDialogLayer';
 
 function App() {
-  useTheme();
+  const initTheme = useThemeStore((state) => state.init);
+  useEffect(() => initTheme(), [initTheme]);
+
   const {
     currentPage,
     mainHistory,
@@ -158,7 +160,7 @@ function App() {
             {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
             {isSidebarOverlay && !sidebarCollapsed && (
               <div
-                className="absolute inset-0 z-40 bg-black/20 backdrop-blur-[1px] animate-in fade-in duration-200"
+                className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200"
                 onClick={() => setSidebarCollapsed(true)}
               />
             )}

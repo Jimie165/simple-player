@@ -2,6 +2,7 @@ import { useState, useEffect, memo, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
+import CustomTooltip from '../../../components/common/CustomTooltip';
 import type { SongMetadata } from '../../../types';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
@@ -126,21 +127,22 @@ const SongListItem = memo(({
             {/* Heart Icon Column */}
             {(
                 <div className="flex justify-center items-center">
-                    <button
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite && toggleFavorite(song);
-                        }}
-                        className={clsx(
-                            "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
-                            song.is_favorite
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
-                        )}
-                        title={song.is_favorite ? "取消喜爱" : "喜爱"}
-                    >
-                        {song.is_favorite ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
-                    </button>
+                    <CustomTooltip text={song.is_favorite ? "取消喜爱" : "喜爱"} placement="top">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite && toggleFavorite(song);
+                            }}
+                            className={clsx(
+                                "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
+                                song.is_favorite
+                                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
+                                    : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                            )}
+                        >
+                            {song.is_favorite ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
+                        </button>
+                    </CustomTooltip>
                 </div>
             )}
 

@@ -14,36 +14,45 @@ interface SidebarNavButtonProps {
     collapsed: boolean;
     onClick: () => void;
     isBottom?: boolean;
+    isOverlay?: boolean;
 }
 
-export default function SidebarNavButton({ item, isActive, collapsed, onClick, isBottom = false }: SidebarNavButtonProps) {
+export default function SidebarNavButton({ item, isActive, collapsed, onClick, isBottom = false, isOverlay = false }: SidebarNavButtonProps) {
+    const [isClicked, setIsClicked] = React.useState(false);
+
+    const handleClick = () => {
+        setIsClicked(true);
+        onClick();
+        // 500ms 后重置，足以覆盖侧边栏关闭动画
+        setTimeout(() => setIsClicked(false), 500);
+    };
+
     return (
-        // 1. Tooltip 包在最外层，并给予 w-full
         <CustomTooltip
             text={item.label}
-            // 2. 只有折叠(collapsed=true)时才启用 Tooltip (即 disabled=false)
-            //    展开时禁用 Tooltip (disabled=true)
-            disabled={!collapsed}
-            // 3. 底部“设置”按钮向上弹，其它保持向下
+            // 只有折叠且没有被点击、且不是在 Overlay 展开状态下才显示
+            disabled={!collapsed || isClicked || (isOverlay && !collapsed)}
             placement={isBottom ? "top" : "bottom"}
-            className={clsx("w-full", isBottom && "mt-auto")}
+            className={clsx(collapsed ? "w-[72px]" : "w-full", isBottom && "mt-auto")}
         >
             <button
-                onClick={onClick}
+                onClick={handleClick}
                 className={clsx(
-                    "group relative flex items-center min-h-[56px] w-full mb-1"
-                    // mt-auto 移到了外层的 Tooltip 上，或者这里保留也没关系，但外层 wrapper 更安全
+                    "group relative flex items-center min-h-[56px] mb-1 outline-none",
+                    collapsed ? "w-[72px]" : "w-full"
                 )}
             >
                 {/* 1. 独立的背景层 (胶囊) */}
                 <div className={clsx(
                     "absolute top-1/2 -translate-y-1/2 h-10 rounded-full transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                     "left-3",
-                    // 宽度逻辑：因为现在父容器宽度正常了，这里计算就会准确
                     collapsed ? "w-12" : "w-[calc(100%-24px)]",
                     isActive
-                        ? "bg-secondary-container"
-                        : "bg-transparent group-hover:bg-surface-container-high"
+                        ? "bg-primary/15" // 稍微加深点 active 状态
+                        : clsx(
+                            "bg-transparent",
+                            !isClicked && "group-hover:bg-primary/5" // 如果点击了就不再显示 hover 背景
+                        )
                 )} />
 
                 {/* 2. 内容容器 (图标 + 文字) */}
@@ -54,7 +63,7 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                         <item.icon className={clsx(
                             "text-[24px] transition-colors duration-200",
                             isActive
-                                ? "text-on-secondary-container"
+                                ? "text-primary"
                                 : "text-on-surface-variant group-hover:text-on-surface"
                         )} />
                     </div>
@@ -63,7 +72,7 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                     <span className={clsx(
                         "whitespace-nowrap overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                         isActive
-                            ? "text-on-secondary-container font-bold"
+                            ? "text-primary font-bold"
                             : "text-on-surface-variant font-medium group-hover:text-on-surface",
                         // 文字显示逻辑：展开时显示，折叠时隐藏
                         collapsed ? "w-0 opacity-0 ml-0" : "w-auto opacity-100 ml-4"

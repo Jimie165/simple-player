@@ -190,7 +190,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     const getButtonClass = () => {
         const baseClass = `flex items-center justify-center transition-colors z-20 ${buttonClassName || 'w-8 h-8'}`;
         if (variant === 'clean') {
-            return `${baseClass} text-[#1867c0] dark:text-[#64b5f6] hover:bg-neutral-100 dark:hover:bg-white/10 rounded-full`;
+            return `${baseClass} text-primary dark:text-primary-light hover:bg-primary/10 dark:hover:bg-primary/15 rounded-full`;
         }
         return `${baseClass} rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white hover:bg-white/30`;
     };
