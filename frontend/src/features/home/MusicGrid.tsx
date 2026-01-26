@@ -30,7 +30,7 @@ interface MusicGridProps {
  */
 function PlaylistGridCover({ item }: { item: RecentItem }) {
     const [songs, setSongs] = useState<SongMetadata[]>([]);
-    const { getPlaylistSettings } = useLibraryStore();
+    const { getPlaylistSettings, libraryVersion } = useLibraryStore();
 
     useEffect(() => {
         const load = async () => {
@@ -49,7 +49,7 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
             setSongs(plSongs);
         };
         load();
-    }, [item.id, getPlaylistSettings]);
+    }, [item.id, getPlaylistSettings, libraryVersion]);
 
     return <PlaylistCoverCollage songs={songs} className="w-full h-full" />;
 }

@@ -471,7 +471,8 @@ impl SongRepo {
         let pattern = format!("%{}%", query);
         let sql = format!(
             "SELECT {} FROM songs 
-             WHERE title LIKE ?1 OR artist LIKE ?1 OR album LIKE ?1 OR album_artist LIKE ?1
+             WHERE (title LIKE ?1 OR artist LIKE ?1 OR album LIKE ?1 OR album_artist LIKE ?1)
+             AND status = 'active'
              ORDER BY 
                 CASE WHEN title LIKE ?1 THEN 0 ELSE 1 END,
                 CASE WHEN artist LIKE ?1 THEN 0 ELSE 1 END,
@@ -754,7 +755,7 @@ impl PlaylistRepo {
                     s.play_count, s.last_played_at, s.is_favorite, s.rating, s.status, s.created_at, s.updated_at
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
-             WHERE ps.playlist_id = ?1
+             WHERE ps.playlist_id = ?1 AND s.status = 'active'
              ORDER BY ps.position"
         );
         let mut stmt = conn.prepare(&sql)?;

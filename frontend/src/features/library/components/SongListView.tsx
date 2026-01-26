@@ -50,9 +50,7 @@ export default function SongListView({
     const headerPaddingClass = isLibraryContext ? "px-2" : "px-4";
     const rowPaddingClass = isLibraryContext ? "px-2" : "px-4";
     // 表头在不同上下文下的背景/模糊效果
-    const headerBgClass = context === 'artist_detail'
-        ? "text-[13px] text-on-surface-variant font-medium bg-surface/60 dark:bg-black/30 backdrop-blur-md transition-colors"
-        : "text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl transition-colors";
+
     // Responsive: auto-hide album column on narrow windows
     const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
     useEffect(() => {
@@ -257,10 +255,10 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky top-0 z-45 grid pt-10 pb-3 border-b border-outline-variant/10",
+                    "sticky top-10 z-45 grid pt-2 pb-3 border-b border-white/10 backdrop-blur-xl",
                     gridGapClass,
                     headerPaddingClass,
-                    headerBgClass
+                    "text-[13px] text-on-surface-variant font-medium"
                 )}>
                 {/* Selection header removed */}
                 <div></div> {/* Heart header spacer */}

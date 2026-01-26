@@ -13,6 +13,7 @@ import { useSelectionStore } from '../../store/useSelectionStore';
 import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 import { ErrorBoundary } from '../common/ErrorBoundary';
 import { AnimatePresence, motion } from 'framer-motion';
+import ScrollArea from '../common/ScrollArea';
 
 export default function GlobalDetailStack() {
     const { overlayStack, push, pop } = useNavigationStore();
@@ -90,46 +91,48 @@ export default function GlobalDetailStack() {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="absolute inset-0 bg-surface dark:bg-surface-container-low overflow-y-auto shadow-xl"
+                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-[50]"
                         style={{ zIndex: 50 + index }}
                     >
                         <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-[100] bg-transparent" />
-                        <ErrorBoundary>
-                            {(() => {
-                                switch (activeView.type) {
-                                    case 'album_detail':
-                                        return (
-                                            <AlbumOverlay
-                                                data={activeView.data as AlbumData}
-                                                onPlaySong={handlePlaySong}
-                                                onShuffle={shufflePlay}
-                                                addToRecent={addToRecent}
-                                                onOpenArtistByName={handleOpenArtistByName}
-                                            />
-                                        );
-                                    case 'artist_detail':
-                                        return (
-                                            <ArtistOverlay
-                                                data={activeView.data as ArtistData}
-                                                onPlaySong={handlePlaySong}
-                                                onShuffle={shufflePlay}
-                                                addToRecent={addToRecent}
-                                                push={push}
-                                                onOpenArtistByName={handleOpenArtistByName}
-                                            />
-                                        );
-                                    case 'playlist_detail':
-                                        const plData = activeView.data as { id: number | 'favorites', name: string };
-                                        return (
-                                            <div className="h-full">
-                                                <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
-                                            </div>
-                                        );
-                                    default:
-                                        return null;
-                                }
-                            })()}
-                        </ErrorBoundary>
+                        <ScrollArea className="h-full" topOffset={48}>
+                            <ErrorBoundary>
+                                {(() => {
+                                    switch (activeView.type) {
+                                        case 'album_detail':
+                                            return (
+                                                <AlbumOverlay
+                                                    data={activeView.data as AlbumData}
+                                                    onPlaySong={handlePlaySong}
+                                                    onShuffle={shufflePlay}
+                                                    addToRecent={addToRecent}
+                                                    onOpenArtistByName={handleOpenArtistByName}
+                                                />
+                                            );
+                                        case 'artist_detail':
+                                            return (
+                                                <ArtistOverlay
+                                                    data={activeView.data as ArtistData}
+                                                    onPlaySong={handlePlaySong}
+                                                    onShuffle={shufflePlay}
+                                                    addToRecent={addToRecent}
+                                                    push={push}
+                                                    onOpenArtistByName={handleOpenArtistByName}
+                                                />
+                                            );
+                                        case 'playlist_detail':
+                                            const plData = activeView.data as { id: number | 'favorites', name: string };
+                                            return (
+                                                <div className="h-full">
+                                                    <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
+                                                </div>
+                                            );
+                                        default:
+                                            return null;
+                                    }
+                                })()}
+                            </ErrorBoundary>
+                        </ScrollArea>
                     </motion.div>
                 );
             })}
@@ -262,6 +265,26 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
         push?.({ type: 'album_detail', data: album });
     };
 
+    const handlePlayAlbum = (album: AlbumData) => {
+        const songs = album.songs || [];
+        if (songs.length === 0) return;
+
+        addToRecent({
+            id: `album:${album.name}:${album.artist}`,
+            type: 'album',
+            title: album.name,
+            artist: album.artist,
+            description: `${songs.length} 首歌曲`,
+            cover: album.cover,
+            cover_path: album.cover_path || null,
+            path: songs[0]?.path || '',
+            lastPlayed: Date.now(),
+            isLibraryItem: true
+        });
+
+        onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true });
+    };
+
     return (
         <ArtistDetailView
             artist={artistData}
@@ -287,7 +310,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
                     onShuffle({ songs: artistData.songs });
                 }
             }}
-            onPlayAlbum={handleOpenAlbum}
+            onPlayAlbum={handlePlayAlbum}
             onOpenAlbum={handleOpenAlbum}
             onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options)}
             onDeleteSong={() => { }}

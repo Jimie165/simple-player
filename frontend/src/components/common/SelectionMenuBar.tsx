@@ -151,7 +151,10 @@ export default function SelectionMenuBar() {
                     {visibleActions.map(action => (
                         <button
                             key={action.id}
-                            onClick={action.onClick}
+                            onClick={() => {
+                                action.onClick();
+                                clearSelection();
+                            }}
                             className={`
                                 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 whitespace-nowrap
                                 ${action.id === 'play' // Highlight Play primary
@@ -178,7 +181,10 @@ export default function SelectionMenuBar() {
                                 {overflowActions.map(action => (
                                     <MenuItem key={action.id}>
                                         <button
-                                            onClick={action.onClick}
+                                            onClick={() => {
+                                                action.onClick();
+                                                clearSelection();
+                                            }}
                                             className={`group flex w-full items-center gap-2 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10 ${action.variant === 'danger' ? 'text-red-600' : 'text-neutral-700 dark:text-neutral-200'
                                                 }`}
                                         >

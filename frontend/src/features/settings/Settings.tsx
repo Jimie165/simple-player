@@ -55,7 +55,7 @@ export default function Settings() {
 
     return (
         <PageContainer title="设置">
-            <div className="max-w-2xl space-y-8 pb-20">
+            <div className="w-full space-y-8 pb-20">
 
                 {/* 1. 常规设置 (Refresh Library) */}
                 <section className="space-y-4">
@@ -184,7 +184,7 @@ export default function Settings() {
                 <section className="rounded-2xl bg-surface-container-high p-6 border border-outline-variant/30">
                     <h3 className="text-lg font-semibold mb-2 text-on-surface">关于 Simple Player</h3>
                     <p className="text-sm text-on-surface-variant leading-relaxed">
-                        这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器 (其实并不高效)，(大概) 遵循 Material Design 3 设计规范。
+                        这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器 (其实并不高效)。
                     </p>
                     <div className="mt-4 flex gap-4 text-xs text-on-surface-variant/70">
                         <span>Version 0.1.0 (Alpha)</span>

@@ -134,15 +134,40 @@ body {
 
 /* Utilities */
 @layer utilities {
+  /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-corner { background: transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-outline-variant/40 rounded-full hover:bg-outline-variant/60 transition-colors border-2 border-transparent bg-clip-content; }
+  
+  /* Make scrollbar thinner and truly transparent track */
+  :hover::-webkit-scrollbar-thumb {
+     @apply bg-outline-variant/60;
+  }
+
   /* M3 Elevation */
   .elevation-1 { box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.3), 0px 1px 3px 1px rgba(0,0,0,0.15); }
   .elevation-2 { box-shadow: 0px 1px 2px 0px rgba(0,0,0,0.3), 0px 2px 6px 2px rgba(0,0,0,0.15); }
   .elevation-3 { box-shadow: 0px 1px 3px 0px rgba(0,0,0,0.3), 0px 4px 8px 3px rgba(0,0,0,0.15); }
   
-  /* Modern Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-outline-variant/40 rounded-full hover:bg-outline-variant/60 transition-colors; }
+  /* Hiding Scrollbar for Custom ScrollArea */
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }
+  .scrollbar-hidden {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+
+  /* Custom Scrollbar Overlay - Legacy utility if needed */
+  .scrollbar-overlay {
+    overflow-y: auto;
+  }
+  @supports (overflow-y: overlay) {
+    .scrollbar-overlay {
+      overflow-y: overlay;
+    }
+  }
 
   /* M3 Ripple Implementation */
   .ripple {

@@ -191,7 +191,9 @@ pub async fn scan_library(
         }
     }
 
-    Ok(all_songs)
+    // 返回重新获取的完整排序列表，以保证与 get_library_songs 一致
+    let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
+    Ok(songs.iter().map(SongMetadata::from_db_song).collect())
 }
 
 /// 获取库中所有缓存的歌曲（不重新扫描）

@@ -4,6 +4,8 @@ import SongListView from './SongListView';
 import CoverImage from '../../../components/common/CoverImage';
 import type { AlbumData } from './AlbumGridView';
 import type { SongMetadata } from '../../../types';
+import { useScrollBlur } from '../../../hooks/useScrollBlur';
+import clsx from 'clsx';
 
 interface AlbumDetailViewProps {
     album: AlbumData;
@@ -23,6 +25,7 @@ export default function AlbumDetailView({
     onDeleteSong,
     onOpenArtistByName
 }: AlbumDetailViewProps) {
+    const { isScrolled, topSentinelRef } = useScrollBlur();
 
     const totalDuration = useMemo(() => {
         if (!album || !album.songs) return 0;
@@ -41,9 +44,19 @@ export default function AlbumDetailView({
     };
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-300">
+        <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-300 relative isolate">
+            <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
+
+            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
+            <div className={clsx(
+                "sticky top-0 left-0 right-0 h-10 z-[60] transition-all duration-300 border-b",
+                isScrolled
+                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
+                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
+            )} data-tauri-drag-region />
+
             {/* Header Area using Material 3 Styling */}
-            <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6">
+            <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6 relative z-10 -mt-10">
                 {/* Cover: Elevation, Large Radius */}
                 <div className="w-48 h-48 md:w-60 md:h-60 rounded-3xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
                     <CoverImage

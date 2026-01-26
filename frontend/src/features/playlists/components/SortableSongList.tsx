@@ -589,7 +589,7 @@ export default function SortableSongList({
 
     return (
         <div className="w-full relative select-none">
-            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-outline-variant/10 text-[13px] text-on-surface-variant font-medium bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl">
+            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-white/10 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl">
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 <HeaderCell label="标题" />

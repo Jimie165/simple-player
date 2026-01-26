@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from './components/layout/TitleBar';
 import Sidebar from './components/layout/Sidebar';
 import GlobalDetailStack from './components/layout/GlobalDetailStack';
+import ScrollArea from './components/common/ScrollArea';
 
 import MusicGrid from './features/home/MusicGrid';
 import Library from './features/library/Library';
@@ -113,27 +114,29 @@ function App() {
   };
 
   const mainContent = (
-    <div className="flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-[24px] border-l border-t border-outline-variant/20 overflow-hidden shadow-sm relative z-0 transition-colors duration-300">
+    <div className="flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden shadow-sm relative z-0 transition-colors duration-300">
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
         data-tauri-drag-region
         className="absolute top-0 left-0 right-0 h-12 bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl z-40 border-b border-outline-variant/5"
       />
 
-      <main className="flex-1 overflow-y-auto pt-10 scroll-smooth relative no-scrollbar">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="h-full"
-          >
-            {renderContent()}
-          </motion.div>
-        </AnimatePresence>
-      </main>
+      <ScrollArea className="flex-1 relative" topOffset={48}>
+        <div className="pt-12 min-h-full">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentPage}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="h-full"
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </ScrollArea>
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
       <GlobalDetailStack />
@@ -165,11 +168,11 @@ function App() {
             onRequestClose={() => setSidebarCollapsed(true)}
           />
 
-          <div className="flex-1 flex flex-col min-w-0 relative">
+          <div className="flex-1 flex flex-col min-w-0 relative bg-surface-container before:absolute before:inset-0 before:bg-primary/5 before:pointer-events-none">
             {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
             {isSidebarOverlay && !sidebarCollapsed && (
               <div
-                className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200"
+                className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
                 onClick={() => setSidebarCollapsed(true)}
               />
             )}

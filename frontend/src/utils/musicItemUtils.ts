@@ -14,24 +14,40 @@ export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | Albu
 export function getMusicItemId(item: any): string {
     if (!item) return '';
 
-    // If it's a playlist item
-    if (typeof item.id === 'string' && item.id.startsWith('playlist:')) return item.id;
-    if (item.song_count !== undefined && item.updated_at !== undefined) return `playlist:${item.id}`;
+    // 1. If it's a RecentItem or SelectionItem with an explicit type
+    const type = item.type;
+    if (type && ['album', 'artist', 'playlist', 'folder'].includes(type) && item.id !== undefined) {
+        return String(item.id);
+    }
 
-    // If it's an Artist or Album object (has name and songs array)
+    // 2. String ID with prefix (standardized)
+    if (typeof item.id === 'string' && (
+        item.id.startsWith('playlist:') ||
+        item.id.startsWith('album:') ||
+        item.id.startsWith('artist:')
+    )) {
+        return item.id;
+    }
+
+    // 3. Playlist object detection
+    if (item.song_count !== undefined && item.updated_at !== undefined) {
+        return `playlist:${item.id}`;
+    }
+
+    // 4. Album/Artist object detection (from Grid views)
     if (item.name && item.songs && Array.isArray(item.songs)) {
         if (item.artist && item.albumCount === undefined) {
-            // Album
+            // AlbumData
             return `album:${item.name}:${item.artist}`;
         }
-        // Artist
+        // ArtistData
         return `artist:${item.name}`;
     }
 
-    // Default for Song/File: Path is the best unique ID
+    // 5. Default for Song/File: Path is the best unique ID
     if (item.path) return item.path;
 
-    // Fallback
+    // 6. Last resort
     if (item.id !== undefined) return String(item.id);
     return '';
 }

@@ -73,33 +73,7 @@ export default function Library() {
     };
 
 
-    const deleteSong = async (song: SongMetadata) => {
-        if (song.id) {
-            await libraryService.deleteSong(song.id as number);
-            // 本地过滤，保持原有顺序
-            setLibrarySongs(prev => prev.filter(s => s.id !== song.id));
-        }
-    };
 
-    const deleteAlbum = async (album: AlbumData) => {
-        const ids = album.songs.map(s => s.id).filter((id): id is number => id !== undefined);
-        if (ids.length > 0) {
-            await libraryService.batchDeleteSongs(ids);
-            // 本地过滤
-            const idSet = new Set(ids);
-            setLibrarySongs(prev => prev.filter(s => !s.id || !idSet.has(s.id as number)));
-        }
-    };
-
-    const deleteArtist = async (artist: ArtistData) => {
-        const ids = artist.songs.map(s => s.id).filter((id): id is number => id !== undefined);
-        if (ids.length > 0) {
-            await libraryService.batchDeleteSongs(ids);
-            // 本地过滤
-            const idSet = new Set(ids);
-            setLibrarySongs(prev => prev.filter(s => !s.id || !idSet.has(s.id as number)));
-        }
-    };
 
     useEffect(() => { refreshLibrary(); }, []);
 
@@ -359,7 +333,6 @@ export default function Library() {
                                 <SongListView
                                     songs={librarySongs}
                                     onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
-                                    onDelete={deleteSong}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
                                 />
@@ -404,7 +377,6 @@ export default function Library() {
                                         const found = artists.find(a => a.name === artistName);
                                         if (found) handleOpenArtist(found);
                                     }}
-                                    onDeleteAlbum={deleteAlbum}
                                 />
                             </motion.div>
                         )}
@@ -430,7 +402,6 @@ export default function Library() {
                                         }
                                     }}
                                     onOpenArtist={handleOpenArtist}
-                                    onDeleteArtist={deleteArtist}
                                 />
                             </motion.div>
                         )}

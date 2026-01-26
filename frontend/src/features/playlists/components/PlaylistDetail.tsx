@@ -247,7 +247,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             />
 
             {/* Immersive Background */}
-            <div className="fixed inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
+            <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
                 {coverPath ? (
                     <CoverImage src={coverPath} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
                 ) : (
@@ -276,7 +276,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                 "flex items-center transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full",
                                 isSearchOpen
                                     ? "w-64 bg-surface-container-highest/50 backdrop-blur-md border border-outline-variant/20 mr-2"
-                                    : "w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-highest cursor-pointer"
+                                    : "w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-highest hover:text-primary cursor-pointer"
                             )}
                             onClick={() => !isSearchOpen && setIsSearchOpen(true)}
                         >
@@ -336,7 +336,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                 }}
                                 className={clsx(
                                     "w-10 h-10 flex items-center justify-center rounded-full transition-colors",
-                                    isSortMenuOpen ? "bg-primary text-on-primary shadow-lg" : "btn-blur text-on-surface-variant hover:bg-surface-container-highest"
+                                    isSortMenuOpen ? "bg-primary text-on-primary shadow-lg" : "btn-blur text-on-surface-variant hover:bg-surface-container-highest hover:text-primary"
                                 )}
                             >
                                 <MdSort className="text-xl" />

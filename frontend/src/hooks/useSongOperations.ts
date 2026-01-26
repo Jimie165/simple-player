@@ -131,7 +131,8 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         const songs = await resolveSongsFromItems(items);
         // 倒序加入，保持原本顺序在下一首逻辑中正确
         [...songs].reverse().forEach(s => addToNext(s));
-    }, [items, onAddToQueue, addToNext]);
+        clearSelection();
+    }, [items, onAddToQueue, addToNext, clearSelection]);
 
     // 4. 添加到播放列表
     const handleAddToPlaylist = useCallback(async () => {
@@ -174,6 +175,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
                 if (ids.length > 0) {
                     await libraryService.batchDeleteSongs(ids);
+
+                    // Remove from Recent History
+                    items.forEach(item => {
+                        const id = getMusicItemId(item);
+                        if (id) removeFromRecent(id);
+                    });
+
                     triggerLibraryUpdate();
                 }
             },
@@ -181,7 +189,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             '从音乐库删除',
             '删除'
         );
-    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection]);
+    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection, removeFromRecent]);
 
     // 5. 删除或从播放列表移除
     const handleDeleteOrRemove = useCallback(async () => {
