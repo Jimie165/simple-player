@@ -10,6 +10,7 @@ import SongListView from './SongListView';
 import AlbumGridView from './AlbumGridView';
 import type { SongMetadata } from '../../../types';
 import { useSelectionStore } from '../../../store/useSelectionStore';
+import { useNavigationStore } from '../../../store/useNavigationStore';
 import { useScrollBlur } from '../../../hooks/useScrollBlur';
 
 interface ArtistDetailViewProps {
@@ -55,22 +56,19 @@ export default function ArtistDetailView({
         }
     };
 
-    // 默认显示用户上次选择的视图，如果没有则默认为 'songs'
+    const { lastArtistDetailTab, setArtistDetailTab } = useNavigationStore();
+
+    // Use persistent tab state from store
     const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
-        try {
-            const saved = localStorage.getItem('artist_detail_active_tab');
-            return (saved === 'albums' || saved === 'songs') ? saved : 'songs';
-        } catch {
-            return 'songs';
-        }
+        return (lastArtistDetailTab === 'albums' || lastArtistDetailTab === 'songs')
+            ? lastArtistDetailTab
+            : 'songs';
     });
 
     const handleTabChange = (tab: 'albums' | 'songs') => {
         useSelectionStore.getState().clearSelection();
         setActiveTab(tab);
-        try {
-            localStorage.setItem('artist_detail_active_tab', tab);
-        } catch { }
+        setArtistDetailTab(tab);
     };
 
     // 计算总时长

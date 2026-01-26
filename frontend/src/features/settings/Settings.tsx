@@ -9,7 +9,7 @@ import {
     MdCheck,
     MdAdd,
     MdLibraryMusic,
-    MdFullscreen
+    MdWeb
 } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -110,8 +110,8 @@ export default function Settings() {
                     {/* Full Screen Style Selection */}
                     <div className="space-y-3">
                         <div className="flex items-center gap-2 px-1">
-                            <MdFullscreen className="text-primary text-lg" />
-                            <h4 className="text-sm font-medium text-on-surface">全屏播放页样式</h4>
+                            <MdWeb className="text-primary text-lg" />
+                            <h4 className="text-sm font-medium text-on-surface">播放页样式</h4>
                         </div>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             <button

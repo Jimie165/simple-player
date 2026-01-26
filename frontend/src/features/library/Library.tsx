@@ -27,15 +27,9 @@ export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
     const { currentTab, setTab } = useNavigationStore();
 
-    // Initial load: restore from localStorage if needed
+    // Initial load: restore logic handled by useNavigationStore
     useEffect(() => {
-        const saved = localStorage.getItem('library_active_tab');
-        if (saved && (saved === 'songs' || saved === 'albums' || saved === 'artists')) {
-            // Only set if different from default to avoid unnecessary history entry
-            if (saved !== currentTab && useNavigationStore.getState().mainHistory.length === 0) {
-                setTab(saved);
-            }
-        }
+        // Optional: Sync selection clearing ?
     }, []);
 
     const handleTabChange = (tab: 'songs' | 'albums' | 'artists') => {

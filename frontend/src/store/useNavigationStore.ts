@@ -24,9 +24,14 @@ interface NavigationState {
     // Overlay Stack
     overlayStack: ViewState[];
 
+    // Persistent UI State
+    lastLibraryTab: string;
+    lastArtistDetailTab: string;
+
     // Actions
     navigate: (page: PageId, tab?: string) => void;
     setTab: (tab: string) => void; // For tab-only changes within current page
+    setArtistDetailTab: (tab: string) => void;
     push: (view: ViewState) => void;
     pop: () => void;
     goBack: (onPreBack?: () => boolean) => void;
@@ -41,10 +46,13 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     currentPage: 'home',
     currentTab: 'songs',
     mainHistory: [],
-
     overlayStack: [],
     activeOverlay: null,
     hasOverlay: false,
+
+    // Persistent UI State
+    lastLibraryTab: 'songs',
+    lastArtistDetailTab: 'songs',
 
     navigate: (page, tab) => set((state) => {
         // If navigating to the exact same spot, do nothing
@@ -61,9 +69,15 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             }
         ];
 
+        // Resolve target tab
+        let targetTab = tab || 'songs';
+        if (page === 'library') {
+            targetTab = tab || state.lastLibraryTab;
+        }
+
         return {
             currentPage: page,
-            currentTab: tab || 'songs',
+            currentTab: targetTab,
             mainHistory: newHistory,
             // Clear overlays when explicitly switching main pages
             overlayStack: [],
@@ -82,11 +96,21 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
                 overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined
             }
         ];
-        return {
+
+        // Update persistent state for library
+        const updates: Partial<NavigationState> = {
             currentTab: tab,
             mainHistory: newHistory
         };
+
+        if (state.currentPage === 'library') {
+            updates.lastLibraryTab = tab;
+        }
+
+        return updates;
     }),
+
+    setArtistDetailTab: (tab) => set({ lastArtistDetailTab: tab }),
 
     push: (view) => set((state) => {
         const newStack = [...state.overlayStack, view];
