@@ -31,8 +31,8 @@ export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: S
                 </div>
 
                 <div className="min-w-0 flex-1 flex flex-col justify-center transition-all duration-500 pr-4">
-                    <div className="font-semibold text-sm truncate text-neutral-900 dark:text-neutral-100 group-hover:text-primary dark:group-hover:text-primary-light transition-colors w-full flex items-center gap-2">
-                        <span>{metadata?.title || "未播放音乐"}</span>
+                    <div className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-primary dark:group-hover:text-primary-light transition-colors w-full flex items-center gap-2 min-w-0">
+                        <span className="truncate">{metadata?.title || "未播放音乐"}</span>
                         {metadata?.is_favorite && <MdFavorite className="text-red-500 text-xs shrink-0" />}
                     </div>
                     <div className="text-xs text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-neutral-300 transition-colors truncate w-full mt-0.5">
