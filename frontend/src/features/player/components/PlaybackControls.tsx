@@ -26,6 +26,7 @@ export default function PlaybackControls() {
 
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
+    const [isRemoteDragging, setIsRemoteDragging] = useState(false);
 
     // 防抖锁：防止自动播放时连续跳过
     const isAutoChanging = useRef(false);
@@ -181,6 +182,19 @@ export default function PlaybackControls() {
         let unlistenEnded: (() => void) | undefined;
         let isMounted = true;
 
+        const handleSeekEvent = (e: any) => {
+            if (e.detail && typeof e.detail.time === 'number') {
+                setCurrentTime(e.detail.time);
+            }
+        };
+        const handleRemoteDraggingEvent = (e: any) => {
+            if (e.detail && typeof e.detail.dragging === 'boolean') {
+                setIsRemoteDragging(e.detail.dragging);
+            }
+        };
+        window.addEventListener('playback:seeked', handleSeekEvent);
+        window.addEventListener('playback:dragging', handleRemoteDraggingEvent);
+
         const setupListeners = async () => {
             try {
                 const nextFn = await listen('smtc:next', () => {
@@ -236,6 +250,8 @@ export default function PlaybackControls() {
             safeUnlisten(unlistenNext);
             safeUnlisten(unlistenPrev);
             safeUnlisten(unlistenEnded);
+            window.removeEventListener('playback:seeked', handleSeekEvent);
+            window.removeEventListener('playback:dragging', handleRemoteDraggingEvent);
         };
     }, []); // 依赖项始终为空，只在挂载/卸载时执行
 
@@ -244,7 +260,7 @@ export default function PlaybackControls() {
     useEffect(() => {
         let interval: number;
 
-        if (isPlaying && !isDragging) {
+        if (isPlaying && !isDragging && !isRemoteDragging) {
             // 改为 500ms 更新一次，响应更灵敏
             interval = window.setInterval(() => {
                 setCurrentTime((prev) => {
@@ -258,7 +274,7 @@ export default function PlaybackControls() {
             }, 500);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, isDragging, metadata, repeatMode, playlist, currentSongIndex]);
+    }, [isPlaying, isDragging, isRemoteDragging, metadata, repeatMode, playlist, currentSongIndex]);
 
     // Metadata 变化时的兜底重置 (比如从 Library 切歌)
     useEffect(() => {

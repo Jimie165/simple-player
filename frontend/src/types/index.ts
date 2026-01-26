@@ -57,6 +57,7 @@ export interface RecentItem {
     lastPlayed: number; // 时间戳
     // 专辑额外信息
     artist?: string;
+    album?: string;
     isLibraryItem?: boolean;
 }
 

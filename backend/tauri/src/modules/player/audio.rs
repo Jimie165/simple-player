@@ -121,4 +121,13 @@ impl AudioState {
             let _ = player.SetVolume(volume as f64);
         }
     }
+
+    pub fn get_position(&self) -> Result<f32, String> {
+        if let Some(player) = self.player.lock().unwrap().as_ref() {
+            let session = player.PlaybackSession().map_err(|e| e.to_string())?;
+            let position = session.Position().map_err(|e| e.to_string())?;
+            return Ok((position.Duration as f32) / 10_000_000.0);
+        }
+        Ok(0.0)
+    }
 }

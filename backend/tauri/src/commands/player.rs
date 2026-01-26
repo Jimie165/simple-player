@@ -30,3 +30,8 @@ pub fn seek_audio(state: State<'_, AudioState>, position: f32) -> Result<(), Str
 pub fn set_volume(state: State<'_, AudioState>, volume: f32) {
     state.set_volume(volume);
 }
+
+#[tauri::command]
+pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
+    state.get_position()
+}

@@ -5,7 +5,6 @@ import type { MenuItemData } from '../../hooks/useSongOperations';
 import {
     MdPlayArrow,
     MdShuffle,
-    MdAdd,
     MdFavorite,
     MdFavoriteBorder,
     MdDelete,
@@ -14,7 +13,8 @@ import {
     MdPerson,
     MdAlbum,
     MdEdit,
-    MdPlaylistPlay
+    MdPlaylistPlay,
+    MdPlaylistAdd
 } from 'react-icons/md';
 
 export type MusicMenuType = 'song' | 'playlist' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'other';
@@ -75,7 +75,7 @@ export function getMusicMenuGroups(options: MusicMenuOptions): MenuItemData[][] 
     if (onPlay) group1.push({ id: 'play', label: '播放', icon: MdPlayArrow, onClick: onPlay });
     if (onShuffle) group1.push({ id: 'shuffle', label: '随机播放', icon: MdShuffle, onClick: onShuffle });
     if (onAddToQueue) group1.push({ id: 'queue', label: '加入播放队列', icon: MdPlaylistPlay, onClick: onAddToQueue });
-    if (onAddToPlaylist) group1.push({ id: 'add-to', label: '添加到', icon: MdAdd, onClick: onAddToPlaylist });
+    if (onAddToPlaylist) group1.push({ id: 'add-to', label: '添加到', icon: MdPlaylistAdd, onClick: onAddToPlaylist });
     if (onFavorite) {
         group1.push({
             id: 'favorite',
@@ -147,7 +147,7 @@ function MenuContent({
             <MenuItems
                 ref={menuRef}
                 transition
-                className="fixed w-56 rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
+                className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
                 style={menuPosition ? { top: menuPosition!.top, left: menuPosition!.left, transformOrigin: menuPosition!.origin } : undefined}
             >
                 {resolvedGroups.map((group, groupIndex) => (

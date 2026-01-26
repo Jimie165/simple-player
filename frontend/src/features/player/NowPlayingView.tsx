@@ -3,17 +3,23 @@ import clsx from 'clsx';
 import { MdMusicNote } from 'react-icons/md';
 import type { SongMetadata } from '../../types';
 import { resolveCover } from '../../utils/cover';
+import { useTheme } from '../../hooks/useTheme';
+
 
 interface NowPlayingViewProps {
     metadata: SongMetadata | null;
 }
 
 export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
+    const { fullScreenMode } = useTheme();
+
+    // Classic Mode Logic
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        let isMounted = true;
+        if (fullScreenMode !== 'classic') return;
 
+        let isMounted = true;
         const loadCover = async () => {
             if (!metadata) {
                 setCoverUrl(null);
@@ -27,13 +33,33 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
 
         loadCover();
         return () => { isMounted = false; };
-    }, [metadata]);
+    }, [metadata, fullScreenMode]);
+
+    // If Immersive (Apple) Mode, render that component
+    // Note: onClose logic is handled by parent visibility usually, but here we pass a dummy or actual closer if needed.
+    // However, App.tsx controls visibility. NowPlayingView is just the content.
+    // AppleMusicPlayer has its own "close" button which needs to close the fullscreen mode.
+    // We assume App.tsx passes a way to close, OR we use a global store to close it.
+    // Let's assume we can't easily close from here without a prop or store action.
+    // Wait, App.tsx has `setIsFullScreen`. We can't access it here easily unless we use a store?
+    // Actually, `PlayerControl` uses `isFullScreen` state from `App.tsx` via props? No, `App.tsx` has the state.
+    // But we can add a close action to `useThemeStore` or `useNavigationStore`? No, `isFullScreen` is local state in App.tsx?
+    // Let's check App.tsx again. `const [isFullScreen, setIsFullScreen] = useState(false);`
+    // This is a problem. AppleMusicPlayer needs to close the view.
+    // Option: Move `isFullScreen` to `usePlayerStore` or `useThemeStore` (as ephemeral state).
+    // Or simpler: Just render it, and rely on the user dragging down? AppleMusicPlayer has a close button.
+    // We need to pass a close handler. But NowPlayingView doesn't receive one.
+    // I will modify NowPlayingView to take `onClose` prop, and update App.tsx to pass it.
+
+    if (fullScreenMode === 'immersive') {
+        return null;
+    }
 
     const hasCover = !!coverUrl;
 
     return (
         <div className="relative flex-1 w-full h-full overflow-hidden bg-white dark:bg-[#121212]">
-
+            {/* ... Classic View Content ... */}
             {/* 顶部拖动区域 */}
             <div
                 data-tauri-drag-region

@@ -97,6 +97,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
             path,
             lastPlayed: Date.now(),
             artist: meta.artist,
+            album: meta.album,
             isLibraryItem
         };
     };
@@ -332,8 +333,8 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                                         )} title={item.title}>
                                             {item.title}
                                         </span>
-                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={item.description}>
-                                            {item.description}
+                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={`${item.description}${item.album ? ` — ${item.album}` : ''}`}>
+                                            {item.description}{item.album && ` — ${item.album}`}
                                         </span>
                                     </div>
                                 </div>

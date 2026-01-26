@@ -15,6 +15,7 @@ import Library from './features/library/Library';
 import Settings from './features/settings/Settings';
 import NowPlayingView from './features/player/NowPlayingView';
 import PlayerControl from './features/player/PlayerControl';
+import AppleMusicPlayer from './features/player/AppleMusicPlayer';
 
 import { usePlayerStore } from './store/usePlayerStore';
 import type { PageId } from './types/index';
@@ -26,7 +27,7 @@ import AddToPlaylistSheet from './features/playlists/components/AddToPlaylistShe
 import GlobalDialogLayer from './components/common/GlobalDialogLayer';
 
 function App() {
-  const initTheme = useThemeStore((state) => state.init);
+  const { init: initTheme, fullScreenMode } = useThemeStore();
   useEffect(() => initTheme(), [initTheme]);
 
   const {
@@ -50,6 +51,14 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  
+  // Listen for close event from AppleMusicPlayer
+  useEffect(() => {
+      const handleClose = () => setIsFullScreen(false);
+      window.addEventListener('close-fullscreen-player', handleClose);
+      return () => window.removeEventListener('close-fullscreen-player', handleClose);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState('');
 
   useQueuePersistence(); // Activate queue persistence
@@ -185,7 +194,10 @@ function App() {
 
         {/* --- 层级 3: 沉浸模式 (Now Playing Overlay) --- */}
         <div className={clsx(
-          "absolute inset-0 z-[60] transition-all duration-500 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
+          "absolute inset-0 transition-all duration-500 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
+          // Z-Index Switch: If immersive mode and active, cover EVERYTHING (z-80). Otherwise z-60 (under bottom bar).
+          // Note: Bottom Bar is z-[70].
+          (isFullScreen && fullScreenMode === 'immersive') ? "z-[80]" : "z-[60]",
           isFullScreen
             ? "opacity-100 visible translate-y-0"
             : "opacity-0 invisible translate-y-8 pointer-events-none"
@@ -204,6 +216,12 @@ function App() {
       </div>
       <AddToPlaylistSheet />
       <GlobalDialogLayer />
+
+      <AnimatePresence>
+        {isFullScreen && fullScreenMode === 'immersive' && (
+          <AppleMusicPlayer onClose={() => setIsFullScreen(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

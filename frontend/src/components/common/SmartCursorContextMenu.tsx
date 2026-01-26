@@ -21,6 +21,8 @@ interface SmartCursorContextMenuProps {
     isSelected?: boolean;
     menuGroups?: MenuItemData[][];
     extraGroups?: MenuItemData[][];
+    variant?: 'default' | 'apple';
+    placement?: 'auto' | 'top' | 'bottom';
 }
 
 /**
@@ -31,7 +33,7 @@ interface SmartCursorContextMenuProps {
  * Uses Portal and viewport boundary detection.
  */
 export default function SmartCursorContextMenu(props: SmartCursorContextMenuProps) {
-    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, menuGroups, extraGroups } = props;
+    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, menuGroups, extraGroups, variant = 'default', placement = 'auto' } = props;
 
     // Store
     const { selectedIds, toggleSelectionMode, clearSelection } = useSelectionStore();
@@ -122,8 +124,18 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
             if (x + menuRect.width > windowWidth - padding) {
                 newLeft = x - menuRect.width;
             }
-            if (y + menuRect.height > windowHeight - padding) {
+
+            // Placement Logic
+            if (placement === 'top') {
+                // Force top positioning (above cursor)
                 newTop = y - menuRect.height;
+            } else if (placement === 'bottom') {
+                newTop = y;
+            } else {
+                // Auto
+                if (y + menuRect.height > windowHeight - padding) {
+                    newTop = y - menuRect.height;
+                }
             }
 
             if (newLeft < padding) newLeft = padding;
@@ -142,11 +154,16 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
 
     if (!resolvedGroups || resolvedGroups.length === 0) return null;
 
+    const isApple = variant === 'apple';
+
     return (
         <Portal>
             <div
                 ref={menuRef}
-                className="fixed z-[9999] w-56 rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 dark:border-neutral-700/50 dark:text-white transition-opacity duration-150"
+                className={`fixed z-[9999] w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
+                    ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
+                    : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
+                    }`}
                 style={{
                     top: position.top,
                     left: position.left,
@@ -158,7 +175,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
             >
                 {resolvedGroups.map((group, groupIndex) => (
                     <React.Fragment key={groupIndex}>
-                        {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
+                        {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-neutral-200/50 dark:bg-white/20'}`} />}
                         {group.map((mItem) => (
                             <button
                                 key={mItem.id}
@@ -166,16 +183,20 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                                     mItem.onClick();
                                     onClose();
                                 }}
-                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 hover:bg-neutral-100 dark:hover:bg-white/10 ${mItem.variant === 'danger'
-                                    ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                    : 'text-neutral-900 dark:text-neutral-200'
+                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors ${isApple
+                                    ? 'hover:bg-white/10 font-medium text-white'
+                                    : 'hover:bg-neutral-100 dark:hover:bg-white/10'
+                                    } ${!isApple && mItem.variant === 'danger'
+                                        ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                        : ''
+                                    } ${isApple && mItem.variant === 'danger' ? 'text-red-400' : ''
                                     }`}
                             >
                                 <div className="flex flex-1 items-center gap-3">
-                                    {mItem.icon && <mItem.icon className="text-lg opacity-70" />}
-                                    {mItem.label}
+                                    {mItem.icon && <mItem.icon className={isApple ? 'text-lg opacity-100' : 'text-lg opacity-70'} />}
+                                    <span>{mItem.label}</span>
                                 </div>
-                                {mItem.suffix}
+                                {!isApple && mItem.suffix}
                             </button>
                         ))}
                     </React.Fragment>

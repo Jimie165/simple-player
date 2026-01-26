@@ -13,8 +13,8 @@ import { resolveSongsFromItems, getMusicItemId, getMusicItemType } from '../util
 import type { MusicItem } from '../utils/musicItemUtils';
 import type { SongMetadata } from '../types';
 import {
-    MdPlayArrow, MdShuffle, MdAdd, MdFavorite, MdFavoriteBorder, MdDelete,
-    MdInfo, MdEdit, MdCheckBoxOutlineBlank, MdCheckBox, MdAlbum, MdPerson, MdPlaylistPlay, MdPlaylistRemove
+    MdPlayArrow, MdShuffle, MdFavorite, MdFavoriteBorder, MdDelete,
+    MdInfo, MdEdit, MdCheckBoxOutlineBlank, MdCheckBox, MdAlbum, MdPerson, MdPlaylistPlay, MdPlaylistRemove, MdPlaylistAdd
 } from 'react-icons/md';
 
 // 菜单上下文类型
@@ -344,7 +344,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         // - "If it is an opened folder, then it should be one less 'Add to' than Playlist"
         // - Interpreted as: Hide "Add to Playlist" in Folder context.
         if (context !== 'folder') {
-            group1.push({ id: 'add-to', label: '添加到', icon: MdAdd, onClick: handleAddToPlaylist });
+            group1.push({ id: 'add-to', label: '添加到播放列表...', icon: MdPlaylistAdd, onClick: handleAddToPlaylist });
         }
 
         // Favorite (Allow mixed song/file selection)
@@ -388,24 +388,25 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             const item: any = firstItem;
 
             let showProperties = true;
-            if (context === 'playlist' || context === 'playlist_list') showProperties = false;
-            else if (context === 'folder' && type === 'folder') showProperties = false;
+            if (context === 'folder' && type === 'folder') showProperties = false;
 
             if (showProperties && ['song', 'file'].includes(type) && type !== 'playlist') {
                 group2.push({ id: 'properties', label: '属性', icon: MdInfo, onClick: handleProperties });
             }
 
-            const showAlbum = context !== 'playlist_list' && context !== 'album_detail';
-            const showArtist = context !== 'playlist_list' && context !== 'artist_detail';
+            const showAlbum = context !== 'album_detail';
+            const showArtist = context !== 'artist_detail';
 
             const albumValue = item?.album || (type === 'album' ? (item?.name || item?.title) : undefined);
             const artistValue = item?.artist || (type === 'artist' ? item?.name : undefined) || (type === 'album' ? item?.artist : undefined);
 
-            if (showAlbum && albumValue) {
-                group2.push({ id: 'album', label: '显示专辑', icon: MdAlbum, onClick: handleShowAlbum });
+            const isSongFile = type === 'song' || type === 'file';
+
+            if (showAlbum && (albumValue || isSongFile)) {
+                group2.push({ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: handleShowAlbum });
             }
-            if (showArtist && artistValue) {
-                group2.push({ id: 'artist', label: '显示艺人', icon: MdPerson, onClick: handleShowArtist });
+            if (showArtist && (artistValue || isSongFile)) {
+                group2.push({ id: 'artist', label: '前往艺人', icon: MdPerson, onClick: handleShowArtist });
             }
         }
 

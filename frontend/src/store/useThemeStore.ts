@@ -9,10 +9,12 @@ interface ThemeState {
     sourceColor: string; // Hex Code
     isCustomColor: boolean;
     isDark: boolean; // Computed actual state
+    fullScreenMode: 'classic' | 'immersive';
 
     setThemeMode: (mode: ThemeMode) => void;
+    setFullScreenMode: (mode: 'classic' | 'immersive') => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
-    
+
     // Internal use: update computed state and apply CSS
     applyTheme: () => void;
     init: () => () => void; // Returns cleanup function
@@ -25,10 +27,15 @@ export const useThemeStore = create<ThemeState>()(
             sourceColor: PRESET_COLORS[0].value, // Default Blue
             isCustomColor: false,
             isDark: false,
+            fullScreenMode: 'classic',
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
                 get().applyTheme();
+            },
+
+            setFullScreenMode: (mode) => {
+                set({ fullScreenMode: mode });
             },
 
             setSourceColor: (hex, isCustom = false) => {
@@ -40,7 +47,7 @@ export const useThemeStore = create<ThemeState>()(
                 const { themeMode, sourceColor } = get();
                 const root = window.document.documentElement;
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                
+
                 let isDark = false;
                 if (themeMode === 'dark') {
                     isDark = true;
@@ -91,7 +98,8 @@ export const useThemeStore = create<ThemeState>()(
             partialize: (state) => ({
                 themeMode: state.themeMode,
                 sourceColor: state.sourceColor,
-                isCustomColor: state.isCustomColor
+                isCustomColor: state.isCustomColor,
+                fullScreenMode: state.fullScreenMode
             }),
         }
     )

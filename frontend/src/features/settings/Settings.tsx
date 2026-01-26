@@ -8,7 +8,8 @@ import {
     MdColorLens,
     MdCheck,
     MdAdd,
-    MdLibraryMusic
+    MdLibraryMusic,
+    MdFullscreen
 } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -19,7 +20,9 @@ export default function Settings() {
         sourceColor,
         setSourceColor,
         presetColors,
-        isCustomColor
+        isCustomColor,
+        fullScreenMode,
+        setFullScreenMode
     } = useTheme();
 
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -101,6 +104,40 @@ export default function Settings() {
                             <ThemeOption val="light" label="浅色模式" />
                             <ThemeOption val="dark" label="深色模式" />
                             <ThemeOption val="system" label="跟随系统" />
+                        </div>
+                    </div>
+
+                    {/* Full Screen Style Selection */}
+                    <div className="space-y-3">
+                        <div className="flex items-center gap-2 px-1">
+                            <MdFullscreen className="text-primary text-lg" />
+                            <h4 className="text-sm font-medium text-on-surface">全屏播放页样式</h4>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <button
+                                onClick={() => setFullScreenMode('classic')}
+                                className={clsx(
+                                    "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
+                                    fullScreenMode === 'classic'
+                                        ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                        : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                                )}
+                            >
+                                <span>经典 (Classic)</span>
+                                {fullScreenMode === 'classic' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                            </button>
+                            <button
+                                onClick={() => setFullScreenMode('immersive')}
+                                className={clsx(
+                                    "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
+                                    fullScreenMode === 'immersive'
+                                        ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                        : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                                )}
+                            >
+                                <span>沉浸 (Immersive)</span>
+                                {fullScreenMode === 'immersive' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                            </button>
                         </div>
                     </div>
 

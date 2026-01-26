@@ -43,4 +43,7 @@ export const audioService = {
 
     // 设置音量 (0.0 - 1.0)
     setVolume: async (volume: number) => invoke('set_volume', { volume }),
+
+    // 获取当前播放进度 (秒)
+    getCurrentTime: async (): Promise<number> => invoke('get_audio_position'),
 };

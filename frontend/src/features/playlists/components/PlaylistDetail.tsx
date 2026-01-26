@@ -119,6 +119,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         path: song.path || '',
         lastPlayed: Date.now(),
         artist: song.artist,
+        album: song.album,
         isLibraryItem: true
     });
 

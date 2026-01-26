@@ -163,10 +163,60 @@ export function usePlaybackActions() {
         }
     };
 
+    // --- New Actions for Controls ---
+    const seek = async (time: number) => {
+        await audioService.seek(time);
+        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time } }));
+    };
+
+    const playNext = async () => {
+        const { playlist, currentSongIndex, pushHistory } = useLibraryStore.getState();
+        if (playlist.length === 0) return;
+
+        pushHistory(currentSongIndex);
+        const nextIdx = (currentSongIndex + 1) % playlist.length;
+
+        const song = playlist[nextIdx];
+        if (song?.path) {
+            await playSong({ song, index: nextIdx, playlist, options: { restartIfCurrent: true } });
+        }
+    };
+
+    const playPrev = async (currentTime: number = 0) => {
+        const { playlist, currentSongIndex, popHistory } = useLibraryStore.getState();
+        if (playlist.length === 0) return;
+
+        // Check if we should just restart current song (> 3s)
+        if (currentTime > 3) {
+            await audioService.seek(0);
+            return;
+        }
+
+        // Try history first
+        const historyIndex = popHistory();
+        if (historyIndex !== undefined && historyIndex >= 0 && historyIndex < playlist.length) {
+            const song = playlist[historyIndex];
+            if (song?.path) {
+                await playSong({ song, index: historyIndex, playlist, options: { restartIfCurrent: true } });
+                return;
+            }
+        }
+
+        // Fallback to previous index
+        const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
+        const song = playlist[prevIdx];
+        if (song?.path) {
+            await playSong({ song, index: prevIdx, playlist, options: { restartIfCurrent: true } });
+        }
+    };
+
     return {
         playSong,
         playList,
         shufflePlay,
-        playQueueItem
+        playQueueItem,
+        playNext,
+        playPrev,
+        seek
     };
 }

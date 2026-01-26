@@ -192,6 +192,7 @@ export default function Library() {
         path: song.path || '',
         lastPlayed: Date.now(),
         artist: song.artist,
+        album: song.album,
         isLibraryItem: true
     });
 
