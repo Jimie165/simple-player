@@ -1,7 +1,6 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import clsx from 'clsx';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     IoPlay, IoPause,
     IoShuffle, IoRepeat,
@@ -9,9 +8,6 @@ import {
     IoList, IoStar, IoStarOutline, IoEllipsisHorizontal,
     IoPlayBack, IoPlayForward
 } from 'react-icons/io5';
-import {
-    MdPlaylistPlay, MdFavorite, MdFavoriteBorder, MdAlbum, MdPerson, MdInfo, MdPlaylistAdd
-} from 'react-icons/md';
 
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -19,13 +15,14 @@ import { useNavigationStore } from '../../store/useNavigationStore';
 
 import { usePlaybackActions } from '../../hooks/usePlaybackActions';
 import { useSongOperations } from '../../hooks/useSongOperations';
-import type { MenuItemData } from '../../hooks/useSongOperations';
+import type { SongMetadata } from '../../types';
 import { audioService } from '../../services/audioService';
 import { formatTime } from '../../utils/time';
 import { resolveCover } from '../../utils/cover';
 import CoverImage from '../../components/common/CoverImage';
-import SmartCursorContextMenu from '../../components/common/SmartCursorContextMenu';
+import MusicContextMenu from '../../components/common/MusicContextMenu';
 import MusicSlider from '../../components/common/MusicSlider';
+import AppleMusicQueue from './AppleMusicQueue';
 
 export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
     const {
@@ -42,6 +39,7 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [bgImageSrc, setBgImageSrc] = useState<string | null>(null);
+    const [showQueue, setShowQueue] = useState(false);
 
     // Get volume from store for consistency
     const { volume, setVolume } = usePlayerStore();
@@ -61,9 +59,6 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
         observer.observe(coverRef.current);
         return () => observer.disconnect();
     }, []);
-
-    // Context Menu State
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number } | null>(null);
 
     // Sync volume with audio service
     useEffect(() => {
@@ -152,7 +147,7 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };
 
-    const lastCloseRef = React.useRef(0);
+    // const lastCloseRef = React.useRef(0); // Removed
 
     // Background Image Source - already handled by state
 
@@ -179,300 +174,260 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Content Layer - Responsive Flex Layout */}
-            <div className="relative z-20 flex-1 flex flex-col items-center w-full min-h-0 px-8 pb-8 md:pb-12">
+            <div className="relative z-20 flex-1 flex w-full min-h-0 px-8 pb-8 md:pb-12">
 
-                {/* Content Wrapper: Controls vertical spacing */}
-                <div className="w-full h-full max-w-[500px] flex flex-col gap-6 md:gap-8 justify-center items-center">
+                <div className={clsx(
+                    "flex flex-col items-center justify-center transition-all duration-500 ease-[0.32,0.72,0,1]",
+                    showQueue ? "w-[42%] mr-auto pr-4" : "w-full px-12"
+                )}>
+                    {/* Content Wrapper: Controls vertical spacing */}
+                    <div className="w-full h-full max-w-[500px] flex flex-col gap-6 md:gap-8 justify-center items-center mx-auto">
 
-                    {/* Artwork Container - Auto scaling with aspect ratio preservation */}
-                    {/* flex-1 min-h-0 allows shrinking. flex justify-center aligns it. */}
-                    <div className="flex-1 min-h-0 flex items-center justify-center w-full">
-                        {/* 
-                            Key Layout Fix: 
-                            max-h-full: Don't exceed parent height.
-                            max-w-full: Don't exceed parent width.
-                            aspect-square: Maintain 1:1.
-                            w-auto h-auto: Let the aspect ratio and max constraints drive the size.
-                         */}
-                        <motion.div
-                            ref={coverRef}
-                            className="relative aspect-square h-auto w-auto max-h-full max-w-full rounded-[12px] md:rounded-[18px] shadow-2xl overflow-hidden bg-white/5"
-                            animate={{
-                                scale: isPlaying ? 1 : 0.85,
-                                boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
-                            }}
-                            transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                        {/* Artwork Container - Auto scaling with aspect ratio preservation */}
+                        {/* flex-1 min-h-0 allows shrinking. flex justify-center aligns it. */}
+                        <div className="flex-1 min-h-0 flex items-center justify-center w-full">
+                            {/* 
+                                Key Layout Fix: 
+                                max-h-full: Don't exceed parent height.
+                                max-w-full: Don't exceed parent width.
+                                aspect-square: Maintain 1:1.
+                                w-auto h-auto: Let the aspect ratio and max constraints drive the size.
+                             */}
+                            <motion.div
+                                ref={coverRef}
+                                className="relative aspect-square h-auto w-auto max-h-full max-w-full rounded-[12px] md:rounded-[18px] shadow-2xl overflow-hidden bg-white/5"
+                                animate={{
+                                    scale: isPlaying ? 1 : 0.85,
+                                    boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
+                                }}
+                                transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                            >
+                                <CoverImage
+                                    song={metadata}
+                                    className="w-full h-full object-cover"
+                                    iconClassName="text-white/20 text-9xl"
+                                />
+                            </motion.div>
+                        </div>
+
+                        {/* Controls Container - Fixed Height */}
+                        <div
+                            className="flex flex-col gap-2 flex-shrink-0 transition-[width] duration-100 ease-out"
+                            style={{ width: contentWidth ? `${contentWidth}px` : '100%' }}
                         >
-                            <CoverImage
-                                song={metadata}
-                                className="w-full h-full object-cover"
-                                iconClassName="text-white/20 text-9xl"
-                            />
-                        </motion.div>
-                    </div>
 
-                    {/* Controls Container - Fixed Height */}
-                    <div
-                        className="flex flex-col gap-2 flex-shrink-0 transition-[width] duration-100 ease-out"
-                        style={{ width: contentWidth ? `${contentWidth}px` : '100%' }}
-                    >
-
-                        {/* Title & Artist Row */}
-                        <div className="flex items-center justify-between px-0.5">
-                            <div className="flex flex-col min-w-0 pr-4">
-                                <h1 className="text-xl md:text-2xl font-bold text-white truncate drop-shadow-md leading-tight">
-                                    {metadata?.title || "未播放音乐"}
-                                </h1>
-                                <div className="text-base md:text-lg text-white/60 truncate font-medium leading-tight mt-1 flex items-center gap-1">
-                                    <span
-                                        onClick={() => {
-                                            if (metadata?.artist) {
-                                                push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
-                                                onClose();
-                                            }
-                                        }}
-                                        className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
+                            {/* Title & Artist Row */}
+                            <div className="flex items-center justify-between px-0.5">
+                                <div className="flex flex-col min-w-0 pr-4">
+                                    <h1 className="text-xl md:text-2xl font-bold text-white truncate drop-shadow-md leading-tight">
+                                        {metadata?.title || "未播放音乐"}
+                                    </h1>
+                                    <div className="text-base md:text-lg text-white/60 truncate font-medium leading-tight mt-1 flex items-center gap-1">
+                                        <span
+                                            onClick={() => {
+                                                if (metadata?.artist) {
+                                                    push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
+                                                    onClose();
+                                                }
+                                            }}
+                                            className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
+                                        >
+                                            {metadata?.artist || "Simple Player"}
+                                        </span>
+                                        {metadata?.album && (
+                                            <>
+                                                <span>—</span>
+                                                <span
+                                                    onClick={() => {
+                                                        if (metadata?.album) {
+                                                            // Use full object structure to match what useSongOperations expects and prevent crashes
+                                                            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover || null, count: 0 } });
+                                                            onClose();
+                                                        }
+                                                    }}
+                                                    className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
+                                                >
+                                                    {metadata.album}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                    <button
+                                        onClick={() => metadata && toggleFavorite(metadata)}
+                                        className="w-8 h-8 flex-shrink-0 rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-red-500 transition-all backdrop-blur-md"
                                     >
-                                        {metadata?.artist || "Simple Player"}
-                                    </span>
-                                    {metadata?.album && (
-                                        <>
-                                            <span>—</span>
-                                            <span
-                                                onClick={() => {
-                                                    if (metadata?.album) {
-                                                        // Use full object structure to match what useSongOperations expects and prevent crashes
-                                                        push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover || null, count: 0 } });
-                                                        onClose();
-                                                    }
-                                                }}
-                                                className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
-                                            >
-                                                {metadata.album}
-                                            </span>
-                                        </>
-                                    )}
+                                        {metadata?.is_favorite ? <IoStar className="text-xl text-red-500" /> : <IoStarOutline className="text-xl" />}
+                                    </button>
+
+                                    {/* Unified Context Menu */}
+                                    <MenuWrapper metadata={metadata} onClose={onClose} />
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
+
+                            {/* Progress Bar */}
+                            <div className="flex flex-col gap-1.5 mt-2">
+                                {metadata && (
+                                    <MusicSlider
+                                        value={currentTime}
+                                        min={0}
+                                        max={metadata.duration}
+                                        onChange={handleSeekChange}
+                                        onMouseDown={handleSeekStart}
+                                        onMouseUp={handleSeekEnd}
+                                        trackHeightClass="h-2"
+                                        hoverHeightClass="group-hover:h-3.5"
+                                        activeHeightClass="group-active:h-4"
+                                    />
+                                )}
+                                <div className="flex justify-between text-[11px] font-medium text-white/40 select-none">
+                                    <span>{formatTime(currentTime)}</span>
+                                    <span>-{formatTime((metadata?.duration || 0) - currentTime)}</span>
+                                </div>
+                            </div>
+
+                            {/* Main Controls - Responsive */}
+                            <div className="flex items-center justify-between mt-[2%] w-full">
                                 <button
-                                    onClick={() => metadata && toggleFavorite(metadata)}
-                                    className="w-8 h-8 rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-red-500 transition-all backdrop-blur-md"
-                                >
-                                    {metadata?.is_favorite ? <IoStar className="text-xl text-red-500" /> : <IoStarOutline className="text-xl" />}
-                                </button>
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        const now = Date.now();
-                                        if (now - lastCloseRef.current < 300) {
-                                            return;
-                                        }
-                                        if (contextMenu) {
-                                            setContextMenu(null);
-                                        } else {
-                                            setContextMenu({ x: e.clientX, y: e.clientY });
-                                        }
-                                    }}
+                                    onClick={toggleShuffle}
                                     className={clsx(
-                                        "w-8 h-8 rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center transition-all backdrop-blur-md",
-                                        contextMenu ? "text-white bg-white/20" : "text-white/50 hover:text-white"
+                                        "flex-1 aspect-square max-w-[40px] flex items-center justify-center rounded-lg transition-colors hover:bg-white/10",
+                                        isShuffling ? "text-primary" : "text-white/40 hover:text-white"
                                     )}
                                 >
-                                    <IoEllipsisHorizontal className="text-base" />
+                                    <IoShuffle className="text-xl sm:text-2xl" />
+                                </button>
+
+                                <button onClick={() => playPrev(currentTime)} className="flex-1 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                                    <IoPlayBack className="text-3xl sm:text-4xl" />
+                                </button>
+
+                                <button
+                                    onClick={togglePlay}
+                                    className="flex-shrink-0 w-[18%] max-w-[64px] aspect-square rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
+                                >
+                                    {isPlaying ? <IoPause className="text-4xl sm:text-6xl" /> : <IoPlay className="text-4xl sm:text-6xl" />}
+                                </button>
+
+                                <button onClick={playNext} className="flex-1 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                                    <IoPlayForward className="text-3xl sm:text-4xl" />
+                                </button>
+
+                                <button
+                                    onClick={toggleRepeat}
+                                    className={clsx(
+                                        "flex-1 aspect-square max-w-[40px] flex items-center justify-center rounded-lg transition-colors relative hover:bg-white/10",
+                                        repeatMode !== 'off' ? "text-primary" : "text-white/40 hover:text-white"
+                                    )}
+                                >
+                                    {repeatMode === 'one' ? (
+                                        <div className="relative">
+                                            <IoRepeat className="text-xl sm:text-2xl" />
+                                            <span className="absolute -top-1 -right-1 text-[8px] font-bold">1</span>
+                                        </div>
+                                    ) : (
+                                        <IoRepeat className="text-xl sm:text-2xl" />
+                                    )}
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Progress Bar */}
-                        <div className="flex flex-col gap-1.5 mt-2">
-                            {metadata && (
+                            {/* Volume Slider */}
+                            <div className="flex items-center gap-3 mt-6 px-1">
+                                <IoVolumeLow className="text-white/40 text-xs" />
                                 <MusicSlider
-                                    value={currentTime}
+                                    value={volume}
                                     min={0}
-                                    max={metadata.duration}
-                                    onChange={handleSeekChange}
-                                    onMouseDown={handleSeekStart}
-                                    onMouseUp={handleSeekEnd}
-                                    trackHeightClass="h-2"
-                                    hoverHeightClass="group-hover:h-3.5"
-                                    activeHeightClass="group-active:h-4"
+                                    max={100}
+                                    onChange={handleVolumeChange}
+                                    className="flex-1"
                                 />
-                            )}
-                            <div className="flex justify-between text-[11px] font-medium text-white/40 select-none">
-                                <span>{formatTime(currentTime)}</span>
-                                <span>-{formatTime((metadata?.duration || 0) - currentTime)}</span>
+                                <IoVolumeHigh className="text-white/40 text-xs" />
                             </div>
+
                         </div>
-
-                        {/* Main Controls */}
-                        <div className="flex items-center justify-between mt-2 px-2">
-                            <button
-                                onClick={toggleShuffle}
-                                className={clsx(
-                                    "p-2 rounded-lg transition-colors hover:bg-white/10",
-                                    isShuffling ? "text-primary" : "text-white/40 hover:text-white"
-                                )}
-                            >
-                                <IoShuffle className="text-xl" />
-                            </button>
-
-                            <button onClick={() => playPrev(currentTime)} className="text-white hover:opacity-70 transition-opacity p-2">
-                                <IoPlayBack className="text-4xl" />
-                            </button>
-
-                            <button
-                                onClick={togglePlay}
-                                className="w-14 h-14 rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
-                            >
-                                {isPlaying ? <IoPause className="text-6xl" /> : <IoPlay className="text-6xl" />}
-                            </button>
-
-                            <button onClick={playNext} className="text-white hover:opacity-70 transition-opacity p-2">
-                                <IoPlayForward className="text-4xl" />
-                            </button>
-
-                            <button
-                                onClick={toggleRepeat}
-                                className={clsx(
-                                    "p-2 rounded-lg transition-colors relative hover:bg-white/10",
-                                    repeatMode !== 'off' ? "text-primary" : "text-white/40 hover:text-white"
-                                )}
-                            >
-                                {repeatMode === 'one' ? (
-                                    <div className="relative">
-                                        <IoRepeat className="text-xl" />
-                                        <span className="absolute -top-1 -right-1 text-[8px] font-bold">1</span>
-                                    </div>
-                                ) : (
-                                    <IoRepeat className="text-xl" />
-                                )}
-                            </button>
-                        </div>
-
-                        {/* Volume Slider */}
-                        <div className="flex items-center gap-3 mt-6 px-1">
-                            <IoVolumeLow className="text-white/40 text-xs" />
-                            <MusicSlider
-                                value={volume}
-                                min={0}
-                                max={100}
-                                onChange={handleVolumeChange}
-                                className="flex-1"
-                            />
-                            <IoVolumeHigh className="text-white/40 text-xs" />
-                        </div>
-
                     </div>
                 </div>
+
+                {/* Right Side (Queue) - Slide In */}
+                <AnimatePresence>
+                    {showQueue && (
+                        <motion.div
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+                            className="flex-1 h-full max-h-[95%] pl-8 md:pl-9 pr-8 flex flex-col z-30 ml-auto justify-center min-w-0"
+                        >
+                            {/* Apple Music Style: Not floating, but integrated panel */}
+                            {/* However, user says "悬浮状" is WRONG. Apple Music iPad Landscape has it as a side panel. */}
+                            {/* But looking at the reference image, it looks like a clear split view with no "card" background. */}
+                            {/* The text "Continue Playing" is directly on the blurred background. */}
+                            <div className="flex-1 overflow-hidden">
+                                <AppleMusicQueue onNavigate={onClose} />
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Bottom Right Actions (Queue/Lyrics) */}
             <div className="absolute bottom-8 right-8 z-30">
-                <button className="p-3 rounded-xl hover:bg-white/10 hover:text-white transition-all text-white/60">
-                    <IoList className="text-xl" />
+                <button className={clsx(
+                    "p-3 rounded-xl transition-all backdrop-blur-md",
+                    // Use conditional border/bg based on showQueue
+                    showQueue
+                        ? "bg-white/10 border border-white/10 text-white shadow-lg"
+                        : "hover:bg-white/10 hover:text-white text-white/50"
+                )}>
+                    <IoList
+                        className={clsx("text-xl", showQueue ? "text-primary" : "")}
+                        onClick={() => setShowQueue(!showQueue)}
+                    />
                 </button>
             </div>
 
-            {/* Render Context Menu if active */}
-            {contextMenu && metadata && (
-                <AppleStyleContextMenu
-                    x={contextMenu.x}
-                    y={contextMenu.y}
-                    metadata={metadata}
-                    onClose={() => {
-                        lastCloseRef.current = Date.now();
-                        setContextMenu(null);
-                    }}
-                />
-            )}
+
         </motion.div >
     );
 }
 
 // Sub-component for Menu Logic to keep main component clean
-function AppleStyleContextMenu({ x, y, metadata, onClose }: { x: number, y: number, metadata: any, onClose: () => void }) {
-    // We need to use useSongOperations to get the actions
-    // But we want to structure them customly.
-    // Actually, useSongOperations returns prepared menuItems.
-    // We might want to construct our own list using the HANDLERS from useSongOperations.
 
-    // Wrap metadata in array for hook
-    const items = React.useMemo(() => [metadata], [metadata]);
+// Helper Component for Menu
+function MenuWrapper({ metadata, onClose }: { metadata: SongMetadata | null, onClose: () => void }) {
+    if (!metadata) return null;
 
-    const {
-        handleAddToPlaylist,
-        handleAddToQueue,
-        handleFavorite,
-        handleProperties
-    } = useSongOperations({ items, context: 'other', hideSelect: true });
+    // We use a small local component to call the hook
+    // This wrapper ensures hook rules are followed
+    return <MenuButton metadata={metadata} onClose={onClose} />;
+}
 
-    // Custom Navigation Handlers 
-    // (We duplicate navigation logic slightly here because useSongOperations navigation might not close the fullscreen player, 
-    // although we could pass a custom onSelect/Close to it, but manual construction is safer for specific Apple Layout)
-    const { push } = useNavigationStore();
+function MenuButton({ metadata, onClose }: { metadata: SongMetadata, onClose: () => void }) {
+    const ops = useSongOperations({
+        items: [metadata],
+        context: 'other', // Use 'other' or 'player' generic context. 
+        hideSelect: true,
+        onNavigate: onClose,
+    });
 
-    const goToAlbum = () => {
-        if (metadata.album) {
-            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover || null, count: 0 } });
-            // Close player is handled by parent if needed? 
-            // Actually usually clicking "Go to Album" should close the player to show the album.
-            // But AppleMusicPlayer `onClose` is passed from parent.
-            // We can't easily close it from here without prop drilling.
-            // Let's rely on the user manually closing or we can dispatch the close event we used before?
-            // Wait, previous step we made `onClose` work via props.
-            // Let's just Dispatch 'close-fullscreen-player' as a failsafe or accept that updated navigation might not auto-close.
-            // User request "Go to Album" implies standard navigation behavior. 
-            // Standard behavior in App is `handleNavigate` -> `setIsFullScreen(false)`.
-            // `push` updates store, but doesn't auto-close fullscreen in App.tsx unless we trigger it.
-            // Let's trigger the event we set up in App.tsx: 'close-fullscreen-player'.
-            window.dispatchEvent(new CustomEvent('close-fullscreen-player'));
-        }
-    };
-
-    const goToArtist = () => {
-        if (metadata.artist) {
-            push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
-            window.dispatchEvent(new CustomEvent('close-fullscreen-player'));
-        }
-    };
-
-    // Icons are imported at module level
-
-    // Construct Groups
-    const menuGroups: MenuItemData[][] = [
-        [
-            { id: 'add-to', label: '添加到播放列表...', icon: MdPlaylistAdd, onClick: handleAddToPlaylist },
-            { id: 'queue', label: '加入播放队列', icon: MdPlaylistPlay, onClick: handleAddToQueue },
-        ],
-        [
-            { id: 'artist', label: '前往艺人', icon: MdPerson, onClick: goToArtist },
-            ...(metadata.album ? [{ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: goToAlbum }] : [])
-        ],
-        [
-            {
-                id: 'favorite',
-                label: metadata.is_favorite ? '取消喜爱' : '喜爱',
-                icon: metadata.is_favorite ? MdFavorite : MdFavoriteBorder,
-                onClick: handleFavorite
-            }
-        ],
-        [
-            { id: 'properties', label: '属性', icon: MdInfo, onClick: handleProperties }
-        ]
-    ];
+    // Filter out Play and Delete as requested
+    const filteredGroups = useMemo(() => {
+        return ops.menuItems.map(group =>
+            group.filter(item => item.id !== 'play' && item.id !== 'delete')
+        ).filter(group => group.length > 0);
+    }, [ops.menuItems]);
 
     return (
-        <SmartCursorContextMenu
-            x={x}
-            y={y}
-            onClose={onClose}
-            menuGroups={menuGroups}
-            variant="apple"
-            placement="top"
-        />
+        <MusicContextMenu
+            groups={filteredGroups}
+            variant="clean"
+            buttonClassName="w-8 h-8 rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center transition-all backdrop-blur-md text-white/50 hover:text-white"
+        >
+            <IoEllipsisHorizontal className="text-base" />
+        </MusicContextMenu>
     );
 }
+
 
 // Memoized Background Component to prevent re-renders on progress/volume change
 const BackgroundLayer = React.memo(({ src }: { src: string | null }) => {

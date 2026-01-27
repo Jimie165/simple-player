@@ -28,6 +28,7 @@ interface LibraryState {
     setCurrentSongIndex: (index: number) => void;
     pushHistory: (index: number) => void;
     popHistory: () => number | undefined;
+    clearPlayHistory: () => void;
 
     // 修改：参数变了，不再需要 mode 参数，因为状态在 store 里
     // 或者为了解耦，我们依然接收参数，或者在组件层处理
@@ -42,10 +43,20 @@ interface LibraryState {
     // 新增：按索引从显示队列移除（支持重复歌曲的精确删除）
     removeSongFromPlaylistByIndex: (index: number) => void;
 
+    // 新增：拖拽排序
+    reorderPlaylist: (fromIndex: number, toIndex: number) => void;
+
     // Add to Queue (Add to end of playlist)
     addToPlaylist: (song: SongMetadata) => void;
     // Add to Next (Insert after current song)
-    addToNext: (song: SongMetadata) => void;
+    addToNext: (song: SongMetadata, asQueueItem?: boolean) => void;
+    // Add multiple to next (helper)
+    addMultipleToNext: (songs: SongMetadata[], asQueueItem?: boolean) => void;
+
+    // 清空用户手动添加的队列
+    clearUserQueue: () => void;
+    // 移除单个队列项
+    removeQueueItem: (index: number) => void;
 
     // Library Version for Sync
     libraryVersion: number;
@@ -56,6 +67,10 @@ interface LibraryState {
 
     setPlaylistSettings: (id: string, settings: PlaylistSettings) => void;
     getPlaylistSettings: (id: string) => PlaylistSettings;
+
+    // Queue Context
+    queueContext: { type: string, name: string, id?: string } | null;
+    setQueueContext: (context: { type: string, name: string, id?: string } | null) => void;
 }
 
 import { libraryService } from '../services/libraryService';
@@ -104,6 +119,9 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     playlist: [],
     originalPlaylist: [],
     currentSongIndex: -1,
+    queueContext: null,
+
+    setQueueContext: (context) => set({ queueContext: context }),
 
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
@@ -159,6 +177,8 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     setCurrentSongIndex: (currentSongIndex) => set({ currentSongIndex }),
 
     pushHistory: (index) => set((state) => ({ playHistory: [...state.playHistory, index] })),
+
+    clearPlayHistory: () => set({ playHistory: [] }),
 
     popHistory: () => {
         const { playHistory } = get();
@@ -306,30 +326,197 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         });
     },
 
+    reorderPlaylist: (fromIndex, toIndex) => set((state) => {
+        const { playlist, currentSongIndex } = state;
+        if (fromIndex < 0 || fromIndex >= playlist.length || toIndex < 0 || toIndex >= playlist.length) {
+            return state;
+        }
+
+        const newPlaylist = [...playlist];
+        const [moved] = newPlaylist.splice(fromIndex, 1);
+        newPlaylist.splice(toIndex, 0, moved);
+
+        let newCurrent = currentSongIndex;
+        if (currentSongIndex === fromIndex) {
+            newCurrent = toIndex;
+        } else {
+            if (fromIndex < currentSongIndex && toIndex >= currentSongIndex) {
+                newCurrent--;
+            } else if (fromIndex > currentSongIndex && toIndex <= currentSongIndex) {
+                newCurrent++;
+            }
+        }
+
+        return { playlist: newPlaylist, currentSongIndex: newCurrent };
+    }),
+
     addToPlaylist: (song) => set((state) => ({
         playlist: [...state.playlist, song],
         originalPlaylist: [...state.originalPlaylist, song]
     })),
 
-    addToNext: (song) => set((state) => {
+    addToNext: (song, asQueueItem = false) => get().addMultipleToNext([song], asQueueItem),
+
+    addMultipleToNext: (songs, asQueueItem = false) => set((state) => {
         const { playlist, originalPlaylist, currentSongIndex } = state;
+        const songsToAdd = songs.map(s => asQueueItem ? { ...s, is_queue_item: true } : s);
+
         if (playlist.length === 0) {
             return {
-                playlist: [song],
-                originalPlaylist: [song],
+                playlist: songsToAdd,
+                originalPlaylist: songsToAdd,
                 currentSongIndex: 0
             };
         }
 
+        // Logic: Insert AFTER current song, BUT AFTER existing "queue items" that are already after current song.
+        // If we just added a song to queue, it sits at cur+1.
+        // If we add another, it should go to cur+2 (end of the user queue block), or cur+1?
+        // Usually "Play Next" means immediately next. Apple Music "Play Next" puts it at top of queue. 
+        // "Play Last" (Add to Queue) puts it at end of queue.
+        // Our UI says "Add to Queue" (加入播放队列), implying end of queue list.
+        // But "Play Next" (插队播放) is another concept.
+        // Let's assume `addToNext` here is used for "Add to Queue" action in `useSongOperations`.
+
+        // Wait, `handleAddToQueue` in `useSongOperations` calls `addToNext` in reverse order.
+        // And `handleAddToQueue` is labeled "加入播放队列" (Queue).
+        // If the user wants "Add to Queue" (End of the 'Next Up' user list), we need to find where the user queue ends.
+
+        // Let's find the insertion index.
+        let insertIndex = currentSongIndex + 1;
+
+        // If asQueueItem is true, we act as "Add to Queue" (append to user queue).
+        // If we want specific "Play Next" (top of queue), we might need another flag or function.
+        // Assuming this function is general "Insert Next".
+        // BUT `useSongOperations` calls it `addToNext`.
+        // If `asQueueItem` is true, we should try to append to the existing queue block if possible?
+        // Actually, let's keep it simple: `addToNext` always inserts at `currentSongIndex + 1`.
+        // BUT if we are adding a batch in reverse (like `useSongOperations` does), they stack up:
+        // Song A, B. Cur=A.
+        // Add C, D.
+        // addToNext(D) -> A, D, B
+        // addToNext(C) -> A, C, D, B. -> Order C, D. Correct.
+        // 
+        // However, if we already have a queue:
+        // A, [Q1, Q2], B.
+        // Add C. addToNext(C) -> A, C, Q1, Q2, B.
+        // This is "Play Next" behavior (Top of Queue).
+        // 
+        // If the user wants "Add to Queue" (Bottom of Queue):
+        // It should be A, Q1, Q2, C, B.
+        // 
+        // The user request says "Add to Queue ... rather than directly add to [Next From]".
+        // And provided image shows "Queue" section.
+        // So we likely want "Add to Queue" to append to the Queue section.
+        // So we need to find the last `is_queue_item` after current index.
+
+        if (asQueueItem) {
+            let lastQueueIndex = currentSongIndex;
+            while (lastQueueIndex + 1 < playlist.length && playlist[lastQueueIndex + 1].is_queue_item) {
+                lastQueueIndex++;
+            }
+            insertIndex = lastQueueIndex + 1;
+        }
+
         const newPlaylist = [...playlist];
-        newPlaylist.splice(currentSongIndex + 1, 0, song);
+        newPlaylist.splice(insertIndex, 0, ...songsToAdd);
 
         const newOriginal = [...originalPlaylist];
-        newOriginal.splice(currentSongIndex + 1, 0, song);
+        // For original, we just insert at same relative position or just append?
+        // Logic for original playlist with queue items is tricky if we want to restore un-shuffle.
+        // But standard behavior: exact sync.
+        // We just need to find where to insert in original.
+        // Simplified: insert at same index if strict sync, or just append since queue items are temporary?
+        // Let's insert at currentSongIndex + 1 for now to ensure they exist.
+        // Wait, if we shuffle, `originalPlaylist` order doesn't match `playlist`.
+        // If we add to `playlist` at specific index, we should add to `originalPlaylist` somewhere reasonable.
+        // Since queue items are usually temporary, maybe just append or insert after current song's original position?
+        // Let's just insert after current song index in `originalPlaylist` to be safe, or just append?
+        // safest is allow them to desync order but exist.
+        // Actually, we use `originalPlaylist` to restore `toggleShuffle(false)`.
+        // If we add queue items, we want them to persist even after unshuffle? Yes.
+        // So let's add them to originalPlaylist too.
+        // We'll just splice them into `originalPlaylist` at `currentSongIndex` (or matching logic) to keep simple?
+        // Actually, if shuffled, `currentSongIndex` points to `playlist`.
+        // The song at `playlist[currentSongIndex]` can be found in `originalPlaylist`.
+        // Let's find it.
+        let originalInsertIndex = -1;
+        const currentSong = playlist[currentSongIndex];
+        if (currentSong) {
+            originalInsertIndex = originalPlaylist.findIndex(s => s.path === currentSong.path) + 1;
+        }
+        if (originalInsertIndex === -1) originalInsertIndex = originalPlaylist.length;
+
+        newOriginal.splice(originalInsertIndex, 0, ...songsToAdd);
 
         return {
             playlist: newPlaylist,
             originalPlaylist: newOriginal
+        };
+    }),
+
+    clearUserQueue: () => set((state) => {
+        const { playlist, originalPlaylist, currentSongIndex } = state;
+        const currentSong = playlist[currentSongIndex];
+
+        if (currentSong) {
+            // Remove all is_queue_item EXCEPT the currently playing one
+            const finalPlaylist = playlist.filter((s, i) => i === currentSongIndex || !s.is_queue_item);
+            const finalOriginal = originalPlaylist.filter(s => (s.path === currentSong.path && s.id === currentSong.id) || !s.is_queue_item);
+
+            const newIdx = finalPlaylist.findIndex(s => s === currentSong);
+            return {
+                playlist: finalPlaylist,
+                originalPlaylist: finalOriginal,
+                currentSongIndex: newIdx !== -1 ? newIdx : 0
+            };
+        }
+
+        return {
+            playlist: playlist.filter(s => !s.is_queue_item),
+            originalPlaylist: originalPlaylist.filter(s => !s.is_queue_item),
+            currentSongIndex: 0
+        };
+    }),
+
+    removeQueueItem: (index: number) => set((state) => {
+        const { playlist, originalPlaylist, currentSongIndex } = state;
+        if (index < 0 || index >= playlist.length) return {};
+
+        // Cannot remove currently playing song via this method (use standard next/prev logic if needed, but for queue management we likely restrict it)
+        if (index === currentSongIndex) return {};
+
+        const itemToRemove = playlist[index];
+        const finalPlaylist = [...playlist];
+        finalPlaylist.splice(index, 1);
+
+        // Also remove from originalPlaylist if it exists there (it should)
+        // We find the 'best' match in originalPlaylist.
+        const originalIndex = originalPlaylist.findIndex((s) => {
+            // If unique IDs exist, use them. If not, path.
+            // Also need to handle duplicates? Queue items might be duplicates.
+            // Basic strategy: find first match? Or tracking?
+            // Since we don't track detailed mapping, we try exact object ref if possible?
+            // State updates create new objects? Maybe not.
+            return s === itemToRemove || (s.id === itemToRemove.id && s.path === itemToRemove.path && s.is_queue_item === itemToRemove.is_queue_item);
+        });
+
+        let finalOriginal = originalPlaylist;
+        if (originalIndex !== -1) {
+            finalOriginal = [...originalPlaylist];
+            finalOriginal.splice(originalIndex, 1);
+        }
+
+        // Adjust currentSongIndex
+        let newCurrentIndex = currentSongIndex;
+        if (index < currentSongIndex) {
+            newCurrentIndex--;
+        }
+
+        return {
+            playlist: finalPlaylist,
+            originalPlaylist: finalOriginal,
+            currentSongIndex: newCurrentIndex
         };
     }),
 

@@ -195,7 +195,8 @@ export default function Library() {
         index: number,
         scopeSongs: SongMetadata[] = librarySongs,
         addToHistory = true,
-        options?: { restartIfCurrent?: boolean }
+        options?: { restartIfCurrent?: boolean },
+        context?: { type: string, name: string, id?: string }
     ) => {
         await playSong({
             song,
@@ -205,6 +206,11 @@ export default function Library() {
                 ...options,
                 addToRecent: addToHistory,
                 recentItem: addToHistory ? buildRecentForSong(song) : undefined
+            },
+            context: context || {
+                type: 'library',
+                name: '音乐库',
+                id: 'library'
             }
         });
     };
@@ -272,6 +278,11 @@ export default function Library() {
                                     options: {
                                         addToRecent: true,
                                         buildRecentItem: buildRecentForSong
+                                    },
+                                    context: {
+                                        type: 'library',
+                                        name: '音乐库',
+                                        id: 'library'
                                     }
                                 });
                             }
@@ -358,12 +369,12 @@ export default function Library() {
                                             isLibraryItem: true
                                         });
                                         if (album.songs.length > 0) {
-                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true });
+                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: album.name, id: album.name });
                                         }
                                     }}
                                     onShuffleAlbum={(album) => {
                                         if (album.songs.length > 0) {
-                                            shufflePlay({ songs: album.songs });
+                                            shufflePlay({ songs: album.songs, context: { type: 'album_detail', name: album.name, id: album.name } });
                                         }
                                     }}
                                     onOpenAlbum={handleOpenAlbum}
@@ -388,12 +399,12 @@ export default function Library() {
                                     artists={artists}
                                     onPlayArtist={(artist) => {
                                         if (artist.songs.length > 0) {
-                                            handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true });
+                                            handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true }, { type: 'artist_detail', name: artist.name, id: artist.name });
                                         }
                                     }}
                                     onShuffleArtist={(artist) => {
                                         if (artist.songs.length > 0) {
-                                            shufflePlay({ songs: artist.songs });
+                                            shufflePlay({ songs: artist.songs, context: { type: 'artist_detail', name: artist.name, id: artist.name } });
                                         }
                                     }}
                                     onOpenArtist={handleOpenArtist}

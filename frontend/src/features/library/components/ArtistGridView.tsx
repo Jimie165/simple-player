@@ -57,7 +57,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
 
     const handleContextMenu = (e: React.MouseEvent, artist: ArtistData) => {
         e.preventDefault();
-        document.body.click();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, artist });
     };
 

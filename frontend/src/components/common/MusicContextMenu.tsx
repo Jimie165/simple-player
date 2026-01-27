@@ -46,6 +46,7 @@ export interface MusicContextMenuProps extends Partial<MusicMenuOptions> {
     buttonClassName?: string; // Button class configuration
     variant?: 'glass' | 'clean'; // Visual variant
     onOpen?: () => void; // Callback when menu is opened
+    children?: React.ReactNode; // Custom trigger content
 }
 
 export function getMusicMenuGroups(options: MusicMenuOptions): MenuItemData[][] {
@@ -190,7 +191,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     const getButtonClass = () => {
         const baseClass = `flex items-center justify-center transition-colors z-20 ${buttonClassName || 'w-8 h-8'}`;
         if (variant === 'clean') {
-            return `${baseClass} text-primary dark:text-primary-light hover:bg-primary/10 dark:hover:bg-primary/15 rounded-full`;
+            return `${baseClass} text-primary dark:text-primary-light hover:opacity-80`;
         }
         return `${baseClass} rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white hover:bg-white/30`;
     };
@@ -236,14 +237,37 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     return (
         <div
             className={className}
-            onClick={(e) => { e.stopPropagation(); onOpen?.(); }}
-            onDoubleClick={(e) => e.stopPropagation()}
         >
             <Menu as="div" className="relative">
                 {({ open }) => (
                     <>
-                        <MenuButton ref={buttonRef} className={getButtonClass()}>
-                            <MdMoreHoriz />
+                        <MenuButton
+                            ref={buttonRef}
+                            className={getButtonClass()}
+                            onClick={(e) => {
+                                // Stop propagation first to prevent event from triggering row click
+                                e.stopPropagation();
+
+                                // Close any open context menus (right-click menus) before opening this menu
+                                // Dispatch mousedown event synchronously to trigger cleanup handlers
+                                const closeEvent = new MouseEvent('mousedown', {
+                                    bubbles: true,
+                                    cancelable: true,
+                                    view: window
+                                });
+                                document.dispatchEvent(closeEvent);
+
+                                // Notify parent component that menu is opening
+                                // This should close the right-click menu via setContextMenu(null)
+                                onOpen?.();
+                            }}
+                            onDoubleClick={(e) => e.stopPropagation()}
+                            onContextMenu={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                            }}
+                        >
+                            {props.children || <MdMoreHoriz />}
                         </MenuButton>
                         <MenuContent
                             open={open}

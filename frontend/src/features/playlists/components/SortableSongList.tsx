@@ -555,8 +555,10 @@ export default function SortableSongList({
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
-        // Close other menus (HeadlessUI)
-        document.body.click();
+        e.stopPropagation();
+
+        // Close other menus (HeadlessUI) before opening the right-click menu
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
 
         const id = getSongId(song, index);
         const isSelected = id ? selectedIds.has(id) : false;
@@ -631,7 +633,10 @@ export default function SortableSongList({
                                     onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
                                     toggleFavorite={toggleFavorite}
                                     toggleSelection={toggleSelection}
-                                    onMenuOpen={() => setContextMenu(null)}
+                                    onMenuOpen={() => {
+                                        // Close right-click context menu when opening three-dot menu
+                                        setContextMenu(null);
+                                    }}
                                     playlistId={playlistId} // Pass down
                                     context={context}
                                 />

@@ -14,11 +14,11 @@ import type { MusicItem } from '../utils/musicItemUtils';
 import type { SongMetadata } from '../types';
 import {
     MdPlayArrow, MdShuffle, MdFavorite, MdFavoriteBorder, MdDelete,
-    MdInfo, MdEdit, MdCheckBoxOutlineBlank, MdCheckBox, MdAlbum, MdPerson, MdPlaylistPlay, MdPlaylistRemove, MdPlaylistAdd
+    MdInfo, MdEdit, MdCheckBoxOutlineBlank, MdCheckBox, MdAlbum, MdPerson, MdPlaylistPlay, MdPlaylistRemove, MdPlaylistAdd, MdRemoveCircleOutline
 } from 'react-icons/md';
 
 // 菜单上下文类型
-export type MusicMenuContext = 'library' | 'playlist' | 'folder' | 'recent' | 'album_detail' | 'artist_detail' | 'playlist_list' | 'other';
+export type MusicMenuContext = 'library' | 'playlist' | 'folder' | 'recent' | 'album_detail' | 'artist_detail' | 'playlist_list' | 'queue' | 'other';
 
 // 菜单项数据结构 (兼容 MusicContextMenu)
 export interface MenuItemData {
@@ -42,6 +42,7 @@ interface UseSongOperationsOptions {
     onDelete?: () => void; // 仅当您想覆盖默认删除逻辑时使用
     onEdit?: () => void;
     onSelect?: () => void; // 用于触发选择模式或切换选中状态
+    onNavigate?: () => void; // New: Callback after navigation (e.g., closing player)
 
     // UI 配置
     hideSelect?: boolean;
@@ -53,11 +54,11 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const {
         items, context, playlistId, onSelect,
         hideSelect = false, selectText = '选择', isSelected = false,
-        onPlay, onShuffle, onAddToQueue, onDelete, onEdit
+        onPlay, onShuffle, onAddToQueue, onDelete, onEdit, onNavigate
     } = options;
 
     // Stores
-    const { addToNext, isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
+    const { isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { setShuffleState, isShuffling } = usePlayerStore();
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
@@ -129,10 +130,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             return;
         }
         const songs = await resolveSongsFromItems(items);
-        // 倒序加入，保持原本顺序在下一首逻辑中正确
-        [...songs].reverse().forEach(s => addToNext(s));
+        if (songs.length === 0) return;
+
+        // Use addMultipleToNext with asQueueItem=true
+        // This will append them to the user queue block.
+        useLibraryStore.getState().addMultipleToNext(songs, true);
         clearSelection();
-    }, [items, onAddToQueue, addToNext, clearSelection]);
+    }, [items, onAddToQueue, clearSelection]);
 
     // 4. 添加到播放列表
     const handleAddToPlaylist = useCallback(async () => {
@@ -258,9 +262,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 '删除记录',
                 '删除'
             );
-        } else {
+        } else if (context !== 'queue') {
             // 默认：从库中删除 (仅对 Song / Album / Artist 有效，对 File/Folder 暂时视为 Recent? 不，File 可以删库)
             // 我们约定：在 Library Context 下，都是删库引用。
+            // Context 'queue' should ideally NOT auto-delete-from-library unless onDelete is passed.
             handleDeleteFromLibrary();
         }
     }, [context, playlistId, items, count, onDelete, openDeleteConfirm, triggerLibraryUpdate, removeFromRecent, handleDeleteFromLibrary, clearSelection]);
@@ -294,8 +299,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                     count: 0
                 }
             });
+            onNavigate?.(); // Close player or navigate
         }
-    }, [isSingle, firstItem, push, clearSelection]);
+    }, [isSingle, firstItem, push, clearSelection, onNavigate]);
 
     const handleShowArtist = useCallback(() => {
         if (!isSingle) return;
@@ -305,8 +311,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         if (artist) {
             clearSelection();
             push({ type: 'artist_detail', data: { name: artist, count: 0, albumCount: 0, songs: [], cover: null } });
+            onNavigate?.(); // Close player or navigate
         }
-    }, [isSingle, firstItem, push, clearSelection]);
+    }, [isSingle, firstItem, push, clearSelection, onNavigate]);
 
 
 
@@ -425,6 +432,12 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             // 增加从音乐库中删除
             const deleteLabel = count > 1 ? `从音乐库删除 ${count} 项` : '从音乐库删除';
             group3.push({ id: 'delete', label: deleteLabel, icon: MdDelete, onClick: handleDeleteFromLibrary, variant: 'danger' });
+        } else if (context === 'queue') {
+            // Queue: Show Remove from Queue
+            const label = count > 1 ? `从播放队列移除 ${count} 项` : '从播放队列移除';
+            // Context 'queue' typically implies we are editing the temporary queue. 
+            // We use handleDeleteOrRemove which will call onDelete() if provided (AppleMusicQueue should provide it).
+            group3.push({ id: 'remove_queue', label, icon: MdRemoveCircleOutline, onClick: handleDeleteOrRemove, variant: 'default' });
         } else {
             // Delete
             let label = count > 1 ? `从音乐库删除 ${count} 项` : '从音乐库删除';

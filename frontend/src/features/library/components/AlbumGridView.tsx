@@ -59,7 +59,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
 
     const handleContextMenu = (e: React.MouseEvent, album: AlbumData) => {
         e.preventDefault();
-        document.body.click();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, album });
     };
 

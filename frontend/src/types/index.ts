@@ -24,6 +24,8 @@ export interface SongMetadata {
     last_played_at?: string;
     is_favorite?: boolean;
     rating?: number;
+    // 队列控制
+    is_queue_item?: boolean;
 }
 
 // 库文件夹

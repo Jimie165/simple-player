@@ -34,7 +34,7 @@ export default function GlobalDetailStack() {
         artist: song.artist
     });
 
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean }) => {
+    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean }, context?: { type: string, name: string, id?: string }) => {
         await playSong({
             song,
             index,
@@ -43,7 +43,8 @@ export default function GlobalDetailStack() {
                 ...options,
                 addToRecent: addToHistory,
                 recentItem: addToHistory ? buildRecentForSong(song) : undefined
-            }
+            },
+            context
         });
     };
 
@@ -144,8 +145,8 @@ export default function GlobalDetailStack() {
 
 interface OverlayProps {
     data: any;
-    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean }) => void;
-    onShuffle: (params: { songs: SongMetadata[] }) => void;
+    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean }, context?: { type: string, name: string, id?: string }) => void;
+    onShuffle: (params: { songs: SongMetadata[], context?: { type: string, name: string, id?: string } }) => void;
     addToRecent: (item: any) => void;
     push?: (view: any) => void;
     onOpenArtistByName: (name: string) => void;
@@ -182,7 +183,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
     return (
         <AlbumDetailView
             album={{ ...albumData, songs: albumData.songs || [] }} // Ensure songs is never undefined
-            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, options)}
+            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, options, { type: 'album_detail', name: albumData.name, id: albumData.name })}
             onPlayAll={() => {
                 const songs = albumData.songs || [];
                 addToRecent({
@@ -197,12 +198,12 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
                     lastPlayed: Date.now(),
                     isLibraryItem: true
                 });
-                if (songs.length > 0) onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true });
+                if (songs.length > 0) onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: albumData.name, id: albumData.name });
             }}
             onShuffle={() => {
                 const songs = albumData.songs || [];
                 if (songs.length > 0) {
-                    onShuffle({ songs });
+                    onShuffle({ songs, context: { type: 'album_detail', name: albumData.name, id: albumData.name } });
                 }
             }}
             onDeleteSong={() => { }} // TODO: Global Delete
@@ -282,7 +283,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
             isLibraryItem: true
         });
 
-        onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true });
+        onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: album.name, id: album.name });
     };
 
     return (
@@ -303,16 +304,16 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
                     lastPlayed: Date.now(),
                     isLibraryItem: true
                 });
-                if (artistData.songs.length > 0) onPlaySong(artistData.songs[0], 0, artistData.songs, false, { restartIfCurrent: true });
+                if (artistData.songs.length > 0) onPlaySong(artistData.songs[0], 0, artistData.songs, false, { restartIfCurrent: true }, { type: 'artist_detail', name: artistData.name, id: artistData.name });
             }}
             onShuffle={() => {
                 if (artistData.songs.length > 0) {
-                    onShuffle({ songs: artistData.songs });
+                    onShuffle({ songs: artistData.songs, context: { type: 'artist_detail', name: artistData.name, id: artistData.name } });
                 }
             }}
             onPlayAlbum={handlePlayAlbum}
             onOpenAlbum={handleOpenAlbum}
-            onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options)}
+            onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
             onDeleteSong={() => { }}
             onDeleteAlbum={() => { }}
             onOpenArtistByName={onOpenArtistByName}

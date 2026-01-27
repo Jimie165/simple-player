@@ -15,6 +15,7 @@ interface PlaySongParams {
     index: number;
     playlist?: SongMetadata[];
     options?: PlayOptions;
+    context?: { type: string, name: string, id?: string };
 }
 
 interface PlayListParams {
@@ -22,11 +23,13 @@ interface PlayListParams {
     startIndex?: number;
     shuffle?: boolean;
     options?: PlayOptions;
+    context?: { type: string, name: string, id?: string };
 }
 
 interface ShufflePlayParams {
     songs: SongMetadata[];
     options?: PlayOptions;
+    context?: { type: string, name: string, id?: string };
 }
 
 interface PlayQueueParams {
@@ -44,10 +47,10 @@ const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
 };
 
 export function usePlaybackActions() {
-    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent } = useLibraryStore();
+    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent, setQueueContext } = useLibraryStore();
     const { setMetadata, setIsPlaying, setShuffleState, setRepeatState, togglePlay, restartSong } = usePlayerStore();
 
-    const playSong = async ({ song, index, playlist, options }: PlaySongParams) => {
+    const playSong = async ({ song, index, playlist, options, context }: PlaySongParams) => {
         if (!song.path) return;
 
         const { metadata, isShuffling } = usePlayerStore.getState();
@@ -69,6 +72,9 @@ export function usePlaybackActions() {
 
             if (playlist && playlist.length > 0) {
                 setPlaylist(playlist);
+                if (context) {
+                    setQueueContext(context);
+                }
                 if (isShuffling) {
                     setCurrentSongIndex(index);
                     toggleShuffleList(true);
@@ -76,6 +82,9 @@ export function usePlaybackActions() {
                     setCurrentSongIndex(index);
                 }
             }
+
+            // If just playing a song without playlist change, maybe we don't update context?
+            // Usually we do update playlist if context changes.
 
             if (options?.addToRecent !== false) {
                 const recentItem = options?.recentItem ?? options?.buildRecentItem?.(song);
@@ -87,11 +96,11 @@ export function usePlaybackActions() {
         }
     };
 
-    const playList = async ({ songs, startIndex = 0, shuffle = false, options }: PlayListParams) => {
+    const playList = async ({ songs, startIndex = 0, shuffle = false, options, context }: PlayListParams) => {
         if (songs.length === 0) return;
 
         if (shuffle) {
-            await shufflePlay({ songs, options });
+            await shufflePlay({ songs, options, context });
             return;
         }
 
@@ -104,11 +113,12 @@ export function usePlaybackActions() {
             song,
             index: startIndex,
             playlist: songs,
-            options
+            options,
+            context
         });
     };
 
-    const shufflePlay = async ({ songs, options }: ShufflePlayParams) => {
+    const shufflePlay = async ({ songs, options, context }: ShufflePlayParams) => {
         if (songs.length === 0) return;
 
         const randomIndex = Math.floor(Math.random() * songs.length);
@@ -121,6 +131,9 @@ export function usePlaybackActions() {
         }
 
         setPlaylist(songs);
+        if (context) {
+            setQueueContext(context);
+        }
         setCurrentSongIndex(randomIndex);
         toggleShuffleList(true);
         setShuffleState(true);
@@ -134,7 +147,8 @@ export function usePlaybackActions() {
                 ...options,
                 restartIfCurrent: true,
                 recentItem
-            }
+            },
+            context
         });
     };
 
@@ -178,7 +192,7 @@ export function usePlaybackActions() {
 
         const song = playlist[nextIdx];
         if (song?.path) {
-            await playSong({ song, index: nextIdx, playlist, options: { restartIfCurrent: true } });
+            await playQueueItem({ song, index: nextIdx, restartIfCurrent: true });
         }
     };
 
@@ -188,7 +202,7 @@ export function usePlaybackActions() {
 
         // Check if we should just restart current song (> 3s)
         if (currentTime > 3) {
-            await audioService.seek(0);
+            await seek(0); // Use the seek action to ensure UI sync
             return;
         }
 
@@ -197,7 +211,7 @@ export function usePlaybackActions() {
         if (historyIndex !== undefined && historyIndex >= 0 && historyIndex < playlist.length) {
             const song = playlist[historyIndex];
             if (song?.path) {
-                await playSong({ song, index: historyIndex, playlist, options: { restartIfCurrent: true } });
+                await playQueueItem({ song, index: historyIndex, restartIfCurrent: true });
                 return;
             }
         }
@@ -206,7 +220,7 @@ export function usePlaybackActions() {
         const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
         const song = playlist[prevIdx];
         if (song?.path) {
-            await playSong({ song, index: prevIdx, playlist, options: { restartIfCurrent: true } });
+            await playQueueItem({ song, index: prevIdx, restartIfCurrent: true });
         }
     };
 

@@ -43,7 +43,7 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { addToNext, libraryVersion, getPlaylistSettings } = useLibraryStore();
+    const { addMultipleToNext, libraryVersion, getPlaylistSettings } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
@@ -185,13 +185,26 @@ export default function PlaylistList() {
         };
 
         if (shuffle) {
-            await shufflePlay({ songs, options: { recentItem } });
+            await shufflePlay({
+                songs,
+                options: { recentItem },
+                context: {
+                    type: 'playlist_detail',
+                    name: pl.name,
+                    id: pl.id.toString()
+                }
+            });
         } else {
             setShuffleState(false);
             await playList({
                 songs,
                 startIndex: 0,
-                options: { restartIfCurrent: true, recentItem }
+                options: { restartIfCurrent: true, recentItem },
+                context: {
+                    type: 'playlist_detail',
+                    name: pl.name,
+                    id: pl.id.toString()
+                }
             });
         }
 
@@ -202,7 +215,7 @@ export default function PlaylistList() {
     // 添加到播放队列
     const handleAddToQueue = async (pl: Playlist) => {
         const songs = await loadPlaylistSongs(pl.id);
-        [...songs].reverse().forEach(s => addToNext(s));
+        addMultipleToNext(songs, true);
     };
 
     // 播放喜爱歌曲
@@ -223,13 +236,26 @@ export default function PlaylistList() {
             };
 
             if (shuffle) {
-                await shufflePlay({ songs, options: { recentItem } });
+                await shufflePlay({
+                    songs,
+                    options: { recentItem },
+                    context: {
+                        type: 'playlist_detail',
+                        name: '喜爱歌曲',
+                        id: 'favorites'
+                    }
+                });
             } else {
                 setShuffleState(false);
                 await playList({
                     songs,
                     startIndex: 0,
-                    options: { restartIfCurrent: true, recentItem }
+                    options: { restartIfCurrent: true, recentItem },
+                    context: {
+                        type: 'playlist_detail',
+                        name: '喜爱歌曲',
+                        id: 'favorites'
+                    }
                 });
             }
 
@@ -242,7 +268,7 @@ export default function PlaylistList() {
     const handleAddFavoritesToQueue = async () => {
         try {
             const songs = await libraryService.getFavorites();
-            [...songs].reverse().forEach(s => addToNext(s));
+            addMultipleToNext(songs, true);
         } catch (error) {
             console.error('Failed to add favorites to queue:', error);
         }
@@ -262,7 +288,7 @@ export default function PlaylistList() {
     const handleContextMenu = (e: React.MouseEvent, playlist: Playlist) => {
         e.preventDefault();
         // 触发一个全屏点击来关闭任何打开的 HeadlessUI 菜单（三个点菜单）
-        document.body.click();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
 
         setFavoritesContextMenu(null);
         setContextMenu({ x: e.clientX, y: e.clientY, playlist });
@@ -270,7 +296,7 @@ export default function PlaylistList() {
 
     const handleFavoritesContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
-        document.body.click();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
 
         setContextMenu(null);
         setFavoritesContextMenu({ x: e.clientX, y: e.clientY });

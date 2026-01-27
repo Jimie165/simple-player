@@ -49,6 +49,8 @@ export default function SongListView({
     const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
     const headerPaddingClass = isLibraryContext ? "px-2" : "px-4";
     const rowPaddingClass = isLibraryContext ? "px-2" : "px-4";
+    // 艺人详情和专辑详情页都使用 top-10，library 也使用 top-10
+    const headerTopClass = "top-10";
     // 表头在不同上下文下的背景/模糊效果
 
     // Responsive: auto-hide album column on narrow windows
@@ -101,6 +103,10 @@ export default function SongListView({
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
+
+        // Dispatch 'mousedown' to ensure Headless UI menus close (click() is sometimes insufficient)
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
     };
 
@@ -255,7 +261,8 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky top-10 z-45 grid pt-2 pb-3 border-b border-white/10 backdrop-blur-xl",
+                    "sticky z-45 grid pt-2 pb-3 border-b border-white/10 backdrop-blur-xl",
+                    headerTopClass,
                     gridGapClass,
                     headerPaddingClass,
                     "text-[13px] text-on-surface-variant font-medium"

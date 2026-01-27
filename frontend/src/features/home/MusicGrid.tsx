@@ -65,7 +65,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
 
     const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
         e.preventDefault();
-        document.body.click();
+        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, item });
     };
 
@@ -119,6 +119,11 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 options: {
                     restartIfCurrent: true,
                     recentItem: buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent)
+                },
+                context: {
+                    type: 'home',
+                    name: '主页',
+                    id: 'home'
                 }
             });
         } catch (err) { console.error("Play single file failed", err); }
@@ -147,6 +152,11 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 options: {
                     restartIfCurrent: true,
                     recentItem: { ...item, lastPlayed: Date.now() }
+                },
+                context: {
+                    type: 'home',
+                    name: '主页',
+                    id: 'home'
                 }
             });
         };
@@ -218,6 +228,11 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                             path: selected,
                             lastPlayed: Date.now()
                         }
+                    },
+                    context: {
+                        type: 'home',
+                        name: '主页',
+                        id: 'home'
                     }
                 });
             }

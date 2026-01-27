@@ -158,13 +158,13 @@ export default function ArtistDetailView({
                     className={clsx(
                         "pb-3 text-sm font-medium transition-all relative",
                         activeTab === 'albums'
-                            ? "text-blue-600 dark:text-blue-400"
+                            ? "text-primary"
                             : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                     )}
                 >
                     专辑 ({albums.length})
                     {activeTab === 'albums' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
                     )}
                 </button>
                 <button
@@ -172,19 +172,19 @@ export default function ArtistDetailView({
                     className={clsx(
                         "pb-3 text-sm font-medium transition-all relative",
                         activeTab === 'songs'
-                            ? "text-blue-600 dark:text-blue-400"
+                            ? "text-primary"
                             : "text-neutral-500 hover:text-neutral-800 dark:text-neutral-400 dark:hover:text-neutral-200"
                     )}
                 >
                     歌曲 ({artist.songs.length})
                     {activeTab === 'songs' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 dark:bg-blue-400 rounded-t-full" />
+                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
                     )}
                 </button>
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 px-2 pb-8 overflow-x-hidden">
+            <div className="flex-1 px-2 pb-8">
                 <AnimatePresence mode="wait">
                     {activeTab === 'albums' ? (
                         <motion.div
@@ -263,7 +263,7 @@ export default function ArtistDetailView({
                                     </div>
 
                                     {/* Right: Song List */}
-                                    <div className="flex-1 min-w-0 bg-neutral-50/50 dark:bg-white/5 rounded-2xl p-2 md:p-4">
+                                    <div className="flex-1 min-w-0">
                                         <SongListView
                                             songs={album.songs}
                                             onPlay={(song, _index, options) => {

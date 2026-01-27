@@ -131,6 +131,11 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             options: {
                 ...options,
                 buildRecentItem: buildRecentForSong
+            },
+            context: {
+                type: 'playlist_detail',
+                name: displayName,
+                id: id.toString()
             }
         });
     };
@@ -143,6 +148,11 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 options: {
                     restartIfCurrent: true,
                     buildRecentItem: buildRecentForSong
+                },
+                context: {
+                    type: 'playlist_detail',
+                    name: displayName,
+                    id: id.toString()
                 }
             });
             // Track playlist play time
@@ -158,6 +168,11 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 songs,
                 options: {
                     buildRecentItem: buildRecentForSong
+                },
+                context: {
+                    type: 'playlist_detail',
+                    name: displayName,
+                    id: id.toString()
                 }
             });
 

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
-import { MdMusicNote, MdRemoveCircle } from 'react-icons/md';
+import { MdMusicNote, MdRemoveCircleOutline } from 'react-icons/md';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
 import { useNavigationStore } from '../../../store/useNavigationStore';
@@ -167,9 +167,9 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                     className={clsx(
                                         "group flex items-center gap-3 p-2 rounded-lg text-xs cursor-default transition-colors",
                                         isCurrent
-                                        ? "bg-primary/10 text-primary"
-                                        : "hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-200"
-                                )}
+                                            ? "bg-primary/10 text-primary"
+                                            : "hover:bg-neutral-100 dark:hover:bg-white/5 text-neutral-700 dark:text-neutral-200"
+                                    )}
                                 >
                                     <div className="w-10 h-10 shrink-0 rounded overflow-hidden bg-neutral-200 dark:bg-neutral-800">
                                         <SongCoverOverlay
@@ -194,14 +194,14 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                             variant="clean"
                                             buttonClassName="w-6 h-6"
                                             onPlay={() => handlePlay(song, index, { restartIfCurrent: true })}
-                                            onAddToQueue={() => addToNext(song)}
+                                            onAddToQueue={() => addToNext(song, true)}
                                             onAddToPlaylist={() => addToPlaylistStore.open(song)}
                                             onShowProperties={() => handleShowProperties(song)}
                                             onShowAlbum={song.album ? () => handleShowAlbum(song) : undefined}
                                             onShowArtist={song.artist ? () => handleShowArtist(song) : undefined}
                                             onDelete={() => removeSongFromPlaylistByIndex(index)}
                                             deleteText="从播放队列移除"
-                                            deleteIcon={MdRemoveCircle}
+                                            deleteIcon={MdRemoveCircleOutline}
                                             deleteVariant="default"
                                             onFavorite={() => toggleFavorite(song)}
                                             isFavorite={song.is_favorite}
@@ -225,14 +225,14 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                     menuGroups={getMusicMenuGroups({
                         type: 'song',
                         onPlay: () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }),
-                        onAddToQueue: () => addToNext(contextMenu.song),
+                        onAddToQueue: () => addToNext(contextMenu.song, true),
                         onAddToPlaylist: () => addToPlaylistStore.open(contextMenu.song),
                         onShowProperties: () => handleShowProperties(contextMenu.song),
                         onShowAlbum: contextMenu.song.album ? () => handleShowAlbum(contextMenu.song) : undefined,
                         onShowArtist: contextMenu.song.artist ? () => handleShowArtist(contextMenu.song) : undefined,
                         onDelete: () => removeSongFromPlaylistByIndex(contextMenu.index),
                         deleteText: "从播放队列移除",
-                        deleteIcon: MdRemoveCircle,
+                        deleteIcon: MdRemoveCircleOutline,
                         deleteVariant: 'default',
                         onFavorite: () => toggleFavorite(contextMenu.song),
                         isFavorite: contextMenu.song.is_favorite,
