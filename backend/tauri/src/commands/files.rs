@@ -1,19 +1,23 @@
 use crate::modules::library::{self, SongMetadata};
 use std::path::Path;
+use tauri::Manager;
 
 #[tauri::command]
-pub fn get_metadata(path: String) -> Result<SongMetadata, String> {
-    library::get_metadata(&path)
+pub fn get_metadata(app: tauri::AppHandle, path: String) -> Result<SongMetadata, String> {
+    // 尝试获取 app_data_dir 以支持缓存
+    let app_data_dir = app.path().app_data_dir().ok();
+    library::get_metadata(&path, app_data_dir.as_deref())
 }
 
 /// 读取文件夹内的所有音频文件路径
 #[tauri::command]
-pub fn read_folder_audio_files(folder: String) -> Vec<SongMetadata> {
+pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<SongMetadata> {
     let paths = library::scan_audio_files(&folder);
     let mut songs = Vec::new();
+    let app_data_dir = app.path().app_data_dir().ok();
 
     for path in paths {
-        if let Ok(meta) = library::get_metadata(&path) {
+        if let Ok(meta) = library::get_metadata(&path, app_data_dir.as_deref()) {
             songs.push(meta);
         } else {
             // 如果解析失败，生成简易 metadata

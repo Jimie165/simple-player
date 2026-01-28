@@ -74,7 +74,7 @@ pub async fn scan_library(
                 if existing.status == "archived" {
                     if force_restore {
                         // 场景 B: 强制恢复 (读取新元数据 + 设为 active)
-                        if let Ok(meta) = library::get_metadata(&file) {
+                        if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
                             // 保存封面
                             let cover_path = meta.cover.as_ref().and_then(|cover_data| {
                                 save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
@@ -118,7 +118,7 @@ pub async fn scan_library(
             }
 
             // 从文件读取元数据
-            if let Ok(meta) = library::get_metadata(&file) {
+            if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
                 // 保存封面到文件
                 let cover_path = meta.cover.as_ref().and_then(|cover_data| {
                     save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)

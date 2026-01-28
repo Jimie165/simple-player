@@ -62,8 +62,12 @@ impl SongMetadata {
     }
 }
 
+// 引用 covers 模块
+// 注意：需要在文件头部确保能引用到 crate::modules::library::covers
+// 由于是在同一个 mod 下，使用 super::covers 或者 crate::modules::library::covers
+
 /// 从文件读取完整元数据
-pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
+pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetadata, String> {
     let path_obj = Path::new(path);
 
     // 获取文件大小
@@ -132,6 +136,8 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
 
     // 获取封面图片
     let mut cover_base64 = None;
+    let mut resolved_cover_path = None;
+    
     if let Some(t) = tag {
         if let Some(picture) = t.pictures().first() {
             let b64 = BASE64_STANDARD.encode(picture.data());
@@ -139,7 +145,18 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
                 .mime_type()
                 .map(|m| m.as_str())
                 .unwrap_or("image/jpeg");
-            cover_base64 = Some(format!("data:{};base64,{}", mime_type, b64));
+            let data_url = format!("data:{};base64,{}", mime_type, b64);
+            
+            if let Some(dir) = app_data_dir {
+                 // 如果提供了 app_data_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
+                 // 使用 crate 绝对路径引用 covers
+                 if let Some(path) = crate::modules::library::covers::save_cover(dir, &album, &artist, &data_url) {
+                      resolved_cover_path = Some(path);
+                 }
+                 // 既然已经缓存了路径，就不再返回 base64 数据
+            } else {
+                 cover_base64 = Some(data_url);
+            }
         }
     }
 
@@ -150,7 +167,7 @@ pub fn get_metadata(path: &str) -> Result<SongMetadata, String> {
         album,
         duration,
         cover: cover_base64,
-        cover_path: None, // 将在扫描时由调用者设置
+        cover_path: resolved_cover_path,
         path: Some(path_obj.display().to_string().replace('\\', "/")),
         size,
         sample_rate,
