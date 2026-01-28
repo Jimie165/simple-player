@@ -622,6 +622,11 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     storage: safeStorage,
     partialize: (state) => ({
         recentHistory: state.recentHistory,
-        playlistSettings: state.playlistSettings
+        playlistSettings: state.playlistSettings,
+        queueContext: state.queueContext,
+        // Persist Session
+        currentSongIndex: state.currentSongIndex,
+        playlist: state.playlist,
+        originalPlaylist: state.originalPlaylist
     }),
 }));

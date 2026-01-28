@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import React, { useMemo } from 'react';
 import clsx from 'clsx';
 import {
     DndContext,
@@ -39,7 +39,7 @@ interface SongRowProps {
     onNavigate?: () => void; // Callback on navigation
 }
 
-function SongRow({ song, isActive, onPlay, style, itemRef, dragAttributes, dragListeners, isDraggable, onRemove, onNavigate }: SongRowProps) {
+const SongRow = React.memo(function SongRow({ song, isActive, onPlay, style, itemRef, dragAttributes, dragListeners, isDraggable, onRemove, onNavigate }: SongRowProps) {
     // Generate menu operations
     const ops = useSongOperations({
         items: [song],
@@ -104,7 +104,7 @@ function SongRow({ song, isActive, onPlay, style, itemRef, dragAttributes, dragL
             </div>
         </div>
     );
-}
+});
 
 function SortableQueueItem({ song, index, isActive, onPlay, onRemove, onNavigate }: { song: SongMetadata; index: number; isActive?: boolean; onPlay: () => void, onRemove?: () => void, onNavigate?: () => void }) {
     const {
@@ -169,7 +169,9 @@ export default function AppleMusicQueue({ onNavigate }: { onNavigate?: () => voi
     // filtering only items AFTER currentSongIndex.
 
     const { queueList, nextFromList } = useMemo(() => {
-        const nextItems = playlist.slice(currentSongIndex + 1);
+        // Limit the Lookahead to 100 items (similar to Apple Music)
+        // This is a direct performance optimization to prevent rendering thousands of items
+        const nextItems = playlist.slice(currentSongIndex + 1, currentSongIndex + 1 + 100);
         const queue: { song: SongMetadata; originalIndex: number }[] = [];
         const nextFrom: { song: SongMetadata; originalIndex: number }[] = [];
 

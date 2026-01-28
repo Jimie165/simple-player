@@ -5,6 +5,7 @@ interface MusicSliderProps {
     min: number;
     max: number;
     step?: number;
+    disabled?: boolean;
     onChange: (value: number) => void;
     onMouseDown?: () => void;
     onMouseUp?: () => void;
@@ -23,7 +24,7 @@ interface MusicSliderProps {
  * 特点：悬停时加粗，不显示滑块圆点 (Thumb)
  */
 export default function MusicSlider({
-    value, min, max, step = 1,
+    value, min, max, step = 1, disabled = false,
     onChange, onMouseDown, onMouseUp,
     className,
     trackColor = "bg-white/20",
@@ -35,13 +36,17 @@ export default function MusicSlider({
     const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
 
     return (
-        <div className={clsx("relative w-full group flex items-center h-4", className)}>
+        <div className={clsx(
+            "relative w-full group flex items-center h-4",
+            disabled ? "opacity-40 pointer-events-none cursor-not-allowed" : "",
+            className
+        )}>
             {/* 轨道 & 填充容器 */}
             <div className={clsx(
                 "relative w-full rounded-full overflow-hidden transition-all duration-200 ease-out",
                 trackHeightClass,
-                hoverHeightClass,
-                activeHeightClass,
+                !disabled && hoverHeightClass,
+                !disabled && activeHeightClass,
                 trackColor
             )}>
                 {/* 填充进度 */}
@@ -58,11 +63,13 @@ export default function MusicSlider({
                 max={max}
                 step={step}
                 value={value}
+                disabled={disabled}
                 onMouseDown={onMouseDown}
                 onMouseUp={onMouseUp}
                 onChange={(e) => onChange(Number(e.target.value))}
                 className={clsx(
-                    "absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 appearance-none",
+                    "absolute inset-0 w-full h-full opacity-0 z-10 appearance-none",
+                    disabled ? "cursor-not-allowed" : "cursor-pointer",
                     "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-0 [&::-webkit-slider-thumb]:h-0",
                     "[&::-moz-range-thumb]:w-0 [&::-moz-range-thumb]:h-0 [&::-moz-range-thumb]:border-0"
                 )}

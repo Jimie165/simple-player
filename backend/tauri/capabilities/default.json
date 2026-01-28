@@ -17,6 +17,7 @@
         "core:window:allow-start-dragging",
         "core:window:allow-toggle-maximize",
         "core:event:allow-listen",
+        "core:event:allow-unlisten",
         "dialog:allow-open",
         "fs:default",
         "fs:allow-appdata-read-recursive",

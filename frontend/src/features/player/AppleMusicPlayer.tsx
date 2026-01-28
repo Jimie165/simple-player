@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import clsx from 'clsx';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
     IoPlay, IoPause,
     IoShuffle, IoRepeat,
@@ -24,7 +24,7 @@ import MusicContextMenu from '../../components/common/MusicContextMenu';
 import MusicSlider from '../../components/common/MusicSlider';
 import AppleMusicQueue from './AppleMusicQueue';
 
-export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
+export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {
         metadata, isPlaying, isShuffling, repeatMode,
         togglePlay, toggleShuffle, toggleRepeat
@@ -36,28 +36,62 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
     const { playNext, playPrev, seek } = usePlaybackActions();
 
     // Local state for UI
+    const { volume, setVolume, isQueueOpen, toggleQueue } = usePlayerStore();
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [bgImageSrc, setBgImageSrc] = useState<string | null>(null);
-    const [showQueue, setShowQueue] = useState(false);
+    // Removed: const [showQueue, setShowQueue] = useState(false);
 
-    // Get volume from store for consistency
-    const { volume, setVolume } = usePlayerStore();
+
+    // Layout sizing state
+    // Lazy load queue: mount if open, keep mounted once opened
+    const [queueMounted, setQueueMounted] = useState(isQueueOpen);
+
+    useEffect(() => {
+        if (isQueueOpen) setQueueMounted(true);
+    }, [isQueueOpen]);
+
+    // Preload queue after a short delay to ensure smooth entry animation
+    // This allows the queue to be ready in the DOM before the user even clicks the button
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setQueueMounted(true);
+        }, 600); // 600ms delay to avoid impacting the heavy entry animation
+        return () => clearTimeout(timer);
+    }, []);
 
     // Layout sizing state
     const coverRef = useRef<HTMLDivElement>(null);
-    const [contentWidth, setContentWidth] = useState<number | undefined>(undefined);
+    const controlsRef = useRef<HTMLDivElement>(null);
 
+    // Use pure DOM manipulation for performance (avoids React render cycle lag during animation)
     useEffect(() => {
-        if (!coverRef.current) return;
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                // Use contentRect for precise sub-pixel values, or width/height
-                setContentWidth(entry.contentRect.width);
+        if (!coverRef.current || !controlsRef.current) return;
+
+        const updateWidth = () => {
+            if (coverRef.current && controlsRef.current) {
+                const width = coverRef.current.getBoundingClientRect().width;
+                controlsRef.current.style.width = `${width}px`;
             }
+        };
+
+        // Initial set
+        updateWidth();
+
+        const observer = new ResizeObserver(() => {
+            // Directly set style to avoid React render lag
+            requestAnimationFrame(updateWidth);
         });
+
         observer.observe(coverRef.current);
-        return () => observer.disconnect();
+
+        // Also listen to transitionend on the parent or window resize for good measure
+        window.addEventListener('resize', updateWidth);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('resize', updateWidth);
+        };
     }, []);
 
     // Sync volume with audio service
@@ -109,15 +143,34 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
         return () => { isMounted = false; };
     }, [metadata]);
 
-    // Progress Logic
+
+
+    // Progress Logic with Auto-Sync
     useEffect(() => {
-        let interval: number;
+        let interval: ReturnType<typeof setInterval>;
+        let tickCount = 0;
+
         if (isPlaying && !isDragging) {
-            interval = window.setInterval(() => {
-                setCurrentTime((prev) => {
-                    if (metadata && metadata.duration > 0 && prev >= metadata.duration - 0.5) return prev;
-                    return prev + 0.5;
-                });
+            interval = setInterval(() => {
+                tickCount++;
+
+                // Every 4 ticks (2 seconds), sync with backend to correct drift or handle loop reset
+                if (tickCount % 4 === 0) {
+                    audioService.getCurrentTime().then(t => {
+                        // Only update if difference is significant (>0.5s) or if it looped (decreased)
+                        setCurrentTime(prev => {
+                            if (t < prev - 1 || Math.abs(t - prev) > 0.5) return t;
+                            return prev + 0.5;
+                        });
+                    }).catch(() => { });
+                } else {
+                    setCurrentTime(prev => {
+                        // If we are past estimated duration, clamp or wait for sync
+                        if (metadata && metadata.duration > 0 && prev >= metadata.duration + 1) return 0; // Optimistic loop? No, let sync handle it.
+                        // Just increment
+                        return prev + 0.5;
+                    });
+                }
             }, 500);
         }
         return () => clearInterval(interval);
@@ -147,6 +200,11 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };
 
+    const handleToggleQueue = () => {
+        if (!queueMounted) setQueueMounted(true);
+        toggleQueue();
+    };
+
     // const lastCloseRef = React.useRef(0); // Removed
 
     // Background Image Source - already handled by state
@@ -154,8 +212,11 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: '100%' }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: '100%' }}
+            animate={{
+                opacity: isOpen ? 1 : 0,
+                y: isOpen ? 0 : '100%',
+                pointerEvents: isOpen ? 'auto' : 'none'
+            }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-0 z-[200] flex flex-col overflow-hidden bg-neutral-900"
         >
@@ -177,8 +238,8 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
             <div className="relative z-20 flex-1 flex w-full min-h-0 px-8 pb-8 md:pb-12">
 
                 <div className={clsx(
-                    "flex flex-col items-center justify-center transition-all duration-500 ease-[0.32,0.72,0,1]",
-                    showQueue ? "w-[42%] mr-auto pr-4" : "w-full px-12"
+                    "flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
+                    isQueueOpen ? "w-[42%] pr-4" : "w-full px-12"
                 )}>
                     {/* Content Wrapper: Controls vertical spacing */}
                     <div className="w-full h-full max-w-[500px] flex flex-col gap-6 md:gap-8 justify-center items-center mx-auto">
@@ -212,8 +273,10 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
 
                         {/* Controls Container - Fixed Height */}
                         <div
-                            className="flex flex-col gap-2 flex-shrink-0 transition-[width] duration-100 ease-out"
-                            style={{ width: contentWidth ? `${contentWidth}px` : '100%' }}
+                            ref={controlsRef}
+                            className="flex flex-col gap-2 flex-shrink-0 transition-[width] duration-0 ease-linear" // duration-0 as we drive it manually? Actually keeping transition might fight with JS. Let's make it instant or very fast to follow JS.
+                            // If we drive it frame-by-frame, we don't want CSS transition smoothing it out and lagging.
+                            style={{ width: '100%' }} // Initial fallback, will be overridden by JS immediately
                         >
 
                             {/* Title & Artist Row */}
@@ -268,19 +331,18 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
 
                             {/* Progress Bar */}
                             <div className="flex flex-col gap-1.5 mt-2">
-                                {metadata && (
-                                    <MusicSlider
-                                        value={currentTime}
-                                        min={0}
-                                        max={metadata.duration}
-                                        onChange={handleSeekChange}
-                                        onMouseDown={handleSeekStart}
-                                        onMouseUp={handleSeekEnd}
-                                        trackHeightClass="h-2"
-                                        hoverHeightClass="group-hover:h-3.5"
-                                        activeHeightClass="group-active:h-4"
-                                    />
-                                )}
+                                <MusicSlider
+                                    value={currentTime}
+                                    min={0}
+                                    max={metadata?.duration || 0}
+                                    disabled={!metadata}
+                                    onChange={handleSeekChange}
+                                    onMouseDown={handleSeekStart}
+                                    onMouseUp={handleSeekEnd}
+                                    trackHeightClass="h-2"
+                                    hoverHeightClass="group-hover:h-3.5"
+                                    activeHeightClass="group-active:h-4"
+                                />
                                 <div className="flex justify-between text-[11px] font-medium text-white/40 select-none">
                                     <span>{formatTime(currentTime)}</span>
                                     <span>-{formatTime((metadata?.duration || 0) - currentTime)}</span>
@@ -350,38 +412,39 @@ export default function AppleMusicPlayer({ onClose }: { onClose: () => void }) {
                 </div>
 
                 {/* Right Side (Queue) - Slide In */}
-                <AnimatePresence>
-                    {showQueue && (
-                        <motion.div
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 20 }}
-                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
-                            className="flex-1 h-full max-h-[95%] pl-8 md:pl-9 pr-8 flex flex-col z-30 ml-auto justify-center min-w-0"
-                        >
-                            {/* Apple Music Style: Not floating, but integrated panel */}
-                            {/* However, user says "悬浮状" is WRONG. Apple Music iPad Landscape has it as a side panel. */}
-                            {/* But looking at the reference image, it looks like a clear split view with no "card" background. */}
-                            {/* The text "Continue Playing" is directly on the blurred background. */}
-                            <div className="flex-1 overflow-hidden">
-                                <AppleMusicQueue onNavigate={onClose} />
-                            </div>
-                        </motion.div>
+                <div
+                    className={clsx(
+                        "flex-1 min-w-0 h-full max-h-[95%] flex flex-col z-30 overflow-hidden justify-center",
+                        "transition-[max-width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
+                        isQueueOpen ? "max-w-full pl-8 md:pl-9 pr-8" : "max-w-0 pl-0 pr-0"
                     )}
-                </AnimatePresence>
+                >
+                    <div className="relative flex-1 overflow-hidden">
+                        <motion.div
+                            className={clsx(
+                                "absolute inset-0",
+                                "transition-[opacity,transform] duration-500 ease-[0.32,0.72,0,1]",
+                                isQueueOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-5 pointer-events-none"
+                            )}
+                        >
+                            {queueMounted && <AppleMusicQueue onNavigate={onClose} />}
+                        </motion.div>
+                    </div>
+                </div>
             </div>
 
             {/* Bottom Right Actions (Queue/Lyrics) */}
             <div className="absolute bottom-8 right-8 z-30">
                 <button className={clsx(
                     "p-3 rounded-xl transition-all backdrop-blur-md",
-                    // Use conditional border/bg based on showQueue
-                    showQueue
+                    // Use conditional border/bg based on isQueueOpen
+                    isQueueOpen
                         ? "bg-white/10 border border-white/10 text-white shadow-lg"
                         : "hover:bg-white/10 hover:text-white text-white/50"
                 )}>
                     <IoList
-                        className={clsx("text-xl", showQueue ? "text-primary" : "")}
-                        onClick={() => setShowQueue(!showQueue)}
+                        className={clsx("text-xl", isQueueOpen ? "text-primary" : "")}
+                        onClick={handleToggleQueue}
                     />
                 </button>
             </div>

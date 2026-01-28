@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useThemeStore } from './store/useThemeStore';
+import { useLibraryStore } from './store/useLibraryStore';
 import clsx from 'clsx';
 import { useNavigationStore } from './store/useNavigationStore';
 import { useSelectionStore } from './store/useSelectionStore';
@@ -28,7 +29,24 @@ import GlobalDialogLayer from './components/common/GlobalDialogLayer';
 
 function App() {
   const { init: initTheme, fullScreenMode } = useThemeStore();
+  const playlist = useLibraryStore((state) => state.playlist);
+  const currentSongIndex = useLibraryStore((state) => state.currentSongIndex);
+  const setMetadata = usePlayerStore((state) => state.setMetadata);
+
   useEffect(() => initTheme(), [initTheme]);
+
+  // Restore Session
+  const isRestored = useRef(false);
+  useEffect(() => {
+    // Restore only once when playlist is ready and populated
+    if (!isRestored.current && !usePlayerStore.getState().metadata && playlist.length > 0 && currentSongIndex >= 0 && currentSongIndex < playlist.length) {
+      const song = playlist[currentSongIndex];
+      setMetadata(song);
+      // Ensure paused and time 0
+      usePlayerStore.setState({ isPlaying: false });
+      isRestored.current = true;
+    }
+  }, [playlist, currentSongIndex, setMetadata]);
 
   const {
     currentPage,
@@ -51,12 +69,12 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  
+
   // Listen for close event from AppleMusicPlayer
   useEffect(() => {
-      const handleClose = () => setIsFullScreen(false);
-      window.addEventListener('close-fullscreen-player', handleClose);
-      return () => window.removeEventListener('close-fullscreen-player', handleClose);
+    const handleClose = () => setIsFullScreen(false);
+    window.addEventListener('close-fullscreen-player', handleClose);
+    return () => window.removeEventListener('close-fullscreen-player', handleClose);
   }, []);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -217,11 +235,10 @@ function App() {
       <AddToPlaylistSheet />
       <GlobalDialogLayer />
 
-      <AnimatePresence>
-        {isFullScreen && fullScreenMode === 'immersive' && (
-          <AppleMusicPlayer onClose={() => setIsFullScreen(false)} />
-        )}
-      </AnimatePresence>
+      <AppleMusicPlayer
+        isOpen={isFullScreen && fullScreenMode === 'immersive'}
+        onClose={() => setIsFullScreen(false)}
+      />
     </div>
   );
 }

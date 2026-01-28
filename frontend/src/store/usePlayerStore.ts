@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import type { SongMetadata, RepeatMode } from '../types/index';
 import { audioService } from '../services/audioService';
 
@@ -28,15 +29,20 @@ interface PlayerState {
 
     restartTrigger: number;
     restartSong: () => void;
+
+    // UI Persistence
+    isQueueOpen: boolean;
+    toggleQueue: () => void;
 }
 
-export const usePlayerStore = create<PlayerState>((set, get) => ({
+export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     // --- 初始状态 ---
     isPlaying: false,
     volume: 70,
     metadata: null,
     isShuffling: false,
     repeatMode: 'off',
+    isQueueOpen: false,
 
     // --- Setter 实现 ---
     setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -99,4 +105,15 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
 
     restartTrigger: 0,
     restartSong: () => set((state) => ({ restartTrigger: state.restartTrigger + 1 })),
+
+    // UI States
+    toggleQueue: () => set((state) => ({ isQueueOpen: !state.isQueueOpen })),
+}), {
+    name: 'player-store',
+    partialize: (state) => ({
+        volume: state.volume,
+        isShuffling: state.isShuffling,
+        repeatMode: state.repeatMode,
+        isQueueOpen: state.isQueueOpen,
+    }),
 }));
