@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import clsx from 'clsx';
 import {
     DndContext,
@@ -140,7 +140,8 @@ function SortableQueueItem({ song, index, isActive, onPlay, onRemove, onNavigate
     );
 }
 
-export default function AppleMusicQueue({ onNavigate }: { onNavigate?: () => void }) {
+export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen }: { onNavigate?: () => void; scrollToTopSignal?: number; isOpen?: boolean }) {
+    const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const {
         playlist,
         currentSongIndex,
@@ -150,6 +151,22 @@ export default function AppleMusicQueue({ onNavigate }: { onNavigate?: () => voi
         removeQueueItem
     } = useLibraryStore();
     const { playQueueItem } = usePlaybackActions();
+
+    useEffect(() => {
+        if (!scrollContainerRef.current) return;
+        if (!isOpen) return;
+        const el = scrollContainerRef.current;
+        const scrollNow = () => {
+            el.scrollTop = 0;
+        };
+        scrollNow();
+        const rafId = window.requestAnimationFrame(scrollNow);
+        const timeoutId = window.setTimeout(scrollNow, 550);
+        return () => {
+            window.cancelAnimationFrame(rafId);
+            window.clearTimeout(timeoutId);
+        };
+    }, [scrollToTopSignal, isOpen]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -212,8 +229,10 @@ export default function AppleMusicQueue({ onNavigate }: { onNavigate?: () => voi
 
             {/* Sortable List */}
             <div
-                className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hidden relative z-10 block pb-24"
+                ref={scrollContainerRef}
+                className="flex-1 overflow-y-auto overflow-x-hidden immersive-scrollbar relative z-10 block pb-24"
                 style={{
+                    overflowAnchor: 'none',
                     maskImage: 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
                     WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
                 }}

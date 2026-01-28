@@ -46,10 +46,24 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     // Layout sizing state
     // Lazy load queue: mount if open, keep mounted once opened
     const [queueMounted, setQueueMounted] = useState(isQueueOpen);
+    const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
+    const queueScrollDidMountRef = useRef(false);
 
     useEffect(() => {
         if (isQueueOpen) setQueueMounted(true);
     }, [isQueueOpen]);
+
+    useEffect(() => {
+        if (!queueScrollDidMountRef.current) {
+            queueScrollDidMountRef.current = true;
+            return;
+        }
+        if (isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
+    }, [isQueueOpen]);
+
+    useEffect(() => {
+        if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
+    }, [isOpen, isQueueOpen]);
 
     // Preload queue after a short delay to ensure smooth entry animation
     // This allows the queue to be ready in the DOM before the user even clicks the button
@@ -427,7 +441,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                 isQueueOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-5 pointer-events-none"
                             )}
                         >
-                            {queueMounted && <AppleMusicQueue onNavigate={onClose} />}
+                            {queueMounted && <AppleMusicQueue onNavigate={onClose} scrollToTopSignal={queueScrollToTopSignal} isOpen={isQueueOpen} />}
                         </motion.div>
                     </div>
                 </div>

@@ -159,6 +159,29 @@ body {
     scrollbar-width: none;  /* Firefox */
   }
 
+  .immersive-scrollbar {
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+  .immersive-scrollbar:hover,
+  .immersive-scrollbar:active,
+  .immersive-scrollbar:focus-within {
+    scrollbar-color: rgba(255, 255, 255, 0.28) transparent;
+  }
+  .immersive-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
+  .immersive-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  .immersive-scrollbar::-webkit-scrollbar-corner { background: transparent; }
+  .immersive-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(255, 255, 255, 0);
+    border-radius: 9999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  .immersive-scrollbar:hover::-webkit-scrollbar-thumb,
+  .immersive-scrollbar:active::-webkit-scrollbar-thumb,
+  .immersive-scrollbar:focus-within::-webkit-scrollbar-thumb { background-color: rgba(255, 255, 255, 0.32); }
+
   /* Custom Scrollbar Overlay - Legacy utility if needed */
   .scrollbar-overlay {
     overflow-y: auto;
