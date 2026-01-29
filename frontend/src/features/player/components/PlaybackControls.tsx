@@ -20,20 +20,18 @@ export default function PlaybackControls() {
         togglePlay, setIsPlaying,
         toggleRepeat,
         setMetadata,
+        setAudioLoaded,
         restartTrigger // Destructure trigger
     } = usePlayerStore();
 
     const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory } = useLibraryStore();
-    const { toggleShuffle } = usePlaybackActions();
+    const { toggleShuffle, seek } = usePlaybackActions();
 
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isRemoteDragging, setIsRemoteDragging] = useState(false);
 
-    // 防抖锁：防止自动播放时连续跳过
     const isAutoChanging = useRef(false);
-
-    // ... (keep playSongByIndex and others)
 
     // --- 监听 Metadata 变化，添加到最近播放 ---
     // 已移除：根据用户需求，仅手动点播（点击列表项）才加入最近播放。
@@ -70,6 +68,7 @@ export default function PlaybackControls() {
 
             if (autoPlay) {
                 setIsPlaying(true);
+                setAudioLoaded(true);
             } else {
                 setIsPlaying(false);
                 // 如果不播，可能需要通知后端暂停或停止
@@ -298,11 +297,16 @@ export default function PlaybackControls() {
 
     // 拖拽处理
     const handleSeekStart = () => setIsDragging(true);
-    const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => setCurrentTime(Number(e.target.value));
+    const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const time = Number(e.target.value);
+        setCurrentTime(time);
+        // Real-time sync for other components (like immersive player)
+        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time } }));
+    };
     const handleSeekEnd = async (e: React.MouseEvent<HTMLInputElement>) => {
         const newTime = Number((e.currentTarget as HTMLInputElement).value);
         setIsDragging(false);
-        await audioService.seek(newTime);
+        await seek(newTime); // Use hook action to ensure consistent behavior & event dispatch
         setCurrentTime(newTime);
     };
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;

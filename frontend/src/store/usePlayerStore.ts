@@ -9,6 +9,7 @@ interface PlayerState {
     isPlaying: boolean;
     volume: number;
     metadata: SongMetadata | null;
+    isAudioLoaded: boolean;
 
     isShuffling: boolean;      // 随机状态
     repeatMode: RepeatMode;    // 循环模式
@@ -17,6 +18,7 @@ interface PlayerState {
     setIsPlaying: (isPlaying: boolean) => void;
     setVolume: (volume: number) => void;
     setMetadata: (metadata: SongMetadata | null) => void;
+    setAudioLoaded: (loaded: boolean) => void;
 
     // 辅助 Setter (给 Library 用)
     setShuffleState: (state: boolean) => void;
@@ -40,6 +42,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     isPlaying: false,
     volume: 70,
     metadata: null,
+    isAudioLoaded: false,
     isShuffling: false,
     repeatMode: 'off',
     isQueueOpen: false,
@@ -47,6 +50,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     // --- Setter 实现 ---
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setMetadata: (metadata) => set({ metadata }),
+    setAudioLoaded: (loaded) => set({ isAudioLoaded: loaded }),
     setVolume: (volume) => {
         set({ volume });
         audioService.setVolume(volume / 100);
@@ -90,8 +94,16 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
                 await audioService.pause();
                 set({ isPlaying: false });
             } else {
-                await audioService.resume();
-                set({ isPlaying: true });
+                // Check if audio is loaded. If not (and we have metadata), we must PLAY first to load it.
+                // This happens when app restarts: metadata is restored but backend audio is empty.
+                const { isAudioLoaded, metadata } = get();
+                if (!isAudioLoaded && metadata && metadata.path) {
+                    await audioService.play(metadata.path, metadata);
+                    set({ isPlaying: true, isAudioLoaded: true });
+                } else {
+                    await audioService.resume();
+                    set({ isPlaying: true });
+                }
             }
         } catch (error) {
             console.error('Toggle play failed', error);

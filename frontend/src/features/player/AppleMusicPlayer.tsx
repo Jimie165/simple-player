@@ -139,7 +139,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         return () => {
             window.removeEventListener('playback:seeked', handleSeekEvent);
         };
-    }, [metadata]); // Run on mount (metadata available) and when song changes
+    }, [metadata, isOpen]); // Run on mount, song change, or when player opens
 
     const handleVolumeChange = async (val: number) => {
         setVolume(val); // This also calls audioService.setVolume inside the store
@@ -287,6 +287,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     // const lastCloseRef = React.useRef(0); // Removed
 
     // Background Image Source - already handled by state
+    const hasCover = Boolean(bgImageSrc);
 
     return (
         <motion.div
@@ -343,7 +344,10 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                              */}
                             <div
                                 ref={coverShellRef}
-                                className="relative aspect-square h-auto w-auto max-h-full max-w-full"
+                                className={clsx(
+                                    "relative aspect-square h-auto w-auto max-h-full max-w-full",
+                                    !hasCover && "min-w-[240px] min-h-[240px] w-[70%] max-w-[360px]"
+                                )}
                             >
                                 <motion.div
                                     ref={coverRef}
@@ -380,12 +384,17 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                     <div className="text-base md:text-lg text-white/60 truncate font-medium leading-tight mt-1 flex items-center gap-1">
                                         <span
                                             onClick={() => {
-                                                if (metadata?.artist) {
+                                                if (metadata?.artist && metadata && typeof (metadata as any).id === 'number') {
                                                     push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
                                                     onClose();
                                                 }
                                             }}
-                                            className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
+                                            className={clsx(
+                                                "transition-colors",
+                                                metadata && typeof (metadata as any).id === 'number'
+                                                    ? "hover:underline hover:text-white/80 cursor-pointer"
+                                                    : "cursor-default"
+                                            )}
                                         >
                                             {metadata?.artist || "Simple Player"}
                                         </span>
@@ -394,13 +403,18 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                                 <span>—</span>
                                                 <span
                                                     onClick={() => {
-                                                        if (metadata?.album) {
+                                                        if (metadata?.album && metadata && typeof (metadata as any).id === 'number') {
                                                             // Use full object structure to match what useSongOperations expects and prevent crashes
                                                             push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover || null, count: 0 } });
                                                             onClose();
                                                         }
                                                     }}
-                                                    className="hover:underline hover:text-white/80 cursor-pointer transition-colors"
+                                                    className={clsx(
+                                                        "transition-colors",
+                                                        metadata && typeof (metadata as any).id === 'number'
+                                                            ? "hover:underline hover:text-white/80 cursor-pointer"
+                                                            : "cursor-default"
+                                                    )}
                                                 >
                                                     {metadata.album}
                                                 </span>
