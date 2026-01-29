@@ -11,18 +11,20 @@ import { audioService } from '../../../services/audioService';
 import { formatTime } from '../../../utils/time';
 // Components
 import CustomTooltip from '../../../components/common/CustomTooltip';
+import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
 
 export default function PlaybackControls() {
     const {
         isPlaying, metadata,
         isShuffling, repeatMode,
         togglePlay, setIsPlaying,
-        toggleShuffle, toggleRepeat,
+        toggleRepeat,
         setMetadata,
         restartTrigger // Destructure trigger
     } = usePlayerStore();
 
-    const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory, toggleShuffleList } = useLibraryStore();
+    const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory } = useLibraryStore();
+    const { toggleShuffle } = usePlaybackActions();
 
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -151,9 +153,6 @@ export default function PlaybackControls() {
 
     const handleBtnShuffle = () => {
         toggleShuffle();
-        // 这里的 toggleShuffleList 需要传入新的状态
-        // Store update 可能是异步的，所以这里取反当前状态
-        toggleShuffleList(!isShuffling);
     };
 
     const handleBtnRepeat = () => {

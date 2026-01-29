@@ -65,7 +65,9 @@ export default function SelectionMenuBar() {
             const item = selectedItemsMap.get(id);
             if (item && selectionType) {
                 // Ensure item carries its type for useSongOperations metadata logic
-                return { ...item, type: selectionType };
+                // ONLY override if item doesn't have a type (e.g. SongMetadata from SongList)
+                // RecentItems already have a type ('file', 'album') which we should preserve.
+                return { ...item, type: item.type || selectionType };
             }
             return item;
         }).filter(Boolean);

@@ -363,7 +363,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         // Add to Playlist Rule:
         // - "If it is an opened folder, then it should be one less 'Add to' than Playlist"
         // - Interpreted as: Hide "Add to Playlist" in Folder context.
-        if (context !== 'folder') {
+        // - Also hide if items are not in library (no numeric ID)
+        const allHaveIds = items.every(i => typeof (i as any).id === 'number');
+        if (context !== 'folder' && allHaveIds) {
             group1.push({ id: 'add-to', label: '添加到播放列表...', icon: MdPlaylistAdd, onClick: handleAddToPlaylist });
         }
 
@@ -390,14 +392,17 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             // Icon logic: if single, show actual status. If multi, show "Favorite" (generic) or maybe checks all?
             // "only remove if mixed types" -> implied "show if all songs".
 
-            const isFav = isAllFavorited;
+            // Only show Favorite if items have IDs (are in library)
+            if (allHaveIds) {
+                const isFav = isAllFavorited;
 
-            group1.push({
-                id: 'favorite',
-                label: isFav ? '取消喜爱' : '喜爱',
-                icon: isFav ? MdFavorite : MdFavoriteBorder,
-                onClick: handleFavorite
-            });
+                group1.push({
+                    id: 'favorite',
+                    label: isFav ? '取消喜爱' : '喜爱',
+                    icon: isFav ? MdFavorite : MdFavoriteBorder,
+                    onClick: handleFavorite
+                });
+            }
         }
         groups.push(group1);
 
@@ -423,10 +428,16 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             const isSongFile = type === 'song' || type === 'file';
 
             if (showAlbum && (albumValue || isSongFile)) {
-                group2.push({ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: handleShowAlbum });
+                // Only show Go to Album if item has ID (is in library)
+                if (typeof (item as any).id === 'number') {
+                    group2.push({ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: handleShowAlbum });
+                }
             }
             if (showArtist && (artistValue || isSongFile)) {
-                group2.push({ id: 'artist', label: '前往艺人', icon: MdPerson, onClick: handleShowArtist });
+                // Only show Go to Artist if item has ID (is in library)
+                if (typeof (item as any).id === 'number') {
+                    group2.push({ id: 'artist', label: '前往艺人', icon: MdPerson, onClick: handleShowArtist });
+                }
             }
         }
 

@@ -48,7 +48,18 @@ const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
 
 export function usePlaybackActions() {
     const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent, setQueueContext } = useLibraryStore();
-    const { setMetadata, setIsPlaying, setShuffleState, setRepeatState, togglePlay, restartSong } = usePlayerStore();
+    const { setMetadata, setIsPlaying, setShuffleState, setRepeatState, togglePlay, restartSong, toggleShuffle: togglePlayerShuffle } = usePlayerStore();
+
+    const toggleShuffle = () => {
+        const { isShuffling } = usePlayerStore.getState();
+        const newShuffleState = !isShuffling;
+
+        // 1. Update Player Store (UI Icon)
+        togglePlayerShuffle();
+
+        // 2. Update Library Store (Queue Order)
+        toggleShuffleList(newShuffleState);
+    };
 
     const playSong = async ({ song, index, playlist, options, context }: PlaySongParams) => {
         if (!song.path) return;
@@ -231,6 +242,7 @@ export function usePlaybackActions() {
         playQueueItem,
         playNext,
         playPrev,
-        seek
+        seek,
+        toggleShuffle
     };
 }

@@ -27,13 +27,13 @@ import AppleMusicQueue from './AppleMusicQueue';
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {
         metadata, isPlaying, isShuffling, repeatMode,
-        togglePlay, toggleShuffle, toggleRepeat
+        togglePlay, toggleRepeat
     } = usePlayerStore();
 
     const { toggleFavorite } = useLibraryStore();
 
     const { push } = useNavigationStore();
-    const { playNext, playPrev, seek } = usePlaybackActions();
+    const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
 
     // Local state for UI
     const { volume, setVolume, isQueueOpen, toggleQueue } = usePlayerStore();
@@ -338,8 +338,18 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
                                     <button
-                                        onClick={() => metadata && toggleFavorite(metadata)}
-                                        className="w-8 h-8 flex-shrink-0 rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center text-white/50 hover:text-red-500 transition-all backdrop-blur-md"
+                                        onClick={() => {
+                                            if (metadata && typeof (metadata as any).id === 'number') {
+                                                toggleFavorite(metadata);
+                                            }
+                                        }}
+                                        disabled={!metadata || typeof (metadata as any).id !== 'number'}
+                                        className={clsx(
+                                            "w-8 h-8 flex-shrink-0 rounded-full flex items-center justify-center transition-all backdrop-blur-md",
+                                            metadata && typeof (metadata as any).id === 'number'
+                                                ? "bg-white/10 ring-1 ring-white/10 hover:bg-white/20 text-white/50 hover:text-red-500 cursor-pointer"
+                                                : "bg-white/5 ring-1 ring-white/5 text-white/20 cursor-default"
+                                        )}
                                     >
                                         {metadata?.is_favorite ? <IoStar className="text-xl text-red-500" /> : <IoStarOutline className="text-xl" />}
                                     </button>
