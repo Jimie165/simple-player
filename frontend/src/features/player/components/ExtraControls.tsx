@@ -21,6 +21,12 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
     // 点击外部关闭逻辑 (合并处理)
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
+            // Ignore clicks inside Headless UI menus (Portals)
+            const target = event.target as Element;
+            if (target && target.closest && (target.closest('[role="menu"]') || target.closest('[role="dialog"]') || target.closest('[data-menu-portal="true"]'))) {
+                return;
+            }
+
             if (volumeRef.current && !volumeRef.current.contains(event.target as Node)) {
                 setShowVolumePopup(false);
             }
@@ -37,7 +43,7 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
 
             {/* 1. 播放队列 */}
             <div className="relative" ref={queueRef}>
-                <PlayQueuePopup show={showQueuePopup} />
+                <PlayQueuePopup show={showQueuePopup} onNavigateClose={() => setShowQueuePopup(false)} />
                 <CustomTooltip text="播放队列">
                     <button
                         onClick={() => setShowQueuePopup(!showQueuePopup)}

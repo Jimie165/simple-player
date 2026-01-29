@@ -46,6 +46,7 @@ export interface MusicContextMenuProps extends Partial<MusicMenuOptions> {
     buttonClassName?: string; // Button class configuration
     variant?: 'glass' | 'clean'; // Visual variant
     onOpen?: () => void; // Callback when menu is opened
+    suppressCloseEvent?: boolean; // Prevent dispatching global close event on open
     children?: React.ReactNode; // Custom trigger content
 }
 
@@ -147,9 +148,11 @@ function MenuContent({
         <Portal>
             <MenuItems
                 ref={menuRef}
+                data-menu-portal="true"
                 transition
                 className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
                 style={menuPosition ? { top: menuPosition!.top, left: menuPosition!.left, transformOrigin: menuPosition!.origin } : undefined}
+                onMouseDown={(e) => e.stopPropagation()}
             >
                 {resolvedGroups.map((group, groupIndex) => (
                     <React.Fragment key={groupIndex}>
@@ -177,7 +180,7 @@ function MenuContent({
 }
 
 export default function MusicContextMenu(props: MusicContextMenuProps) {
-    const { groups, className, buttonClassName, variant = 'glass', onOpen } = props;
+    const { groups, className, buttonClassName, variant = 'glass', onOpen, suppressCloseEvent } = props;
     const resolvedGroups = groups ?? (props.type ? getMusicMenuGroups(props as MusicMenuOptions) : []);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -250,12 +253,14 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
 
                                 // Close any open context menus (right-click menus) before opening this menu
                                 // Dispatch mousedown event synchronously to trigger cleanup handlers
-                                const closeEvent = new MouseEvent('mousedown', {
-                                    bubbles: true,
-                                    cancelable: true,
-                                    view: window
-                                });
-                                document.dispatchEvent(closeEvent);
+                                if (!suppressCloseEvent) {
+                                    const closeEvent = new MouseEvent('mousedown', {
+                                        bubbles: true,
+                                        cancelable: true,
+                                        view: window
+                                    });
+                                    document.dispatchEvent(closeEvent);
+                                }
 
                                 // Notify parent component that menu is opening
                                 // This should close the right-click menu via setContextMenu(null)

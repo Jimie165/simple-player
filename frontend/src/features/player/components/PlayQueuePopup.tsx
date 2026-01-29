@@ -1,41 +1,40 @@
 import { useState, useRef, useEffect } from 'react';
 import clsx from 'clsx';
-import { MdMusicNote, MdRemoveCircleOutline } from 'react-icons/md';
+import { MdMusicNote } from 'react-icons/md';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { usePlayerStore } from '../../../store/usePlayerStore';
-import { useNavigationStore } from '../../../store/useNavigationStore';
 import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
-import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
 import type { SongMetadata } from '../../../types';
-import MusicContextMenu, { getMusicMenuGroups } from '../../../components/common/MusicContextMenu';
-import CursorContextMenu from '../../../components/common/CursorContextMenu';
-import InfoDialog from '../../../components/common/InfoDialog';
+import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
+import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
-import { libraryService } from '../../../services/libraryService';
+import { useSongOperations } from '../../../hooks/useSongOperations';
 
 interface PlayQueuePopupProps {
     show: boolean;
+    onNavigateClose?: () => void;
 }
 
-export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
+export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopupProps) {
     const {
         playlist,
         currentSongIndex,
-        removeSongFromPlaylistByIndex,
-        addToNext,
-        toggleFavorite
+        removeSongFromPlaylistByIndex
     } = useLibraryStore();
     const { togglePlay, restartSong } = usePlayerStore();
     const { playQueueItem } = usePlaybackActions();
-    const { push } = useNavigationStore();
-    const addToPlaylistStore = useAddToPlaylistStore();
 
     // Context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
 
-    // Properties dialog state
-    const [isPropertiesOpen, setIsPropertiesOpen] = useState(false);
-    const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
+    const contextMenuOps = useSongOperations({
+        items: contextMenu ? [contextMenu.song] : [],
+        context: 'queue',
+        onPlay: contextMenu ? () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }) : undefined,
+        onDelete: contextMenu ? () => removeSongFromPlaylistByIndex(contextMenu.index) : undefined,
+        onNavigate: onNavigateClose,
+        hideSelect: true
+    });
 
     const activeItemRef = useRef<HTMLDivElement>(null);
     const listRef = useRef<HTMLDivElement>(null);
@@ -87,53 +86,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
     };
 
-    const handleShowProperties = (song: SongMetadata) => {
-        setPropertySong(song);
-        setIsPropertiesOpen(true);
-    };
 
-    const handleShowAlbum = async (song: SongMetadata) => {
-        if (!song.album || !song.artist) return;
-
-        // Fetch full library to find the album and its songs to avoid white screen
-        const allSongs = await libraryService.getLibrarySongs();
-        const albumSongs = allSongs.filter(s => s.album === song.album && s.artist === song.artist);
-
-        if (albumSongs.length > 0) {
-            push({
-                type: 'album_detail',
-                data: {
-                    name: song.album,
-                    artist: song.artist,
-                    cover: albumSongs[0].cover || null,
-                    cover_path: albumSongs[0].cover_path || null,
-                    songs: albumSongs
-                }
-            });
-        }
-    };
-
-    const handleShowArtist = async (song: SongMetadata) => {
-        if (!song.artist) return;
-
-        // Fetch full library to find the artist and their songs/albums to avoid white screen
-        const allSongs = await libraryService.getLibrarySongs();
-        const artistSongs = allSongs.filter(s => s.artist === song.artist);
-
-        if (artistSongs.length > 0) {
-            const albums = new Set(artistSongs.map(s => s.album));
-            push({
-                type: 'artist_detail',
-                data: {
-                    name: song.artist,
-                    songs: artistSongs,
-                    albumCount: albums.size,
-                    count: artistSongs.length,
-                    cover: artistSongs[0]?.cover || null
-                }
-            });
-        }
-    };
 
     return (
         <div className={clsx(
@@ -142,12 +95,6 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
             "transition-all duration-200 origin-bottom-right z-[60]",
             show ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible pointer-events-none"
         )}>
-            {/* Properties Dialog */}
-            <InfoDialog
-                isOpen={isPropertiesOpen}
-                onClose={() => setIsPropertiesOpen(false)}
-                song={propertySong}
-            />
 
             {/* 标题 */}
             <div className="p-4 border-b border-neutral-200/50 dark:border-neutral-700/50 bg-neutral-50/50 dark:bg-white/5">
@@ -198,25 +145,21 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
                                     </div>
 
                                     {/* Three dots menu button */}
-                                    <div className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                                        <MusicContextMenu
-                                            type="song"
+                                    <div
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <SmartMusicContextMenu
+                                            items={song}
+                                            context="queue"
                                             variant="clean"
                                             buttonClassName="w-6 h-6"
                                             onPlay={() => handlePlay(song, index, { restartIfCurrent: true })}
-                                            onAddToQueue={() => addToNext(song, true)}
-                                            onAddToPlaylist={() => addToPlaylistStore.open(song)}
-                                            onShowProperties={() => handleShowProperties(song)}
-                                            onShowAlbum={song.album ? () => handleShowAlbum(song) : undefined}
-                                            onShowArtist={song.artist ? () => handleShowArtist(song) : undefined}
                                             onDelete={() => removeSongFromPlaylistByIndex(index)}
-                                            deleteText="从播放队列移除"
-                                            deleteIcon={MdRemoveCircleOutline}
-                                            deleteVariant="default"
-                                            onFavorite={() => toggleFavorite(song)}
-                                            isFavorite={song.is_favorite}
-                                            hideSelect
                                             onOpen={() => setContextMenu(null)}
+                                            onNavigate={onNavigateClose}
+                                            suppressCloseEvent
+                                            hideSelect
                                         />
                                     </div>
                                 </div>
@@ -228,26 +171,17 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
 
             {/* Right-click Context Menu */}
             {contextMenu && (
-                <CursorContextMenu
+                <SmartCursorContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}
+                    item={contextMenu.song}
+                    context="queue"
                     onClose={() => setContextMenu(null)}
-                    menuGroups={getMusicMenuGroups({
-                        type: 'song',
-                        onPlay: () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }),
-                        onAddToQueue: () => addToNext(contextMenu.song, true),
-                        onAddToPlaylist: () => addToPlaylistStore.open(contextMenu.song),
-                        onShowProperties: () => handleShowProperties(contextMenu.song),
-                        onShowAlbum: contextMenu.song.album ? () => handleShowAlbum(contextMenu.song) : undefined,
-                        onShowArtist: contextMenu.song.artist ? () => handleShowArtist(contextMenu.song) : undefined,
-                        onDelete: () => removeSongFromPlaylistByIndex(contextMenu.index),
-                        deleteText: "从播放队列移除",
-                        deleteIcon: MdRemoveCircleOutline,
-                        deleteVariant: 'default',
-                        onFavorite: () => toggleFavorite(contextMenu.song),
-                        isFavorite: contextMenu.song.is_favorite,
-                        hideSelect: true
-                    })}
+                    onPlay={() => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true })}
+                    onDelete={() => removeSongFromPlaylistByIndex(contextMenu.index)}
+                    onNavigate={onNavigateClose}
+                    hideSelect
+                    menuGroups={contextMenuOps.menuItems}
                 />
             )}
         </div>

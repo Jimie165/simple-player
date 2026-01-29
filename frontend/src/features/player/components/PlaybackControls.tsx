@@ -277,10 +277,24 @@ export default function PlaybackControls() {
     }, [isPlaying, isDragging, isRemoteDragging, metadata, repeatMode, playlist, currentSongIndex]);
 
     // Metadata 变化时的兜底重置 (比如从 Library 切歌)
+    const prevSongKeyRef = useRef<string>('');
+    const prevRestartRef = useRef<number>(restartTrigger);
     useEffect(() => {
-        setCurrentTime(0);
-        // 这里也加一道解锁保险
-        isAutoChanging.current = false;
+        const songKey = metadata?.id !== undefined
+            ? `id:${metadata.id}`
+            : (metadata?.path ? `path:${metadata.path}` : '');
+
+        const restartChanged = prevRestartRef.current !== restartTrigger;
+        const songChanged = songKey !== prevSongKeyRef.current;
+
+        if (restartChanged || songChanged) {
+            setCurrentTime(0);
+            // 这里也加一道解锁保险
+            isAutoChanging.current = false;
+        }
+
+        prevRestartRef.current = restartTrigger;
+        prevSongKeyRef.current = songKey;
     }, [metadata, restartTrigger]);
 
     // 拖拽处理

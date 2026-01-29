@@ -19,6 +19,9 @@ interface SmartCursorContextMenuProps {
     onShuffle?: () => void;
     onSelect?: () => void;
     isSelected?: boolean;
+    hideSelect?: boolean;
+    selectText?: string;
+    onNavigate?: () => void;
     menuGroups?: MenuItemData[][];
     extraGroups?: MenuItemData[][];
     variant?: 'default' | 'apple';
@@ -33,7 +36,7 @@ interface SmartCursorContextMenuProps {
  * Uses Portal and viewport boundary detection.
  */
 export default function SmartCursorContextMenu(props: SmartCursorContextMenuProps) {
-    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, menuGroups, extraGroups, variant = 'default', placement = 'auto' } = props;
+    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, hideSelect, selectText, onNavigate, menuGroups, extraGroups, variant = 'default', placement = 'auto' } = props;
 
     // Store
     const { selectedIds, toggleSelectionMode, clearSelection } = useSelectionStore();
@@ -73,6 +76,9 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         onDelete,
         onShuffle,
         isSelected,
+        hideSelect,
+        selectText,
+        onNavigate,
         onSelect: onSelectProp ? onSelectProp : () => {
             if (!item) return;
             if (isSelected && targetItems.length > 1) {
@@ -160,6 +166,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         <Portal>
             <div
                 ref={menuRef}
+                data-menu-portal="true"
                 className={`fixed z-[9999] w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
                     ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
                     : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
@@ -170,6 +177,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                     opacity: position.opacity,
                     pointerEvents: position.opacity === 0 ? 'none' : 'auto'
                 }}
+                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
                 onContextMenu={(e) => e.preventDefault()}
             >

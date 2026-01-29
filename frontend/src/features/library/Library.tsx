@@ -105,10 +105,18 @@ export default function Library() {
         let list = Array.from(map.values());
 
         // Sorting
+        const compare = (a: string, b: string) => {
+            const isAsciiA = /^[a-zA-Z]/.test(a);
+            const isAsciiB = /^[a-zA-Z]/.test(b);
+            if (isAsciiA && !isAsciiB) return -1;
+            if (!isAsciiA && isAsciiB) return 1;
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        };
+
         if (albumSortKey === 'name') {
-            list.sort((a, b) => a.name.localeCompare(b.name));
+            list.sort((a, b) => compare(a.name, b.name));
         } else {
-            list.sort((a, b) => a.artist.localeCompare(b.artist));
+            list.sort((a, b) => compare(a.artist, b.artist));
         }
         return list;
     }, [librarySongs, albumSortKey]);
@@ -145,8 +153,16 @@ export default function Library() {
             artist.albumCount = artistAlbums.size;
         });
 
-        // Sort by name
-        list.sort((a, b) => a.name.localeCompare(b.name));
+        // Sort by name (English first)
+        const compare = (a: string, b: string) => {
+            const isAsciiA = /^[a-zA-Z]/.test(a);
+            const isAsciiB = /^[a-zA-Z]/.test(b);
+            if (isAsciiA && !isAsciiB) return -1;
+            if (!isAsciiA && isAsciiB) return 1;
+            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+        };
+
+        list.sort((a, b) => compare(a.name, b.name));
         return list;
     }, [librarySongs]);
 
