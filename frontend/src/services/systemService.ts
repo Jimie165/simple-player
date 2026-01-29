@@ -9,4 +9,5 @@ export const systemService = {
     // 监听窗口大小变化
     onResize: (callback: () => void) => appWindow.listen('tauri://resize', callback),
     isMaximized: () => appWindow.isMaximized(),
+    setFullscreen: (fullscreen: boolean) => appWindow.setFullscreen(fullscreen),
 };

@@ -6,8 +6,10 @@ import {
     IoShuffle, IoRepeat,
     IoVolumeLow, IoVolumeHigh,
     IoList, IoStar, IoStarOutline, IoEllipsisHorizontal,
-    IoPlayBack, IoPlayForward
+    IoPlayBack, IoPlayForward,
+    IoExpand, IoContract
 } from 'react-icons/io5';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -220,6 +222,68 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         toggleQueue();
     };
 
+    // Fullscreen Logic
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const wasMaximizedBeforeFullscreenRef = useRef(false);
+
+    useEffect(() => {
+        const checkFullscreen = async () => {
+            try {
+                const isFull = await getCurrentWindow().isFullscreen();
+                setIsFullscreen(isFull);
+            } catch (e) {
+                console.error("Failed to check fullscreen status", e);
+            }
+        };
+        checkFullscreen();
+    }, [isOpen]);
+
+    const toggleFullscreen = async () => {
+        const appWindow = getCurrentWindow();
+        const anyWindow = appWindow as any;
+        try {
+            const currentFullscreen = await appWindow.isFullscreen();
+            const newState = !currentFullscreen;
+
+            if (newState) {
+                const wasMaximized = await appWindow.isMaximized();
+                wasMaximizedBeforeFullscreenRef.current = wasMaximized;
+                if (wasMaximized) {
+                    if (typeof anyWindow.unmaximize === 'function') {
+                        await anyWindow.unmaximize();
+                    } else {
+                        await appWindow.toggleMaximize();
+                    }
+                    await new Promise(requestAnimationFrame);
+                }
+                await appWindow.setFullscreen(true);
+                setIsFullscreen(true);
+            } else {
+                await appWindow.setFullscreen(false);
+                setIsFullscreen(false);
+                if (wasMaximizedBeforeFullscreenRef.current) {
+                    await appWindow.maximize();
+                    wasMaximizedBeforeFullscreenRef.current = false;
+                }
+            }
+        } catch (e) {
+            console.error("Failed to toggle fullscreen", e);
+        }
+    };
+
+    // Auto-exit fullscreen on close
+    useEffect(() => {
+        if (!isOpen && isFullscreen) {
+            const appWindow = getCurrentWindow();
+            appWindow.setFullscreen(false).catch(console.error);
+            if (wasMaximizedBeforeFullscreenRef.current) {
+                appWindow.maximize().catch(console.error);
+                wasMaximizedBeforeFullscreenRef.current = false;
+            }
+            setIsFullscreen(false);
+        }
+    }, [isOpen, isFullscreen]);
+
     // const lastCloseRef = React.useRef(0); // Removed
 
     // Background Image Source - already handled by state
@@ -241,12 +305,20 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             {/* Top Bar (Drag Region) - Fixed Height */}
             <div
                 data-tauri-drag-region
-                className="w-full h-16 z-50 flex justify-center items-center flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+                className="w-full h-16 z-50 flex justify-center items-center flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity relative"
             >
                 <button
                     onClick={onClose}
                     className="w-12 h-1.5 bg-white/40 rounded-full hover:bg-white/60 transition-colors cursor-pointer"
                 />
+
+                {/* Fullscreen Toggle */}
+                <button
+                    onClick={toggleFullscreen}
+                    className="absolute right-6 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all backdrop-blur-md"
+                >
+                    {isFullscreen ? <IoContract className="text-xl" /> : <IoExpand className="text-xl" />}
+                </button>
             </div>
 
             {/* Content Layer - Responsive Flex Layout */}
