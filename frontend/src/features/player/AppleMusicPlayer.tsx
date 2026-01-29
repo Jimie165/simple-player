@@ -76,15 +76,16 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
 
     // Layout sizing state
     const coverRef = useRef<HTMLDivElement>(null);
+    const coverShellRef = useRef<HTMLDivElement>(null);
     const controlsRef = useRef<HTMLDivElement>(null);
 
     // Use pure DOM manipulation for performance (avoids React render cycle lag during animation)
     useEffect(() => {
-        if (!coverRef.current || !controlsRef.current) return;
+        if (!coverShellRef.current || !controlsRef.current) return;
 
         const updateWidth = () => {
-            if (coverRef.current && controlsRef.current) {
-                const width = coverRef.current.getBoundingClientRect().width;
+            if (coverShellRef.current && controlsRef.current) {
+                const width = coverShellRef.current.getBoundingClientRect().width;
                 controlsRef.current.style.width = `${width}px`;
             }
         };
@@ -97,7 +98,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             requestAnimationFrame(updateWidth);
         });
 
-        observer.observe(coverRef.current);
+        observer.observe(coverShellRef.current);
 
         // Also listen to transitionend on the parent or window resize for good measure
         window.addEventListener('resize', updateWidth);
@@ -268,21 +269,26 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                 aspect-square: Maintain 1:1.
                                 w-auto h-auto: Let the aspect ratio and max constraints drive the size.
                              */}
-                            <motion.div
-                                ref={coverRef}
-                                className="relative aspect-square h-auto w-auto max-h-full max-w-full rounded-[12px] md:rounded-[18px] shadow-2xl overflow-hidden bg-white/5"
-                                animate={{
-                                    scale: isPlaying ? 1 : 0.85,
-                                    boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
-                                }}
-                                transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                            <div
+                                ref={coverShellRef}
+                                className="relative aspect-square h-auto w-auto max-h-full max-w-full"
                             >
-                                <CoverImage
-                                    song={metadata}
-                                    className="w-full h-full object-cover"
-                                    iconClassName="text-white/20 text-9xl"
-                                />
-                            </motion.div>
+                                <motion.div
+                                    ref={coverRef}
+                                    className="relative w-full h-full rounded-[12px] md:rounded-[18px] shadow-2xl overflow-hidden bg-white/5"
+                                    animate={{
+                                        scale: isPlaying ? 1 : 0.85,
+                                        boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
+                                    }}
+                                    transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                                >
+                                    <CoverImage
+                                        song={metadata}
+                                        className="w-full h-full object-cover"
+                                        iconClassName="text-white/20 text-9xl"
+                                    />
+                                </motion.div>
+                            </div>
                         </div>
 
                         {/* Controls Container - Fixed Height */}
