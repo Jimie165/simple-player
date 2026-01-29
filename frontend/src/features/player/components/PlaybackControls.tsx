@@ -177,6 +177,8 @@ export default function PlaybackControls() {
     useEffect(() => {
         let unlistenNext: (() => void) | undefined;
         let unlistenPrev: (() => void) | undefined;
+        let unlistenPlay: (() => void) | undefined;
+        let unlistenPause: (() => void) | undefined;
         let unlistenEnded: (() => void) | undefined;
         let isMounted = true;
 
@@ -213,6 +215,40 @@ export default function PlaybackControls() {
                     prevFn();
                 }
 
+                // --- 监听 SMTC 播放/暂停 ---
+                const playFn = await listen('smtc:play', async () => {
+                    const { isAudioLoaded, metadata, setIsPlaying, setAudioLoaded } = usePlayerStore.getState();
+
+                    if (!isAudioLoaded && metadata?.path) {
+                        try {
+                            await audioService.play(metadata.path, metadata);
+                            setIsPlaying(true);
+                            setAudioLoaded(true);
+                        } catch (error) {
+                            console.error("SMTC Auto Play failed:", error);
+                        }
+                    } else {
+                        // 如果已经 Loaded，则直接 Resume
+                        await audioService.resume();
+                        setIsPlaying(true);
+                    }
+                });
+                if (isMounted) {
+                    unlistenPlay = playFn;
+                } else {
+                    playFn();
+                }
+
+                const pauseFn = await listen('smtc:pause', async () => {
+                    await audioService.pause();
+                    setIsPlaying(false);
+                });
+                if (isMounted) {
+                    unlistenPause = pauseFn;
+                } else {
+                    pauseFn();
+                }
+
                 // --- 核心修复：监听后端发送的播放结束事件 ---
                 const endedFn = await listen('audio:ended', () => {
                     console.log("Audio ended event received from backend.");
@@ -247,6 +283,8 @@ export default function PlaybackControls() {
             };
             safeUnlisten(unlistenNext);
             safeUnlisten(unlistenPrev);
+            safeUnlisten(unlistenPlay);
+            safeUnlisten(unlistenPause);
             safeUnlisten(unlistenEnded);
             window.removeEventListener('playback:seeked', handleSeekEvent);
             window.removeEventListener('playback:dragging', handleRemoteDraggingEvent);
