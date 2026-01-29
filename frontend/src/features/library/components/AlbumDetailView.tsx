@@ -72,7 +72,7 @@ export default function AlbumDetailView({
                     <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-50 truncate leading-tight tracking-tight mt-2" title={album.name}>
                         {album.name}
                     </h1>
-                    <h2 className="text-2xl font-medium text-[#1867c0] dark:text-[#64b5f6] truncate" title={album.artist}>
+                    <h2 className="text-2xl font-medium text-primary truncate" title={album.artist}>
                         {album.artist}
                     </h2>
 

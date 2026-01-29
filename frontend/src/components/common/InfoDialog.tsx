@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle, DialogBackdrop } from '@headlessui/react';
-import { MdClose, MdMusicNote } from 'react-icons/md';
+import { MdClose } from 'react-icons/md';
 import { usePlayerStore } from '../../store/usePlayerStore';
 import { fileService } from '../../services/fileService';
 import { formatTime } from '../../utils/time';
 import type { SongMetadata } from '../../types';
+import CoverImage from './CoverImage';
 
 interface InfoDialogProps {
     isOpen: boolean;
@@ -88,13 +89,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                         {/* 上半部分：封面 + 核心信息 */}
                         <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
                             <div className="w-40 h-40 rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden shadow-md shrink-0 border border-neutral-200/30">
-                                {displayMeta?.cover ? (
-                                    <img src={displayMeta.cover} alt="Cover" className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                        <MdMusicNote className="text-5xl" />
-                                    </div>
-                                )}
+                                <CoverImage song={displayMeta} className="w-full h-full" iconClassName="text-5xl" />
                             </div>
 
                             <div className="flex-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-[13px] w-full items-center">

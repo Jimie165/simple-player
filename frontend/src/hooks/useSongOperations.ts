@@ -233,13 +233,26 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 items,
                 async () => {
                     clearSelection();
-                    const songIds = items.map(i => (i as any).id).filter(id => typeof id === 'number') as number[];
-                    if (songIds.length > 0) {
+                    // 优先使用 unique_id (playlist_entry_id) 进行精确移除
+                    const uniqueIds = items.map(i => (i as any).unique_id).filter(id => typeof id === 'number') as number[];
+
+                    if (uniqueIds.length > 0) {
                         try {
-                            await libraryService.batchRemoveFromPlaylist(playlistId, songIds);
+                            await libraryService.batchRemovePlaylistItems(playlistId, uniqueIds);
                             triggerLibraryUpdate();
                         } catch (e) {
-                            console.error('Failed to remove from playlist', e);
+                            console.error('Failed to remove playlist items', e);
+                        }
+                    } else {
+                        // Fallback: 使用 song_id 移除 (会移除所有重复项)
+                        const songIds = items.map(i => (i as any).id).filter(id => typeof id === 'number') as number[];
+                        if (songIds.length > 0) {
+                            try {
+                                await libraryService.batchRemoveFromPlaylist(playlistId, songIds);
+                                triggerLibraryUpdate();
+                            } catch (e) {
+                                console.error('Failed to remove from playlist', e);
+                            }
                         }
                     }
                 },

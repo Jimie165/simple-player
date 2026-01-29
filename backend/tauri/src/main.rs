@@ -77,6 +77,7 @@ fn main() {
             commands::playlist::batch_add_to_playlist,
             commands::playlist::remove_from_playlist,
             commands::playlist::batch_remove_from_playlist,
+            commands::playlist::batch_remove_playlist_items,
             commands::playlist::reorder_playlist_songs,
             commands::playlist::update_playlist_info,
             commands::playlist::update_playlist_cover,

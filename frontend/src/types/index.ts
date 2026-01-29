@@ -26,6 +26,8 @@ export interface SongMetadata {
     rating?: number;
     // 队列控制
     is_queue_item?: boolean;
+    // 播放列表唯一ID (用于处理重复歌曲)
+    unique_id?: number;
 }
 
 // 库文件夹

@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 5;
+const SCHEMA_VERSION: i32 = 6;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -63,6 +63,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 5 {
         migrate_v5(conn)?;
+        set_db_version(conn, 5)?;
+    }
+
+    if current_version < 6 {
+        migrate_v6(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -284,6 +289,48 @@ fn migrate_v5(conn: &Connection) -> Result<()> {
     if !columns.contains(&"last_played_at".to_string()) {
         conn.execute("ALTER TABLE playlists ADD COLUMN last_played_at TEXT", [])?;
     }
+
+    Ok(())
+}
+
+/// 版本 6: 移除 playlist_songs 的唯一约束 (playlist_id, song_id)
+/// 允许播放列表中存在重复歌曲
+fn migrate_v6(conn: &Connection) -> Result<()> {
+    // 1. 创建新表 (无 UNIQUE 约束)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS playlist_songs_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            playlist_id INTEGER NOT NULL,
+            song_id INTEGER NOT NULL,
+            position INTEGER NOT NULL,
+            FOREIGN KEY (playlist_id) REFERENCES playlists(id) ON DELETE CASCADE,
+            FOREIGN KEY (song_id) REFERENCES songs(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+
+    // 2. 迁移旧数据
+    conn.execute(
+        "INSERT INTO playlist_songs_new (id, playlist_id, song_id, position)
+         SELECT id, playlist_id, song_id, position FROM playlist_songs",
+        [],
+    )?;
+
+    // 3. 删除旧表
+    conn.execute("DROP TABLE playlist_songs", [])?;
+
+    // 4. 重命名新表
+    conn.execute("ALTER TABLE playlist_songs_new RENAME TO playlist_songs", [])?;
+
+    // 5. 重建索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_playlist_songs_playlist_id ON playlist_songs(playlist_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_playlist_songs_song_id ON playlist_songs(song_id)",
+        [],
+    )?;
 
     Ok(())
 }

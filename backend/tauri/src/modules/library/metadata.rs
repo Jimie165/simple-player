@@ -30,6 +30,7 @@ pub struct SongMetadata {
     pub last_played_at: Option<String>,
     pub is_favorite: Option<bool>,
     pub rating: Option<i32>,
+    pub unique_id: Option<i64>, // Playlist Entry ID
 }
 
 impl SongMetadata {
@@ -58,6 +59,7 @@ impl SongMetadata {
             last_played_at: song.last_played_at.clone(),
             is_favorite: Some(song.is_favorite),
             rating: song.rating,
+            unique_id: song.unique_id,
         }
     }
 }
@@ -183,5 +185,6 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
         last_played_at: None,
         is_favorite: None,
         rating: None,
+        unique_id: None,
     })
 }

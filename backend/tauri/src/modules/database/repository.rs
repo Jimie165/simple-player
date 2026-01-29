@@ -37,9 +37,10 @@ pub struct Song {
     pub is_favorite: bool,
     pub rating: Option<i32>,
     pub status: String, // 'active' | 'archived'
-    // 时间戳
     pub created_at: String,
     pub updated_at: String,
+    // Join Table ID (for playlist items)
+    pub unique_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -177,6 +178,7 @@ impl SongRepo {
                 .unwrap_or("active".to_string()),
             created_at: row.get(21)?,
             updated_at: row.get(22)?,
+            unique_id: None,
         })
     }
 
@@ -691,7 +693,7 @@ impl PlaylistRepo {
             .unwrap_or(0);
 
         conn.execute(
-            "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, position) VALUES (?1, ?2, ?3)",
+            "INSERT INTO playlist_songs (playlist_id, song_id, position) VALUES (?1, ?2, ?3)",
             params![playlist_id, song_id, max_position + 1],
         )?;
 
@@ -719,7 +721,7 @@ impl PlaylistRepo {
 
         for (i, song_id) in song_ids.iter().enumerate() {
             conn.execute(
-                "INSERT OR IGNORE INTO playlist_songs (playlist_id, song_id, position) VALUES (?1, ?2, ?3)",
+                "INSERT INTO playlist_songs (playlist_id, song_id, position) VALUES (?1, ?2, ?3)",
                 params![playlist_id, song_id, max_position + 1 + i as i64],
             )?;
         }
@@ -747,12 +749,13 @@ impl PlaylistRepo {
         Ok(())
     }
 
-    /// 获取播放列表中的所有歌曲
+    /// 获取播放列表中的所有歌曲 (带 unique_id / playlist_song.id)
     pub fn get_songs(conn: &Connection, playlist_id: i64) -> Result<Vec<Song>> {
         let sql = format!(
             "SELECT s.id, s.path, s.title, s.artist, s.album, s.duration, s.cover, s.cover_path, s.folder_id,
                     s.album_artist, s.year, s.genre, s.track_number, s.track_total, s.disc_number, s.disc_total,
-                    s.play_count, s.last_played_at, s.is_favorite, s.rating, s.status, s.created_at, s.updated_at
+                    s.play_count, s.last_played_at, s.is_favorite, s.rating, s.status, s.created_at, s.updated_at,
+                    ps.id as playlist_entry_id
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1 AND s.status = 'active'
@@ -760,7 +763,12 @@ impl PlaylistRepo {
         );
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
-            .query_map(params![playlist_id], SongRepo::map_row)?
+            .query_map(params![playlist_id], |row| {
+                let mut song = SongRepo::map_row(row)?;
+                // map_row 读取 0-22. 我们追加了 ps.id 在 23.
+                song.unique_id = Some(row.get(23)?);
+                Ok(song)
+            })?
             .collect::<Result<Vec<_>>>()?;
         Ok(songs)
     }
@@ -780,6 +788,35 @@ impl PlaylistRepo {
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         params_vec.push(Box::new(playlist_id));
         for id in song_ids {
+            params_vec.push(Box::new(*id));
+        }
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            params_vec.iter().map(|p| p.as_ref()).collect();
+        stmt.execute(params_refs.as_slice())?;
+
+        conn.execute(
+            "UPDATE playlists SET updated_at = datetime('now') WHERE id = ?1",
+            params![playlist_id],
+        )?;
+
+        Ok(())
+    }
+
+    /// 批量移除歌曲 (通过 playlist_songs.id，可精确移除重复项)
+    pub fn batch_remove_playlist_items(conn: &Connection, playlist_id: i64, unique_ids: &[i64]) -> Result<()> {
+        if unique_ids.is_empty() {
+            return Ok(());
+        }
+        let placeholders: String = unique_ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "DELETE FROM playlist_songs WHERE playlist_id = ?1 AND id IN ({})",
+            placeholders
+        );
+        let mut stmt = conn.prepare(&sql)?;
+
+        let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
+        params_vec.push(Box::new(playlist_id));
+        for id in unique_ids {
             params_vec.push(Box::new(*id));
         }
         let params_refs: Vec<&dyn rusqlite::ToSql> =

@@ -90,6 +90,17 @@ pub fn batch_remove_from_playlist(
     PlaylistRepo::batch_remove_songs(&conn, playlist_id, &song_ids).map_err(|e| e.to_string())
 }
 
+/// 批量从播放列表移除项 (通过 unique_id)
+#[tauri::command]
+pub fn batch_remove_playlist_items(
+    db: State<'_, DbState>,
+    playlist_id: i64,
+    unique_ids: Vec<i64>,
+) -> Result<(), String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    PlaylistRepo::batch_remove_playlist_items(&conn, playlist_id, &unique_ids).map_err(|e| e.to_string())
+}
+
 /// 重新排序播放列表歌曲
 #[tauri::command]
 pub fn reorder_playlist_songs(

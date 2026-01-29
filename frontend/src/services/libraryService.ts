@@ -102,6 +102,10 @@ export const libraryService = {
         return invoke('batch_remove_from_playlist', { playlistId, songIds });
     },
 
+    batchRemovePlaylistItems: async (playlistId: number, uniqueIds: number[]): Promise<void> => {
+        return invoke('batch_remove_playlist_items', { playlistId, uniqueIds });
+    },
+
     reorderPlaylistSongs: async (playlistId: number, songIds: number[]): Promise<void> => {
         return invoke('reorder_playlist_songs', { playlistId, songIds });
     },

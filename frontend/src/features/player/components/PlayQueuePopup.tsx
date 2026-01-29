@@ -38,10 +38,20 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
     const [propertySong, setPropertySong] = useState<SongMetadata | null>(null);
 
     const activeItemRef = useRef<HTMLDivElement>(null);
+    const listRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (show && activeItemRef.current) {
-            activeItemRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        if (show && activeItemRef.current && listRef.current) {
+            const container = listRef.current;
+            const item = activeItemRef.current;
+
+            // Manual scroll calculation to avoid layout shift caused by scrollIntoView
+            const itemTop = item.offsetTop;
+            const itemHeight = item.offsetHeight;
+            const containerHeight = container.clientHeight;
+
+            // Center the item
+            container.scrollTop = itemTop - containerHeight / 2 + itemHeight / 2;
         }
         // Auto-close context menu when popup closes
         if (!show) {
@@ -148,7 +158,7 @@ export default function PlayQueuePopup({ show }: PlayQueuePopupProps) {
             </div>
 
             {/* 列表 */}
-            <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+            <div ref={listRef} className="flex-1 overflow-y-auto p-2 scrollbar-thin">
                 {playlist.length === 0 ? (
                     <div className="flex flex-col items-center justify-center h-40 text-neutral-400 text-xs">
                         <MdMusicNote className="text-3xl mb-2 opacity-20" />
