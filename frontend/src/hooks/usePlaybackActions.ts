@@ -6,6 +6,7 @@ import type { RecentItem, SongMetadata } from '../types';
 export interface PlayOptions {
     restartIfCurrent?: boolean;
     addToRecent?: boolean;
+    disableShuffle?: boolean;
     recentItem?: RecentItem;
     buildRecentItem?: (song: SongMetadata) => RecentItem;
 }
@@ -75,6 +76,7 @@ export function usePlaybackActions() {
         try {
             if (isCurrent && options?.restartIfCurrent) {
                 await audioService.seek(0);
+                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
             }
 
             await audioService.play(song.path, song);
@@ -83,15 +85,25 @@ export function usePlaybackActions() {
             setAudioLoaded(true);
 
             if (playlist && playlist.length > 0) {
-                setPlaylist(playlist);
-                if (context) {
-                    setQueueContext(context);
-                }
-                if (isShuffling) {
+                if (options?.disableShuffle) {
+                    setShuffleState(false);
+                    setPlaylist(playlist);
+                    if (context) {
+                        setQueueContext(context);
+                    }
                     setCurrentSongIndex(index);
-                    toggleShuffleList(true);
+                    toggleShuffleList(false);
                 } else {
-                    setCurrentSongIndex(index);
+                    setPlaylist(playlist);
+                    if (context) {
+                        setQueueContext(context);
+                    }
+                    if (isShuffling) {
+                        setCurrentSongIndex(index);
+                        toggleShuffleList(true);
+                    } else {
+                        setCurrentSongIndex(index);
+                    }
                 }
             }
 
@@ -125,7 +137,10 @@ export function usePlaybackActions() {
             song,
             index: startIndex,
             playlist: songs,
-            options,
+            options: {
+                ...options,
+                disableShuffle: !shuffle
+            },
             context
         });
     };

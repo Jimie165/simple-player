@@ -211,7 +211,7 @@ export default function Library() {
         index: number,
         scopeSongs: SongMetadata[] = librarySongs,
         addToHistory = true,
-        options?: { restartIfCurrent?: boolean },
+        options?: { restartIfCurrent?: boolean, disableShuffle?: boolean },
         context?: { type: string, name: string, id?: string }
     ) => {
         await playSong({
@@ -385,7 +385,7 @@ export default function Library() {
                                             isLibraryItem: true
                                         });
                                         if (album.songs.length > 0) {
-                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: album.name, id: album.name });
+                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: album.name, id: album.name });
                                         }
                                     }}
                                     onShuffleAlbum={(album) => {
@@ -415,7 +415,9 @@ export default function Library() {
                                     artists={artists}
                                     onPlayArtist={(artist) => {
                                         if (artist.songs.length > 0) {
-                                            handlePlaySong(artist.songs[0], 0, artist.songs, true, { restartIfCurrent: true }, { type: 'artist_detail', name: artist.name, id: artist.name });
+                                            // Sort by album year desc
+                                            const sorted = [...artist.songs].sort((a, b) => (b.year || 0) - (a.year || 0));
+                                            handlePlaySong(sorted[0], 0, sorted, true, { restartIfCurrent: true, disableShuffle: true }, { type: 'artist_detail', name: artist.name, id: artist.name });
                                         }
                                     }}
                                     onShuffleArtist={(artist) => {

@@ -305,7 +305,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
 
             {/* Top Bar (Drag Region) - Fixed Height */}
             <div
-                data-tauri-drag-region
+                data-tauri-drag-region={isFullscreen ? undefined : ""}
                 className="w-full h-16 z-50 flex justify-center items-center flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity relative"
             >
                 <button

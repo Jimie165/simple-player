@@ -34,13 +34,14 @@ export default function GlobalDetailStack() {
         artist: song.artist
     });
 
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean }, context?: { type: string, name: string, id?: string }) => {
+    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => {
         await playSong({
             song,
             index,
             playlist: scopeSongs,
             options: {
                 ...options,
+                disableShuffle: true,
                 addToRecent: addToHistory,
                 recentItem: addToHistory ? buildRecentForSong(song) : undefined
             },
@@ -145,7 +146,7 @@ export default function GlobalDetailStack() {
 
 interface OverlayProps {
     data: any;
-    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean }, context?: { type: string, name: string, id?: string }) => void;
+    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
     onShuffle: (params: { songs: SongMetadata[], context?: { type: string, name: string, id?: string } }) => void;
     addToRecent: (item: any) => void;
     push?: (view: any) => void;
@@ -183,7 +184,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
     return (
         <AlbumDetailView
             album={{ ...albumData, songs: albumData.songs || [] }} // Ensure songs is never undefined
-            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, options, { type: 'album_detail', name: albumData.name, id: albumData.name })}
+            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, { ...options, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name })}
             onPlayAll={() => {
                 const songs = albumData.songs || [];
                 addToRecent({
@@ -198,7 +199,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
                     lastPlayed: Date.now(),
                     isLibraryItem: true
                 });
-                if (songs.length > 0) onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: albumData.name, id: albumData.name });
+                if (songs.length > 0) onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name });
             }}
             onShuffle={() => {
                 const songs = albumData.songs || [];
@@ -285,34 +286,22 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
         onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: album.name, id: album.name });
     };
 
+    const sortedSongs = useMemo(() => {
+        return [...(artistData.songs || [])].sort((a, b) => (b.year || 0) - (a.year || 0));
+    }, [artistData.songs]);
+
     return (
         <ArtistDetailView
             artist={artistData}
             albums={artistAlbums}
-            allArtistSongs={artistData.songs || []}
-            onPlayAll={() => {
-                addToRecent({
-                    id: `artist:${artistData.name}`,
-                    type: 'album',
-                    title: artistData.name,
-                    artist: artistData.name,
-                    description: `${artistData.songs.length} 首歌曲`,
-                    cover: artistData.cover,
-                    cover_path: artistData.songs[0]?.cover_path || null,
-                    path: artistData.songs[0]?.path || '',
-                    lastPlayed: Date.now(),
-                    isLibraryItem: true
-                });
-                if (artistData.songs.length > 0) onPlaySong(artistData.songs[0], 0, artistData.songs, false, { restartIfCurrent: true }, { type: 'artist_detail', name: artistData.name, id: artistData.name });
-            }}
             onShuffle={() => {
-                if (artistData.songs.length > 0) {
-                    onShuffle({ songs: artistData.songs, context: { type: 'artist_detail', name: artistData.name, id: artistData.name } });
+                if (sortedSongs.length > 0) {
+                    onShuffle({ songs: sortedSongs, context: { type: 'artist_detail', name: artistData.name, id: artistData.name } });
                 }
             }}
             onPlayAlbum={handlePlayAlbum}
             onOpenAlbum={handleOpenAlbum}
-            onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
+            onPlaySong={(song, idx, options) => onPlaySong(song, idx, sortedSongs, true, { ...options, disableShuffle: true }, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
             onOpenArtistByName={onOpenArtistByName}
             onOpenAlbumByName={() => { }}
         />

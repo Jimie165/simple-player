@@ -9,7 +9,7 @@ import clsx from 'clsx';
 
 interface AlbumDetailViewProps {
     album: AlbumData;
-    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
+    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }) => void;
     onPlayAll: () => void;
     onShuffle: () => void;
     onDeleteSong?: (song: SongMetadata) => void;

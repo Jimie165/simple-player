@@ -57,6 +57,9 @@ interface LibraryState {
     clearUserQueue: () => void;
     // 移除单个队列项
     removeQueueItem: (index: number) => void;
+    // 记录播放列表添加时间
+    recordPlaylistAddition: (playlistId: number) => void;
+    lastAddedToPlaylists: Record<number, number>;
 
     // Library Version for Sync
     libraryVersion: number;
@@ -120,6 +123,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     originalPlaylist: [],
     currentSongIndex: -1,
     queueContext: null,
+    lastAddedToPlaylists: {},
 
     setQueueContext: (context) => set({ queueContext: context }),
 
@@ -158,6 +162,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     },
 
     addToRecent: (item) => set((state) => {
+        if (item.type === 'artist') return state;
         const safeItem = sanitizeRecentItem(item);
         // 使用 id 去重而不是 path，因为专辑的 id 是 album:name:artist 格式
         const filtered = state.recentHistory.filter(i => i.id !== safeItem.id);
@@ -520,6 +525,13 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         };
     }),
 
+    recordPlaylistAddition: (playlistId) => set((state) => ({
+        lastAddedToPlaylists: {
+            ...state.lastAddedToPlaylists,
+            [playlistId]: Date.now()
+        }
+    })),
+
     libraryVersion: 0,
     triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
 
@@ -627,6 +639,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         // Persist Session
         currentSongIndex: state.currentSongIndex,
         playlist: state.playlist,
-        originalPlaylist: state.originalPlaylist
+        originalPlaylist: state.originalPlaylist,
+        lastAddedToPlaylists: state.lastAddedToPlaylists
     }),
 }));

@@ -17,12 +17,10 @@ import { useScrollBlur } from '../../../hooks/useScrollBlur';
 interface ArtistDetailViewProps {
     artist: ArtistData;
     albums: AlbumData[];
-    allArtistSongs: SongMetadata[]; // 该艺人的所有歌曲（用于队列视图）
-    onPlayAll: () => void;
     onShuffle: () => void;
     onPlayAlbum: (album: AlbumData) => void;
     onOpenAlbum: (album: AlbumData) => void;
-    onPlaySong: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
+    onPlaySong: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }) => void;
     onDeleteSong?: (song: SongMetadata) => void;
     onDeleteAlbum?: (album: AlbumData) => void;
     onOpenArtistByName?: (name: string) => void;
@@ -32,8 +30,6 @@ interface ArtistDetailViewProps {
 export default function ArtistDetailView({
     artist,
     albums,
-    allArtistSongs,
-    onPlayAll,
     onShuffle,
     onPlayAlbum,
     onOpenAlbum,
@@ -74,8 +70,8 @@ export default function ArtistDetailView({
 
     // 计算总时长
     const totalDuration = useMemo(() => {
-        return allArtistSongs.reduce((acc, song) => acc + song.duration, 0);
-    }, [allArtistSongs]);
+        return artist.songs.reduce((acc, song) => acc + song.duration, 0);
+    }, [artist.songs]);
 
     const formatDuration = (sec: number) => {
         const h = Math.floor(sec / 3600);
@@ -105,6 +101,10 @@ export default function ArtistDetailView({
 
         return list.map(x => x.album);
     }, [albums]);
+
+    const sortedSongs = useMemo(() => {
+        return sortedAlbums.flatMap(album => album.songs);
+    }, [sortedAlbums]);
 
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     useEffect(() => {
@@ -169,7 +169,11 @@ export default function ArtistDetailView({
                     {/* Actions */}
                     <div className="flex items-center justify-center md:justify-start gap-3">
                         <button
-                            onClick={onPlayAll}
+                            onClick={() => {
+                                if (sortedSongs.length > 0) {
+                                    onPlaySong(sortedSongs[0], 0, { restartIfCurrent: true, disableShuffle: true });
+                                }
+                            }}
                             className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary shadow-md transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
@@ -311,9 +315,9 @@ export default function ArtistDetailView({
                                                     <SongListView
                                                         songs={album.songs}
                                                         onPlay={(song, _index, options) => {
-                                                            const globalIndex = allArtistSongs.findIndex(s => s.path === song.path);
+                                                            const globalIndex = sortedSongs.findIndex(s => s.path === song.path);
                                                             if (globalIndex !== -1) {
-                                                                onPlaySong(song, globalIndex, options);
+                                                                onPlaySong(song, globalIndex, { ...options, disableShuffle: true });
                                                             }
                                                         }}
                                                         onDelete={onDeleteSong}

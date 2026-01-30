@@ -4,6 +4,150 @@ use crate::modules::library::{self, SongMetadata, save_cover};
 use std::path::Path;
 use tauri::{Manager, State};
 
+async fn scan_library_internal(
+    db: State<'_, DbState>,
+    app_handle: tauri::AppHandle,
+    force_restore: bool,
+    restore_folder_id: Option<i64>,
+) -> Result<Vec<SongMetadata>, String> {
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| e.to_string())?;
+
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let folders = FolderRepo::get_all(&conn).map_err(|e| e.to_string())?;
+    let mut all_songs = Vec::new();
+
+    for folder in folders {
+        let files = library::scan_audio_files_recursive(&folder.path);
+
+        let stale_songs = SongRepo::get_songs_not_in_paths(&conn, folder.id, &files)
+            .map_err(|e| e.to_string())?;
+        for stale in stale_songs {
+            let _ = SongRepo::hard_delete(&conn, stale.id);
+        }
+
+        for file in files {
+            if let Ok(Some(existing)) = SongRepo::get_by_path_any_status(&conn, &file) {
+                if existing.status == "archived" {
+                    let should_restore = force_restore
+                        && restore_folder_id
+                            .map(|target| existing.folder_id == Some(target))
+                            .unwrap_or(true);
+
+                    if should_restore {
+                        if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
+                            let cover_path = meta.cover_path.clone().or_else(|| {
+                                meta.cover.as_ref().and_then(|cover_data| {
+                                    save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
+                                })
+                            });
+
+                            let _ = SongRepo::update_metadata(
+                                &conn,
+                                existing.id,
+                                &meta.title,
+                                &meta.artist,
+                                &meta.album,
+                                meta.duration as i64,
+                                None,
+                                cover_path.as_deref(),
+                                meta.album_artist.as_deref(),
+                                meta.year,
+                                meta.genre.as_deref(),
+                                meta.track_number,
+                                meta.track_total,
+                                meta.disc_number,
+                                meta.disc_total,
+                            );
+                            let _ = SongRepo::restore(&conn, existing.id);
+
+                            if let Ok(Some(updated)) = SongRepo::get_by_path(&conn, &file) {
+                                all_songs.push(SongMetadata::from_db_song(&updated));
+                            }
+                        }
+                    } else {
+                        continue;
+                    }
+                } else {
+                    all_songs.push(SongMetadata::from_db_song(&existing));
+                }
+                continue;
+            }
+
+            if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
+                let cover_path = meta.cover_path.clone().or_else(|| {
+                    meta.cover.as_ref().and_then(|cover_data| {
+                        save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
+                    })
+                });
+
+                let _ = SongRepo::upsert(
+                    &conn,
+                    &file,
+                    &meta.title,
+                    &meta.artist,
+                    &meta.album,
+                    meta.duration as i64,
+                    None,
+                    cover_path.as_deref(),
+                    Some(folder.id),
+                    meta.album_artist.as_deref(),
+                    meta.year,
+                    meta.genre.as_deref(),
+                    meta.track_number,
+                    meta.track_total,
+                    meta.disc_number,
+                    meta.disc_total,
+                );
+
+                if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &file) {
+                    all_songs.push(SongMetadata::from_db_song(&inserted));
+                } else {
+                    let mut result_meta = meta.clone();
+                    result_meta.cover_path = cover_path;
+                    result_meta.cover = None;
+                    all_songs.push(result_meta);
+                }
+            } else {
+                let p = Path::new(&file);
+                let filename = p
+                    .file_name()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("Unknown")
+                    .to_string();
+
+                let _ = SongRepo::upsert(
+                    &conn,
+                    &file,
+                    &filename,
+                    "Unknown",
+                    "Unknown",
+                    0,
+                    None,
+                    None,
+                    Some(folder.id),
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                );
+
+                if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &file) {
+                    all_songs.push(SongMetadata::from_db_song(&inserted));
+                }
+            }
+        }
+    }
+
+    let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
+    Ok(songs.iter().map(SongMetadata::from_db_song).collect())
+}
+
 /// 获取所有已保存的文件夹路径
 #[tauri::command]
 pub fn get_library_folders(db: State<'_, DbState>) -> Result<Vec<LibraryFolder>, String> {
@@ -19,13 +163,14 @@ pub async fn add_library_folder(
     app_handle: tauri::AppHandle,
     folder: String,
 ) -> Result<Vec<SongMetadata>, String> {
-    {
+    let added_folder_id = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
-        FolderRepo::add(&conn, &folder).map_err(|e| e.to_string())?;
-    }
+        let folder_row = FolderRepo::add(&conn, &folder).map_err(|e| e.to_string())?;
+        folder_row.id
+    };
 
-    // 添加后立即扫描，强制恢复已归档歌曲
-    scan_library(db, app_handle, true).await
+    // 添加后立即扫描：仅恢复该文件夹内已归档歌曲
+    scan_library_internal(db, app_handle, true, Some(added_folder_id)).await
 }
 
 /// 移除文件夹
@@ -47,155 +192,7 @@ pub async fn scan_library(
     app_handle: tauri::AppHandle,
     force_restore: bool,
 ) -> Result<Vec<SongMetadata>, String> {
-    let app_data_dir = app_handle
-        .path()
-        .app_data_dir()
-        .map_err(|e| e.to_string())?;
-
-    let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let folders = FolderRepo::get_all(&conn).map_err(|e| e.to_string())?;
-    let mut all_songs = Vec::new();
-
-    for folder in folders {
-        // 使用递归扫描文件夹中的音频文件
-        let files = library::scan_audio_files_recursive(&folder.path);
-
-        // 清理已删除的文件（数据库中有但磁盘上没有）
-        // 无论是否归档，只要文件不存在了，就硬删除
-        let stale_songs = SongRepo::get_songs_not_in_paths(&conn, folder.id, &files)
-            .map_err(|e| e.to_string())?;
-        for stale in stale_songs {
-            let _ = SongRepo::hard_delete(&conn, stale.id);
-        }
-
-        for file in files {
-            // 尝试从数据库获取缓存的元数据 (查任意状态)
-            if let Ok(Some(existing)) = SongRepo::get_by_path_any_status(&conn, &file) {
-                if existing.status == "archived" {
-                    if force_restore {
-                        // 场景 B: 强制恢复 (读取新元数据 + 设为 active)
-                        if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
-                            let cover_path = meta.cover_path.clone().or_else(|| {
-                                meta.cover.as_ref().and_then(|cover_data| {
-                                    save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
-                                })
-                            });
-
-                            // 更新元数据
-                            let _ = SongRepo::update_metadata(
-                                &conn,
-                                existing.id,
-                                &meta.title,
-                                &meta.artist,
-                                &meta.album,
-                                meta.duration as i64,
-                                None,
-                                cover_path.as_deref(),
-                                meta.album_artist.as_deref(),
-                                meta.year,
-                                meta.genre.as_deref(),
-                                meta.track_number,
-                                meta.track_total,
-                                meta.disc_number,
-                                meta.disc_total,
-                            );
-                            // 设为活跃
-                            let _ = SongRepo::restore(&conn, existing.id);
-
-                            // 返回更新后的数据
-                            if let Ok(Some(updated)) = SongRepo::get_by_path(&conn, &file) {
-                                all_songs.push(SongMetadata::from_db_song(&updated));
-                            }
-                        }
-                    } else {
-                        // 场景 A: 刷新 (保持归档，跳过)
-                        continue;
-                    }
-                } else {
-                    // 活跃歌曲，直接返回缓存
-                    all_songs.push(SongMetadata::from_db_song(&existing));
-                }
-                continue;
-            }
-
-            // 从文件读取元数据
-            if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
-                let cover_path = meta.cover_path.clone().or_else(|| {
-                    meta.cover.as_ref().and_then(|cover_data| {
-                        save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
-                    })
-                });
-
-                // 保存到数据库
-                let _ = SongRepo::upsert(
-                    &conn,
-                    &file,
-                    &meta.title,
-                    &meta.artist,
-                    &meta.album,
-                    meta.duration as i64,
-                    None, // 不再存储 base64 cover
-                    cover_path.as_deref(),
-                    Some(folder.id),
-                    meta.album_artist.as_deref(),
-                    meta.year,
-                    meta.genre.as_deref(),
-                    meta.track_number,
-                    meta.track_total,
-                    meta.disc_number,
-                    meta.disc_total,
-                );
-
-                // 重新从数据库获取，以确保有正确的 ID
-                if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &file) {
-                    all_songs.push(SongMetadata::from_db_song(&inserted));
-                } else {
-                    // Fallback (不应该发生)
-                    let mut result_meta = meta.clone();
-                    result_meta.cover_path = cover_path;
-                    result_meta.cover = None;
-                    all_songs.push(result_meta);
-                }
-            } else {
-                // 解析失败，创建简易元数据
-                let p = Path::new(&file);
-                let filename = p
-                    .file_name()
-                    .and_then(|s| s.to_str())
-                    .unwrap_or("Unknown")
-                    .to_string();
-
-                // 简易 Upsert 如果存在则不更新 status
-                let _ = SongRepo::upsert(
-                    &conn,
-                    &file,
-                    &filename,
-                    "Unknown",
-                    "Unknown",
-                    0,
-                    None,
-                    None,
-                    Some(folder.id),
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                    None,
-                );
-
-                // 重新从数据库获取
-                if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &file) {
-                    all_songs.push(SongMetadata::from_db_song(&inserted));
-                }
-            }
-        }
-    }
-
-    // 返回重新获取的完整排序列表，以保证与 get_library_songs 一致
-    let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
-    Ok(songs.iter().map(SongMetadata::from_db_song).collect())
+    scan_library_internal(db, app_handle, force_restore, None).await
 }
 
 /// 获取库中所有缓存的歌曲（不重新扫描）

@@ -15,6 +15,7 @@ import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();
     const { clearSelection } = useSelectionStore();
+    const { lastAddedToPlaylists, recordPlaylistAddition } = useLibraryStore();
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
@@ -90,7 +91,17 @@ export default function AddToPlaylistSheet() {
                 if (s.id !== undefined) map.set(s.id, s);
             });
             setLibraryMap(map);
-            setPlaylists(list);
+
+            // Sort playlists: 
+            // 1. By locally tracked lastAddedToPlaylists (most recent first)
+            // 2. Fallback to updated_at from backend
+            const sorted = [...list].sort((a, b) => {
+                const timeA = lastAddedToPlaylists[a.id] || (a.updated_at ? new Date(a.updated_at).getTime() : 0);
+                const timeB = lastAddedToPlaylists[b.id] || (b.updated_at ? new Date(b.updated_at).getTime() : 0);
+                return timeB - timeA;
+            });
+
+            setPlaylists(sorted);
         } catch (error) {
             console.error(error);
         } finally {
@@ -179,7 +190,7 @@ export default function AddToPlaylistSheet() {
                 const allIds = resolvedSongs.map(s => s.id).filter((id): id is number => id !== undefined);
                 if (allIds.length > 0) {
                     await libraryService.batchAddToPlaylist(playlistId, allIds);
-                    finishAdd();
+                    finishAdd(playlistId);
                 } else {
                     alert("无法添加：未找到歌曲的库ID，请先导入到音乐库");
                 }
@@ -215,7 +226,7 @@ export default function AddToPlaylistSheet() {
                 await libraryService.batchAddToPlaylist(playlistId, idsToAdd);
             }
 
-            finishAdd();
+            finishAdd(playlistId);
         } catch (error) {
             console.error("Failed to add songs after confirm", error);
             alert("添加失败");
@@ -224,7 +235,10 @@ export default function AddToPlaylistSheet() {
         }
     };
 
-    const finishAdd = async () => {
+    const finishAdd = async (playlistId?: number) => {
+        if (playlistId) {
+            recordPlaylistAddition(playlistId);
+        }
         clearSelection();
         useLibraryStore.getState().triggerLibraryUpdate();
 
@@ -245,11 +259,11 @@ export default function AddToPlaylistSheet() {
                         }
                         return s;
                     });
-                    
+
                     // Apply Sort using playlist settings to match Detail View
                     const settings = useLibraryStore.getState().getPlaylistSettings(pl.id.toString());
                     const sorted = sortSongs(hydrated, settings.sortKey, settings.sortOrder);
-                    
+
                     updatedSongsMap[pl.id] = sorted;
                 })
             );
