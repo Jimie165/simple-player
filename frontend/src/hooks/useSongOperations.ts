@@ -363,8 +363,8 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         // Add to Playlist Rule:
         // - "If it is an opened folder, then it should be one less 'Add to' than Playlist"
         // - Interpreted as: Hide "Add to Playlist" in Folder context.
-        // - Also hide if items are not in library (no numeric ID)
-        const allHaveIds = items.every(i => typeof (i as any).id === 'number');
+        // - Also hide if items are not in library (no numeric ID) AND not marked as library items (RecentItem.isLibraryItem)
+        const allHaveIds = items.every(i => typeof (i as any).id === 'number' || (i as any).isLibraryItem === true);
         if (context !== 'folder' && allHaveIds) {
             group1.push({ id: 'add-to', label: '添加到播放列表...', icon: MdPlaylistAdd, onClick: handleAddToPlaylist });
         }
@@ -392,7 +392,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             // Icon logic: if single, show actual status. If multi, show "Favorite" (generic) or maybe checks all?
             // "only remove if mixed types" -> implied "show if all songs".
 
-            // Only show Favorite if items have IDs (are in library)
+            // Only show Favorite if items have IDs (are in library) or marked as library item
             if (allHaveIds) {
                 const isFav = isAllFavorited;
 
@@ -429,13 +429,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
             if (showAlbum && (albumValue || isSongFile)) {
                 // Only show Go to Album if item has ID (is in library)
-                if (typeof (item as any).id === 'number') {
+                if (typeof (item as any).id === 'number' || item.isLibraryItem === true) {
                     group2.push({ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: handleShowAlbum });
                 }
             }
             if (showArtist && (artistValue || isSongFile)) {
                 // Only show Go to Artist if item has ID (is in library)
-                if (typeof (item as any).id === 'number') {
+                if (typeof (item as any).id === 'number' || item.isLibraryItem === true) {
                     group2.push({ id: 'artist', label: '前往艺人', icon: MdPerson, onClick: handleShowArtist });
                 }
             }
