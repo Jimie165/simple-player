@@ -6,9 +6,9 @@ import {
     IoShuffle, IoRepeat,
     IoVolumeLow, IoVolumeHigh,
     IoList, IoStar, IoStarOutline, IoEllipsisHorizontal,
-    IoPlayBack, IoPlayForward,
-    IoExpand, IoContract
+    IoPlayBack, IoPlayForward
 } from 'react-icons/io5';
+import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePlayerStore } from '../../store/usePlayerStore';
@@ -318,7 +318,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                     onClick={toggleFullscreen}
                     className="absolute right-6 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all backdrop-blur-md"
                 >
-                    {isFullscreen ? <IoContract className="text-xl" /> : <IoExpand className="text-xl" />}
+                    {isFullscreen ? <FiMinimize2 className="text-xl" /> : <FiMaximize2 className="text-xl" />}
                 </button>
             </div>
 

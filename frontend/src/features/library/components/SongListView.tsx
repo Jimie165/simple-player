@@ -1,6 +1,7 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MdAccessTime, MdArrowDropUp, MdArrowDropDown, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
+import { Virtuoso } from 'react-virtuoso';
 import type { SongMetadata } from '../../../types';
 import { useLibraryStore } from '../../../store/useLibraryStore';
 import { useSelectionStore } from '../../../store/useSelectionStore';
@@ -19,11 +20,12 @@ interface SongListViewProps {
     songs: SongMetadata[];
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     onDelete?: (song: SongMetadata) => void;
-    hideCover?: boolean; // 新增：是否隐藏封面
-    enableDelete?: boolean; // 新增：是否启用删除功能 (默认 true)
-    hideArtist?: boolean; // 新增：是否隐藏艺人列
-    hideAlbum?: boolean; // 新增：是否隐藏专辑列
-    disableSort?: boolean; // 新增：禁用排序点击
+    hideCover?: boolean;
+    enableDelete?: boolean;
+    hideArtist?: boolean;
+    hideAlbum?: boolean;
+    disableSort?: boolean;
+    virtualize?: boolean;
     onOpenArtist?: (artist: string) => void;
     onOpenAlbum?: (album: string) => void;
     context?: MusicMenuContext;
@@ -41,6 +43,7 @@ export default function SongListView({
     hideArtist = false,
     hideAlbum = false,
     disableSort = false,
+    virtualize = true,
     onOpenArtist,
     onOpenAlbum,
     context = 'library'
@@ -49,9 +52,9 @@ export default function SongListView({
     const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
     const headerPaddingClass = isLibraryContext ? "px-2" : "px-4";
     const rowPaddingClass = isLibraryContext ? "px-2" : "px-4";
-    // 艺人详情和专辑详情页都使用 top-10，library 也使用 top-10
     const headerTopClass = "top-10";
-    // 表头在不同上下文下的背景/模糊效果
+
+    // Header Blur / Context specific class - kept from original if any logic existed, seemingly generic sticky
 
     // Responsive: auto-hide album column on narrow windows
     const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
@@ -64,10 +67,9 @@ export default function SongListView({
         return () => window.removeEventListener('resize', checkWidth);
     }, []);
 
-    // Combine prop and responsive state
     const effectiveHideAlbum = hideAlbum || shouldHideAlbum;
 
-    // Persist sort state to localStorage
+    // Persist sort state
     const [sortKey, setSortKey] = useState<SortKey>(() => {
         try {
             const saved = localStorage.getItem('songlist_sort_key');
@@ -92,7 +94,7 @@ export default function SongListView({
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, clearSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
     const { toggleFavorite, isFavorite, favoriteSet } = useLibraryStore();
 
-    // 右键菜单状态
+    // Context Menu State
     type ContextMenuState = {
         x: number;
         y: number;
@@ -103,21 +105,16 @@ export default function SongListView({
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
-
-        // Dispatch 'mousedown' to ensure Headless UI menus close (click() is sometimes insufficient)
         document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
     };
 
-    // 格式化时长
     const formatDuration = (sec: number) => {
         const m = Math.floor(sec / 60);
         const s = Math.floor(sec % 60);
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
-    // 排序逻辑
     const sortedSongs = useMemo(() => {
         if (!sortKey || sortKey === 'manual') return songs;
         return [...songs].sort((a, b) => {
@@ -127,7 +124,6 @@ export default function SongListView({
             if (valB === undefined || valB === null) valB = '';
 
             if (typeof valA === 'string' && typeof valB === 'string') {
-                // Check if starts with English/Number (Ascii 0-127)
                 const isAsciiA = /^[\x00-\x7F]/.test(valA);
                 const isAsciiB = /^[\x00-\x7F]/.test(valB);
 
@@ -144,7 +140,7 @@ export default function SongListView({
         });
     }, [songs, sortKey, sortOrder]);
 
-    // Handle Select All Request
+    // Update Selectable IDs
     useEffect(() => {
         if (selectAllRequested && isSelectionMode) {
             const items = sortedSongs.map(song => ({
@@ -204,33 +200,24 @@ export default function SongListView({
         </div>
     );
 
-    // Selection Logic Helpers
-    const isSelected = (id: string | undefined) => id ? selectedIds.has(id.toString()) : false;
-
-    // Check if current selection type allows adding songs (or is empty)
+    const isSelected = useCallback((id: string | undefined) => id ? selectedIds.has(id.toString()) : false, [selectedIds]);
     const canSelect = !selectionType || selectionType === 'song' || selectionType === 'file';
 
-    const handleItemClick = (e: React.MouseEvent, song: SongMetadata) => {
+    const handleItemClick = useCallback((e: React.MouseEvent, song: SongMetadata) => {
         e.stopPropagation();
-        if (e.button !== 0) return; // Only allow left click
-
-        // Use standardized ID
+        if (e.button !== 0) return;
         const id = getMusicItemId(song);
         if (!id) return;
-
         if (isSelectionMode) {
             if (canSelect) {
                 toggleSelection(id, 'song', song);
             } else {
-                // Switch type? Or notify?
                 toggleSelection(id, 'song', song);
             }
-        } else {
-            // Normal visual click does NOTHING usually unless it's double click for playback in desktop
         }
-    };
+    }, [isSelectionMode, canSelect, toggleSelection]);
 
-    const handleCheckboxClick = (e: React.MouseEvent | null, song: SongMetadata) => {
+    const handleCheckboxClick = useCallback((e: React.MouseEvent | null, song: SongMetadata) => {
         if (e) e.stopPropagation();
         const id = getMusicItemId(song);
         if (!id) return;
@@ -239,25 +226,177 @@ export default function SongListView({
         } else {
             toggleSelection(id, 'song', song);
         }
-    };
+    }, [isSelectionMode, toggleSelection, toggleSelectionMode]);
 
-
-    // Grid 定义
     const getGridCols = () => {
-        // Normal: Heart (24px)
         let cols = "24px minmax(0,4fr)";
-
-        if (!hideArtist) cols += " minmax(0,3fr)"; // Artist
-        if (!effectiveHideAlbum) cols += " minmax(0,3fr)"; // Album
-        cols += " 100px 40px"; // Time, Menu
+        if (!hideArtist) cols += " minmax(0,3fr)";
+        if (!effectiveHideAlbum) cols += " minmax(0,3fr)";
+        cols += " 100px 40px";
         return cols;
     };
-
     const gridStyle = { gridTemplateColumns: getGridCols() };
+
+    // Find custom scroll parent
+    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!virtualize) return;
+        const el = document.querySelector('[data-scroll-viewport]');
+        if (el instanceof HTMLElement) setScrollParent(el);
+    }, [virtualize]);
+
+    // Render Row Function
+    const itemContent = (index: number, song: SongMetadata) => {
+        const id = getMusicItemId(song);
+        const selected = isSelected(id);
+        const isFav = (song.id !== undefined && typeof song.id === 'number')
+            ? favoriteSet.has(song.id)
+            : isFavorite(song as any);
+
+        return (
+            <div
+                key={id || index}
+                onDoubleClick={() => {
+                    if (!isSelectionMode) {
+                        const { metadata, togglePlay } = usePlayerStore.getState();
+                        const isCurrent = metadata && (
+                            (song.id !== undefined && song.id === metadata.id) ||
+                            (song.path === metadata.path)
+                        );
+                        if (isCurrent) {
+                            togglePlay();
+                        } else {
+                            onPlay(song, index);
+                        }
+                    }
+                }}
+                onClick={(e) => handleItemClick(e, song)}
+                onContextMenu={(e) => handleContextMenu(e, song, index)}
+                style={gridStyle}
+                className={clsx(
+                    "group grid py-2 items-center rounded-lg transition-colors relative",
+                    gridGapClass,
+                    rowPaddingClass,
+                    selected
+                        ? "bg-primary/10 hover:bg-primary/15"
+                        : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
+                    "cursor-default text-[14px]"
+                )}
+            >
+                {selected && (
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
+                )}
+
+                {/* Heart Icon */}
+                <div className="flex justify-center items-center">
+                    <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(song);
+                            }}
+                            className={clsx(
+                                "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
+                                isFav
+                                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
+                                    : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                            )}
+                        >
+                            {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
+                        </button>
+                    </CustomTooltip>
+                </div>
+
+                {/* Title + Cover */}
+                <div className="flex items-center gap-3 overflow-hidden">
+                    {!hideCover && (
+                        <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                            <SongCoverOverlay
+                                song={song}
+                                className="w-full h-full"
+                                onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
+                                restartOnPlay
+                            />
+                        </div>
+                    )}
+                    <span className={clsx(
+                        "font-medium truncate pr-4",
+                        selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
+                    )}>
+                        {song.title}
+                    </span>
+                </div>
+
+                {/* Artist */}
+                {!hideArtist && (
+                    <div
+                        className={clsx(
+                            "text-neutral-500 dark:text-neutral-400 truncate font-medium transition-colors",
+                            !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
+                        )}
+                        onClick={(e) => {
+                            if (isSelectionMode) return;
+                            if (onOpenArtist && song.artist) {
+                                e.stopPropagation();
+                                onOpenArtist(song.artist);
+                            }
+                        }}
+                    >
+                        {song.artist}
+                    </div>
+                )}
+
+                {/* Album */}
+                {!effectiveHideAlbum && (
+                    <div
+                        className={clsx(
+                            "text-neutral-500 dark:text-neutral-400 truncate transition-colors",
+                            !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
+                        )}
+                        onClick={(e) => {
+                            if (isSelectionMode) return;
+                            if (onOpenAlbum && song.album) {
+                                e.stopPropagation();
+                                onOpenAlbum(song.album);
+                            }
+                        }}
+                    >
+                        {song.album}
+                    </div>
+                )}
+
+                {/* Duration */}
+                <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
+                    {formatDuration(song.duration)}
+                </div>
+
+                {/* Context Menu Trigger */}
+                <div
+                    className={clsx(
+                        "flex justify-end transition-opacity",
+                        isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                    )}
+                    onDoubleClick={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <SmartMusicContextMenu
+                        onOpen={() => setContextMenu(null)}
+                        items={song}
+                        context={context}
+                        variant="clean"
+                        onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
+                        onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
+                        isSelected={selected}
+                        onSelect={() => handleCheckboxClick(null, song)}
+                    />
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="w-full relative select-none">
-            {/* 表头 (Sticky) */}
+            {/* Header (Sticky) via CSS outside Virtuoso */}
             <div
                 style={gridStyle}
                 className={clsx(
@@ -267,8 +406,7 @@ export default function SongListView({
                     headerPaddingClass,
                     "text-[13px] text-on-surface-variant font-medium"
                 )}>
-                {/* Selection header removed */}
-                <div></div> {/* Heart header spacer */}
+                <div></div>
                 <HeaderCell label="标题" colKey="title" className="pl-0" allowSort={!disableSort} />
                 {!hideArtist && <HeaderCell label="艺人" colKey="artist" allowSort={!disableSort} />}
                 {!effectiveHideAlbum && <HeaderCell label="专辑" colKey="album" allowSort={!disableSort} />}
@@ -281,160 +419,25 @@ export default function SongListView({
                 <div></div>
             </div>
 
-            {/* 列表内容 */}
-            <div className="flex flex-col">
-                {sortedSongs.map((song, index) => {
-                    const id = getMusicItemId(song);
-                    const selected = isSelected(id);
-                    const isFav = (song.id !== undefined && typeof song.id === 'number')
-                        ? favoriteSet.has(song.id)
-                        : isFavorite(song as any);
-
-                    return (
-                        <div
-                            key={id || index}
-                            onDoubleClick={() => {
-                                if (!isSelectionMode) {
-                                    const { metadata, togglePlay } = usePlayerStore.getState();
-                                    const isCurrent = metadata && (
-                                        (song.id !== undefined && song.id === metadata.id) ||
-                                        (song.path === metadata.path)
-                                    );
-                                    if (isCurrent) {
-                                        togglePlay();
-                                    } else {
-                                        onPlay(song, index);
-                                    }
-                                }
-                            }}
-                            onClick={(e) => handleItemClick(e, song)}
-                            onContextMenu={(e) => handleContextMenu(e, song, index)}
-                            style={gridStyle}
-                            className={clsx(
-                                "group grid py-2 items-center rounded-lg transition-colors relative",
-                                gridGapClass,
-                                rowPaddingClass,
-                                selected
-                                    ? "bg-primary/10 hover:bg-primary/15"
-                                    : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
-                                "cursor-default text-[14px]"
-                            )}
-                        >
-                            {/* Blue Selection Bar */}
-                            {selected && (
-                                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
-                            )}
-
-                            {/* Column 1: Checkbox Removed */}
-
-                            {/* Column 2: Heart Icon (Always shown) */}
-                            {(
-                                <div className="flex justify-center items-center">
-                                    <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                toggleFavorite(song);
-                                            }}
-                                            className={clsx(
-                                                "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
-                                                isFav
-                                                    ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                                    : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
-                                            )}
-                                        >
-                                            {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
-                                        </button>
-                                    </CustomTooltip>
-                                </div>
-                            )}
-
-                            {/* Column 3: Title + Cover */}
-                            <div className="flex items-center gap-3 overflow-hidden">
-                                {!hideCover && (
-                                    <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
-                                        <SongCoverOverlay
-                                            song={song}
-                                            className="w-full h-full"
-                                            onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
-                                            restartOnPlay
-                                        />
-                                    </div>
-                                )}
-                                <span className={clsx(
-                                    "font-medium truncate pr-4",
-                                    selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
-                                )}>
-                                    {song.title}
-                                </span>
-                            </div>
-
-                            {/* Column 4: Artist */}
-                            {!hideArtist && (
-                                <div
-                                    className={clsx(
-                                        "text-neutral-500 dark:text-neutral-400 truncate font-medium transition-colors",
-                                        !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
-                                    )}
-                                    onClick={(e) => {
-                                        if (isSelectionMode) return;
-                                        if (onOpenArtist && song.artist) {
-                                            e.stopPropagation();
-                                            onOpenArtist(song.artist);
-                                        }
-                                    }}
-                                >
-                                    {song.artist}
-                                </div>
-                            )}
-
-                            {/* Column 5: Album */}
-                            {!effectiveHideAlbum && (
-                                <div
-                                    className={clsx(
-                                        "text-neutral-500 dark:text-neutral-400 truncate transition-colors",
-                                        !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
-                                    )}
-                                    onClick={(e) => {
-                                        if (isSelectionMode) return;
-                                        if (onOpenAlbum && song.album) {
-                                            e.stopPropagation();
-                                            onOpenAlbum(song.album);
-                                        }
-                                    }}
-                                >
-                                    {song.album}
-                                </div>
-                            )}
-
-                            {/* Column 6: Duration */}
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
-                                {formatDuration(song.duration)}
-                            </div>
-
-                            <div
-                                className={clsx(
-                                    "flex justify-end transition-opacity",
-                                    isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                                )}
-                                onDoubleClick={(e) => e.stopPropagation()}
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <SmartMusicContextMenu
-                                    onOpen={() => setContextMenu(null)}
-                                    items={song}
-                                    context={context}
-                                    variant="clean"
-                                    onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
-                                    onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
-                                    isSelected={selected}
-                                    onSelect={() => handleCheckboxClick(null, song)}
-                                />
-                            </div>
-                        </div>
-                    );
-                })}
-            </div >
+            {/* List Content */}
+            {virtualize ? (
+                scrollParent ? (
+                    <Virtuoso
+                        useWindowScroll={false}
+                        customScrollParent={scrollParent}
+                        data={sortedSongs}
+                        itemContent={itemContent}
+                        overscan={{ main: 2000, reverse: 2000 }}
+                        className="w-full"
+                    />
+                ) : (
+                    <div className="flex flex-col opacity-0" />
+                )
+            ) : (
+                <div className="w-full">
+                    {sortedSongs.map((song, index) => itemContent(index, song))}
+                </div>
+            )}
 
             {contextMenu && (
                 <SmartCursorContextMenu

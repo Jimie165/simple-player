@@ -193,6 +193,7 @@ export default function ScrollArea({ children, className, topOffset = 0 }: Scrol
         >
             <div
                 ref={viewportRef}
+                data-scroll-viewport
                 className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
             >
                 <div ref={contentRef}>

@@ -1,7 +1,8 @@
-import { useState, useEffect, memo, useMemo } from 'react';
+import { useState, useEffect, memo, useMemo, forwardRef } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
+import { Virtuoso, type Components } from 'react-virtuoso';
 import CustomTooltip from '../../../components/common/CustomTooltip';
 import type { SongMetadata } from '../../../types';
 import { useLibraryStore } from '../../../store/useLibraryStore';
@@ -25,7 +26,12 @@ import {
     type DragEndEvent,
     type DragStartEvent,
     DragOverlay,
+    type Modifier,
 } from '@dnd-kit/core';
+
+import {
+    restrictToVerticalAxis,
+} from '@dnd-kit/modifiers';
 
 import {
     arrayMove,
@@ -166,35 +172,16 @@ const SongListItem = memo(({
             <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
                 <span
                     className={clsx(
-                        "transition-colors cursor-pointer",
-                        !isSelectionMode && "hover:text-primary"
+                        "transition-colors",
+                        !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
                     )}
                     onClick={(e) => {
-                        if (isSelectionMode) return; // Allow selection to happen via row click
+                        if (isSelectionMode) return;
                         e.stopPropagation();
-                        // Navigation logic here if needed?
-                        // Wait, I need the navigation store instance
-                        // It is a hook, so I must call it at the top of the component
+                        push({ type: 'artist_detail', data: { name: song.artist } });
                     }}
                 >
-                    {/* Actually, I need to call the hook inside the component. I will add the hook call at the top of SongListItem first. */}
-                    {/* Since I can't split the replacement easily for the hook call, I'll do it in a separate chunk or careful ordering */}
-                    {/* Let's redo this part. I'll add the hook call in a separate chunk at the top of SongListItem, and then use 'push' here. */}
-                    {/* But wait, I can just use useNavigationStore.getState().push if I don't want to re-render? No, use the hook for consistency. */}
-                    {/* I will assume I add `const { push } = useNavigationStore()` at the top of SongListItem. */}
-                    <span
-                        className={clsx(
-                            "transition-colors",
-                            !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
-                        )}
-                        onClick={(e) => {
-                            if (isSelectionMode) return;
-                            e.stopPropagation();
-                            push({ type: 'artist_detail', data: { name: song.artist } });
-                        }}
-                    >
-                        {song.artist}
-                    </span>
+                    {song.artist}
                 </span>
             </div>
 
@@ -454,6 +441,55 @@ export default function SortableSongList({
 
     const [activeId, setActiveId] = useState<string | null>(null);
 
+    // Custom modifier to restrict dragging within scroll viewport
+    const restrictToScrollViewport: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
+        if (!draggingNodeRect || !containerNodeRect) return transform;
+
+        const viewport = document.querySelector('[data-scroll-viewport]');
+        if (!viewport) return transform;
+
+        const viewportRect = viewport.getBoundingClientRect();
+
+        // Calculate the dragged element's new position
+        const draggedTop = draggingNodeRect.top + transform.y;
+        const draggedBottom = draggingNodeRect.bottom + transform.y;
+
+        let adjustedY = transform.y;
+
+        // Restrict top edge
+        if (draggedTop < viewportRect.top) {
+            adjustedY = transform.y + (viewportRect.top - draggedTop);
+        }
+
+        // Restrict bottom edge
+        if (draggedBottom > viewportRect.bottom) {
+            adjustedY = transform.y - (draggedBottom - viewportRect.bottom);
+        }
+
+        return {
+            ...transform,
+            y: adjustedY,
+        };
+    };
+
+    // Prevent body scroll during drag, only allow viewport scroll
+    useEffect(() => {
+        if (!activeId) return;
+
+        const style = document.createElement('style');
+        style.textContent = `
+            body, html {
+                overflow: hidden !important;
+            }
+        `;
+        document.head.appendChild(style);
+
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, [activeId]);
+
+
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -584,10 +620,62 @@ export default function SortableSongList({
     const gridStyle = { gridTemplateColumns: getGridCols() };
 
     // Filter valid items for SortableContext using SORTED songs
-    const sortableItems = displaySongs.map((s: SongMetadata, i: number) => getSongId(s, i));
+    const sortableItems = useMemo(() => displaySongs.map((s, i) => getSongId(s, i)), [displaySongs]);
 
     // Derived state for dragging to show proper visuals
     const isDraggingSelection = !!(activeId && selectedIds.has(activeId));
+
+    // Custom Virtuoso Context
+    const VirtuosoList = useMemo(() => forwardRef<HTMLDivElement, any>(({ children, ...props }, ref) => {
+        return (
+            <SortableContext
+                items={sortableItems}
+                strategy={verticalListSortingStrategy}
+                disabled={disableReorder || sortKey !== 'manual'}
+            >
+                <div ref={ref} {...props}>
+                    {children}
+                </div>
+            </SortableContext>
+        );
+    }), [sortableItems, disableReorder, sortKey]);
+
+
+    // Find custom scroll parent
+    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        const el = document.querySelector('[data-scroll-viewport]');
+        if (el instanceof HTMLElement) setScrollParent(el);
+    }, []);
+
+    const itemContent = (index: number, song: SongMetadata) => {
+        const uniqueId = getSongId(song, index);
+        return (
+            <SortableItem
+                key={uniqueId}
+                song={song}
+                index={index}
+                style={gridStyle}
+                isSelectionMode={isSelectionMode}
+                selected={isSelected(uniqueId)}
+                onPlay={onPlay}
+                handleItemClick={handleItemClick}
+                handleCheckboxClick={handleCheckboxClick}
+                handleContextMenu={handleContextMenu}
+                hideAlbum={shouldHideAlbum}
+                formatDuration={formatDuration}
+                onSelect={(s: SongMetadata) => handleCheckboxClick(null, s)}
+                onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
+                toggleFavorite={toggleFavorite}
+                toggleSelection={toggleSelection}
+                onMenuOpen={() => {
+                    setContextMenu(null);
+                }}
+                playlistId={playlistId}
+                context={context}
+            />
+        );
+    };
 
     return (
         <div className="w-full relative select-none">
@@ -606,44 +694,31 @@ export default function SortableSongList({
                 collisionDetection={closestCenter}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                modifiers={[restrictToVerticalAxis, restrictToScrollViewport]}
+                autoScroll={{
+                    enabled: true,
+                    threshold: { x: 0, y: 0.2 },
+                    acceleration: 10,
+                    canScroll(element) {
+                        // Only allow scrolling the viewport element
+                        return element.hasAttribute('data-scroll-viewport');
+                    },
+                }}
             >
-                <SortableContext
-                    items={sortableItems}
-                    strategy={verticalListSortingStrategy}
-                    disabled={disableReorder || sortKey !== 'manual'} // Allow reorder in manual mode (asc or desc)
-                >
-                    <div className="flex flex-col">
-                        {displaySongs.map((song: SongMetadata, index: number) => {
-                            const uniqueId = getSongId(song, index);
-                            return (
-                                <SortableItem
-                                    key={uniqueId}
-                                    song={song}
-                                    index={index}
-                                    style={gridStyle}
-                                    isSelectionMode={isSelectionMode}
-                                    selected={isSelected(uniqueId)}
-                                    onPlay={onPlay}
-                                    handleItemClick={handleItemClick}
-                                    handleCheckboxClick={handleCheckboxClick}
-                                    handleContextMenu={handleContextMenu}
-                                    hideAlbum={shouldHideAlbum}
-                                    formatDuration={formatDuration}
-                                    onSelect={(s: SongMetadata) => handleCheckboxClick(null, s)}
-                                    onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
-                                    toggleFavorite={toggleFavorite}
-                                    toggleSelection={toggleSelection}
-                                    onMenuOpen={() => {
-                                        // Close right-click context menu when opening three-dot menu
-                                        setContextMenu(null);
-                                    }}
-                                    playlistId={playlistId} // Pass down
-                                    context={context}
-                                />
-                            );
-                        })}
-                    </div>
-                </SortableContext>
+                {scrollParent ? (
+                    <Virtuoso
+                        useWindowScroll={false}
+                        customScrollParent={scrollParent}
+                        data={displaySongs}
+                        components={{ List: VirtuosoList as Components['List'] }}
+                        itemContent={itemContent}
+                        overscan={{ main: 2000, reverse: 2000 }} // High overscan for both directions
+                        className="w-full"
+                    />
+                ) : (
+                    <div className="flex flex-col opacity-0"></div>
+                )}
+
                 {typeof document !== 'undefined' && createPortal(
                     <DragOverlay adjustScale={true}>
                         {activeId ? (() => {

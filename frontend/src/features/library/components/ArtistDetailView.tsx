@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Virtuoso } from 'react-virtuoso';
 import CardPlayButton from '../../../components/common/CardPlayButton';
 import CoverImage from '../../../components/common/CoverImage';
 import clsx from 'clsx';
@@ -83,6 +84,40 @@ export default function ArtistDetailView({
             return `${h} 小时 ${m} 分钟`;
         }
         return `${m} 分钟`;
+    };
+
+    const sortedAlbums = useMemo(() => {
+        const list = albums.map((album, originalIndex) => {
+            const year = album.songs.reduce((max, song) => Math.max(max, song.year ?? 0), 0);
+            return { album, originalIndex, year: year > 0 ? year : null };
+        });
+
+        list.sort((a, b) => {
+            if (a.year !== null && b.year !== null) {
+                if (a.year !== b.year) return b.year - a.year;
+                // Year matched, use original order
+                return a.originalIndex - b.originalIndex;
+            }
+            if (a.year !== null && b.year === null) return -1;
+            if (a.year === null && b.year !== null) return 1;
+            return a.originalIndex - b.originalIndex;
+        });
+
+        return list.map(x => x.album);
+    }, [albums]);
+
+    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        const el = document.querySelector('[data-scroll-viewport]');
+        if (el instanceof HTMLElement) setScrollParent(el);
+    }, []);
+
+    const animatedAlbumIdsRef = useRef(new Set<string>());
+    const getAlbumAnimationClass = (album: AlbumData) => {
+        const key = `${album.name}::${album.artist}`;
+        const already = animatedAlbumIdsRef.current.has(key);
+        if (!already) animatedAlbumIdsRef.current.add(key);
+        return already ? "" : "animate-in fade-in duration-500";
     };
 
     return (
@@ -195,7 +230,7 @@ export default function ArtistDetailView({
                             transition={{ duration: 0.2, ease: "easeOut" }}
                         >
                             <AlbumGridView
-                                albums={albums}
+                                albums={sortedAlbums}
                                 onPlayAlbum={onPlayAlbum}
                                 onOpenAlbum={onOpenAlbum}
                                 onDeleteAlbum={onDeleteAlbum}
@@ -209,81 +244,97 @@ export default function ArtistDetailView({
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: -10 }}
                             transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="flex flex-col gap-12 mt-4"
+                            className="w-full"
                         >
-                            {albums.map(album => (
-                                <div key={album.name} className="flex flex-col md:flex-row gap-6 md:gap-8 animate-in fade-in duration-500">
-                                    {/* Left: Album Info */}
-                                    <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
-                                        <div
-                                            className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
-                                            onClick={() => onPlayAlbum(album)}
-                                        >
-                                            {album.songs.length > 0 ? (
-                                                <CoverImage
-                                                    song={album.songs[0]}
-                                                    className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                                                    iconClassName="text-6xl"
-                                                />
-                                            ) : (
-                                                <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                                    <MdPerson className="text-6xl" />
+                            {scrollParent ? (
+                                <Virtuoso
+                                    useWindowScroll={false}
+                                    customScrollParent={scrollParent}
+                                    data={sortedAlbums}
+                                    overscan={{ main: 1200, reverse: 1200 }}
+                                    components={{
+                                        Header: () => <div className="mt-4" />,
+                                        Footer: () => <div className="h-8" />
+                                    }}
+                                    itemContent={(index, album) => (
+                                        <div className={index === sortedAlbums.length - 1 ? "" : "mb-12"}>
+                                            <div className={clsx("flex flex-col md:flex-row gap-6 md:gap-8", getAlbumAnimationClass(album))}>
+                                                <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
+                                                    <div
+                                                        className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
+                                                        onClick={() => onPlayAlbum(album)}
+                                                    >
+                                                        {album.songs.length > 0 ? (
+                                                            <CoverImage
+                                                                song={album.songs[0]}
+                                                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                                                iconClassName="text-6xl"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                                                                <MdPerson className="text-6xl" />
+                                                            </div>
+                                                        )}
+                                                        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                            <CardPlayButton
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    onPlayAlbum(album);
+                                                                }}
+                                                                className="!static !inset-auto !translate-x-0 scale-125 hover:!scale-[1.35] active:!scale-110"
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                    <div className="px-1 text-center md:text-left">
+                                                        <h3
+                                                            className="font-bold text-neutral-900 dark:text-neutral-50 text-lg leading-tight cursor-pointer hover:text-primary transition-colors"
+                                                            onClick={() => onOpenAlbum(album)}
+                                                        >
+                                                            {album.name}
+                                                        </h3>
+                                                        <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                                                            {album.artist}
+                                                        </div>
+                                                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
+                                                            <span>{album.songs[0]?.year || "Unknown Year"}</span>
+                                                            {album.songs[0]?.genre && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span>{album.songs[0]?.genre}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            )}
-                                            <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                <CardPlayButton
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        onPlayAlbum(album);
-                                                    }}
-                                                    className="!static !inset-auto !translate-x-0 scale-125 hover:!scale-[1.35] active:!scale-110"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="px-1 text-center md:text-left">
-                                            <h3
-                                                className="font-bold text-neutral-900 dark:text-neutral-50 text-lg leading-tight cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                                                onClick={() => onOpenAlbum(album)}
-                                            >
-                                                {album.name}
-                                            </h3>
-                                            <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                                                {album.artist}
-                                            </div>
-                                            <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
-                                                <span>{album.songs[0]?.year || "Unknown Year"}</span>
-                                                {album.songs[0]?.genre && (
-                                                    <>
-                                                        <span>•</span>
-                                                        <span>{album.songs[0]?.genre}</span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    {/* Right: Song List */}
-                                    <div className="flex-1 min-w-0">
-                                        <SongListView
-                                            songs={album.songs}
-                                            onPlay={(song, _index, options) => {
-                                                const globalIndex = allArtistSongs.findIndex(s => s.path === song.path);
-                                                if (globalIndex !== -1) {
-                                                    onPlaySong(song, globalIndex, options);
-                                                }
-                                            }}
-                                            onDelete={onDeleteSong}
-                                            hideCover={true}
-                                            hideArtist={true}
-                                            hideAlbum={true}
-                                            disableSort={true}
-                                            enableDelete={true}
-                                            onOpenAlbum={handleOpenAlbumByName}
-                                            context="artist_detail"
-                                        />
-                                    </div>
-                                </div>
-                            ))}
+                                                <div className="flex-1 min-w-0">
+                                                    <SongListView
+                                                        songs={album.songs}
+                                                        onPlay={(song, _index, options) => {
+                                                            const globalIndex = allArtistSongs.findIndex(s => s.path === song.path);
+                                                            if (globalIndex !== -1) {
+                                                                onPlaySong(song, globalIndex, options);
+                                                            }
+                                                        }}
+                                                        onDelete={onDeleteSong}
+                                                        hideCover={true}
+                                                        hideArtist={true}
+                                                        hideAlbum={true}
+                                                        disableSort={true}
+                                                        enableDelete={true}
+                                                        virtualize={false}
+                                                        onOpenAlbum={handleOpenAlbumByName}
+                                                        context="artist_detail"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    className="w-full"
+                                />
+                            ) : (
+                                <div className="opacity-0" />
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>

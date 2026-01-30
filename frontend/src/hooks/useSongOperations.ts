@@ -364,8 +364,19 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         // - "If it is an opened folder, then it should be one less 'Add to' than Playlist"
         // - Interpreted as: Hide "Add to Playlist" in Folder context.
         // - Also hide if items are not in library (no numeric ID) AND not marked as library items (RecentItem.isLibraryItem)
-        const allHaveIds = items.every(i => typeof (i as any).id === 'number' || (i as any).isLibraryItem === true);
-        if (context !== 'folder' && allHaveIds) {
+        // - UPDATE: Allow Album/Artist/Playlist objects (from grid views) as they resolve to library songs.
+        const canAddToPlaylist = items.every(i => {
+            const t = getMusicItemType(i);
+            return (
+                typeof (i as any).id === 'number' ||
+                (i as any).isLibraryItem === true ||
+                t === 'album' ||
+                t === 'artist' ||
+                t === 'playlist'
+            );
+        });
+
+        if (context !== 'folder' && canAddToPlaylist) {
             group1.push({ id: 'add-to', label: '添加到播放列表...', icon: MdPlaylistAdd, onClick: handleAddToPlaylist });
         }
 
@@ -393,7 +404,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             // "only remove if mixed types" -> implied "show if all songs".
 
             // Only show Favorite if items have IDs (are in library) or marked as library item
-            if (allHaveIds) {
+            if (canAddToPlaylist) {
                 const isFav = isAllFavorited;
 
                 group1.push({
@@ -428,14 +439,14 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             const isSongFile = type === 'song' || type === 'file';
 
             if (showAlbum && (albumValue || isSongFile)) {
-                // Only show Go to Album if item has ID (is in library)
-                if (typeof (item as any).id === 'number' || item.isLibraryItem === true) {
+                // Only show Go to Album if item has ID (is in library) OR if it is an Album/Artist object from the library grid
+                if (typeof (item as any).id === 'number' || item.isLibraryItem === true || type === 'album' || type === 'artist') {
                     group2.push({ id: 'album', label: '前往专辑', icon: MdAlbum, onClick: handleShowAlbum });
                 }
             }
             if (showArtist && (artistValue || isSongFile)) {
-                // Only show Go to Artist if item has ID (is in library)
-                if (typeof (item as any).id === 'number' || item.isLibraryItem === true) {
+                // Only show Go to Artist if item has ID (is in library) OR if it is an Album/Artist object from the library grid
+                if (typeof (item as any).id === 'number' || item.isLibraryItem === true || type === 'album' || type === 'artist') {
                     group2.push({ id: 'artist', label: '前往艺人', icon: MdPerson, onClick: handleShowArtist });
                 }
             }

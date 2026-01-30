@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import clsx from 'clsx';
 import { resolveCover } from '../../utils/cover';
 import type { SongMetadata } from '../../types';
+import { useLibraryStore } from '../../store/useLibraryStore';
 
 interface PlaylistCoverCollageProps {
     songs: SongMetadata[];
@@ -18,6 +19,8 @@ interface PlaylistCoverCollageProps {
  */
 export default function PlaylistCoverCollage({ songs, className, iconClassName }: PlaylistCoverCollageProps) {
     const [coverUrls, setCoverUrls] = useState<(string | null)[]>([]);
+    const libraryVersion = useLibraryStore(s => s.libraryVersion);
+    const blobUrlsRef = useRef<string[]>([]);
 
     useEffect(() => {
         let isMounted = true;
@@ -57,8 +60,19 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
 
         return () => {
             isMounted = false;
+            blobUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
+            blobUrlsRef.current = [];
         };
-    }, [songs]);
+    }, [songs, libraryVersion]);
+
+    useEffect(() => {
+        const nextBlobUrls = coverUrls.filter((u): u is string => !!u && u.startsWith('blob:'));
+        const prev = blobUrlsRef.current;
+        prev.forEach(u => {
+            if (!nextBlobUrls.includes(u)) URL.revokeObjectURL(u);
+        });
+        blobUrlsRef.current = nextBlobUrls;
+    }, [coverUrls]);
 
     // 无封面：显示默认图标
     if (coverUrls.length === 0) {

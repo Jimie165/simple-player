@@ -128,6 +128,7 @@ body {
   @apply bg-surface-container text-on-surface transition-colors duration-300;
   font-family: 'Roboto', 'Inter', system-ui, sans-serif;
   overflow: hidden;
+  overscroll-behavior: none;
   user-select: none;
   cursor: default;
 }

@@ -9,6 +9,7 @@ import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import CardPlayButton from '../../../components/common/CardPlayButton';
 import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
+import VirtualizedGrid from '../../../components/common/VirtualizedGrid';
 import { getMusicItemId } from '../../../utils/musicItemUtils';
 
 // 定义专辑数据结构
@@ -100,28 +101,28 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                 type="danger"
             />
 
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-2 pb-8">
-                {albums.map((album) => {
+            <VirtualizedGrid
+                data={albums}
+                itemKey={(_index, album) => getAlbumId(album)}
+                listClassName="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-2 pb-8"
+                itemContent={(_index, album) => {
                     const id = getAlbumId(album);
                     const isSelected = selectedIds.has(id);
 
                     return (
                         <div
-                            key={id}
                             className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
                             onClick={(e) => handleItemClick(album, e)}
                             onContextMenu={(e) => handleContextMenu(e, album)}
                         >
-                            {/* 封面区域 (M3 风格：更大的圆角，阴影) */}
                             <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5">
                                 <CoverImage
                                     song={album.songs[0]}
-                                    src={album.cover} // Fallback to base64 if present, or let CoverImage prefer song path
+                                    src={album.cover}
                                     className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
                                     iconClassName="text-6xl opacity-50"
                                 />
 
-                                {/* Selection Checkbox Overlay */}
                                 {isSelectionMode && (
                                     <div className="absolute top-2 left-2 z-20">
                                         <div
@@ -136,15 +137,10 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                     </div>
                                 )}
 
-                                {/* 交互遮罩：仅在hover时出现，渐变背景提供更好的文字对比度 */}
                                 {!isSelectionMode && (
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-
-                                        {/* 左下角：播放按钮 (M3 FAB 风格) */}
                                         <CardPlayButton onClick={() => onPlayAlbum(album)} title="播放专辑" />
 
-                                        {/* 右下角：更多菜单 (M3 风格) */}
-                                        {/* 右下角：更多菜单 (M3 风格) */}
                                         <SmartMusicContextMenu
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
@@ -191,8 +187,8 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                             </div>
                         </div>
                     );
-                })}
-            </div>
+                }}
+            />
             {/* Cursor Context Menu */}
             {contextMenu && (
                 <SmartCursorContextMenu

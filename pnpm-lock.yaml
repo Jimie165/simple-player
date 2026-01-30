@@ -63,6 +63,9 @@ importers:
       react-router-dom:
         specifier: ^7.12.0
         version: 7.12.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      react-virtuoso:
+        specifier: ^4.18.1
+        version: 4.18.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
@@ -1418,6 +1421,12 @@ packages:
     peerDependenciesMeta:
       react-dom:
         optional: true
+
+  react-virtuoso@4.18.1:
+    resolution: {integrity: sha512-KF474cDwaSb9+SJ380xruBB4P+yGWcVkcu26HtMqYNMTYlYbrNy8vqMkE+GpAApPPufJqgOLMoWMFG/3pJMXUA==}
+    peerDependencies:
+      react: '>=16 || >=17 || >= 18 || >= 19'
+      react-dom: '>=16 || >=17 || >= 18 || >=19'
 
   react@19.2.3:
     resolution: {integrity: sha512-Ku/hhYbVjOQnXDZFv2+RibmLFGwFdeeKHFcOTlrt7xplBnya5OGn/hIRDsqDiSUcfORsDC7MPxwork8jBwsIWA==}
@@ -2802,6 +2811,11 @@ snapshots:
       react: 19.2.3
       set-cookie-parser: 2.7.2
     optionalDependencies:
+      react-dom: 19.2.3(react@19.2.3)
+
+  react-virtuoso@4.18.1(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+    dependencies:
+      react: 19.2.3
       react-dom: 19.2.3(react@19.2.3)
 
   react@19.2.3: {}

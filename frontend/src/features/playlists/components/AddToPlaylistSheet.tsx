@@ -9,11 +9,13 @@ import { useSelectionStore } from '../../../store/useSelectionStore';
 import { libraryService } from '../../../services/libraryService';
 import type { Playlist, SongMetadata } from '../../../types';
 import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
+import { sortSongs } from '../../../utils/songSort';
 import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
 
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();
     const { clearSelection } = useSelectionStore();
+    const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
     const [loading, setLoading] = useState(false);
@@ -31,32 +33,63 @@ export default function AddToPlaylistSheet() {
         newSongs: []
     });
 
-    useEffect(() => {
-        if (isOpen) {
-            loadPlaylists();
-        }
-    }, [isOpen]);
+    const [libraryMap, setLibraryMap] = useState<Map<number, SongMetadata>>(new Map());
 
     useEffect(() => {
-        if (playlists.length > 0) {
-            playlists.forEach(async (pl) => {
-                if (!playlistSongs[pl.id]) {
+        if (isOpen) {
+            setPlaylistSongs({});
+            loadPlaylists();
+        }
+    }, [isOpen, libraryVersion]);
+
+    useEffect(() => {
+        if (isOpen && playlists.length > 0 && libraryMap.size > 0) {
+            const fetchAll = async () => {
+                const newMap: Record<number, SongMetadata[]> = {};
+                await Promise.all(playlists.map(async (pl) => {
                     try {
                         const songs = await libraryService.getPlaylistSongs(pl.id);
-                        setPlaylistSongs(prev => ({ ...prev, [pl.id]: songs }));
+                        // Hydrate with cover info from library
+                        const hydrated = songs.map(s => {
+                            if (s.id !== undefined && libraryMap.has(s.id)) {
+                                const match = libraryMap.get(s.id)!;
+                                return {
+                                    ...s,
+                                    cover: match.cover || s.cover,
+                                    cover_path: match.cover_path || s.cover_path
+                                };
+                            }
+                            return s;
+                        });
+
+                        // Apply Sort using playlist settings to match Detail View
+                        const settings = useLibraryStore.getState().getPlaylistSettings(pl.id.toString());
+                        const sorted = sortSongs(hydrated, settings.sortKey, settings.sortOrder);
+
+                        newMap[pl.id] = sorted;
                     } catch (e) {
                         // ignore
                     }
-                }
-            });
+                }));
+                setPlaylistSongs(newMap);
+            };
+            fetchAll();
         }
-    }, [playlists]);
+    }, [isOpen, playlists, libraryMap]);
 
     const loadPlaylists = async () => {
         setLoading(true);
         try {
-            const list = await libraryService.getPlaylists();
-            // Filter out playlists? Maybe not.
+            const [list, libSongs] = await Promise.all([
+                libraryService.getPlaylists(),
+                libraryService.getLibrarySongs()
+            ]);
+
+            const map = new Map<number, SongMetadata>();
+            libSongs.forEach(s => {
+                if (s.id !== undefined) map.set(s.id, s);
+            });
+            setLibraryMap(map);
             setPlaylists(list);
         } catch (error) {
             console.error(error);
@@ -191,10 +224,41 @@ export default function AddToPlaylistSheet() {
         }
     };
 
-    const finishAdd = () => {
+    const finishAdd = async () => {
         clearSelection();
-        close();
         useLibraryStore.getState().triggerLibraryUpdate();
+
+        // Reload all playlist songs to update covers
+        try {
+            const updatedSongsMap: Record<number, SongMetadata[]> = {};
+            await Promise.all(
+                playlists.map(async (pl) => {
+                    const songs = await libraryService.getPlaylistSongs(pl.id);
+                    const hydrated = songs.map(s => {
+                        if (s.id !== undefined && libraryMap.has(s.id)) {
+                            const match = libraryMap.get(s.id)!;
+                            return {
+                                ...s,
+                                cover: match.cover || s.cover,
+                                cover_path: match.cover_path || s.cover_path
+                            };
+                        }
+                        return s;
+                    });
+                    
+                    // Apply Sort using playlist settings to match Detail View
+                    const settings = useLibraryStore.getState().getPlaylistSettings(pl.id.toString());
+                    const sorted = sortSongs(hydrated, settings.sortKey, settings.sortOrder);
+                    
+                    updatedSongsMap[pl.id] = sorted;
+                })
+            );
+            setPlaylistSongs(updatedSongsMap);
+        } catch (e) {
+            console.error('Failed to reload playlist songs', e);
+        }
+
+        close();
         // TODO: Toast Success
     };
 
@@ -245,28 +309,34 @@ export default function AddToPlaylistSheet() {
                                         {loading ? (
                                             <div className="text-center py-4 text-neutral-500">加载中...</div>
                                         ) : (
-                                            playlists.map(pl => (
-                                                <button
-                                                    key={pl.id}
-                                                    onClick={() => handleAddToPlaylist(pl.id)}
-                                                    className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left"
-                                                >
-                                                    <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
-                                                        <PlaylistCoverCollage
-                                                            songs={playlistSongs[pl.id] || []}
-                                                            className="w-full h-full"
-                                                        />
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
-                                                            {pl.name}
-                                                        </span>
-                                                        <span className="text-xs text-neutral-500">
-                                                            {pl.song_count || 0} 首歌曲
-                                                        </span>
-                                                    </div>
-                                                </button>
-                                            ))
+                                            playlists.map(pl => {
+                                                const songs = playlistSongs[pl.id] || [];
+                                                // Use song count and first song's cover_path as key to force re-render when content changes
+                                                const coverKey = `${pl.id}-${songs.length}-${songs[0]?.cover_path || songs[0]?.id || 'empty'}`;
+                                                return (
+                                                    <button
+                                                        key={pl.id}
+                                                        onClick={() => handleAddToPlaylist(pl.id)}
+                                                        className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left"
+                                                    >
+                                                        <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
+                                                            <PlaylistCoverCollage
+                                                                key={coverKey}
+                                                                songs={songs}
+                                                                className="w-full h-full"
+                                                            />
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                                                                {pl.name}
+                                                            </span>
+                                                            <span className="text-xs text-neutral-500">
+                                                                {pl.song_count || 0} 首歌曲
+                                                            </span>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })
                                         )}
                                     </div>
                                 </DialogPanel>

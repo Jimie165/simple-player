@@ -206,7 +206,6 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
                     onShuffle({ songs, context: { type: 'album_detail', name: albumData.name, id: albumData.name } });
                 }
             }}
-            onDeleteSong={() => { }} // TODO: Global Delete
             onOpenAlbumByName={() => { }}
             onOpenArtistByName={onOpenArtistByName}
         />
@@ -314,8 +313,6 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
             onPlayAlbum={handlePlayAlbum}
             onOpenAlbum={handleOpenAlbum}
             onPlaySong={(song, idx, options) => onPlaySong(song, idx, artistData.songs, true, options, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
-            onDeleteSong={() => { }}
-            onDeleteAlbum={() => { }}
             onOpenArtistByName={onOpenArtistByName}
             onOpenAlbumByName={() => { }}
         />

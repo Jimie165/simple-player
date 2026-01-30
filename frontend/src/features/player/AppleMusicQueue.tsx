@@ -7,6 +7,7 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
+    type Modifier,
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -220,6 +221,34 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
         playQueueItem({ song: playlist[globalIndex], index: globalIndex, restartIfCurrent: true });
     };
 
+    // Custom modifier to restrict dragging within scroll viewport
+    const restrictToQueueViewport: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
+        if (!draggingNodeRect || !containerNodeRect) return transform;
+
+        const viewport = document.querySelector('[data-queue-viewport]');
+        if (!viewport) return transform;
+
+        const viewportRect = viewport.getBoundingClientRect();
+
+        const draggedTop = draggingNodeRect.top + transform.y;
+        const draggedBottom = draggingNodeRect.bottom + transform.y;
+
+        let adjustedY = transform.y;
+
+        if (draggedTop < viewportRect.top) {
+            adjustedY = transform.y + (viewportRect.top - draggedTop);
+        }
+
+        if (draggedBottom > viewportRect.bottom) {
+            adjustedY = transform.y - (draggedBottom - viewportRect.bottom);
+        }
+
+        return {
+            ...transform,
+            y: adjustedY,
+        };
+    };
+
     return (
         <div className="h-full flex flex-col bg-transparent relative overflow-hidden">
             {/* Fixed Top Header Area */}
@@ -230,6 +259,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
             {/* Sortable List */}
             <div
                 ref={scrollContainerRef}
+                data-queue-viewport
                 className="flex-1 overflow-y-auto overflow-x-hidden immersive-scrollbar relative z-10 block pb-24"
                 style={{
                     overflowAnchor: 'none',
@@ -241,7 +271,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
-                    modifiers={[restrictToVerticalAxis]}
+                    modifiers={[restrictToVerticalAxis, restrictToQueueViewport]}
                 >
                     {/* Section 1: User Queue */}
                     {queueList.length > 0 && (

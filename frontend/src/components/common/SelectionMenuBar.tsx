@@ -48,7 +48,8 @@ export default function SelectionMenuBar() {
 
         // Preference 2: Navigation context
         if (activeOverlay?.type === 'playlist_detail') return 'playlist';
-        if (activeOverlay?.type === 'album_detail') return 'library';
+        if (activeOverlay?.type === 'album_detail') return 'album_detail';
+        if (activeOverlay?.type === 'artist_detail') return 'artist_detail';
         if (currentPage === 'home') return 'recent'; // Home page uses recent context for history
         if (currentPage === 'library') return 'library';
         return 'other'; // generic
@@ -115,7 +116,7 @@ export default function SelectionMenuBar() {
     const overflowActions = flattenedActions.slice(visibleCount);
 
     return (
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 w-max max-w-[calc(100%-48px)] transition-all duration-300 pointer-events-auto" ref={containerRef}>
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[60] w-max max-w-[calc(100%-48px)] transition-all duration-300 pointer-events-auto" ref={containerRef}>
             <div className="flex items-center gap-3 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-2 pl-3 pr-3 rounded-2xl shadow-2xl border border-neutral-200/30 dark:border-white/10">
                 {/* Select All Toggle */}
                 <button

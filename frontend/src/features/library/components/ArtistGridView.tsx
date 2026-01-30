@@ -7,6 +7,7 @@ import type { SongMetadata } from '../../../types';
 import ConfirmDialog from '../../../components/common/ConfirmDialog';
 import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
 import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
+import VirtualizedGrid from '../../../components/common/VirtualizedGrid';
 import { getMusicItemId } from '../../../utils/musicItemUtils';
 
 // 定义艺人数据结构
@@ -95,20 +96,21 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 type="danger"
             />
 
-            <div className="grid grid-cols-2 gap-4 md:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-4 pb-8">
-                {artists.map((artist) => {
+            <VirtualizedGrid
+                data={artists}
+                itemKey={(_index, artist) => getMusicItemId(artist)}
+                listClassName="grid grid-cols-2 gap-4 md:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-4 pb-8"
+                itemContent={(_index, artist) => {
                     const id = getMusicItemId(artist);
                     const isSelected = selectedIds.has(id);
+
                     return (
                         <div
-                            key={id}
                             className="group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
                             onClick={(e) => handleItemClick(artist, e)}
                             onContextMenu={(e) => handleContextMenu(e, artist)}
                         >
-                            {/* Wrapper for Image + Overlays - Changed to responsive w-full with limit */}
                             <div className="relative w-full aspect-square max-w-[160px] shrink-0">
-                                {/* The Circle Image (Clipped) */}
                                 <div className="w-full h-full rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative z-10 border border-black/5 dark:border-white/5">
                                     <CoverImage
                                         song={artist.songs[0]}
@@ -117,13 +119,11 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                         iconClassName="text-6xl"
                                     />
 
-                                    {/* Selected Overlay (Blue Tint) */}
                                     {isSelected && (
-                                        <div className="absolute inset-0 bg-primary/20 pointer-events-none" />
+                                        <div className="absolute inset-0 bg-black/10 dark:bg-white/5 pointer-events-none" />
                                     )}
                                 </div>
 
-                                {/* Checkbox (Top Left) - Outside clipped area */}
                                 {(isSelectionMode || isSelected) && (
                                     <div className="absolute top-0 left-0 z-20 transition-opacity duration-300">
                                         <div
@@ -138,10 +138,8 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                     </div>
                                 )}
 
-                                {/* Play & Menu Buttons - Bottom Edges (Outside Clipped Area) */}
                                 {!isSelectionMode && (
                                     <div className="absolute inset-0 z-20 pointer-events-none">
-                                        {/* Play Button - Bottom Left */}
                                         <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity">
                                             <button
                                                 onClick={(e) => {
@@ -155,7 +153,6 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                             </button>
                                         </div>
 
-                                        {/* Menu Button - Bottom Right */}
                                         <SmartMusicContextMenu
                                             className="absolute bottom-1 right-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity"
                                             buttonClassName="w-10 h-10"
@@ -185,8 +182,8 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                             </div>
                         </div>
                     );
-                })}
-            </div >
+                }}
+            />
             {/* Cursor Context Menu */}
             {contextMenu && (
                 <SmartCursorContextMenu
