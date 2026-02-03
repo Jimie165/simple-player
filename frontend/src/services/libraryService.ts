@@ -33,6 +33,10 @@ export const libraryService = {
         return invoke('refresh_library');
     },
 
+    refreshVideoLibrary: async (): Promise<VideoMetadata[]> => {
+        return invoke('scan_videos');
+    },
+
     getLibrarySongs: async (): Promise<SongMetadata[]> => {
         return invoke('get_library_songs');
     },

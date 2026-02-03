@@ -25,19 +25,30 @@ export default function Settings() {
         setFullScreenMode
     } = useTheme();
 
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isRefreshingMusic, setIsRefreshingMusic] = useState(false);
+    const [isRefreshingVideo, setIsRefreshingVideo] = useState(false);
 
-    const handleRefreshLibrary = async () => {
-        if (isRefreshing) return;
-        setIsRefreshing(true);
+    const handleRefreshMusicLibrary = async () => {
+        if (isRefreshingMusic) return;
+        setIsRefreshingMusic(true);
         try {
             await libraryService.refreshLibrary();
-            // TODO: Add toast notification
         } catch (error) {
-            console.error('Failed to refresh library', error);
+            console.error('Failed to refresh music library', error);
         } finally {
-            // Add artificial delay for better UX
-            setTimeout(() => setIsRefreshing(false), 800);
+            setTimeout(() => setIsRefreshingMusic(false), 800);
+        }
+    };
+
+    const handleRefreshVideoLibrary = async () => {
+        if (isRefreshingVideo) return;
+        setIsRefreshingVideo(true);
+        try {
+            await libraryService.refreshVideoLibrary();
+        } catch (error) {
+            console.error('Failed to refresh video library', error);
+        } finally {
+            setTimeout(() => setIsRefreshingVideo(false), 800);
         }
     };
 
@@ -67,25 +78,51 @@ export default function Settings() {
                         <span>常规设置</span>
                     </div>
 
-                    <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 overflow-hidden">
-                        <div className="flex items-center justify-between p-4 hover:bg-surface-container-highest transition-colors">
-                            <div className="flex flex-col gap-1">
-                                <span className="text-base font-medium text-on-surface">刷新音乐库</span>
-                                <span className="text-sm text-on-surface-variant">重新扫描本地文件夹并更新元数据</span>
+                    <div className="space-y-3">
+                        {/* Refresh Music */}
+                        <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 overflow-hidden">
+                            <div className="flex items-center justify-between p-4 hover:bg-surface-container-highest transition-colors">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-base font-medium text-on-surface">刷新音乐库</span>
+                                    <span className="text-sm text-on-surface-variant">重新扫描音乐文件夹并更新元数据</span>
+                                </div>
+                                <button
+                                    onClick={handleRefreshMusicLibrary}
+                                    disabled={isRefreshingMusic}
+                                    className={clsx(
+                                        "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
+                                        isRefreshingMusic
+                                            ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
+                                            : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
+                                    )}
+                                >
+                                    <MdRefresh className={clsx("text-lg", isRefreshingMusic && "animate-spin")} />
+                                    {isRefreshingMusic ? '刷新中...' : '刷新'}
+                                </button>
                             </div>
-                            <button
-                                onClick={handleRefreshLibrary}
-                                disabled={isRefreshing}
-                                className={clsx(
-                                    "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
-                                    isRefreshing
-                                        ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
-                                        : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
-                                )}
-                            >
-                                <MdRefresh className={clsx("text-lg", isRefreshing && "animate-spin")} />
-                                {isRefreshing ? '刷新中...' : '刷新'}
-                            </button>
+                        </div>
+
+                        {/* Refresh Video */}
+                        <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 overflow-hidden">
+                            <div className="flex items-center justify-between p-4 hover:bg-surface-container-highest transition-colors">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-base font-medium text-on-surface">刷新视频库</span>
+                                    <span className="text-sm text-on-surface-variant">重新扫描视频文件夹并更新缩略图</span>
+                                </div>
+                                <button
+                                    onClick={handleRefreshVideoLibrary}
+                                    disabled={isRefreshingVideo}
+                                    className={clsx(
+                                        "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
+                                        isRefreshingVideo
+                                            ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
+                                            : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
+                                    )}
+                                >
+                                    <MdRefresh className={clsx("text-lg", isRefreshingVideo && "animate-spin")} />
+                                    {isRefreshingVideo ? '刷新中...' : '刷新'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </section>
