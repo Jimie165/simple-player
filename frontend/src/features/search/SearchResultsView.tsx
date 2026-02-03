@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { SongMetadata } from '../../types';
-import { libraryService } from '../../services/libraryService';
-import PageContainer from '../../components/layout/PageContainer';
-import SongListView from '../library/components/SongListView';
-import ArtistGridView, { type ArtistData } from '../library/components/ArtistGridView';
-import AlbumGridView, { type AlbumData } from '../library/components/AlbumGridView';
+import type { SongMetadata } from '@/types';
+import { libraryService } from '@/services/libraryService';
+import PageContainer from '@/components/layout/PageContainer';
+import SongListView from '@/features/library/components/SongListView';
+import ArtistGridView, { type ArtistData } from '@/features/library/components/ArtistGridView';
+import AlbumGridView, { type AlbumData } from '@/features/library/components/AlbumGridView';
 import { MdSearch } from 'react-icons/md';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import { useNavigationStore } from '../../store/useNavigationStore';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 interface SearchResultsViewProps {
     query: string;

@@ -1,0 +1,146 @@
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tauri::AppHandle;
+use tauri::Manager;
+use windows::core::Interface;
+use windows::core::HSTRING;
+use windows::Storage::FileProperties::{ThumbnailMode, ThumbnailOptions};
+use windows::Storage::StorageFile;
+use windows::Storage::Streams::{DataReader, IInputStream};
+
+use crate::utils::path::normalize_windows_path;
+use crate::utils::ffmpeg::resolve_ffmpeg_binary;
+use crate::utils::paths::VIDEO_THUMBNAILS_DIR;
+
+/// 获取视频缩略图缓存目录
+fn get_thumbnails_dir(app_data_dir: &Path) -> PathBuf {
+    app_data_dir.join(VIDEO_THUMBNAILS_DIR)
+}
+
+fn extension_from_mime(mime: &str) -> &'static str {
+    match mime {
+        "image/jpeg" => "jpg",
+        "image/png" => "png",
+        "image/webp" => "webp",
+        "image/bmp" => "bmp",
+        _ => "img",
+    }
+}
+
+fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>, String), String> {
+    let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(file_path))
+        .map_err(|e| format!("GetFileFromPathAsync failed: {e}"))?
+        .get()
+        .map_err(|e| format!("GetFileFromPathAsync get failed: {e}"))?;
+
+    let thumb = file
+        .GetThumbnailAsync(ThumbnailMode::VideosView, requested_size, ThumbnailOptions::None)
+        .map_err(|e| format!("GetThumbnailAsync failed: {e}"))?
+        .get()
+        .map_err(|e| format!("GetThumbnailAsync get failed: {e}"))?;
+
+    let mime = thumb
+        .ContentType()
+        .map(|h| h.to_string_lossy())
+        .unwrap_or_else(|_| "application/octet-stream".to_string());
+
+    let size = thumb.Size().unwrap_or(0) as u32;
+    if size == 0 {
+        return Err("empty thumbnail stream".to_string());
+    }
+
+    let input: IInputStream = thumb
+        .cast()
+        .map_err(|e| format!("cast thumbnail to IInputStream failed: {e}"))?;
+
+    let reader = DataReader::CreateDataReader(&input)
+        .map_err(|e| format!("CreateDataReader failed: {e}"))?;
+
+    reader
+        .LoadAsync(size)
+        .map_err(|e| format!("LoadAsync failed: {e}"))?
+        .get()
+        .map_err(|e| format!("LoadAsync get failed: {e}"))?;
+
+    let mut buf = vec![0u8; size as usize];
+    reader
+        .ReadBytes(&mut buf)
+        .map_err(|e| format!("ReadBytes failed: {e}"))?;
+
+    Ok((buf, mime))
+}
+
+/// 为视频文件生成缩略图
+/// 
+/// 首先尝试使用 Windows API（如果在 Windows 上），
+/// 如果失败则回退到 FFmpeg。
+/// 
+/// 返回相对路径（如 `cache/video_thumbnails/{hash}.jpg`）
+pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Option<String>, String> {
+    let cache_dir = app
+        .path()
+        .app_cache_dir()
+        .map_err(|e| format!("app_cache_dir failed: {e}"))?;
+    let thumbs_dir = get_thumbnails_dir(&cache_dir);
+    fs::create_dir_all(&thumbs_dir).ok();
+
+    let mut hasher = Sha256::new();
+    hasher.update(video_path.as_bytes());
+    let hash = format!("{:x}", hasher.finalize())[..16].to_string();
+
+    let file_path = normalize_windows_path(video_path);
+
+    let (bytes, mime) = match read_thumbnail_bytes(&file_path, 512) {
+        Ok(v) => v,
+        Err(_) => match read_thumbnail_bytes(&file_path, 256) {
+            Ok(v) => v,
+            Err(_) => match read_thumbnail_bytes(&file_path, 128) {
+                Ok(v) => v,
+                Err(_) => {
+                    // Fallback to ffmpeg
+                    if let Some(ffmpeg_path) = resolve_ffmpeg_binary(app, "ffmpeg") {
+                        let out_path_jpg = thumbs_dir.join(format!("{hash}.jpg"));
+                        if generate_thumbnail_with_ffmpeg(&ffmpeg_path, &file_path, &out_path_jpg) {
+                             return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
+                        }
+                    }
+                    return Ok(None);
+                },
+            },
+        },
+    };
+
+    let ext = extension_from_mime(mime.as_str());
+    let out_path: PathBuf = thumbs_dir.join(format!("{hash}.{ext}"));
+
+    if !Path::new(&out_path).exists() {
+        let _ = fs::write(&out_path, bytes);
+    }
+
+    Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)))
+}
+
+fn generate_thumbnail_with_ffmpeg(ffmpeg_path: &str, input_path: &str, output_path: &Path) -> bool {
+    let status = std::process::Command::new(ffmpeg_path)
+        .args([
+            "-y",
+            "-i",
+            input_path,
+            "-ss",
+            "00:00:05.000",
+            "-vframes",
+            "1",
+            "-q:v",
+            "2",
+            output_path.to_str().unwrap_or(""),
+        ])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status();
+
+    match status {
+        Ok(s) => s.success() && output_path.exists(),
+        Err(_) => false,
+    }
+}

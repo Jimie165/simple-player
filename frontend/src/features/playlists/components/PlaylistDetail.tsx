@@ -1,21 +1,21 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MdPlayArrow, MdShuffle, MdEdit, MdSort, MdCheck, MdSearch, MdClose, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
-import CustomTooltip from '../../../components/common/CustomTooltip';
-import { useScrollBlur } from '../../../hooks/useScrollBlur';
+import CustomTooltip from '@/components/common/CustomTooltip';
+import { useScrollBlur } from '@/hooks/useScrollBlur';
 
 
 import SortableSongList from './SortableSongList';
-import type { SortKey, SortOrder } from '../../../utils/songSort';
-import { sortSongs } from '../../../utils/songSort';
+import type { SortKey, SortOrder } from '@/utils/songSort';
+import { sortSongs } from '@/utils/songSort';
 import EditPlaylistDialog from './EditPlaylistDialog';
-import CoverImage from '../../../components/common/CoverImage';
-import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
+import CoverImage from '@/components/common/CoverImage';
+import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 
-import { libraryService } from '../../../services/libraryService';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import type { RecentItem, SongMetadata, Playlist } from '../../../types';
-import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
+import { libraryService } from '@/services/libraryService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import type { RecentItem, SongMetadata, Playlist } from '@/types';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 
 interface PlaylistDetailProps {
     id: number | 'favorites';

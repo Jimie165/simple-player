@@ -1,7 +1,7 @@
 import MusicContextMenu from './MusicContextMenu';
-import { useSongOperations } from '../../hooks/useSongOperations';
-import type { MusicMenuContext } from '../../hooks/useSongOperations';
-import type { MusicItem } from '../../utils/musicItemUtils';
+import { useSongOperations } from '@/hooks/useSongOperations';
+import type { MusicMenuContext } from '@/hooks/useSongOperations';
+import type { MusicItem } from '@/utils/musicItemUtils';
 
 interface SmartMusicContextMenuProps {
     items: MusicItem[] | MusicItem; // 支持单个或数组，方便使用
@@ -18,6 +18,7 @@ interface SmartMusicContextMenuProps {
     onDelete?: () => void;
     onShuffle?: () => void;
     onSelect?: () => void;
+    onShowProperties?: () => void;
     hideSelect?: boolean;
     selectText?: string;
     isSelected?: boolean;
@@ -31,7 +32,7 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
     const {
         items, context, playlistId,
         className, buttonClassName, variant, onOpen, suppressCloseEvent,
-        onPlay, onDelete, onShuffle, onSelect, hideSelect, selectText, isSelected, onNavigate
+        onPlay, onDelete, onShuffle, onSelect, onShowProperties, hideSelect, selectText, isSelected, onNavigate
     } = props;
 
     const normalizedItems = Array.isArray(items) ? items : [items];
@@ -44,6 +45,7 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
         onDelete,
         onShuffle,
         onSelect,
+        onShowProperties,
         hideSelect,
         selectText,
         isSelected,

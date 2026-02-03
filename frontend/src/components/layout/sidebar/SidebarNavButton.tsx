@@ -1,6 +1,6 @@
 import React from 'react';
 import clsx from 'clsx';
-import CustomTooltip from '../../common/CustomTooltip';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 export type NavItem = {
     icon: React.ElementType;

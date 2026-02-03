@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
-import PageContainer from '../../components/layout/PageContainer';
+import PageContainer from '@/components/layout/PageContainer';
 import LibraryHeaderButton from './components/LibraryHeaderButton';
 import SongListView from './components/SongListView';
 import AlbumGridView from './components/AlbumGridView';
@@ -15,13 +15,13 @@ import ArtistGridView from './components/ArtistGridView';
 import type { AlbumData } from './components/AlbumGridView';
 import type { ArtistData } from './components/ArtistGridView';
 
-import { libraryService } from '../../services/libraryService';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useNavigationStore } from '../../store/useNavigationStore';
-import { useSelectionStore } from '../../store/useSelectionStore';
-import type { SongMetadata } from '../../types';
-import type { RecentItem } from '../../types';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
+import { libraryService } from '@/services/libraryService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import type { SongMetadata } from '@/types';
+import type { RecentItem } from '@/types';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation

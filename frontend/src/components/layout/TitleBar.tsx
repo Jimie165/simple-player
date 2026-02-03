@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { systemService } from '../../services/systemService'; // 确保 systemService 已创建
+import { systemService } from '@/services/systemService'; // 确保 systemService 已创建
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
 
 export default function TitleBar() {

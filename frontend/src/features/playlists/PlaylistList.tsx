@@ -2,24 +2,24 @@ import { useState, useEffect, useMemo } from 'react';
 import { MdFavorite, MdMusicNote, MdAdd, MdSearch, MdSort, MdCheck } from 'react-icons/md';
 import clsx from 'clsx';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
-import { useSelectionStore } from '../../store/useSelectionStore';
-import { getMusicItemId } from '../../utils/musicItemUtils';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { getMusicItemId } from '@/utils/musicItemUtils';
 
-import PageContainer from '../../components/layout/PageContainer';
-import { libraryService } from '../../services/libraryService';
-import type { Playlist, SongMetadata } from '../../types';
-import { useNavigationStore } from '../../store/useNavigationStore';
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import SmartCursorContextMenu from '../../components/common/SmartCursorContextMenu';
-import MusicContextMenu from '../../components/common/MusicContextMenu';
-import { useSongOperations } from '../../hooks/useSongOperations';
+import PageContainer from '@/components/layout/PageContainer';
+import { libraryService } from '@/services/libraryService';
+import type { Playlist, SongMetadata } from '@/types';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import MusicContextMenu from '@/components/common/MusicContextMenu';
+import { useSongOperations } from '@/hooks/useSongOperations';
 import EditPlaylistDialog from './components/EditPlaylistDialog';
 import CreatePlaylistDialog from './components/CreatePlaylistDialog';
-import CardPlayButton from '../../components/common/CardPlayButton';
-import PlaylistCoverCollage from '../../components/common/PlaylistCoverCollage';
-import { sortSongs } from '../../utils/songSort';
+import CardPlayButton from '@/components/common/CardPlayButton';
+import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import { sortSongs } from '@/utils/songSort';
 
 type SortKey = 'name' | 'recently_added' | 'recently_played';
 
@@ -287,17 +287,12 @@ export default function PlaylistList() {
     // 右键菜单处理
     const handleContextMenu = (e: React.MouseEvent, playlist: Playlist) => {
         e.preventDefault();
-        // 触发一个全屏点击来关闭任何打开的 HeadlessUI 菜单（三个点菜单）
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-
         setFavoritesContextMenu(null);
         setContextMenu({ x: e.clientX, y: e.clientY, playlist });
     };
 
     const handleFavoritesContextMenu = (e: React.MouseEvent) => {
         e.preventDefault();
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
-
         setContextMenu(null);
         setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
     };

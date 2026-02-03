@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SongMetadata } from '../types';
+import type { SongMetadata } from '@/types';
 
 export const fileService = {
     // 获取单个文件的元数据

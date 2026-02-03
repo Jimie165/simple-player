@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SongMetadata } from '../types';
+import type { SongMetadata } from '@/types';
 
 interface AddToPlaylistState {
     isOpen: boolean;

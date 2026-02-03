@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import { MdPlayArrow, MdPause } from 'react-icons/md';
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { audioService } from '../../services/audioService';
-import type { SongMetadata } from '../../types';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { audioService } from '@/services/audioService';
+import type { SongMetadata } from '@/types';
 import CoverImage from './CoverImage';
 import Equalizer from './Equalizer';
 

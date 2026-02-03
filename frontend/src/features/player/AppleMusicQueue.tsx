@@ -19,13 +19,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { IoPlay, IoEllipsisHorizontal } from 'react-icons/io5';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useNavigationStore } from '../../store/useNavigationStore';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import type { SongMetadata } from '../../types';
-import CoverImage from '../../components/common/CoverImage';
-import MusicContextMenu from '../../components/common/MusicContextMenu';
-import { useSongOperations } from '../../hooks/useSongOperations';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import type { SongMetadata } from '@/types';
+import CoverImage from '@/components/common/CoverImage';
+import MusicContextMenu from '@/components/common/MusicContextMenu';
+import { useSongOperations } from '@/hooks/useSongOperations';
 
 interface SongRowProps {
     song: SongMetadata;

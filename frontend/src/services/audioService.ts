@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir } from '@tauri-apps/api/path';
-import type { SongMetadata } from '../types';
+import type { SongMetadata } from '@/types';
 
 let cachedAppDataDir: string | null = null;
 

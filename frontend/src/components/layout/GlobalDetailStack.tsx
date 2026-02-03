@@ -1,19 +1,19 @@
 import { useMemo, useEffect, useState } from 'react';
-import { useNavigationStore } from '../../store/useNavigationStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { libraryService } from '../../services/libraryService';
-import AlbumDetailView from '../../features/library/components/AlbumDetailView';
-import ArtistDetailView from '../../features/library/components/ArtistDetailView';
-import PlaylistDetail from '../../features/playlists/components/PlaylistDetail';
-import type { AlbumData } from '../../features/library/components/AlbumGridView';
-import type { ArtistData } from '../../features/library/components/ArtistGridView';
-import type { SongMetadata } from '../../types';
-import type { RecentItem } from '../../types';
-import { useSelectionStore } from '../../store/useSelectionStore';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import { ErrorBoundary } from '../common/ErrorBoundary';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { libraryService } from '@/services/libraryService';
+import AlbumDetailView from '@/features/library/components/AlbumDetailView';
+import ArtistDetailView from '@/features/library/components/ArtistDetailView';
+import PlaylistDetail from '@/features/playlists/components/PlaylistDetail';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
+import type { ArtistData } from '@/features/library/components/ArtistGridView';
+import type { SongMetadata } from '@/types';
+import type { RecentItem } from '@/types';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { AnimatePresence, motion } from 'framer-motion';
-import ScrollArea from '../common/ScrollArea';
+import ScrollArea from '@/components/common/ScrollArea';
 
 export default function GlobalDetailStack() {
     const { overlayStack, push, pop } = useNavigationStore();

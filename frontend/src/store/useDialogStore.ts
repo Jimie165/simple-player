@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { SongMetadata, RecentItem } from '../types';
+import type { SongMetadata, RecentItem } from '@/types';
 
 // 定义通用的音乐项类型，涵盖 SongMetadata, RecentItem 等
 export type MusicItem = SongMetadata | RecentItem | any;

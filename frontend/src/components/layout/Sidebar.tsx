@@ -20,7 +20,7 @@ interface SidebarProps {
 const navItems: NavItem[] = [
     { id: 'home', icon: MdHomeFilled, label: '主页' },
     { id: 'library', icon: MdLibraryMusic, label: '音乐库' },
-    { id: 'videos', icon: MdVideoLibrary, label: '视频库' },
+    { id: 'videos', icon: MdVideoLibrary, label: '视频' },
     { id: 'playlists', icon: MdFeaturedPlayList, label: '播放列表' },
 ];
 

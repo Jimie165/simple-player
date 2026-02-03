@@ -17,6 +17,7 @@ interface MusicSliderProps {
     trackHeightClass?: string;
     hoverHeightClass?: string;
     activeHeightClass?: string;
+    thumbClassName?: string;
 }
 
 /**
@@ -31,7 +32,8 @@ export default function MusicSlider({
     fillColor = "bg-white/80",
     trackHeightClass = "h-1.5",
     hoverHeightClass = "group-hover:h-2.5",
-    activeHeightClass = "group-active:h-3"
+    activeHeightClass = "group-active:h-3",
+    thumbClassName
 }: MusicSliderProps) {
     const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
 
@@ -43,7 +45,7 @@ export default function MusicSlider({
         )}>
             {/* 轨道 & 填充容器 */}
             <div className={clsx(
-                "relative w-full rounded-full overflow-hidden transition-all duration-200 ease-out",
+                "relative w-full rounded-full overflow-hidden transition-[height,background-color] duration-200 ease-out",
                 trackHeightClass,
                 !disabled && hoverHeightClass,
                 !disabled && activeHeightClass,
@@ -55,6 +57,17 @@ export default function MusicSlider({
                     style={{ width: `${percent}%` }}
                 />
             </div>
+
+            {/* 可选：显示自定义滑块 (Thumb) */}
+            {thumbClassName && (
+                <div
+                    className={clsx("absolute top-1/2 -translate-y-1/2 pointer-events-none transition-[opacity,transform,color]", thumbClassName)}
+                    style={{ left: `${percent}%` }}
+                >
+                    <div className="w-3 h-3 bg-current rounded-full shadow-md -translate-x-1/2" />
+                </div>
+            )}
+
 
             {/* 原生 Input 用于交互 (完全透明) */}
             <input

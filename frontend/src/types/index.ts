@@ -28,12 +28,18 @@ export interface SongMetadata {
     is_queue_item?: boolean;
     // 播放列表唯一ID (用于处理重复歌曲)
     unique_id?: number;
+    // 媒体详细信息
+    width?: number;
+    height?: number;
+    frame_rate?: number;
+    channels?: number;
 }
 
 // 库文件夹
 export interface LibraryFolder {
     id: number;
     path: string;
+    folder_type: string;
     created_at: string;
 }
 
@@ -52,7 +58,7 @@ export interface Playlist {
 // 最近播放/历史记录项
 export interface RecentItem {
     id: string; // 通常是路径
-    type: 'file' | 'folder' | 'album' | 'artist' | 'playlist';
+    type: 'file' | 'folder' | 'album' | 'artist' | 'playlist' | 'video';
     title: string;
     description: string;
     cover?: string | null;
@@ -69,4 +75,6 @@ export interface RecentItem {
 export type RepeatMode = 'off' | 'all' | 'one';
 
 // 页面 ID
-export type PageId = 'home' | 'library' | 'videos' | 'queue' | 'playlists' | 'settings' | 'search';
+export type PageId = 'home' | 'library' | 'videos' | 'playlists' | 'settings' | 'search';
+
+export * from './video';

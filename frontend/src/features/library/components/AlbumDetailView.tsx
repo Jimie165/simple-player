@@ -1,10 +1,10 @@
 import { useMemo } from 'react';
 import { MdPlayArrow, MdShuffle } from 'react-icons/md';
 import SongListView from './SongListView';
-import CoverImage from '../../../components/common/CoverImage';
+import CoverImage from '@/components/common/CoverImage';
 import type { AlbumData } from './AlbumGridView';
-import type { SongMetadata } from '../../../types';
-import { useScrollBlur } from '../../../hooks/useScrollBlur';
+import type { SongMetadata } from '@/types';
+import { useScrollBlur } from '@/hooks/useScrollBlur';
 import clsx from 'clsx';
 
 interface AlbumDetailViewProps {

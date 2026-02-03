@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
-import { useSelectionStore } from '../../store/useSelectionStore';
-import { useNavigationStore } from '../../store/useNavigationStore';
-import { useSongOperations } from '../../hooks/useSongOperations';
-import type { MusicMenuContext } from '../../hooks/useSongOperations';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { useSongOperations } from '@/hooks/useSongOperations';
+import type { MusicMenuContext } from '@/hooks/useSongOperations';
 import { MdClose, MdCheckBoxOutlineBlank, MdCheckBox, MdMoreHoriz } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
@@ -40,6 +40,7 @@ export default function SelectionMenuBar() {
     // Determine Context
     const context = useMemo<MusicMenuContext>(() => {
         // Preference 1: Explicit selection type from store
+        if (selectionType === 'video') return 'video';
         if (selectionType === 'playlist') {
             // Check if it's the special favorites playlist
             if (Array.from(selectedIds).includes('playlist:favorites')) return 'playlist_list';
@@ -52,6 +53,7 @@ export default function SelectionMenuBar() {
         if (activeOverlay?.type === 'artist_detail') return 'artist_detail';
         if (currentPage === 'home') return 'recent'; // Home page uses recent context for history
         if (currentPage === 'library') return 'library';
+        if (currentPage === 'videos') return 'video';
         return 'other'; // generic
     }, [activeOverlay, currentPage, selectionType, selectedIds]);
 

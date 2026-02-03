@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank, MdPlayArrow } from 'react-icons/md';
 
-import CoverImage from '../../../components/common/CoverImage';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import type { SongMetadata } from '../../../types';
-import ConfirmDialog from '../../../components/common/ConfirmDialog';
-import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
-import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
-import VirtualizedGrid from '../../../components/common/VirtualizedGrid';
-import { getMusicItemId } from '../../../utils/musicItemUtils';
+import CoverImage from '@/components/common/CoverImage';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import type { SongMetadata } from '@/types';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
+import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -58,7 +58,6 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
 
     const handleContextMenu = (e: React.MouseEvent, artist: ArtistData) => {
         e.preventDefault();
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, artist });
     };
 

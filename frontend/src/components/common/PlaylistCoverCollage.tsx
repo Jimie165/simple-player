@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import clsx from 'clsx';
-import { resolveCover } from '../../utils/cover';
-import type { SongMetadata } from '../../types';
-import { useLibraryStore } from '../../store/useLibraryStore';
+import { resolveCover } from '@/utils/mediaPath';
+import type { SongMetadata } from '@/types';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 interface PlaylistCoverCollageProps {
     songs: SongMetadata[];

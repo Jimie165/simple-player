@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 
 // "recent" is a special type that allows mixing file, folder, album in Recently Used
-type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'playlist' | null;
+type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'playlist' | 'video' | null;
 
 interface SelectionState {
     isSelectionMode: boolean;
@@ -29,7 +29,7 @@ interface SelectionState {
 // Helper to check if types are compatible for mixed selection
 const areTypesCompatible = (type1: SelectionType, type2: SelectionType): boolean => {
     // 'recent' is compatible with file, folder, album, playlist (for Recently Used section)
-    const recentTypes: SelectionType[] = ['file', 'folder', 'album', 'recent', 'playlist'];
+    const recentTypes: SelectionType[] = ['file', 'folder', 'album', 'recent', 'playlist', 'video'];
     if (recentTypes.includes(type1) && recentTypes.includes(type2)) {
         return true;
     }
@@ -50,7 +50,8 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             clearSelection();
             set({ isSelectionMode: false, selectionType: null });
         } else {
-            set({ isSelectionMode: true });
+            // Clear any stale selectionType when entering selection mode
+            set({ isSelectionMode: true, selectionType: null, selectedIds: new Set(), selectedItemsMap: new Map() });
             if (initialItem) {
                 get().selectItem(initialItem.id, initialItem.type, initialItem.data);
             }
@@ -86,12 +87,13 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             newMap.set(id, data);
 
             // Determine the selection type
-            // If mixing file/folder/album, set to 'recent'
+            // If mixing file/folder/album/playlist, set to 'recent'
+            // video and song should remain separate
             let finalType = type;
             if (state.selectionType && areTypesCompatible(state.selectionType, type) && state.selectionType !== type) {
-                const combinedTypes = ['file', 'folder', 'album', 'recent', 'playlist'];
-                if (combinedTypes.includes(state.selectionType as string) &&
-                    combinedTypes.includes(type as string)) {
+                const mixableTypes = ['file', 'folder', 'album', 'recent', 'playlist', 'video'];
+                if (mixableTypes.includes(state.selectionType as string) &&
+                    mixableTypes.includes(type as string)) {
                     finalType = 'recent';
                 }
             }

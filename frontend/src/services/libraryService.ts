@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { SongMetadata, LibraryFolder, Playlist } from '../types';
+import type { SongMetadata, LibraryFolder, Playlist } from '@/types';
+import type { VideoMetadata } from '@/types/video';
 
 export const libraryService = {
     // ========== 文件夹管理 ==========
@@ -7,8 +8,16 @@ export const libraryService = {
         return invoke('get_library_folders');
     },
 
+    getVideoFolders: async (): Promise<LibraryFolder[]> => {
+        return invoke('get_video_folders');
+    },
+
     addFolder: async (folder: string): Promise<SongMetadata[]> => {
         return invoke('add_library_folder', { folder });
+    },
+
+    addVideoFolder: async (folder: string): Promise<VideoMetadata[]> => {
+        return invoke('add_video_folder', { folder });
     },
 
     removeFolder: async (folder: string): Promise<LibraryFolder[]> => {
@@ -49,6 +58,10 @@ export const libraryService = {
     // ========== 批量操作 ==========
     batchDeleteSongs: async (ids: number[]): Promise<void> => {
         return invoke('batch_delete_songs', { ids });
+    },
+
+    batchDeleteVideos: async (ids: number[]): Promise<void> => {
+        return invoke('batch_delete_videos', { ids });
     },
 
     // ========== 收藏功能 ==========

@@ -1,25 +1,31 @@
 import { useState, useEffect } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
-import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite } from 'react-icons/md';
-import PageContainer from '../../components/layout/PageContainer';
+import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdVideocam } from 'react-icons/md';
+import PageContainer from '@/components/layout/PageContainer';
 import OpenFileMenu from './components/OpenFileMenu';
 import EmptyState from './components/EmptyState';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useSelectionStore } from '../../store/useSelectionStore';
-import { fileService } from '../../services/fileService';
-import { libraryService } from '../../services/libraryService';
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { fileService } from '@/services/fileService';
+import { libraryService } from '@/services/libraryService';
+import { audioService } from '@/services/audioService';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 
-import type { RecentItem } from '../../types';
-import type { SongMetadata } from '../../types';
-import SmartMusicContextMenu from '../../components/common/SmartMusicContextMenu';
-import SmartCursorContextMenu from '../../components/common/SmartCursorContextMenu';
-import CoverImage from '../../components/common/CoverImage';
-import PlaylistCoverCollage from '../../components/common/PlaylistCoverCollage';
-import { sortSongs } from '../../utils/songSort';
+import type { RecentItem } from '@/types';
+import type { SongMetadata } from '@/types';
+import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import CoverImage from '@/components/common/CoverImage';
+import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import { sortSongs } from '@/utils/songSort';
+import { formatTime } from '@/utils/time';
 
-import CardPlayButton from '../../components/common/CardPlayButton';
+import CardPlayButton from '@/components/common/CardPlayButton';
+
+// 视频文件扩展名常量
+const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 
 interface MusicGridProps {
     onNavigateToLibrary?: () => void;
@@ -65,7 +71,6 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
 
     const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
         e.preventDefault();
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, item });
     };
 
@@ -82,22 +87,61 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         setSelectableIds(recentHistory.map(item => item.id));
     }, [isSelectionMode, recentHistory, setSelectableIds]);
 
+    // Helper: Check if file is video
+    const isVideoFile = (path: string): boolean => {
+        const ext = path.split('.').pop()?.toLowerCase() || '';
+        return VIDEO_EXTENSIONS.includes(ext);
+    };
+
+    // Helper: Play Video File
+    const playVideoFile = async (path: string, meta: SongMetadata) => {
+        const queue: SongMetadata[] = [{
+            ...meta,
+            path: path
+        }];
+
+        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+
+        setVideoQueue(queue, 0);
+        setVideoMetadata(queue[0]);
+        setVideoMode(true);
+
+        // 暂停音乐
+        if (usePlayerStore.getState().isPlaying) {
+            await audioService.pause();
+            setIsPlaying(false);
+        }
+    };
+
     // Helper: Play Single File
     const buildRecentForFile = (path: string, meta: SongMetadata, isLibraryItem: boolean, existing?: RecentItem): RecentItem => {
+        const isVideo = isVideoFile(path);
+
         if (existing) {
-            return { ...existing, lastPlayed: Date.now() };
+            // 关键修复：即便项已存在，也要确保 path 和 cover_path 被补全/更新
+            return {
+                ...existing,
+                path: existing.path || path,
+                cover_path: existing.cover_path || meta.cover_path || null,
+                cover: existing.cover || meta.cover || null,
+                lastPlayed: Date.now(),
+                // 如果旧数据缺少描述（例如显示为 Unknown Artist），也可以在这里顺便优化
+                description: (existing.description === "Unknown Artist" || !existing.description)
+                    ? (isVideo ? formatTime(meta.duration) : meta.artist)
+                    : existing.description
+            };
         }
         return {
             id: path,
             type: 'file',
             title: meta.title,
-            description: meta.artist,
+            description: isVideo ? formatTime(meta.duration) : meta.artist,
             cover: meta.cover || null,
             cover_path: meta.cover_path || null,
             path,
             lastPlayed: Date.now(),
-            artist: meta.artist,
-            album: meta.album,
+            artist: isVideo ? "" : meta.artist,
+            album: isVideo ? "" : meta.album,
             isLibraryItem
         };
     };
@@ -112,20 +156,30 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, path: path
             };
 
-            await playSong({
-                song: safeMeta,
-                index: 0,
-                playlist: [safeMeta],
-                options: {
-                    restartIfCurrent: true,
-                    recentItem: buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent)
-                },
-                context: {
-                    type: 'home',
-                    name: '主页',
-                    id: 'home'
-                }
-            });
+            // 检测是否为视频文件
+            if (isVideoFile(path)) {
+                // 添加到最近使用
+                const recentItem = buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent);
+                useLibraryStore.getState().addToRecent(recentItem);
+                // 播放视频
+                await playVideoFile(path, safeMeta);
+            } else {
+                // 播放音频
+                await playSong({
+                    song: safeMeta,
+                    index: 0,
+                    playlist: [safeMeta],
+                    options: {
+                        restartIfCurrent: true,
+                        recentItem: buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent)
+                    },
+                    context: {
+                        type: 'home',
+                        name: '主页',
+                        id: 'home'
+                    }
+                });
+            }
         } catch (err) { console.error("Play single file failed", err); }
     };
 
@@ -146,19 +200,39 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
             const firstSong = songs[0];
             if (!firstSong.path) return;
 
-            await playList({
-                songs,
-                startIndex: 0,
-                options: {
-                    restartIfCurrent: true,
-                    recentItem: { ...item, lastPlayed: Date.now() }
-                },
-                context: {
-                    type: 'home',
-                    name: '主页',
-                    id: 'home'
+            // 检测第一个文件是否为视频
+            if (isVideoFile(firstSong.path)) {
+                // 播放视频
+                const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+
+                setVideoQueue(songs, 0);
+                setVideoMetadata(songs[0]);
+                setVideoMode(true);
+
+                // 暂停音乐
+                if (usePlayerStore.getState().isPlaying) {
+                    await audioService.pause();
+                    setIsPlaying(false);
                 }
-            });
+
+                // 添加到最近使用
+                useLibraryStore.getState().addToRecent({ ...item, lastPlayed: Date.now() });
+            } else {
+                // 播放音频
+                await playList({
+                    songs,
+                    startIndex: 0,
+                    options: {
+                        restartIfCurrent: true,
+                        recentItem: { ...item, lastPlayed: Date.now() }
+                    },
+                    context: {
+                        type: 'home',
+                        name: '主页',
+                        id: 'home'
+                    }
+                });
+            }
         };
 
         // Normal Playback Logic
@@ -200,6 +274,22 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 await playListHelper(songs);
             } catch (err) {
                 console.error("Failed to play recent playlist", err);
+            }
+        } else if (item.type === 'video') {
+            try {
+                // 构造基本的 SongMetadata 进行播放
+                const meta: SongMetadata = {
+                    id: -1, // 临时 ID
+                    title: item.title,
+                    artist: item.artist || 'Unknown',
+                    album: item.album || 'Unknown',
+                    duration: 0, // 可能需要从 ID 或其他地方恢复，或者不重要
+                    path: item.path,
+                    cover_path: item.cover_path,
+                };
+                await playVideoFile(item.path, meta);
+            } catch (e) {
+                console.error("Failed to play recent video", e);
             }
         } else {
             playSingleFile(item.path, item.isLibraryItem, item);
@@ -244,7 +334,10 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
     const handleOpenFile = async () => {
         const selected = await open({
             multiple: false,
-            filters: [{ name: 'Audio', extensions: ['mp3', 'flac', 'wav', 'ogg', 'm4a'] }]
+            filters: [
+                { name: 'Audio', extensions: ['mp3', 'flac', 'wav', 'ogg', 'm4a'] },
+                { name: 'Video', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv'] }
+            ]
         });
         if (selected && typeof selected === 'string') {
             playSingleFile(selected);
@@ -278,6 +371,17 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
                                         {item.type === 'folder' ? (
                                             <MdFolder className="text-6xl text-blue-400 opacity-80" />
+                                        ) : item.type === 'video' ? (
+                                            item.cover_path ? (
+                                                <CoverImage
+                                                    src={item.cover_path}
+                                                    className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                                                />
+                                            ) : (
+                                                <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
+                                                    <MdVideocam className="text-6xl text-neutral-600" />
+                                                </div>
+                                            )
                                         ) : item.type === 'playlist' ? (
                                             item.id === 'playlist:favorites' ? (
                                                 <div className="w-full h-full bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center">
@@ -348,8 +452,10 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                                         )} title={item.title}>
                                             {item.title}
                                         </span>
-                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={`${item.description}${item.album ? ` — ${item.album}` : ''}`}>
-                                            {item.description}{item.album && ` — ${item.album}`}
+                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={item.description}>
+                                            {item.description}
+                                            {/* 如果是非视频且有专辑信息才显示专辑 */}
+                                            {!isVideoFile(item.path) && item.album && ` — ${item.album}`}
                                         </span>
                                     </div>
                                 </div>

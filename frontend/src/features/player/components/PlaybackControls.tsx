@@ -5,13 +5,13 @@ import {
 import clsx from 'clsx';
 import { listen } from '@tauri-apps/api/event';
 // Store & Services
-import { usePlayerStore } from '../../../store/usePlayerStore';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { audioService } from '../../../services/audioService';
-import { formatTime } from '../../../utils/time';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { audioService } from '@/services/audioService';
+import { formatTime } from '@/utils/time';
 // Components
-import CustomTooltip from '../../../components/common/CustomTooltip';
-import { usePlaybackActions } from '../../../hooks/usePlaybackActions';
+import CustomTooltip from '@/components/common/CustomTooltip';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 
 export default function PlaybackControls() {
     const {

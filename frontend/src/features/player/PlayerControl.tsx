@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import clsx from 'clsx';
-import { usePlayerStore } from '../../store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 // 引入子组件
 import SongInfo from './components/SongInfo';
@@ -8,14 +8,14 @@ import PlaybackControls from './components/PlaybackControls';
 import ExtraControls from './components/ExtraControls';
 
 // 引入 Common 组件
-import InfoDialog from '../../components/common/InfoDialog';
+import InfoDialog from '@/components/common/InfoDialog';
 
 interface PlayerControlProps {
     isFullScreen: boolean;
-    toggleFullScreen: () => void;
+    onToggleFullScreen: () => void;
 }
 
-export default function PlayerControl({ isFullScreen, toggleFullScreen }: PlayerControlProps) {
+export default function PlayerControl({ isFullScreen, onToggleFullScreen }: PlayerControlProps) {
     const { metadata } = usePlayerStore();
     const [isInfoOpen, setIsInfoOpen] = useState(false);
 
@@ -31,7 +31,7 @@ export default function PlayerControl({ isFullScreen, toggleFullScreen }: Player
                     <SongInfo
                         metadata={metadata}
                         isFullScreen={isFullScreen}
-                        toggleFullScreen={toggleFullScreen}
+                        onToggleFullScreen={onToggleFullScreen}
                     />
 
                     <PlaybackControls />

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { libraryService } from '../services/libraryService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { libraryService } from '@/services/libraryService';
 
 export function useQueuePersistence() {
     const playlist = useLibraryStore((s) => s.playlist);

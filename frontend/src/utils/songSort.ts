@@ -1,4 +1,4 @@
-import type { SongMetadata } from '../types';
+import type { SongMetadata } from '@/types';
 
 export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';

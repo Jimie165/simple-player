@@ -1,5 +1,5 @@
-import { useThemeStore } from '../store/useThemeStore';
-import { PRESET_COLORS } from '../utils/themeColors';
+import { useThemeStore } from '@/store/useThemeStore';
+import { PRESET_COLORS } from '@/utils/themeColors';
 
 /**
  * Facade Hook for Theme Store

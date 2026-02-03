@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { MdMusicNote } from 'react-icons/md';
-import type { SongMetadata } from '../../types';
-import { resolveCover } from '../../utils/cover';
-import { useTheme } from '../../hooks/useTheme';
+import type { SongMetadata } from '@/types';
+import { resolveCover } from '@/utils/mediaPath';
+import { useTheme } from '@/hooks/useTheme';
 
 
 interface NowPlayingViewProps {

@@ -2,17 +2,17 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import { MdAccessTime, MdArrowDropUp, MdArrowDropDown, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 import { Virtuoso } from 'react-virtuoso';
-import type { SongMetadata } from '../../../types';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import { usePlayerStore } from '../../../store/usePlayerStore';
-import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
-import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
-import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
-import type { MusicMenuContext } from '../../../hooks/useSongOperations';
-import CustomTooltip from '../../../components/common/CustomTooltip';
+import type { SongMetadata } from '@/types';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import SongCoverOverlay from '@/components/common/SongCoverOverlay';
+import type { MusicMenuContext } from '@/hooks/useSongOperations';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
-import { getMusicItemId } from '../../../utils/musicItemUtils';
+import { getMusicItemId } from '@/utils/musicItemUtils';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 
@@ -105,7 +105,6 @@ export default function SongListView({
 
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
     };
 

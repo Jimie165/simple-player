@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 6;
+const SCHEMA_VERSION: i32 = 8;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -11,7 +11,7 @@ fn get_db_version(conn: &Connection) -> Result<i32> {
         [],
         |row| row.get(0),
     );
-    
+
     match result {
         Ok(version) => Ok(version),
         Err(_) => Ok(0), // 表不存在或无数据，返回版本 0
@@ -40,12 +40,12 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
     )?;
 
     let current_version = get_db_version(conn)?;
-    
+
     if current_version < 1 {
         migrate_v1(conn)?;
         set_db_version(conn, 1)?;
     }
-    
+
     if current_version < 2 {
         migrate_v2(conn)?;
         set_db_version(conn, 2)?;
@@ -68,6 +68,16 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 6 {
         migrate_v6(conn)?;
+        set_db_version(conn, 6)?;
+    }
+
+    if current_version < 7 {
+        migrate_v7(conn)?;
+        set_db_version(conn, 7)?;
+    }
+
+    if current_version < 8 {
+        migrate_v8(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -165,7 +175,10 @@ fn migrate_v2(conn: &Connection) -> Result<()> {
     ];
 
     for (column_name, column_type) in columns_to_add {
-        let sql = format!("ALTER TABLE songs ADD COLUMN {} {}", column_name, column_type);
+        let sql = format!(
+            "ALTER TABLE songs ADD COLUMN {} {}",
+            column_name, column_type
+        );
         // 忽略"列已存在"错误
         let _ = conn.execute(&sql, []);
     }
@@ -217,19 +230,22 @@ fn migrate_v3(conn: &Connection) -> Result<()> {
         .collect::<Result<Vec<String>>>()?;
 
     if !columns.contains(&"status".to_string()) {
-        conn.execute("ALTER TABLE songs ADD COLUMN status TEXT DEFAULT 'active'", [])?;
+        conn.execute(
+            "ALTER TABLE songs ADD COLUMN status TEXT DEFAULT 'active'",
+            [],
+        )?;
     }
 
     // 2. 迁移旧数据 (is_hidden -> status)
     if columns.contains(&"is_hidden".to_string()) {
-        conn.execute("UPDATE songs SET status = 'archived' WHERE is_hidden = 1", [])?;
+        conn.execute(
+            "UPDATE songs SET status = 'archived' WHERE is_hidden = 1",
+            [],
+        )?;
     }
 
     // 3. 创建视图
-    conn.execute(
-        "DROP VIEW IF EXISTS library_songs",
-        [],
-    )?;
+    conn.execute("DROP VIEW IF EXISTS library_songs", [])?;
     conn.execute(
         "CREATE VIEW library_songs AS 
          SELECT id, path, title, artist, album, duration, cover, cover_path, folder_id, 
@@ -241,10 +257,7 @@ fn migrate_v3(conn: &Connection) -> Result<()> {
         [],
     )?;
 
-    conn.execute(
-        "DROP VIEW IF EXISTS archived_songs",
-        [],
-    )?;
+    conn.execute("DROP VIEW IF EXISTS archived_songs", [])?;
     conn.execute(
         "CREATE VIEW archived_songs AS 
          SELECT id, path, title, artist, album, duration, cover, cover_path, folder_id, 
@@ -270,7 +283,7 @@ fn migrate_v4(conn: &Connection) -> Result<()> {
     if !columns.contains(&"cover_path".to_string()) {
         conn.execute("ALTER TABLE playlists ADD COLUMN cover_path TEXT", [])?;
     }
-    
+
     if !columns.contains(&"description".to_string()) {
         conn.execute("ALTER TABLE playlists ADD COLUMN description TEXT", [])?;
     }
@@ -320,7 +333,10 @@ fn migrate_v6(conn: &Connection) -> Result<()> {
     conn.execute("DROP TABLE playlist_songs", [])?;
 
     // 4. 重命名新表
-    conn.execute("ALTER TABLE playlist_songs_new RENAME TO playlist_songs", [])?;
+    conn.execute(
+        "ALTER TABLE playlist_songs_new RENAME TO playlist_songs",
+        [],
+    )?;
 
     // 5. 重建索引
     conn.execute(
@@ -335,3 +351,79 @@ fn migrate_v6(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// 版本 7: 创建 videos 表
+fn migrate_v7(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS videos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT NOT NULL UNIQUE,
+            title TEXT NOT NULL,
+            duration INTEGER NOT NULL DEFAULT 0,
+            size INTEGER,
+            width INTEGER,
+            height INTEGER,
+            thumbnail_path TEXT,
+            
+            -- 用户数据
+            is_favorite INTEGER DEFAULT 0,
+            play_count INTEGER DEFAULT 0,
+            last_played_at TEXT,
+            
+            -- 关联与状态
+            folder_id INTEGER,
+            status TEXT DEFAULT 'active', -- active, archived (missing)
+            
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+            
+            FOREIGN KEY (folder_id) REFERENCES library_folders(id) ON DELETE CASCADE
+        )",
+        [],
+    )?;
+
+    // 创建索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_videos_path ON videos(path)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_videos_folder_id ON videos(folder_id)",
+        [],
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status)",
+        [],
+    )?;
+
+    Ok(())
+}
+
+/// 版本 8: 给 library_folders 添加 folder_type 字段
+fn migrate_v8(conn: &Connection) -> Result<()> {
+    // 添加 folder_type 字段，默认为 'music'
+    conn.execute(
+        "ALTER TABLE library_folders ADD COLUMN folder_type TEXT NOT NULL DEFAULT 'music'",
+        [],
+    )?;
+
+    // 将包含视频的文件夹类型更新为 'video'
+    // 如果文件夹关联了 videos 表中的记录，则认为是视频文件夹
+    conn.execute(
+        "UPDATE library_folders 
+         SET folder_type = 'video' 
+         WHERE id IN (
+             SELECT DISTINCT folder_id 
+             FROM videos 
+             WHERE folder_id IS NOT NULL
+         )",
+        [],
+    )?;
+
+    // 创建索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_folders_type ON library_folders(folder_type)",
+        [],
+    )?;
+
+    Ok(())
+}

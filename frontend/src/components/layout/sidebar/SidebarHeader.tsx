@@ -1,8 +1,7 @@
 import clsx from 'clsx';
 import { MdArrowBack, MdMenu } from 'react-icons/md';
-import CustomTooltip from '../../common/CustomTooltip';
-// 注意路径
-import appLogo from '../../../assets/logo.png';
+import CustomTooltip from '@/components/common/CustomTooltip';
+import appLogo from '@/assets/logo.png';
 
 interface SidebarHeaderProps {
   collapsed: boolean;

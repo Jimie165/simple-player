@@ -2,17 +2,17 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Virtuoso } from 'react-virtuoso';
-import CardPlayButton from '../../../components/common/CardPlayButton';
-import CoverImage from '../../../components/common/CoverImage';
+import CardPlayButton from '@/components/common/CardPlayButton';
+import CoverImage from '@/components/common/CoverImage';
 import clsx from 'clsx';
 import type { ArtistData } from './ArtistGridView';
 import type { AlbumData } from './AlbumGridView';
 import SongListView from './SongListView';
 import AlbumGridView from './AlbumGridView';
-import type { SongMetadata } from '../../../types';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import { useNavigationStore } from '../../../store/useNavigationStore';
-import { useScrollBlur } from '../../../hooks/useScrollBlur';
+import type { SongMetadata } from '@/types';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { useScrollBlur } from '@/hooks/useScrollBlur';
 
 interface ArtistDetailViewProps {
     artist: ArtistData;

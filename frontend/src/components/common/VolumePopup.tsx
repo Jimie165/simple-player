@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { usePlayerStore } from '../../store/usePlayerStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 interface VolumePopupProps {
     show: boolean;

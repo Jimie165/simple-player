@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import clsx from 'clsx';
 import { MdSearch } from 'react-icons/md';
-import CustomTooltip from '../../common/CustomTooltip';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 interface SidebarSearchProps {
     collapsed: boolean;

@@ -3,18 +3,18 @@ import { createPortal } from 'react-dom';
 import { MdAccessTime, MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 import { Virtuoso, type Components } from 'react-virtuoso';
-import CustomTooltip from '../../../components/common/CustomTooltip';
-import type { SongMetadata } from '../../../types';
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import SongCoverOverlay from '../../../components/common/SongCoverOverlay';
-import MusicContextMenu from '../../../components/common/MusicContextMenu';
-import { useSongOperations } from '../../../hooks/useSongOperations';
-import type { MusicMenuContext } from '../../../hooks/useSongOperations';
-import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
-import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
-import { usePlayerStore } from '../../../store/usePlayerStore';
-import { useNavigationStore } from '../../../store/useNavigationStore';
+import CustomTooltip from '@/components/common/CustomTooltip';
+import type { SongMetadata } from '@/types';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import SongCoverOverlay from '@/components/common/SongCoverOverlay';
+import MusicContextMenu from '@/components/common/MusicContextMenu';
+import { useSongOperations } from '@/hooks/useSongOperations';
+import type { MusicMenuContext } from '@/hooks/useSongOperations';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import { useAddToPlaylistStore } from '@/store/useAddToPlaylistStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 import {
     DndContext,
@@ -592,9 +592,6 @@ export default function SortableSongList({
     const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
         e.stopPropagation();
-
-        // Close other menus (HeadlessUI) before opening the right-click menu
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
 
         const id = getSongId(song, index);
         const isSelected = id ? selectedIds.has(id) : false;

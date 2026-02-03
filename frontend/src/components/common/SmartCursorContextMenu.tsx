@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Portal } from '@headlessui/react';
-import type { MusicMenuContext, MenuItemData } from '../../hooks/useSongOperations';
-import { useSongOperations } from '../../hooks/useSongOperations';
-import { getMusicItemId, getMusicItemType } from '../../utils/musicItemUtils';
-import type { MusicItem } from '../../utils/musicItemUtils';
-import { useSelectionStore } from '../../store/useSelectionStore';
+import type { MusicMenuContext, MenuItemData } from '@/hooks/useSongOperations';
+import { useSongOperations } from '@/hooks/useSongOperations';
+import { getMusicItemId, getMusicItemType } from '@/utils/musicItemUtils';
+import type { MusicItem } from '@/utils/musicItemUtils';
+import { useSelectionStore } from '@/store/useSelectionStore';
 
 interface SmartCursorContextMenuProps {
     x: number;
@@ -18,6 +18,7 @@ interface SmartCursorContextMenuProps {
     onDelete?: () => void;
     onShuffle?: () => void;
     onSelect?: () => void;
+    onShowProperties?: () => void;
     isSelected?: boolean;
     hideSelect?: boolean;
     selectText?: string;
@@ -36,7 +37,7 @@ interface SmartCursorContextMenuProps {
  * Uses Portal and viewport boundary detection.
  */
 export default function SmartCursorContextMenu(props: SmartCursorContextMenuProps) {
-    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, isSelected: isSelectedProp, hideSelect, selectText, onNavigate, menuGroups, extraGroups, variant = 'default', placement = 'auto' } = props;
+    const { x, y, item, context = 'other', playlistId, onClose, onPlay, onEdit, onDelete, onShuffle, onSelect: onSelectProp, onShowProperties, isSelected: isSelectedProp, hideSelect, selectText, onNavigate, menuGroups, extraGroups, variant = 'default', placement = 'auto' } = props;
 
     // Store
     const { selectedIds, toggleSelectionMode, clearSelection } = useSelectionStore();
@@ -62,7 +63,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
     }, [isSelected, selectedIds, item]);
 
     const resolvedType = item ? getMusicItemType(item) : 'song';
-    const selectionType = (['song', 'album', 'artist', 'folder', 'file', 'recent', 'playlist'] as string[]).includes(resolvedType)
+    const selectionType = (['song', 'album', 'artist', 'folder', 'file', 'recent', 'playlist', 'video'] as string[]).includes(resolvedType)
         ? (resolvedType as any)
         : 'song';
 
@@ -79,6 +80,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         hideSelect,
         selectText,
         onNavigate,
+        onShowProperties,
         onSelect: onSelectProp ? onSelectProp : () => {
             if (!item) return;
             if (isSelected && targetItems.length > 1) {

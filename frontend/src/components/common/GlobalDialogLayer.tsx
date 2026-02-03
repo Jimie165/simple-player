@@ -1,6 +1,6 @@
 import ConfirmDialog from './ConfirmDialog';
 import InfoDialog from './InfoDialog';
-import { useDialogStore } from '../../store/useDialogStore';
+import { useDialogStore } from '@/store/useDialogStore';
 
 /**
  * 全局弹窗层

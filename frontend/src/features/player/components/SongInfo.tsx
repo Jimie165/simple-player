@@ -1,20 +1,31 @@
 import clsx from 'clsx';
 import { MdFavorite } from 'react-icons/md';
 
-import type { SongMetadata } from '../../../types';
-import CoverImage from '../../../components/common/CoverImage';
+import type { SongMetadata } from '@/types';
+import CoverImage from '@/components/common/CoverImage';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
     isFullScreen: boolean;
-    toggleFullScreen: () => void;
+    onToggleFullScreen: () => void;
 }
 
-export default function SongInfo({ metadata, isFullScreen, toggleFullScreen }: SongInfoProps) {
+import { usePlayerStore } from '@/store/usePlayerStore';
+
+export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }: SongInfoProps) {
+    const { setVideoMode } = usePlayerStore();
+
     return (
         <div className="w-[30%] min-w-0 flex justify-start">
             <button
-                onClick={toggleFullScreen}
+                onClick={() => {
+                    const isVideo = metadata?.path?.match(/\.(mp4|mkv|webm|avi|mov|flv)$/i);
+                    if (isVideo) {
+                        setVideoMode(true);
+                    } else {
+                        onToggleFullScreen();
+                    }
+                }}
                 className="group flex items-center text-left rounded-lg p-2 -ml-2 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors relative overflow-visible w-auto max-w-full"
             >
                 <div className={clsx(

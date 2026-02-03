@@ -11,19 +11,19 @@ import {
 import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { useLibraryStore } from '../../store/useLibraryStore';
-import { useNavigationStore } from '../../store/useNavigationStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
-import { usePlaybackActions } from '../../hooks/usePlaybackActions';
-import { useSongOperations } from '../../hooks/useSongOperations';
-import type { SongMetadata } from '../../types';
-import { audioService } from '../../services/audioService';
-import { formatTime } from '../../utils/time';
-import { resolveCover } from '../../utils/cover';
-import CoverImage from '../../components/common/CoverImage';
-import MusicContextMenu from '../../components/common/MusicContextMenu';
-import MusicSlider from '../../components/common/MusicSlider';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { useSongOperations } from '@/hooks/useSongOperations';
+import type { SongMetadata } from '@/types';
+import { audioService } from '@/services/audioService';
+import { formatTime } from '@/utils/time';
+import { resolveCover } from '@/utils/mediaPath';
+import CoverImage from '@/components/common/CoverImage';
+import MusicContextMenu from '@/components/common/MusicContextMenu';
+import MusicSlider from '@/components/common/MusicSlider';
 import AppleMusicQueue from './AppleMusicQueue';
 
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {

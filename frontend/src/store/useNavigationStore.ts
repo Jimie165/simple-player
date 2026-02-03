@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { PageId } from '../types/index';
+import type { PageId } from '@/types/index';
 
 // ViewConfig for Overlays
 export type ViewType = 'artist_detail' | 'album_detail' | 'playlist_detail';
@@ -26,6 +26,7 @@ interface NavigationState {
 
     // Persistent UI State
     lastLibraryTab: string;
+    lastVideoTab: string;
     lastArtistDetailTab: string;
 
     // Actions
@@ -52,6 +53,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
     // Persistent UI State
     lastLibraryTab: 'songs',
+    lastVideoTab: 'all',
     lastArtistDetailTab: 'songs',
 
     navigate: (page, tab) => set((state) => {
@@ -73,17 +75,27 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         let targetTab = tab || 'songs';
         if (page === 'library') {
             targetTab = tab || state.lastLibraryTab;
+            // Update persistence if explicit tab provided
+            if (tab) targetTab = tab;
+        } else if (page === 'videos') {
+            targetTab = tab || state.lastVideoTab || 'all';
         }
 
-        return {
+        // Update persistence immediately for target page
+        // tailored for library and videos
+        const updates: Partial<NavigationState> = {
             currentPage: page,
             currentTab: targetTab,
             mainHistory: newHistory,
-            // Clear overlays when explicitly switching main pages
             overlayStack: [],
             activeOverlay: null,
             hasOverlay: false
         };
+
+        if (page === 'library') updates.lastLibraryTab = targetTab;
+        if (page === 'videos') updates.lastVideoTab = targetTab;
+
+        return updates;
     }),
 
     setTab: (tab) => set((state) => {
@@ -105,6 +117,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
         if (state.currentPage === 'library') {
             updates.lastLibraryTab = tab;
+        } else if (state.currentPage === 'videos') {
+            updates.lastVideoTab = tab;
         }
 
         return updates;

@@ -1,13 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite' // 引入插件
+import tailwindcss from '@tailwindcss/vite'
+import path from 'path'
 
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(), // 注册插件
+    tailwindcss(),
   ],
-  // 顺便配置一下，避免 Tauri 开发时的端口冲突
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 5173,
     strictPort: true,

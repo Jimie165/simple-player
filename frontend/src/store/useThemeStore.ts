@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { generateThemeVariables, PRESET_COLORS } from '../utils/themeColors';
+import { generateThemeVariables, PRESET_COLORS } from '@/utils/themeColors';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 

@@ -1,11 +1,12 @@
-import type { SongMetadata, RecentItem, Playlist } from '../types';
-import { libraryService } from '../services/libraryService';
-import { fileService } from '../services/fileService';
+import type { SongMetadata, RecentItem, Playlist } from '@/types';
+import { libraryService } from '@/services/libraryService';
+import { fileService } from '@/services/fileService';
 
-import type { ArtistData } from '../features/library/components/ArtistGridView';
-import type { AlbumData } from '../features/library/components/AlbumGridView';
+import type { ArtistData } from '@/features/library/components/ArtistGridView';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
+import type { VideoMetadata } from '@/types';
 
-export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | AlbumData;
+export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | AlbumData | VideoMetadata;
 
 /**
  * 标准化 MusicItem 以获取 ID 和类型。
@@ -44,10 +45,13 @@ export function getMusicItemId(item: any): string {
         return `artist:${item.name}`;
     }
 
-    // 5. Default for Song/File: Path is the best unique ID
+    // 5. Video detection (usually has path and thumbnail_path but missing artist/album)
+    if (item.thumbnail_path && item.path) return item.path;
+
+    // 6. Default for Song/File: Path is the best unique ID
     if (item.path) return item.path;
 
-    // 6. Last resort
+    // 7. Last resort
     if (item.id !== undefined) return String(item.id);
     return '';
 }
@@ -55,16 +59,29 @@ export function getMusicItemId(item: any): string {
 export function getMusicItemType(item: any): string {
     if (!item) return 'song';
     if (item.type) return item.type;
+
+    // Video detection FIRST (before playlist, since both can have id and updated_at)
+    // Video has: path, thumbnail_path or width/height, but NO artist/album/song_count
+    if (item.path && !item.artist && !item.album && item.song_count === undefined) {
+        if (item.thumbnail_path || item.width !== undefined || item.height !== undefined) {
+            return 'video';
+        }
+    }
+
     // Artist / Album check
     if ((item as any).count !== undefined && (item as any).albumCount !== undefined) return 'artist';
     if ((item as any).artist && (item as any).songs && !(item as any).duration) return 'album';
-    // Heuristics for Playlist
+
+    // Heuristics for Playlist (must have song_count, not just updated_at)
     if (typeof item.id === 'string' && item.id.startsWith('playlist:')) return 'playlist';
-    if (item.id !== undefined && (item.song_count !== undefined || item.updated_at !== undefined)) return 'playlist';
+    if (item.id !== undefined && item.song_count !== undefined) return 'playlist';
+
     // Basic heuristics for Song
     if (item.artist && item.album && item.title) return 'song';
-    // If it has a path but no other metadata, assumes file/song?
+
+    // If it has a path but no other metadata, assumes file
     if (item.path) return 'file';
+
     return 'song';
 }
 
@@ -121,6 +138,17 @@ export async function resolveSongsFromItems(items: any[]): Promise<SongMetadata[
                     const folderSongs = await fileService.readFolder(item.path);
                     songs.push(...folderSongs);
                 }
+            } else if (type === 'video' || (item.thumbnail_path && item.path)) {
+                // 视频转歌曲元数据逻辑
+                songs.push({
+                    id: typeof item.id === 'number' ? item.id : undefined,
+                    path: item.path,
+                    title: item.title || item.path.split(/[\\/]/).pop() || 'Unknown Video',
+                    artist: 'Video',
+                    album: item.folder_id ? 'Folder' : 'Unknown',
+                    duration: item.duration || 0,
+                    cover_path: item.thumbnail_path,
+                });
             } else if (type === 'file' || type === 'song' || !type) {
                 // 单曲逻辑
                 if (item.path) {

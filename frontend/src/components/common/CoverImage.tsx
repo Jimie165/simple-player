@@ -1,9 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { MdMusicNote } from 'react-icons/md';
+import { MdMusicNote, MdVideocam } from 'react-icons/md';
 import clsx from 'clsx';
-import { resolveCover } from '../../utils/cover';
-import type { SongMetadata } from '../../types';
-import { useLibraryStore } from '../../store/useLibraryStore';
+import { resolveCover } from '@/utils/mediaPath';
+import type { SongMetadata } from '@/types';
+import { useLibraryStore } from '@/store/useLibraryStore';
+// Actually MusicGrid logic is not exported or complex. We can just check extension.
+const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
+const isVideo = (song?: SongMetadata | null) => {
+    if (!song) return false;
+    const path = song.path || (typeof song.id === 'string' ? song.id : '');
+    if (!path) return false;
+    const ext = path.split('.').pop()?.toLowerCase() || '';
+    return VIDEO_EXTENSIONS.includes(ext);
+};
 
 interface CoverImageProps {
     song?: SongMetadata | null;
@@ -21,34 +30,38 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
         let isMounted = true;
 
         const loadCover = async () => {
-            // 检查 src 是否有实际值（非空、非 null、非 undefined）
+            // Clean up previous blob
+            if (blobUrlRef.current) {
+                URL.revokeObjectURL(blobUrlRef.current);
+                blobUrlRef.current = null;
+            }
+
+            // 1. Try src first
             if (src && src.length > 0) {
-                if (blobUrlRef.current) {
-                    URL.revokeObjectURL(blobUrlRef.current);
-                    blobUrlRef.current = null;
+                // Import resolveMediaPath dynamically if needed or rely on the import I added earlier
+                // Wait, I need to make sure resolveMediaPath is imported.
+                // The previous replace failed, so imports might be missing too.
+                // Let's assume I will fix imports separately or check if they exist.
+                // Actually, I should check imports first.
+                // But let's fix the logic first.
+                const { resolveMediaPath } = await import('@/utils/mediaPath');
+                const url = await resolveMediaPath(src);
+                if (isMounted) {
+                    if (url && url.startsWith('blob:')) blobUrlRef.current = url;
+                    setImageSrc(url);
                 }
-                setImageSrc(src);
                 return;
             }
 
+            // 2. Try song metadata
             if (!song) {
-                if (blobUrlRef.current) {
-                    URL.revokeObjectURL(blobUrlRef.current);
-                    blobUrlRef.current = null;
-                }
-                setImageSrc(null);
+                if (isMounted) setImageSrc(null);
                 return;
             }
 
             const url = await resolveCover(song);
             if (isMounted) {
-                if (blobUrlRef.current) {
-                    URL.revokeObjectURL(blobUrlRef.current);
-                    blobUrlRef.current = null;
-                }
-                if (url && url.startsWith('blob:')) {
-                    blobUrlRef.current = url;
-                }
+                if (url && url.startsWith('blob:')) blobUrlRef.current = url;
                 setImageSrc(url);
             }
         };
@@ -76,7 +89,11 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
 
     return (
         <div className={clsx("w-full h-full flex items-center justify-center text-neutral-400 bg-neutral-200 dark:bg-neutral-800", className)}>
-            <MdMusicNote className={clsx("text-2xl", iconClassName)} />
+            {isVideo(song) ? (
+                <MdVideocam className={clsx("w-1/2 h-1/2", iconClassName)} />
+            ) : (
+                <MdMusicNote className={clsx("w-1/2 h-1/2", iconClassName)} />
+            )}
         </div>
     );
 }

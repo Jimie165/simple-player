@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react';
 import { MdPlayArrow, MdFolder, MdMusicNote, MdMoreHoriz, MdAdd, MdPerson, MdAlbum, MdDelete, MdInfo, MdQueueMusic } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import clsx from 'clsx';
-import type { RecentItem, SongMetadata } from '../../../types';
-import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
-import { libraryService } from '../../../services/libraryService';
-import { sortSongs } from '../../../utils/songSort';
-import { useLibraryStore } from '../../../store/useLibraryStore';
+import type { RecentItem, SongMetadata } from '@/types';
+import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import { libraryService } from '@/services/libraryService';
+import { sortSongs } from '@/utils/songSort';
+import { useLibraryStore } from '@/store/useLibraryStore';
 
 interface RecentItemCardProps {
     item: RecentItem;

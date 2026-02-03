@@ -1,6 +1,7 @@
 use crate::DbState;
 use crate::modules::database::{FolderRepo, LibraryFolder, SongRepo};
 use crate::modules::library::{self, SongMetadata, save_cover};
+use crate::utils::paths::{is_app_relative_path, is_user_file_path};
 use std::path::Path;
 use tauri::{Manager, State};
 
@@ -10,13 +11,13 @@ async fn scan_library_internal(
     force_restore: bool,
     restore_folder_id: Option<i64>,
 ) -> Result<Vec<SongMetadata>, String> {
-    let app_data_dir = app_handle
+    let app_cache_dir = app_handle
         .path()
-        .app_data_dir()
+        .app_cache_dir()
         .map_err(|e| e.to_string())?;
 
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let folders = FolderRepo::get_all(&conn).map_err(|e| e.to_string())?;
+    let folders = FolderRepo::get_by_type(&conn, "music").map_err(|e| e.to_string())?;
     let mut all_songs = Vec::new();
 
     for folder in folders {
@@ -30,6 +31,12 @@ async fn scan_library_internal(
 
         for file in files {
             if let Ok(Some(existing)) = SongRepo::get_by_path_any_status(&conn, &file) {
+                // 检查是否需要迁移旧封面路径
+                // 如果封面路径存在，但既不是新的相对路径（cache/），也不是用户绝对路径，则认为是旧格式
+                let needs_migration = existing.cover_path.as_ref().map_or(false, |cp| {
+                    !is_app_relative_path(cp) && !is_user_file_path(cp)
+                });
+
                 if existing.status == "archived" {
                     let should_restore = force_restore
                         && restore_folder_id
@@ -37,49 +44,57 @@ async fn scan_library_internal(
                             .unwrap_or(true);
 
                     if should_restore {
-                        if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
-                            let cover_path = meta.cover_path.clone().or_else(|| {
-                                meta.cover.as_ref().and_then(|cover_data| {
-                                    save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
-                                })
-                            });
-
-                            let _ = SongRepo::update_metadata(
-                                &conn,
-                                existing.id,
-                                &meta.title,
-                                &meta.artist,
-                                &meta.album,
-                                meta.duration as i64,
-                                None,
-                                cover_path.as_deref(),
-                                meta.album_artist.as_deref(),
-                                meta.year,
-                                meta.genre.as_deref(),
-                                meta.track_number,
-                                meta.track_total,
-                                meta.disc_number,
-                                meta.disc_total,
-                            );
-                            let _ = SongRepo::restore(&conn, existing.id);
-
-                            if let Ok(Some(updated)) = SongRepo::get_by_path(&conn, &file) {
-                                all_songs.push(SongMetadata::from_db_song(&updated));
-                            }
-                        }
+                         // 复用下面的更新逻辑
                     } else {
                         continue;
                     }
-                } else {
+                } else if !needs_migration {
+                    // 状态正常且不需要迁移，直接使用
                     all_songs.push(SongMetadata::from_db_song(&existing));
+                    continue;
+                }
+                
+                // 需要恢复 或 需要迁移旧数据 -> 重新读取元数据并更新
+                if let Ok(meta) = library::get_metadata(&file, Some(&app_cache_dir)) {
+                    let cover_path = meta.cover_path.clone().or_else(|| {
+                        meta.cover.as_ref().and_then(|cover_data| {
+                            save_cover(&app_cache_dir, &meta.album, &meta.artist, cover_data)
+                        })
+                    });
+
+                    let _ = SongRepo::update_metadata(
+                        &conn,
+                        existing.id,
+                        &meta.title,
+                        &meta.artist,
+                        &meta.album,
+                        meta.duration as i64,
+                        None,
+                        cover_path.as_deref(),
+                        meta.album_artist.as_deref(),
+                        meta.year,
+                        meta.genre.as_deref(),
+                        meta.track_number,
+                        meta.track_total,
+                        meta.disc_number,
+                        meta.disc_total,
+                    );
+                    
+                    if existing.status == "archived" {
+                        let _ = SongRepo::restore(&conn, existing.id);
+                    }
+
+                    if let Ok(Some(updated)) = SongRepo::get_by_path(&conn, &file) {
+                        all_songs.push(SongMetadata::from_db_song(&updated));
+                    }
                 }
                 continue;
             }
 
-            if let Ok(meta) = library::get_metadata(&file, Some(&app_data_dir)) {
+            if let Ok(meta) = library::get_metadata(&file, Some(&app_cache_dir)) {
                 let cover_path = meta.cover_path.clone().or_else(|| {
                     meta.cover.as_ref().and_then(|cover_data| {
-                        save_cover(&app_data_dir, &meta.album, &meta.artist, cover_data)
+                        save_cover(&app_cache_dir, &meta.album, &meta.artist, cover_data)
                     })
                 });
 

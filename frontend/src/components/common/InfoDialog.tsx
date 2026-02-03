@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Dialog, DialogPanel, DialogTitle, DialogBackdrop } from '@headlessui/react';
 import { MdClose } from 'react-icons/md';
-import { usePlayerStore } from '../../store/usePlayerStore';
-import { fileService } from '../../services/fileService';
-import { formatTime } from '../../utils/time';
-import type { SongMetadata } from '../../types';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { fileService } from '@/services/fileService';
+import { formatTime } from '@/utils/time';
+import type { SongMetadata } from '@/types';
 import CoverImage from './CoverImage';
 
 interface InfoDialogProps {
@@ -47,6 +47,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
 
     // 显示的数据源：如果有 fullMetadata（加载完成），用它；否则用 initialMetadata
     const displayMeta = fullMetadata || initialMetadata;
+    const isVideo = !!(displayMeta?.width && displayMeta?.height);
 
     const formatSize = (bytes?: number) => {
         if (!bytes) return '未知';
@@ -62,6 +63,15 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
     const formatSampleRate = (hz?: number) => {
         if (!hz) return '未知';
         return `${hz} Hz`;
+    };
+
+    const formatChannels = (channels?: number) => {
+        if (!channels) return '未知';
+        if (channels === 1) return '1 (单声道)';
+        if (channels === 2) return '2 (立体声)';
+        if (channels === 6) return '5.1 (环绕声)';
+        if (channels === 8) return '7.1 (环绕声)';
+        return `${channels} (多声道)`;
     };
 
     return (
@@ -96,11 +106,15 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                                 <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">标题</div>
                                 <div className="font-semibold text-neutral-900 dark:text-neutral-100 select-text break-all text-base">{displayMeta?.title || "未知"}</div>
 
-                                <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">艺人</div>
-                                <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.artist || "未知"}</div>
+                                {!isVideo && (
+                                    <>
+                                        <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">艺人</div>
+                                        <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.artist || "未知"}</div>
 
-                                <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">专辑</div>
-                                <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.album || "未知"}</div>
+                                        <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">专辑</div>
+                                        <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.album || "未知"}</div>
+                                    </>
+                                )}
 
                                 <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">时长</div>
                                 <div className="text-neutral-900 dark:text-neutral-100 font-mono">{formatTime(displayMeta?.duration || 0)}</div>
@@ -111,14 +125,43 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
 
                         {/* 下半部分：详细技术信息 */}
                         <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-xs w-full">
+                            {/* 仅视频显示分辨率 */}
+                            {(displayMeta?.width && displayMeta?.height) && (
+                                <>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">分辨率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
+                                        {displayMeta.width} x {displayMeta.height}
+                                    </div>
+                                </>
+                            )}
+
+                            {/* 仅视频显示帧率 */}
+                            {displayMeta?.frame_rate && (
+                                <>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">帧速率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
+                                        {displayMeta.frame_rate.toFixed(2)} fps
+                                    </div>
+                                </>
+                            )}
+
+                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">声道</div>
+                            <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
+                                {formatChannels(displayMeta?.channels)}
+                            </div>
+
                             <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">文件大小</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSize(displayMeta?.size)}</div>
 
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">采样率</div>
-                            <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSampleRate(displayMeta?.sample_rate)}</div>
+                            {!isVideo && (
+                                <>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">采样率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSampleRate(displayMeta?.sample_rate)}</div>
 
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">比特率</div>
-                            <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatBitrate(displayMeta?.bitrate)}</div>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">比特率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatBitrate(displayMeta?.bitrate)}</div>
+                                </>
+                            )}
 
                             <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">路径</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text break-all">

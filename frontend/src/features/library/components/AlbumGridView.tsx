@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
 import clsx from 'clsx';
 
-import CoverImage from '../../../components/common/CoverImage';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import type { SongMetadata } from '../../../types';
-import ConfirmDialog from '../../../components/common/ConfirmDialog';
-import CardPlayButton from '../../../components/common/CardPlayButton';
-import SmartMusicContextMenu from '../../../components/common/SmartMusicContextMenu';
-import SmartCursorContextMenu from '../../../components/common/SmartCursorContextMenu';
-import VirtualizedGrid from '../../../components/common/VirtualizedGrid';
-import { getMusicItemId } from '../../../utils/musicItemUtils';
+import CoverImage from '@/components/common/CoverImage';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import type { SongMetadata } from '@/types';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import CardPlayButton from '@/components/common/CardPlayButton';
+import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
+import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
+import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义专辑数据结构
 export interface AlbumData {
@@ -60,7 +60,6 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
 
     const handleContextMenu = (e: React.MouseEvent, album: AlbumData) => {
         e.preventDefault();
-        document.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
         setContextMenu({ x: e.clientX, y: e.clientY, album });
     };
 

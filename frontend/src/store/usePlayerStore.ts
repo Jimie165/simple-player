@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { SongMetadata, RepeatMode } from '../types/index';
-import { audioService } from '../services/audioService';
+import type { SongMetadata, RepeatMode } from '@/types/index';
+import { audioService } from '@/services/audioService';
 
 // 1. 确保接口里定义了所有属性和方法
 interface PlayerState {
@@ -35,6 +35,19 @@ interface PlayerState {
     // UI Persistence
     isQueueOpen: boolean;
     toggleQueue: () => void;
+
+    // Video Mode
+    isVideoMode: boolean;
+    setVideoMode: (enabled: boolean) => void;
+    videoMetadata: SongMetadata | null;
+    setVideoMetadata: (metadata: SongMetadata | null) => void;
+
+    // Video Queue (Context)
+    videoQueue: SongMetadata[];
+    currentVideoIndex: number;
+    setVideoQueue: (queue: SongMetadata[], startIndex: number) => void;
+    playNextVideo: () => void;
+    playPreviousVideo: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
@@ -46,6 +59,10 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     isShuffling: false,
     repeatMode: 'off',
     isQueueOpen: false,
+    isVideoMode: false,
+    videoMetadata: null,
+    videoQueue: [],
+    currentVideoIndex: -1,
 
     // --- Setter 实现 ---
     setIsPlaying: (isPlaying) => set({ isPlaying }),
@@ -54,6 +71,26 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     setVolume: (volume) => {
         set({ volume });
         audioService.setVolume(volume / 100);
+    },
+    setVideoMode: (enabled) => set({ isVideoMode: enabled }),
+
+    setVideoMetadata: (metadata) => set({ videoMetadata: metadata }),
+    setVideoQueue: (queue, startIndex) => set({ videoQueue: queue, currentVideoIndex: startIndex }),
+
+    playNextVideo: () => {
+        const { videoQueue, currentVideoIndex } = get();
+        if (currentVideoIndex < videoQueue.length - 1) {
+            const nextIndex = currentVideoIndex + 1;
+            set({ currentVideoIndex: nextIndex, videoMetadata: videoQueue[nextIndex] });
+        }
+    },
+
+    playPreviousVideo: () => {
+        const { videoQueue, currentVideoIndex } = get();
+        if (currentVideoIndex > 0) {
+            const prevIndex = currentVideoIndex - 1;
+            set({ currentVideoIndex: prevIndex, videoMetadata: videoQueue[prevIndex] });
+        }
     },
 
     setShuffleState: (state) => set({ isShuffling: state }),
@@ -96,6 +133,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
             } else {
                 // Check if audio is loaded. If not (and we have metadata), we must PLAY first to load it.
                 // This happens when app restarts: metadata is restored but backend audio is empty.
+                // NOTE: For video, we might handle this differently, but using standard audioService for now.
                 const { isAudioLoaded, metadata } = get();
                 if (!isAudioLoaded && metadata && metadata.path) {
                     await audioService.play(metadata.path, metadata);
@@ -107,10 +145,6 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
             }
         } catch (error) {
             console.error('Toggle play failed', error);
-            // If we failed to resume, ensure UI shows paused.
-            // If we failed to pause, well, UI probably should show paused to let user try again?
-            // Let's assume sync failed, maybe fetch status? For now, just ensure consistent internal state
-            // If exception, likely backend is unhappy, so default to not playing.
             if (!isPlaying) set({ isPlaying: false });
         }
     },
@@ -127,5 +161,6 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         isShuffling: state.isShuffling,
         repeatMode: state.repeatMode,
         isQueueOpen: state.isQueueOpen,
+        // Don't persist isVideoMode, always start closed
     }),
 }));

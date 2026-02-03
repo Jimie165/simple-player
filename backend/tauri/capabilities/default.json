@@ -28,6 +28,46 @@
         "fs:default",
         "fs:allow-appdata-read-recursive",
         "fs:allow-appdata-write-recursive",
-        "core:path:default"
+        "fs:allow-appcache-read-recursive",
+        "fs:allow-appcache-write-recursive",
+        "core:path:default",
+        {
+            "identifier": "shell:allow-execute",
+            "allow": [
+                {
+                    "args": true,
+                    "name": "binaries/ffmpeg",
+                    "sidecar": true
+                },
+                {
+                    "args": true,
+                    "name": "binaries/ffprobe",
+                    "sidecar": true
+                }
+            ]
+        },
+        {
+            "identifier": "shell:allow-spawn",
+            "allow": [
+                {
+                    "args": true,
+                    "name": "binaries/ffmpeg",
+                    "sidecar": true
+                },
+                {
+                    "args": true,
+                    "name": "binaries/ffprobe",
+                    "sidecar": true
+                }
+            ]
+        },
+        {
+            "identifier": "fs:allow-read",
+            "allow": [
+                {
+                    "path": "**"
+                }
+            ]
+        }
     ]
 }

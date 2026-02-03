@@ -1,24 +1,26 @@
 import { useMemo, useCallback } from 'react';
 import type { ElementType, ReactNode } from 'react';
-import { useLibraryStore } from '../store/useLibraryStore';
-import { usePlaybackActions } from '../hooks/usePlaybackActions';
-import { useAddToPlaylistStore } from '../store/useAddToPlaylistStore';
-import { useDialogStore } from '../store/useDialogStore';
-import { usePlayerStore } from '../store/usePlayerStore';
-import { useNavigationStore } from '../store/useNavigationStore';
-import { useSelectionStore } from '../store/useSelectionStore';
-import { libraryService } from '../services/libraryService';
-import { fileService } from '../services/fileService';
-import { resolveSongsFromItems, getMusicItemId, getMusicItemType } from '../utils/musicItemUtils';
-import type { MusicItem } from '../utils/musicItemUtils';
-import type { SongMetadata } from '../types';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { useAddToPlaylistStore } from '@/store/useAddToPlaylistStore';
+import { useDialogStore } from '@/store/useDialogStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useVideoStore } from '@/store/useVideoStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { libraryService } from '@/services/libraryService';
+import { fileService } from '@/services/fileService';
+import { audioService } from '@/services/audioService';
+import { resolveSongsFromItems, getMusicItemId, getMusicItemType } from '@/utils/musicItemUtils';
+import type { MusicItem } from '@/utils/musicItemUtils';
+import type { SongMetadata } from '@/types';
 import {
     MdPlayArrow, MdShuffle, MdFavorite, MdFavoriteBorder, MdDelete,
     MdInfo, MdEdit, MdCheckBoxOutlineBlank, MdCheckBox, MdAlbum, MdPerson, MdPlaylistPlay, MdPlaylistRemove, MdPlaylistAdd, MdRemoveCircleOutline
 } from 'react-icons/md';
 
 // 菜单上下文类型
-export type MusicMenuContext = 'library' | 'playlist' | 'folder' | 'recent' | 'album_detail' | 'artist_detail' | 'playlist_list' | 'queue' | 'other';
+export type MusicMenuContext = 'library' | 'playlist' | 'folder' | 'recent' | 'album_detail' | 'artist_detail' | 'playlist_list' | 'queue' | 'video' | 'other';
 
 // 菜单项数据结构 (兼容 MusicContextMenu)
 export interface MenuItemData {
@@ -42,6 +44,7 @@ interface UseSongOperationsOptions {
     onDelete?: () => void; // 仅当您想覆盖默认删除逻辑时使用
     onEdit?: () => void;
     onSelect?: () => void; // 用于触发选择模式或切换选中状态
+    onShowProperties?: () => void; // New: Callback for custom properties dialog
     onNavigate?: () => void; // New: Callback after navigation (e.g., closing player)
 
     // UI 配置
@@ -54,13 +57,16 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const {
         items, context, playlistId, onSelect,
         hideSelect = false, selectText = '选择', isSelected = false,
-        onPlay, onShuffle, onAddToQueue, onDelete, onEdit, onNavigate
+        onPlay, onShuffle, onAddToQueue, onDelete, onEdit, onShowProperties, onNavigate
     } = options;
 
     // Stores
     const { isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
-    const { setShuffleState, isShuffling } = usePlayerStore();
+    const {
+        setShuffleState, isShuffling, isPlaying, setIsPlaying,
+        setVideoMode, setVideoMetadata, setVideoQueue
+    } = usePlayerStore();
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
     const { openDeleteConfirm, openProperties } = useDialogStore();
     const { push } = useNavigationStore();
@@ -101,12 +107,25 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
         if (isShuffling) setShuffleState(false);
 
-        await playList({
-            songs,
-            startIndex: 0,
-            options: { restartIfCurrent: true }
-        });
-    }, [items, onPlay, playList, isShuffling, setShuffleState]);
+        // 如果上下文是视频，使用视频播放器
+        if (context === 'video') {
+            setVideoQueue(songs, 0);
+            setVideoMetadata(songs[0]);
+            setVideoMode(true);
+
+            // 如果音频正在播放，暂停它
+            if (isPlaying) {
+                await audioService.pause();
+                setIsPlaying(false);
+            }
+        } else {
+            await playList({
+                songs,
+                startIndex: 0,
+                options: { restartIfCurrent: true }
+            });
+        }
+    }, [items, onPlay, playList, isShuffling, setShuffleState, context, isPlaying, setIsPlaying, setVideoQueue, setVideoMetadata, setVideoMode]);
 
     // 2. 随机播放
     const handleShufflePlay = useCallback(async () => {
@@ -175,25 +194,45 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             items,
             async () => {
                 clearSelection();
-                const songsToDelete = await resolveSongsFromItems(items);
-                const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
-                if (ids.length > 0) {
-                    await libraryService.batchDeleteSongs(ids);
 
-                    // Remove from Recent History
-                    items.forEach(item => {
-                        const id = getMusicItemId(item);
-                        if (id) removeFromRecent(id);
-                    });
+                // Video: prefer direct id/path mapping to avoid missing thumbnails
+                if (context === 'video') {
+                    const videos = useVideoStore.getState().videos;
+                    const pathToId = new Map(videos.map(v => [v.path, v.id] as const));
+                    const ids = items.map((item: any) => {
+                        if (typeof item?.id === 'number') return item.id;
+                        const path = item?.path;
+                        if (path && pathToId.has(path)) return pathToId.get(path);
+                        return undefined;
+                    }).filter((id): id is number => typeof id === 'number');
 
-                    triggerLibraryUpdate();
+                    if (ids.length > 0) {
+                        await libraryService.batchDeleteVideos(ids);
+                        useVideoStore.getState().fetchVideos();
+                    }
+                } else {
+                    const songsToDelete = await resolveSongsFromItems(items);
+                    const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
+                    if (ids.length > 0) {
+                        await libraryService.batchDeleteSongs(ids);
+                    }
                 }
+
+                // Remove from Recent History
+                items.forEach(item => {
+                    const id = getMusicItemId(item);
+                    if (id) removeFromRecent(id);
+                });
+
+                triggerLibraryUpdate();
             },
-            `确定要从音乐库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`,
-            '从音乐库删除',
+            context === 'video'
+                ? `确定要从视频库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`
+                : `确定要从音乐库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`,
+            context === 'video' ? '从视频库删除' : '从音乐库删除',
             '删除'
         );
-    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection, removeFromRecent]);
+    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection, removeFromRecent, context]);
 
     // 5. 删除或从播放列表移除
     const handleDeleteOrRemove = useCallback(async () => {
@@ -331,6 +370,11 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
 
     const handleProperties = useCallback(async () => {
+        if (onShowProperties) {
+            onShowProperties();
+            return;
+        }
+
         if (!isSingle || !firstItem) return;
         // 如果是文件，获取该文件的元数据
         let songToCheck = firstItem as SongMetadata;
@@ -343,7 +387,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             } catch { }
         }
         openProperties(songToCheck);
-    }, [isSingle, firstItem, openProperties]);
+    }, [isSingle, firstItem, openProperties, onShowProperties]);
 
 
     // --- Menu Generation ---
@@ -426,7 +470,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             let showProperties = true;
             if (context === 'folder' && type === 'folder') showProperties = false;
 
-            if (showProperties && ['song', 'file'].includes(type) && type !== 'playlist') {
+            // Allow properties if standard types OR if onShowProperties is provided (e.g. for Video)
+            const allowPropertiesType = ['song', 'file', 'video'].includes(type) || !!onShowProperties;
+
+            if (showProperties && allowPropertiesType && type !== 'playlist') {
                 group2.push({ id: 'properties', label: '属性', icon: MdInfo, onClick: handleProperties });
             }
 
@@ -475,7 +522,8 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             group3.push({ id: 'remove_queue', label, icon: MdRemoveCircleOutline, onClick: handleDeleteOrRemove, variant: 'default' });
         } else {
             // Delete
-            let label = count > 1 ? `从音乐库删除 ${count} 项` : '从音乐库删除';
+            const suffix = context === 'video' ? '视频库' : '音乐库';
+            let label = count > 1 ? `从${suffix}删除 ${count} 项` : `从${suffix}删除`;
             if (context === 'recent') {
                 label = count > 1 ? `删除 ${count} 条记录` : '删除记录';
             } else if (context === 'playlist_list') {
@@ -493,6 +541,48 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             groups.push([{ id: 'select', label, icon, onClick: onSelect }]);
         }
 
+        // Final filter for video context (Video Library)
+        if (context === 'video') {
+            const allowedIds = ['play', 'properties', 'delete', 'select'];
+            return groups.map(group =>
+                group.filter(item => allowedIds.includes(item.id))
+            ).filter(group => group.length > 0);
+        }
+
+        // Logic for Home Page (Recent) - Video Support
+        if (context === 'recent') {
+            // Helper to check if item is video
+            const isVideoItem = (item: MusicItem) => {
+                const t = getMusicItemType(item);
+                if (t === 'video') return true;
+                if (t === 'file' && (item as any).path) {
+                    const ext = (item as any).path.split('.').pop()?.toLowerCase() || '';
+                    return ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'].includes(ext);
+                }
+                return false;
+            };
+
+            const hasVideo = items.some(isVideoItem);
+
+            if (hasVideo) {
+                const allVideos = items.every(isVideoItem);
+
+                if (allVideos) {
+                    // All videos: same as Video Library
+                    const allowedIds = ['play', 'properties', 'delete', 'select'];
+                    return groups.map(group =>
+                        group.filter(item => allowedIds.includes(item.id))
+                    ).filter(group => group.length > 0);
+                } else {
+                    // Mixed (contains video + others): Only allow Delete and Select
+                    const allowedIds = ['delete', 'select'];
+                    return groups.map(group =>
+                        group.filter(item => allowedIds.includes(item.id))
+                    ).filter(group => group.length > 0);
+                }
+            }
+        }
+
         // 最终过滤：如果是“喜爱歌曲”且在播放列表根视图，隐藏整个删除组
         if (context === 'playlist_list' && items.some(i => (i as any).id === 'favorites' || (i as any).id === 'playlist:favorites')) {
             return groups.filter(g => !g.some(m => m.id === 'delete'));
@@ -501,7 +591,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     }, [
         handlePlay, handleShufflePlay, handleAddToQueue, handleAddToPlaylist, handleFavorite,
         handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, onSelect, onEdit,
-        isSingle, singleIsFavorite, isAllFavorited, firstItem, context, hideSelect, selectText, isSelected
+        isSingle, singleIsFavorite, isAllFavorited, firstItem, context, hideSelect, selectText, isSelected, items
     ]);
 
     return {

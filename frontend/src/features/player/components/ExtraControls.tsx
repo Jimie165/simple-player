@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { MdVolumeUp, MdVolumeOff, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
 import clsx from 'clsx';
-import { usePlayerStore } from '../../../store/usePlayerStore';
-import VolumePopup from '../../../components/common/VolumePopup';
-import CustomTooltip from '../../../components/common/CustomTooltip';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import VolumePopup from '@/components/common/VolumePopup';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import PlayQueuePopup from './PlayQueuePopup'; // 引入新组件
 
 interface ExtraControlsProps {

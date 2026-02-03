@@ -1,8 +1,9 @@
 use std::fs;
 use std::path::Path;
+use crate::utils::path::normalize_db_path;
 
 /// 支持的音频格式
-const AUDIO_EXTENSIONS: [&str; 6] = ["mp3", "flac", "wav", "ogg", "m4a", "mp4"];
+const AUDIO_EXTENSIONS: [&str; 5] = ["mp3", "flac", "wav", "ogg", "m4a"];
 
 /// 扫描文件夹内的音频文件（单层）
 pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
@@ -16,9 +17,7 @@ pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
                 if path.is_file() {
                     if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
                         if AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                            if let Some(path_str) = path.to_str() {
-                                audio_files.push(path_str.replace('\\', "/"));
-                            }
+                            audio_files.push(normalize_db_path(&path));
                         }
                     }
                 }
@@ -54,9 +53,7 @@ fn scan_recursive_inner(path: &Path, audio_files: &mut Vec<String>) {
             } else if entry_path.is_file() {
                 if let Some(ext) = entry_path.extension().and_then(|s| s.to_str()) {
                     if AUDIO_EXTENSIONS.contains(&ext.to_lowercase().as_str()) {
-                        if let Some(path_str) = entry_path.to_str() {
-                            audio_files.push(path_str.replace('\\', "/"));
-                        }
+                        audio_files.push(normalize_db_path(&entry_path));
                     }
                 }
             }

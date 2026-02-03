@@ -3,13 +3,13 @@ import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, Dialo
 import { MdPlaylistAdd } from 'react-icons/md';
 import { MdAdd } from 'react-icons/md';
 
-import { useLibraryStore } from '../../../store/useLibraryStore';
-import { useAddToPlaylistStore } from '../../../store/useAddToPlaylistStore';
-import { useSelectionStore } from '../../../store/useSelectionStore';
-import { libraryService } from '../../../services/libraryService';
-import type { Playlist, SongMetadata } from '../../../types';
-import PlaylistCoverCollage from '../../../components/common/PlaylistCoverCollage';
-import { sortSongs } from '../../../utils/songSort';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useAddToPlaylistStore } from '@/store/useAddToPlaylistStore';
+import { useSelectionStore } from '@/store/useSelectionStore';
+import { libraryService } from '@/services/libraryService';
+import type { Playlist, SongMetadata } from '@/types';
+import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import { sortSongs } from '@/utils/songSort';
 import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
 
 export default function AddToPlaylistSheet() {

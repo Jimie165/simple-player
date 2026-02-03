@@ -13,6 +13,7 @@ use windows::core::HSTRING;
 
 use super::smtc;
 use crate::modules::library::SongMetadata;
+use crate::utils::path::normalize_db_path;
 
 pub struct AudioState {
     player: Arc<Mutex<Option<MediaPlayer>>>,
@@ -132,8 +133,6 @@ impl AudioState {
                     Ok(())
                 },
             ));
-
-
         }
     }
 
@@ -149,7 +148,7 @@ impl AudioState {
             }
 
             // 1. 创建 URI
-            let path_uri = format!("file:///{}", path.replace('\\', "/"));
+            let path_uri = format!("file:///{}", normalize_db_path(&std::path::Path::new(&path)));
             let uri = Uri::CreateUri(&HSTRING::from(&path_uri))
                 .map_err(|e| format!("Invalid URI: {}", e))?;
 

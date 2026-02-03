@@ -3,6 +3,7 @@ use lofty::prelude::*;
 use lofty::read_from_path;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use crate::utils::path::normalize_db_path;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SongMetadata {
@@ -31,6 +32,11 @@ pub struct SongMetadata {
     pub is_favorite: Option<bool>,
     pub rating: Option<i32>,
     pub unique_id: Option<i64>, // Playlist Entry ID
+    // 媒体详细信息
+    pub width: Option<u32>,
+    pub height: Option<u32>,
+    pub frame_rate: Option<f64>,
+    pub channels: Option<u8>,
 }
 
 impl SongMetadata {
@@ -60,6 +66,10 @@ impl SongMetadata {
             is_favorite: Some(song.is_favorite),
             rating: song.rating,
             unique_id: song.unique_id,
+            width: None,
+            height: None,
+            frame_rate: None,
+            channels: None,
         }
     }
 }
@@ -69,7 +79,7 @@ impl SongMetadata {
 // 由于是在同一个 mod 下，使用 super::covers 或者 crate::modules::library::covers
 
 /// 从文件读取完整元数据
-pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetadata, String> {
+pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMetadata, String> {
     let path_obj = Path::new(path);
 
     // 获取文件大小
@@ -85,7 +95,13 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
     let title = tag
         .as_ref()
         .and_then(|t| t.title().map(|s| s.to_string()))
-        .unwrap_or_else(|| "Unknown Title".to_string());
+        .unwrap_or_else(|| {
+            path_obj
+                .file_name()
+                .and_then(|s| s.to_str())
+                .unwrap_or("Unknown Title")
+                .to_string()
+        });
 
     let artist = tag
         .as_ref()
@@ -135,6 +151,7 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
     let duration = properties.duration().as_secs();
     let sample_rate = properties.sample_rate();
     let bitrate = properties.audio_bitrate();
+    let channels = properties.channels();
 
     // 获取封面图片
     let mut cover_base64 = None;
@@ -149,8 +166,8 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
                 .unwrap_or("image/jpeg");
             let data_url = format!("data:{};base64,{}", mime_type, b64);
             
-            if let Some(dir) = app_data_dir {
-                 // 如果提供了 app_data_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
+            if let Some(dir) = app_cache_dir {
+                 // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
                  // 使用 crate 绝对路径引用 covers
                  if let Some(path) = crate::modules::library::covers::save_cover(dir, &album, &artist, &data_url) {
                       resolved_cover_path = Some(path);
@@ -170,7 +187,7 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
         duration,
         cover: cover_base64,
         cover_path: resolved_cover_path,
-        path: Some(path_obj.display().to_string().replace('\\', "/")),
+        path: Some(normalize_db_path(&path_obj)),
         size,
         sample_rate,
         bitrate,
@@ -186,5 +203,9 @@ pub fn get_metadata(path: &str, app_data_dir: Option<&Path>) -> Result<SongMetad
         is_favorite: None,
         rating: None,
         unique_id: None,
+        width: None,
+        height: None,
+        frame_rate: None,
+        channels: channels,
     })
 }

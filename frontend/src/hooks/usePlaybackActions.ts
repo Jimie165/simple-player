@@ -1,7 +1,7 @@
-import { useLibraryStore } from '../store/useLibraryStore';
-import { usePlayerStore } from '../store/usePlayerStore';
-import { audioService } from '../services/audioService';
-import type { RecentItem, SongMetadata } from '../types';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { audioService } from '@/services/audioService';
+import type { RecentItem, SongMetadata } from '@/types';
 
 export interface PlayOptions {
     restartIfCurrent?: boolean;

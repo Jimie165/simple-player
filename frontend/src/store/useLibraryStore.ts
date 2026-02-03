@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
-import type { RecentItem, SongMetadata } from '../types/index';
+import type { RecentItem, SongMetadata } from '@/types/index';
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 type SortOrder = 'asc' | 'desc';
@@ -76,8 +76,8 @@ interface LibraryState {
     setQueueContext: (context: { type: string, name: string, id?: string } | null) => void;
 }
 
-import { libraryService } from '../services/libraryService';
-import { usePlayerStore } from './usePlayerStore'; // Assuming we need to sync player metadata too
+import { libraryService } from '@/services/libraryService';
+import { usePlayerStore } from '@/store/usePlayerStore'; // Assuming we need to sync player metadata too
 
 const MAX_RECENT_ITEMS = 50;
 

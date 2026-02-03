@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import PageContainer from '../../components/layout/PageContainer';
-import { useTheme } from '../../hooks/useTheme';
-import { libraryService } from '../../services/libraryService';
+import PageContainer from '@/components/layout/PageContainer';
+import { useTheme } from '@/hooks/useTheme';
+import { libraryService } from '@/services/libraryService';
 import {
     MdBrightness6,
     MdRefresh,

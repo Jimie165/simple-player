@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct LibraryFolder {
     pub id: i64,
     pub path: String,
+    pub folder_type: String,
     pub created_at: String,
 }
 
@@ -81,14 +82,33 @@ pub struct FolderRepo;
 impl FolderRepo {
     /// 获取所有文件夹
     pub fn get_all(conn: &Connection) -> Result<Vec<LibraryFolder>> {
-        let mut stmt =
-            conn.prepare("SELECT id, path, created_at FROM library_folders ORDER BY created_at")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, folder_type, created_at FROM library_folders ORDER BY created_at",
+        )?;
         let folders = stmt
             .query_map([], |row| {
                 Ok(LibraryFolder {
                     id: row.get(0)?,
                     path: row.get(1)?,
-                    created_at: row.get(2)?,
+                    folder_type: row.get(2)?,
+                    created_at: row.get(3)?,
+                })
+            })?
+            .collect::<Result<Vec<_>>>()?;
+        Ok(folders)
+    }
+
+    /// 获取特定类型的文件夹
+    pub fn get_by_type(conn: &Connection, folder_type: &str) -> Result<Vec<LibraryFolder>> {
+        let mut stmt =
+            conn.prepare("SELECT id, path, folder_type, created_at FROM library_folders WHERE folder_type = ?1 ORDER BY created_at")?;
+        let folders = stmt
+            .query_map([folder_type], |row| {
+                Ok(LibraryFolder {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    folder_type: row.get(2)?,
+                    created_at: row.get(3)?,
                 })
             })?
             .collect::<Result<Vec<_>>>()?;
@@ -97,18 +117,31 @@ impl FolderRepo {
 
     /// 添加文件夹
     pub fn add(conn: &Connection, path: &str) -> Result<LibraryFolder> {
+        Self::add_with_type(conn, path, "music")
+    }
+
+    /// 添加文件夹并指定类型
+    pub fn add_with_type(
+        conn: &Connection,
+        path: &str,
+        folder_type: &str,
+    ) -> Result<LibraryFolder> {
+        // 使用 ON CONFLICT 来更新 folder_type，确保类型正确
         conn.execute(
-            "INSERT OR IGNORE INTO library_folders (path) VALUES (?1)",
-            params![path],
+            "INSERT INTO library_folders (path, folder_type) VALUES (?1, ?2)
+             ON CONFLICT(path) DO UPDATE SET folder_type = excluded.folder_type",
+            params![path, folder_type],
         )?;
 
-        let mut stmt =
-            conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, folder_type, created_at FROM library_folders WHERE path = ?1",
+        )?;
         stmt.query_row(params![path], |row| {
             Ok(LibraryFolder {
                 id: row.get(0)?,
                 path: row.get(1)?,
-                created_at: row.get(2)?,
+                folder_type: row.get(2)?,
+                created_at: row.get(3)?,
             })
         })
     }
@@ -126,13 +159,15 @@ impl FolderRepo {
     /// 根据路径获取文件夹
     #[allow(dead_code)]
     pub fn get_by_path(conn: &Connection, path: &str) -> Result<Option<LibraryFolder>> {
-        let mut stmt =
-            conn.prepare("SELECT id, path, created_at FROM library_folders WHERE path = ?1")?;
+        let mut stmt = conn.prepare(
+            "SELECT id, path, folder_type, created_at FROM library_folders WHERE path = ?1",
+        )?;
         let result = stmt.query_row(params![path], |row| {
             Ok(LibraryFolder {
                 id: row.get(0)?,
                 path: row.get(1)?,
-                created_at: row.get(2)?,
+                folder_type: row.get(2)?,
+                created_at: row.get(3)?,
             })
         });
         match result {
@@ -803,7 +838,11 @@ impl PlaylistRepo {
     }
 
     /// 批量移除歌曲 (通过 playlist_songs.id，可精确移除重复项)
-    pub fn batch_remove_playlist_items(conn: &Connection, playlist_id: i64, unique_ids: &[i64]) -> Result<()> {
+    pub fn batch_remove_playlist_items(
+        conn: &Connection,
+        playlist_id: i64,
+        unique_ids: &[i64],
+    ) -> Result<()> {
         if unique_ids.is_empty() {
             return Ok(());
         }

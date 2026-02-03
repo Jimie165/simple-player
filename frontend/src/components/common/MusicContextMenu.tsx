@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
-import type { MenuItemData } from '../../hooks/useSongOperations';
+import type { MenuItemData } from '@/hooks/useSongOperations';
 import {
     MdPlayArrow,
     MdShuffle,
