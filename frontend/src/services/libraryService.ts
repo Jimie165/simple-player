@@ -49,6 +49,9 @@ export const libraryService = {
     search: async (query: string): Promise<SongMetadata[]> => {
         return invoke('search_library', { query });
     },
+    searchVideos: async (query: string): Promise<VideoMetadata[]> => {
+        return invoke('search_videos', { query });
+    },
 
     // ========== 单曲操作 ==========
     deleteSong: async (id: number): Promise<void> => {

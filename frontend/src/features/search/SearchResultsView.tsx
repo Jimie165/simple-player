@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { SongMetadata } from '@/types';
+import type { VideoMetadata } from '@/types/video';
 import { libraryService } from '@/services/libraryService';
 import PageContainer from '@/components/layout/PageContainer';
 import SongListView from '@/features/library/components/SongListView';
@@ -8,6 +9,11 @@ import AlbumGridView, { type AlbumData } from '@/features/library/components/Alb
 import { MdSearch } from 'react-icons/md';
 import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { audioService } from '@/services/audioService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { formatTime } from '@/utils/time';
+import CoverImage from '@/components/common/CoverImage';
 
 interface SearchResultsViewProps {
     query: string;
@@ -15,23 +21,31 @@ interface SearchResultsViewProps {
 
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [results, setResults] = useState<SongMetadata[]>([]);
+    const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
     const [loading, setLoading] = useState(false);
 
     // Player controls
     const { playSong } = usePlaybackActions();
     const { push } = useNavigationStore();
+    const { setVideoMode, setIsPlaying, setVideoMetadata, setVideoQueue } = usePlayerStore();
+    const addToRecent = useLibraryStore(s => s.addToRecent);
 
     useEffect(() => {
         const performSearch = async () => {
             if (!query.trim()) {
                 setResults([]);
+                setVideoResults([]);
                 return;
             }
 
             setLoading(true);
             try {
-                const songs = await libraryService.search(query);
+                const [songs, videos] = await Promise.all([
+                    libraryService.search(query),
+                    libraryService.searchVideos(query),
+                ]);
                 setResults(songs);
+                setVideoResults(videos);
             } catch (error) {
                 console.error("Search failed:", error);
             } finally {
@@ -122,6 +136,43 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         };
     }, [results, query]);
 
+    const handlePlayVideo = async (video: VideoMetadata) => {
+        const queue = videoResults.map((v) => ({
+            id: v.id,
+            title: v.title,
+            artist: "Video",
+            album: v.folder_id ? "Folder" : "Unknown",
+            duration: v.duration,
+            path: v.path,
+            cover_path: v.thumbnail_path,
+        }));
+        let index = videoResults.findIndex(v => v.id === video.id);
+        if (index < 0) index = 0;
+
+        setVideoQueue(queue, index);
+        setVideoMetadata(queue[index]);
+        setVideoMode(true);
+
+        if (usePlayerStore.getState().isPlaying) {
+            await audioService.pause();
+            setIsPlaying(false);
+        }
+
+        addToRecent({
+            id: video.path,
+            type: 'video',
+            title: video.title,
+            description: formatTime(video.duration),
+            cover: null,
+            cover_path: video.thumbnail_path,
+            path: video.path,
+            lastPlayed: Date.now(),
+            artist: "Video",
+            album: video.folder_id ? "Folder" : undefined,
+            isLibraryItem: true
+        });
+    };
+
     const handlePlay = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         await playSong({
             song,
@@ -143,7 +194,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         });
     };
 
-    const hasAnyResults = matchingArtists.length > 0 || matchingAlbums.length > 0 || matchingSongs.length > 0;
+    const hasAnyResults = matchingArtists.length > 0 || matchingAlbums.length > 0 || matchingSongs.length > 0 || videoResults.length > 0;
 
     return (
         <PageContainer title={`搜索: "${query}"`}>
@@ -212,12 +263,60 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                             />
                         </section>
                     )}
+
+                    {/* Videos Section */}
+                    {videoResults.length > 0 && (
+                        <section>
+                            <h2 className="text-xl font-bold mb-2 text-neutral-900 dark:text-neutral-100 flex items-center gap-2">
+                                视频
+                                <span className="text-sm font-normal text-neutral-500 dark:text-neutral-400 bg-neutral-100 dark:bg-neutral-800 px-2 py-0.5 rounded-full">
+                                    {videoResults.length}
+                                </span>
+                            </h2>
+                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                                {videoResults.map((video) => (
+                                    <div
+                                        key={video.id}
+                                        onClick={() => handlePlayVideo(video)}
+                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                                    >
+                                        <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">
+                                            <CoverImage
+                                                song={{
+                                                    id: video.id,
+                                                    title: video.title,
+                                                    artist: "Video",
+                                                    album: video.folder_id ? "Folder" : "Unknown",
+                                                    duration: video.duration,
+                                                    path: video.path,
+                                                    cover_path: video.thumbnail_path,
+                                                }}
+                                                src={video.thumbnail_path}
+                                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                            />
+                                            {video.duration > 0 && (
+                                                <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] text-white font-medium z-10">
+                                                    {formatTime(video.duration)}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex flex-col gap-0.5 px-1 text-center">
+                                            <h3 className="font-medium truncate text-sm" title={video.title}>{video.title}</h3>
+                                            <p className="text-xs opacity-60 truncate">
+                                                {formatTime(video.duration)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </section>
+                    )}
                 </div>
             ) : (
                 <div className="flex flex-col h-full items-center justify-center text-neutral-400 pb-20">
                     <MdSearch className="text-6xl mb-4 opacity-20" />
                     <p className="text-lg font-medium">没有找到相关结果</p>
-                    <p className="text-sm opacity-60 mt-1">尝试搜索歌曲、艺人或专辑名称</p>
+                    <p className="text-sm opacity-60 mt-1">尝试搜索歌曲、艺人、专辑或视频名称</p>
                 </div>
             )}
         </PageContainer>

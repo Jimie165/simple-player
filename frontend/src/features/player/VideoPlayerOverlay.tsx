@@ -14,6 +14,8 @@ import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { systemService } from '@/services/systemService';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
+import CoverImage from '@/components/common/CoverImage';
+import { resolveMediaPath } from '@/utils/mediaPath';
 
 export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const { videoMetadata, videoQueue, currentVideoIndex, playNextVideo, playPreviousVideo, setVideoQueue } = usePlayerStore();
@@ -69,6 +71,52 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
     // Use videoMetadata instead of global metadata
     const metadata = videoMetadata;
     const isMkv = useMemo(() => (metadata?.path ?? '').toLowerCase().endsWith('.mkv'), [metadata?.path]);
+    const supportsHevc = useMemo(() => {
+        if (typeof document === 'undefined') return false;
+        const v = document.createElement('video');
+        const candidates = [
+            'video/mp4; codecs="hvc1.1.6.L123.B0, mp4a.40.2"',
+            'video/mp4; codecs="hev1.1.6.L123.B0, mp4a.40.2"',
+            'video/mp4; codecs="hvc1"',
+            'video/mp4; codecs="hev1"',
+        ];
+        return candidates.some((c) => v.canPlayType(c) !== '');
+    }, []);
+    const supportedAudioCodecs = useMemo(() => {
+        if (typeof document === 'undefined') return ['aac', 'mp3']; // Fallback
+        const v = document.createElement('video');
+        const codecs = new Set<string>(['aac']); // AAC is always supported in standard MP4
+
+        // MP3
+        if (v.canPlayType('audio/mpeg') !== '') codecs.add('mp3');
+
+        // FLAC
+        if (v.canPlayType('audio/flac') !== '' || v.canPlayType('video/mp4; codecs="flac"') !== '') {
+            codecs.add('flac');
+        }
+
+        // AC3 / E-AC3
+        const ac3Candidates = [
+            'video/mp4; codecs="ac-3"', 'video/mp4; codecs="ec-3"',
+            'audio/ac3', 'audio/ac-3', 'audio/eac3', 'audio/ec-3'
+        ];
+        if (ac3Candidates.some(c => v.canPlayType(c) !== '')) {
+            codecs.add('ac3');
+            codecs.add('eac3');
+        }
+
+        // Opus
+        if (v.canPlayType('audio/ogg; codecs=opus') !== '' || v.canPlayType('video/mp4; codecs="opus"') !== '') {
+            codecs.add('opus');
+        }
+
+        // Vorbis
+        if (v.canPlayType('audio/ogg; codecs=vorbis') !== '') {
+            codecs.add('vorbis');
+        }
+
+        return Array.from(codecs);
+    }, []);
 
     const videoSrc = useMemo(() => {
         if (!metadata?.path) return '';
@@ -86,6 +134,33 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         if (p.endsWith('.flv')) return 'video/x-flv';
         return undefined;
     }, [metadata?.path, preparedPath]);
+
+
+
+    const [posterUrl, setPosterUrl] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        let active = true;
+        const loadPoster = async () => {
+            if (!metadata) {
+                if (active) setPosterUrl(undefined);
+                return;
+            }
+            const path = (metadata as any).thumbnail_path || metadata.cover_path;
+            if (path) {
+                try {
+                    const url = await resolveMediaPath(path);
+                    if (active && url) setPosterUrl(url);
+                } catch (e) {
+                    console.error("Failed to resolve poster:", e);
+                }
+            } else {
+                if (active) setPosterUrl(undefined);
+            }
+        };
+        loadPoster();
+        return () => { active = false; };
+    }, [metadata]);
 
     const autoHideEnabled = true;
 
@@ -156,12 +231,20 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
             );
 
             try {
-                const outPath = await invoke<string>('prepare_video_for_playback', { path: metadata.path });
+                console.log('[VideoPlayer] 开始准备视频:', metadata.path);
+                const outPath = await invoke<string>('prepare_video_for_playback', {
+                    path: metadata.path,
+                    supportsHevc: supportsHevc,
+                    supportedAudioCodecs: supportedAudioCodecs,
+                });
+                console.log('[VideoPlayer] 视频准备完成:', outPath);
                 if (cancelled) return;
                 setPreparedPath(outPath);
             } catch (e) {
+                console.error('[VideoPlayer] 视频准备失败:', e);
                 if (cancelled) return;
                 setError(String(e));
+                setShowError(true);
             } finally {
                 if (cancelled) return;
                 setIsPreparing(false);
@@ -360,9 +443,9 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
         // Set metadata
         const artwork: MediaImage[] = [];
-        if (metadata.cover_path) {
+        if (posterUrl) {
             artwork.push({
-                src: convertFileSrc(metadata.cover_path),
+                src: posterUrl,
                 sizes: '512x512',
                 type: 'image/jpeg'
             });
@@ -439,7 +522,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
             navigator.mediaSession.setActionHandler('nexttrack', null);
             navigator.mediaSession.setActionHandler('seekto', null);
         };
-    }, [isOpen, metadata, isPlaying, videoQueue.length, playPreviousVideo, playNextVideo]);
+    }, [isOpen, metadata, isPlaying, videoQueue.length, playPreviousVideo, playNextVideo, posterUrl]);
 
 
     const toggleAppFullscreen = async () => {
@@ -488,7 +571,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                     className={`col-start-1 row-start-1 w-full h-full max-w-full max-h-full ${videoFitClass} object-center z-0`}
                     controls={useNativeControls}
                     controlsList={useNativeControls ? "nodownload" : undefined}
-                    poster={metadata.cover_path ? convertFileSrc(metadata.cover_path, 'asset') : undefined}
+                    poster={posterUrl}
                     onTimeUpdate={onTimeUpdate}
                     onLoadedMetadata={onLoadedMetadata}
                     onEnded={onEnded}
@@ -794,13 +877,12 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                         >
                                             {/* Thumbnail or Icon */}
                                             <div className="w-16 aspect-video bg-black/40 rounded overflow-hidden shrink-0 relative">
-                                                {video.cover_path ? (
-                                                    <img src={convertFileSrc(video.cover_path, 'asset')} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center text-white/20">
-                                                        <MdPlayArrow />
-                                                    </div>
-                                                )}
+                                                <CoverImage
+                                                    song={video}
+                                                    src={video.cover_path}
+                                                    className="w-full h-full object-cover"
+                                                    iconClassName="text-white/30"
+                                                />
                                                 {index === currentVideoIndex && (
                                                     <div className="absolute inset-0 bg-primary/40 flex items-center justify-center">
                                                         <div className="w-2 h-2 bg-primary animate-pulse rounded-full" />

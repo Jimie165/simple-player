@@ -167,6 +167,43 @@ impl VideoRepo {
         Ok(new_fav)
     }
 
+    /// 搜索视频（标题或路径）
+    pub fn search(conn: &Connection, query: &str) -> Result<Vec<Video>> {
+        let pattern = format!("%{}%", query);
+        let mut stmt = conn.prepare(
+            "SELECT id, path, title, duration, size, width, height, thumbnail_path, 
+                    is_favorite, play_count, last_played_at, folder_id, status, created_at, updated_at
+             FROM videos
+             WHERE status = 'active' AND (title LIKE ?1 OR path LIKE ?1)
+             ORDER BY 
+                CASE WHEN title LIKE ?1 THEN 0 ELSE 1 END,
+                title
+             LIMIT 100",
+        )?;
+
+        let iter = stmt.query_map([pattern], |row| {
+            Ok(Video {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                duration: row.get(3)?,
+                size: row.get(4)?,
+                width: row.get(5)?,
+                height: row.get(6)?,
+                thumbnail_path: row.get(7)?,
+                is_favorite: row.get(8)?,
+                play_count: row.get(9)?,
+                last_played_at: row.get(10)?,
+                folder_id: row.get(11)?,
+                status: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        })?;
+
+        iter.collect()
+    }
+
     // 检查哪些路径在数据库中存在 but actual 扫描列表中没有（用于标记清理）
     // 返回这些歌曲的 ID
     pub fn get_videos_not_in_paths(

@@ -68,6 +68,12 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
+    const [pendingFolderPlay, setPendingFolderPlay] = useState<{
+        folderPath: string;
+        folderName: string;
+        audioSongs: SongMetadata[];
+        videoSongs: SongMetadata[];
+    } | null>(null);
 
     const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
         e.preventDefault();
@@ -183,6 +189,78 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         } catch (err) { console.error("Play single file failed", err); }
     };
 
+    const buildFolderRecentItem = (
+        folderPath: string,
+        folderName: string,
+        items: SongMetadata[],
+        label: string,
+    ): RecentItem => ({
+        id: folderPath,
+        type: 'folder',
+        title: folderName,
+        description: `${items.length} ${label}`,
+        cover: items[0]?.cover || null,
+        cover_path: items[0]?.cover_path || null,
+        path: folderPath,
+        lastPlayed: Date.now(),
+    });
+
+    const playVideoList = async (videos: SongMetadata[], recentItem: RecentItem) => {
+        if (videos.length === 0) return;
+        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+        setVideoQueue(videos, 0);
+        setVideoMetadata(videos[0]);
+        setVideoMode(true);
+        if (usePlayerStore.getState().isPlaying) {
+            await audioService.pause();
+            setIsPlaying(false);
+        }
+        useLibraryStore.getState().addToRecent(recentItem);
+    };
+
+    const playAudioList = async (songs: SongMetadata[], recentItem: RecentItem) => {
+        if (songs.length === 0) return;
+        await playList({
+            songs,
+            startIndex: 0,
+            options: {
+                restartIfCurrent: true,
+                recentItem,
+            },
+            context: {
+                type: 'home',
+                name: '主页',
+                id: 'home',
+            }
+        });
+    };
+
+    const playFolderItems = async (folderPath: string, songs: SongMetadata[], folderName: string) => {
+        const audioSongs = songs.filter(s => s.path && !isVideoFile(s.path));
+        const videoSongs = songs.filter(s => s.path && isVideoFile(s.path));
+
+        if (audioSongs.length > 0 && videoSongs.length > 0) {
+            setPendingFolderPlay({
+                folderPath,
+                folderName,
+                audioSongs,
+                videoSongs,
+            });
+            return;
+        }
+
+        if (videoSongs.length > 0) {
+            const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
+            await playVideoList(videoSongs, recentItem);
+            return;
+        }
+
+        if (audioSongs.length > 0) {
+            const recentItem = buildFolderRecentItem(folderPath, folderName, audioSongs, "首歌曲");
+            await playAudioList(audioSongs, recentItem);
+        }
+    };
+
     // Core: Handle Recent Item Click (Primary Action)
     const handleItemClick = async (item: RecentItem, e?: React.MouseEvent) => {
         const id = item.id;
@@ -239,7 +317,8 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         if (item.type === 'folder') {
             try {
                 const songs = await fileService.readFolder(item.path);
-                await playListHelper(songs);
+                const folderName = item.title || item.path.split(/[\\/]/).pop() || "Unknown Folder";
+                await playFolderItems(item.path, songs, folderName);
             } catch (e) {
                 console.error("Failed to play folder", e);
             }
@@ -303,28 +382,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 const songs = await fileService.readFolder(selected);
                 if (songs.length === 0) return;
                 const folderName = selected.split(/[\\/]/).pop() || "Unknown Folder";
-                await playList({
-                    songs,
-                    startIndex: 0,
-                    options: {
-                        restartIfCurrent: true,
-                        recentItem: {
-                            id: selected,
-                            type: 'folder',
-                            title: folderName,
-                            description: `${songs.length} 首歌曲`,
-                            cover: songs[0]?.cover || null,
-                            cover_path: songs[0]?.cover_path || null,
-                            path: selected,
-                            lastPlayed: Date.now()
-                        }
-                    },
-                    context: {
-                        type: 'home',
-                        name: '主页',
-                        id: 'home'
-                    }
-                });
+                await playFolderItems(selected, songs, folderName);
             }
         } catch (err) {
             console.error('Failed to open folder:', err);
@@ -350,6 +408,48 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
             actions={<OpenFileMenu onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} />}
         >
             <section>
+                {pendingFolderPlay && (
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                        <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
+                            <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
+                                检测到混合媒体
+                            </h3>
+                            <p className="text-sm text-neutral-600 dark:text-neutral-300 mt-1">
+                                该文件夹同时包含视频和音乐，请选择播放类型。
+                            </p>
+                            <div className="mt-4 flex gap-3">
+                                <button
+                                    onClick={async () => {
+                                        const { folderPath, folderName, videoSongs } = pendingFolderPlay;
+                                        setPendingFolderPlay(null);
+                                        const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
+                                        await playVideoList(videoSongs, recentItem);
+                                    }}
+                                    className="flex-1 rounded-xl bg-primary text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                                >
+                                    播放视频
+                                </button>
+                                <button
+                                    onClick={async () => {
+                                        const { folderPath, folderName, audioSongs } = pendingFolderPlay;
+                                        setPendingFolderPlay(null);
+                                        const recentItem = buildFolderRecentItem(folderPath, folderName, audioSongs, "首歌曲");
+                                        await playAudioList(audioSongs, recentItem);
+                                    }}
+                                    className="flex-1 rounded-xl bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-800 dark:text-neutral-100 px-4 py-2 text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
+                                >
+                                    播放音乐
+                                </button>
+                            </div>
+                            <button
+                                onClick={() => setPendingFolderPlay(null)}
+                                className="mt-3 w-full rounded-xl px-4 py-2 text-sm text-neutral-500 dark:text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors"
+                            >
+                                取消
+                            </button>
+                        </div>
+                    </div>
+                )}
                 <h2 className="mb-4 text-xl font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-2">
                     <span>最近使用</span>
                 </h2>

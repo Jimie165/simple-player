@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 8;
+const SCHEMA_VERSION: i32 = 10;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -78,6 +78,16 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 8 {
         migrate_v8(conn)?;
+        set_db_version(conn, 8)?;
+    }
+
+    if current_version < 9 {
+        migrate_v9(conn)?;
+        set_db_version(conn, 9)?;
+    }
+
+    if current_version < 10 {
+        migrate_v10(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -425,5 +435,51 @@ fn migrate_v8(conn: &Connection) -> Result<()> {
         [],
     )?;
 
+    Ok(())
+}
+
+/// 版本 9: 创建 transcoded_cache 表用于 LRU 缓存管理
+fn migrate_v9(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS transcoded_cache (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            source_path TEXT NOT NULL,
+            source_hash TEXT NOT NULL UNIQUE,
+            cache_path TEXT NOT NULL,
+            file_size INTEGER NOT NULL,
+            codec_info TEXT,
+            last_accessed_at INTEGER NOT NULL,
+            created_at INTEGER NOT NULL,
+            is_in_use INTEGER DEFAULT 0
+        )",
+        [],
+    )?;
+
+    // 创建索引
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_transcoded_cache_last_accessed 
+         ON transcoded_cache(last_accessed_at)",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_transcoded_cache_in_use 
+         ON transcoded_cache(is_in_use)",
+        [],
+    )?;
+
+    Ok(())
+}
+
+/// 版本 10: 创建 app_settings 表用于持久化配置
+fn migrate_v10(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL DEFAULT (unixepoch())
+        )",
+        [],
+    )?;
     Ok(())
 }

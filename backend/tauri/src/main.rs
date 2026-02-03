@@ -98,9 +98,13 @@ fn main() {
             commands::video::add_video_folder,
             commands::video::get_video_folders,
             commands::video::get_all_videos,
+            commands::video::search_videos,
             commands::video::toggle_video_favorite,
             commands::video::batch_delete_videos,
             commands::video::prepare_video_for_playback,
+            commands::video::get_transcode_cache_info,
+            commands::video::clear_transcode_cache,
+            commands::video::set_transcode_cache_limit,
             // Debug commands
             commands::debug::get_path_debug_info,
         ])

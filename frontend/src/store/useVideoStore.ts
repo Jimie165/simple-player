@@ -1,16 +1,27 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { VideoMetadata } from '@/types/video';
+import type { LibraryFolder } from '@/types';
+import { libraryService } from '@/services/libraryService';
 import { invoke } from '@tauri-apps/api/core';
 
 interface VideoState {
     videos: VideoMetadata[];
     refreshing: boolean;
     viewMode: 'grid' | 'list'; // For future use
+    videoFolders: LibraryFolder[];
+    foldersRefreshing: boolean;
+    collapsedFolderIds: number[];
+    sortBy: 'name' | 'created' | 'played';
+    sortOrder: 'asc' | 'desc';
 
     // Actions
     fetchVideos: () => Promise<void>;
+    fetchVideoFolders: () => Promise<void>;
     scanVideos: () => Promise<void>;
+    toggleFolderCollapse: (id: number) => void;
+    setSortBy: (sortBy: 'name' | 'created' | 'played') => void;
+    setSortOrder: (sortOrder: 'asc' | 'desc') => void;
     toggleFavorite: (id: number) => Promise<void>;
     batchDelete: (ids: number[]) => Promise<void>;
 }
@@ -20,6 +31,11 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
     videos: [],
     refreshing: false,
     viewMode: 'grid',
+    videoFolders: [],
+    foldersRefreshing: false,
+    collapsedFolderIds: [],
+    sortBy: 'created',
+    sortOrder: 'desc',
 
 
     fetchVideos: async () => {
@@ -30,6 +46,32 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
             console.error('Failed to fetch videos', error);
         }
     },
+    fetchVideoFolders: async () => {
+        set({ foldersRefreshing: true });
+        try {
+            const folders = await libraryService.getVideoFolders();
+            set({ videoFolders: folders });
+        } catch (error) {
+            console.error('Failed to fetch video folders', error);
+        } finally {
+            set({ foldersRefreshing: false });
+        }
+    },
+
+    toggleFolderCollapse: (id: number) => {
+        set((state) => {
+            const current = state.collapsedFolderIds;
+            const isCollapsed = current.includes(id);
+            return {
+                collapsedFolderIds: isCollapsed
+                    ? current.filter(fid => fid !== id)
+                    : [...current, id]
+            };
+        });
+    },
+
+    setSortBy: (sortBy) => set({ sortBy }),
+    setSortOrder: (sortOrder) => set({ sortOrder }),
 
     scanVideos: async () => {
         set({ refreshing: true });
@@ -74,6 +116,9 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
     partialize: (state) => ({
         videos: state.videos,
         viewMode: state.viewMode,
-
+        videoFolders: state.videoFolders,
+        collapsedFolderIds: state.collapsedFolderIds,
+        sortBy: state.sortBy,
+        sortOrder: state.sortOrder,
     })
 }));
