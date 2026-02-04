@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
     MdPlayCircle, MdPauseCircle, MdSkipPrevious, MdSkipNext, MdShuffle, MdRepeat
 } from 'react-icons/md';
+import { toast } from 'react-hot-toast';
 import clsx from 'clsx';
 import { listen } from '@tauri-apps/api/event';
 // Store & Services
@@ -78,6 +79,7 @@ export default function PlaybackControls() {
         } catch (err) {
             console.error("Play failed", err);
             // 播放失败，不更新 UI，保持在上一首 (或者显示错误 toast)
+            toast.error("播放失败，请检查文件是否存在");
         } finally {
             // 确保在 500ms 后释放锁，防止连续触发
             setTimeout(() => {

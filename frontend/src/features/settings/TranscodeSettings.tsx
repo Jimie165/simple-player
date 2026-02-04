@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { toast } from 'react-hot-toast';
 import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -37,9 +38,10 @@ export default function TranscodeSettings() {
             const deletedCount = await invoke<number>('clear_transcode_cache');
             console.log(`已清理 ${deletedCount} 个缓存文件`);
             await fetchInfo(); // Refresh stats
-            // Could show a toast here: `已清理 ${deletedCount} 个文件`
+            toast.success(`已清理 ${deletedCount} 个缓存文件`);
         } catch (error) {
             console.error('Failed to clear cache:', error);
+            toast.error('清理缓存失败');
         } finally {
             setClearing(false);
         }
@@ -56,8 +58,10 @@ export default function TranscodeSettings() {
         try {
             await invoke('set_transcode_cache_limit', { limitMb: limit });
             await fetchInfo();
+            toast.success('缓存设置已保存');
         } catch (error) {
             console.error('Failed to set cache limit:', error);
+            toast.error('保存设置失败');
         } finally {
             setSaving(false);
         }

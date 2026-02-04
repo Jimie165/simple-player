@@ -28,6 +28,7 @@ import SelectionMenuBar from '@/components/common/SelectionMenuBar';
 import AddToPlaylistSheet from '@/features/playlists/components/AddToPlaylistSheet';
 import GlobalDialogLayer from '@/components/common/GlobalDialogLayer';
 import VideoPlayerOverlay from '@/features/player/VideoPlayerOverlay';
+import { Toaster } from 'react-hot-toast';
 
 function App() {
   const { init: initTheme, fullScreenMode } = useThemeStore();
@@ -253,6 +254,22 @@ function App() {
       <AppleMusicPlayer
         isOpen={isFullScreen && fullScreenMode === 'immersive'}
         onClose={() => setIsFullScreen(false)}
+      />
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: 'var(--md-sys-color-surface-container-high)',
+            color: 'var(--md-sys-color-on-surface)',
+            borderRadius: '28px', // M3 Pill shape
+            padding: '12px 24px',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            fontSize: '14px',
+            fontWeight: 500,
+          },
+          // Tailwind classes can also be used if needed, but style object guarantees overriding default inline styles
+          className: 'border border-outline-variant/20',
+        }}
       />
     </div>
   );
