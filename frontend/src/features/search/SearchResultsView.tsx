@@ -23,6 +23,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     // Player controls
     const { playSong } = usePlaybackActions();
@@ -31,25 +32,38 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const addToRecent = useLibraryStore(s => s.addToRecent);
 
     useEffect(() => {
+        let isCancelled = false;
+
         const performSearch = async () => {
             if (!query.trim()) {
                 setResults([]);
                 setVideoResults([]);
+                setError(null);
                 return;
             }
 
             setLoading(true);
+            setError(null);
+
             try {
                 const [songs, videos] = await Promise.all([
                     libraryService.search(query),
                     libraryService.searchVideos(query),
                 ]);
-                setResults(songs);
-                setVideoResults(videos);
-            } catch (error) {
-                console.error("Search failed:", error);
+
+                if (!isCancelled) {
+                    setResults(songs);
+                    setVideoResults(videos);
+                }
+            } catch (err) {
+                if (!isCancelled) {
+                    console.error("Search failed:", err);
+                    setError("搜索失败，请稍后重试");
+                }
             } finally {
-                setLoading(false);
+                if (!isCancelled) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -57,7 +71,10 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             performSearch();
         }, 300);
 
-        return () => clearTimeout(timer);
+        return () => {
+            isCancelled = true;
+            clearTimeout(timer);
+        };
     }, [query]);
 
     // Categorize Results
@@ -77,8 +94,12 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         const matchedSongs: SongMetadata[] = [];
 
         results.forEach(song => {
-            // Check Song Match
-            if (song.title && song.title.toLowerCase().includes(lowerQuery)) {
+            // Check Song Match - match against title, artist, or album to be inclusive
+            const matchTitle = song.title && song.title.toLowerCase().includes(lowerQuery);
+            const matchArtist = song.artist && song.artist.toLowerCase().includes(lowerQuery);
+            const matchAlbum = song.album && song.album.toLowerCase().includes(lowerQuery);
+
+            if (matchTitle || matchArtist || matchAlbum) {
                 matchedSongs.push(song);
             }
 
@@ -140,8 +161,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         const queue = videoResults.map((v) => ({
             id: v.id,
             title: v.title,
-            artist: "Video",
-            album: v.folder_id ? "Folder" : "Unknown",
+            artist: "视频",
+            album: v.folder_id ? "文件夹" : "未知",
             duration: v.duration,
             path: v.path,
             cover_path: v.thumbnail_path,
@@ -167,8 +188,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             cover_path: video.thumbnail_path,
             path: video.path,
             lastPlayed: Date.now(),
-            artist: "Video",
-            album: video.folder_id ? "Folder" : undefined,
+            artist: "视频",
+            album: video.folder_id ? "文件夹" : undefined,
             isLibraryItem: true
         });
     };
@@ -201,6 +222,10 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             {loading ? (
                 <div className="flex h-64 items-center justify-center text-neutral-500">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-500"></div>
+                </div>
+            ) : error ? (
+                <div className="flex flex-col h-64 items-center justify-center text-red-500">
+                    <p className="text-lg font-medium">{error}</p>
                 </div>
             ) : hasAnyResults ? (
                 <div className="pb-8 flex flex-col gap-8">
@@ -285,8 +310,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                                 song={{
                                                     id: video.id,
                                                     title: video.title,
-                                                    artist: "Video",
-                                                    album: video.folder_id ? "Folder" : "Unknown",
+                                                    artist: "视频",
+                                                    album: video.folder_id ? "文件夹" : "未知",
                                                     duration: video.duration,
                                                     path: video.path,
                                                     cover_path: video.thumbnail_path,

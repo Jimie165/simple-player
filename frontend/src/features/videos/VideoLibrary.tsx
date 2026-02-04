@@ -356,7 +356,7 @@ export const VideoLibrary: React.FC = () => {
                                                                 </span>
                                                             </div>
                                                             <span className="text-sm text-on-surface-variant/50 ml-2">
-                                                                ({videos.length} videos)
+                                                                ({videos.length}个视频)
                                                             </span>
                                                         </div>
 
@@ -432,8 +432,8 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean }>
             queue = [{
                 id: video.id,
                 title: video.title,
-                artist: "Video",
-                album: video.folder_id ? "Folder" : "Unknown",
+                artist: "视频",
+                album: video.folder_id ? "文件夹" : "未知",
                 duration: video.duration,
                 path: video.path,
                 cover_path: video.thumbnail_path,
@@ -443,8 +443,8 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean }>
             queue = videos.map(v => ({
                 id: v.id,
                 title: v.title,
-                artist: "Video",
-                album: v.folder_id ? "Folder" : "Unknown",
+                artist: "视频",
+                album: v.folder_id ? "文件夹" : "未知",
                 duration: v.duration,
                 path: v.path,
                 cover_path: v.thumbnail_path,
@@ -470,8 +470,8 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean }>
             cover_path: video.thumbnail_path,
             path: video.path,
             lastPlayed: Date.now(),
-            artist: "Video",
-            album: video.folder_id ? "Folder" : undefined,
+            artist: "视频",
+            album: video.folder_id ? "文件夹" : undefined,
             isLibraryItem: true
         });
     };
@@ -503,8 +503,8 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean }>
         const songMeta: SongMetadata = {
             id: video.id,
             title: video.title,
-            artist: "Video",
-            album: video.folder_id ? "Folder" : "Unknown",
+            artist: "视频",
+            album: video.folder_id ? "文件夹" : "未知",
             duration: video.duration,
             path: video.path,
             cover_path: video.thumbnail_path,

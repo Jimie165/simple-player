@@ -11,6 +11,7 @@ import type { Playlist, SongMetadata } from '@/types';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import { sortSongs } from '@/utils/songSort';
 import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
+import CreatePlaylistDialog from './CreatePlaylistDialog';
 
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();
@@ -33,6 +34,8 @@ export default function AddToPlaylistSheet() {
         duplicates: [],
         newSongs: []
     });
+
+    const [isCreateDialogOpen, setCreateDialogOpen] = useState(false);
 
     const [libraryMap, setLibraryMap] = useState<Map<number, SongMetadata>>(new Map());
 
@@ -109,20 +112,18 @@ export default function AddToPlaylistSheet() {
         }
     };
 
-    const handleCreateNew = async () => {
-        // Close this dialog? Or show create dialog on top?
-        // Simple prompt for now as requested in phase 2, but we have CreatePlaylistDialog.
-        // Re-implementing simple prompt here for speed, or we can use the Dialog component if we expose it.
-        // Let's use prompt for now to keep it independent, or create a 'Create' state here.
-        const name = prompt("请输入新播放列表名称");
-        if (name) {
-            try {
-                const newPl = await libraryService.createPlaylist(name);
-                // Auto add to new playlist
-                await handleAddToPlaylist(newPl.id);
-            } catch (error) {
-                console.error(error);
-            }
+    const handleCreateNew = () => {
+        setCreateDialogOpen(true);
+    };
+
+    const handleCreateConfirm = async (name: string) => {
+        try {
+            const newPl = await libraryService.createPlaylist(name);
+            // Auto add to new playlist
+            await handleAddToPlaylist(newPl.id);
+        } catch (error) {
+            console.error("Failed to create playlist", error);
+            throw error;
         }
     };
 
@@ -365,6 +366,11 @@ export default function AddToPlaylistSheet() {
                 onAdd={() => confirmAddDuplicates(true)}
                 onSkip={() => confirmAddDuplicates(false)}
                 duplicateCount={duplicateDialogState.duplicates.length}
+            />
+            <CreatePlaylistDialog
+                isOpen={isCreateDialogOpen}
+                onClose={() => setCreateDialogOpen(false)}
+                onConfirm={handleCreateConfirm}
             />
         </Fragment>
     );
