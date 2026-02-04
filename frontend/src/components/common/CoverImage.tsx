@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdMusicNote, MdVideocam } from 'react-icons/md';
 import clsx from 'clsx';
-import { resolveCover } from '@/utils/mediaPath';
+import { resolveCover, resolveMediaPath } from '@/utils/mediaPath';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
 // Actually MusicGrid logic is not exported or complex. We can just check extension.
@@ -38,13 +38,6 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
 
             // 1. Try src first
             if (src && src.length > 0) {
-                // Import resolveMediaPath dynamically if needed or rely on the import I added earlier
-                // Wait, I need to make sure resolveMediaPath is imported.
-                // The previous replace failed, so imports might be missing too.
-                // Let's assume I will fix imports separately or check if they exist.
-                // Actually, I should check imports first.
-                // But let's fix the logic first.
-                const { resolveMediaPath } = await import('@/utils/mediaPath');
                 const url = await resolveMediaPath(src);
                 if (isMounted) {
                     if (url && url.startsWith('blob:')) blobUrlRef.current = url;

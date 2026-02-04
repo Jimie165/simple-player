@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import PageContainer from '@/components/layout/PageContainer';
 import { useTheme } from '@/hooks/useTheme';
 import { libraryService } from '@/services/libraryService';
@@ -13,6 +13,7 @@ import {
 } from 'react-icons/md';
 import clsx from 'clsx';
 import TranscodeSettings from './TranscodeSettings';
+import { getName, getVersion } from '@tauri-apps/api/app';
 
 export default function Settings() {
     const {
@@ -28,6 +29,22 @@ export default function Settings() {
 
     const [isRefreshingMusic, setIsRefreshingMusic] = useState(false);
     const [isRefreshingVideo, setIsRefreshingVideo] = useState(false);
+    const [appVersion, setAppVersion] = useState('');
+    const [appName, setAppName] = useState('');
+
+    useEffect(() => {
+        const fetchAppInfo = async () => {
+            try {
+                const name = await getName();
+                const version = await getVersion();
+                setAppName(name);
+                setAppVersion(version);
+            } catch (error) {
+                console.error('Failed to get app info', error);
+            }
+        };
+        fetchAppInfo();
+    }, []);
 
     const handleRefreshMusicLibrary = async () => {
         if (isRefreshingMusic) return;
@@ -262,12 +279,12 @@ export default function Settings() {
 
                         {/* About Info */}
                         <section className="rounded-2xl bg-surface-container-high p-6 border border-outline-variant/30">
-                            <h3 className="text-lg font-semibold mb-2 text-on-surface">关于 Simple Player</h3>
+                            <h3 className="text-lg font-semibold mb-2 text-on-surface">关于 {appName || 'Simple Player'}</h3>
                             <p className="text-sm text-on-surface-variant leading-relaxed">
-                                这是一个基于 Tauri v2 和 React 构建的高性能本地音乐播放器 (其实并不高效)。
+                                这是一个基于 Tauri v2 和 React 构建的本地音乐播放器。
                             </p>
                             <div className="mt-4 flex gap-4 text-xs text-on-surface-variant/70">
-                                <span>Version 0.1.0 (Alpha)</span>
+                                <span>Version: {appVersion || '0.1.0'}</span>
                                 <span>•</span>
                                 <span>Made by Jimie165</span>
                             </div>

@@ -1,10 +1,10 @@
 {
     "productName": "Simple Player",
     "version": "0.1.0",
-    "identifier": "com.simple.player",
+    "identifier": "com.maho.simpleplayer",
     "build": {
-        "beforeDevCommand": "pnpm --filter frontend dev",
-        "beforeBuildCommand": "pnpm --filter frontend build",
+        "beforeDevCommand": "pnpm --filter simple-player-ui dev",
+        "beforeBuildCommand": "pnpm --filter simple-player-ui build",
         "devUrl": "http://localhost:5173",
         "frontendDist": "../../frontend/dist"
     },

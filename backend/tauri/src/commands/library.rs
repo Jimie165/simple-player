@@ -37,6 +37,16 @@ async fn scan_library_internal(
                     !is_app_relative_path(cp) && !is_user_file_path(cp)
                 });
 
+                // 检查封面文件是否物理存在（解决用户仅迁移数据库未迁移缓存的问题）
+                let cover_missing = existing.cover_path.as_ref().map_or(false, |cp| {
+                    if is_app_relative_path(cp) {
+                        !app_cache_dir.join(cp).exists()
+                    } else {
+                        // 对于绝对路径，直接检查是否存在
+                        !Path::new(cp).exists()
+                    }
+                });
+
                 if existing.status == "archived" {
                     let should_restore = force_restore
                         && restore_folder_id
@@ -48,8 +58,8 @@ async fn scan_library_internal(
                     } else {
                         continue;
                     }
-                } else if !needs_migration {
-                    // 状态正常且不需要迁移，直接使用
+                } else if !needs_migration && !cover_missing {
+                    // 状态正常、不需要迁移且封面文件存在，直接使用
                     all_songs.push(SongMetadata::from_db_song(&existing));
                     continue;
                 }

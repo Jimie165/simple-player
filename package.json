@@ -8,7 +8,8 @@
     "build": "tauri build --config backend/tauri/tauri.conf.json",
     "preview": "pnpm --filter frontend preview",
     "lint": "pnpm --filter frontend lint",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "bump": "node scripts/bump-version.js"
   },
   "keywords": [],
   "author": "",
