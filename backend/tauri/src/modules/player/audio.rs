@@ -48,92 +48,105 @@ impl AudioState {
 
     /// 在应用启动后调用，注入 AppHandle 并设置事件监听
     pub fn init_with_app_handle(&self, app_handle: AppHandle) {
-        let mut handle_lock = self.app_handle.lock().unwrap();
-        *handle_lock = Some(app_handle.clone());
-
-        // 5. 【核心修复】监听媒体结束事件
-        if let Some(player) = self.player.lock().unwrap().as_ref() {
-            let app_handle_inner = app_handle.clone();
-
-            // 我们捕捉 MediaEnded 事件并推送到前端
-            // 注意：TypedEventHandler 的闭包是 Send + Sync 的
-            let _ = player.MediaEnded(&TypedEventHandler::new(move |_, _| {
-                // 发送自定义事件到前端
-                let _ = app_handle_inner.emit("audio:ended", ());
-                Ok(())
-            }));
+        {
+            let mut handle_lock = self.app_handle.lock().unwrap();
+            *handle_lock = Some(app_handle.clone());
         }
 
-        // 监听 SMTC 上一首/下一首按钮，转发给前端处理
-        if let Some(player) = self.player.lock().unwrap().as_ref() {
-            let command_manager = player.CommandManager().unwrap();
+        let player_arc = self.player.clone();
+        let app_handle_bg = app_handle.clone();
 
-            // Configure CommandManager behaviors
-            if let Ok(next_behavior) = command_manager.NextBehavior() {
-                let _ = next_behavior
-                    .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
-            }
-            if let Ok(prev_behavior) = command_manager.PreviousBehavior() {
-                let _ = prev_behavior
-                    .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
-            }
-            if let Ok(play_behavior) = command_manager.PlayBehavior() {
-                let _ = play_behavior
-                    .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
-            }
-            if let Ok(pause_behavior) = command_manager.PauseBehavior() {
-                let _ = pause_behavior
-                    .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
+        std::thread::spawn(move || {
+            println!("[DEBUG] SMTC init thread started");
+            // 5. 【核心修复】监听媒体结束事件
+            if let Some(player) = player_arc.lock().unwrap().as_ref() {
+                let app_handle_inner = app_handle_bg.clone();
+
+                // 我们捕捉 MediaEnded 事件并推送到前端
+                let _ = player.MediaEnded(&TypedEventHandler::new(move |_, _| {
+                    let _ = app_handle_inner.emit("audio:ended", ());
+                    Ok(())
+                }));
             }
 
-            let app_handle_play = app_handle.clone();
-            let _ = command_manager.PlayReceived(&TypedEventHandler::new(
-                move |_,
-                      _args: windows::core::Ref<
-                    '_,
-                    MediaPlaybackCommandManagerPlayReceivedEventArgs,
-                >| {
-                    let _ = app_handle_play.emit("smtc:play", ());
-                    Ok(())
-                },
-            ));
+            // 监听 SMTC 上一首/下一首按钮，转发给前端处理
+            if let Some(player) = player_arc.lock().unwrap().as_ref() {
+                let command_manager = match player.CommandManager() {
+                    Ok(cm) => cm,
+                    Err(e) => {
+                        println!("[DEBUG] Failed to get CommandManager: {:?}", e);
+                        return;
+                    }
+                };
 
-            let app_handle_pause = app_handle.clone();
-            let _ = command_manager.PauseReceived(&TypedEventHandler::new(
-                move |_,
-                      _args: windows::core::Ref<
-                    '_,
-                    MediaPlaybackCommandManagerPauseReceivedEventArgs,
-                >| {
-                    let _ = app_handle_pause.emit("smtc:pause", ());
-                    Ok(())
-                },
-            ));
+                // Configure CommandManager behaviors
+                if let Ok(next_behavior) = command_manager.NextBehavior() {
+                    let _ = next_behavior
+                        .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
+                }
+                if let Ok(prev_behavior) = command_manager.PreviousBehavior() {
+                    let _ = prev_behavior
+                        .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
+                }
+                if let Ok(play_behavior) = command_manager.PlayBehavior() {
+                    let _ = play_behavior
+                        .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
+                }
+                if let Ok(pause_behavior) = command_manager.PauseBehavior() {
+                    let _ = pause_behavior
+                        .SetEnablingRule(windows::Media::Playback::MediaCommandEnablingRule::Always);
+                }
 
-            let app_handle_next = app_handle.clone();
-            let _ = command_manager.NextReceived(&TypedEventHandler::new(
-                move |_,
-                      _args: windows::core::Ref<
-                    '_,
-                    MediaPlaybackCommandManagerNextReceivedEventArgs,
-                >| {
-                    let _ = app_handle_next.emit("smtc:next", ());
-                    Ok(())
-                },
-            ));
+                let app_handle_play = app_handle_bg.clone();
+                let _ = command_manager.PlayReceived(&TypedEventHandler::new(
+                    move |_,
+                          _args: windows::core::Ref<
+                        '_,
+                        MediaPlaybackCommandManagerPlayReceivedEventArgs,
+                    >| {
+                        let _ = app_handle_play.emit("smtc:play", ());
+                        Ok(())
+                    },
+                ));
 
-            let app_handle_prev = app_handle.clone();
-            let _ = command_manager.PreviousReceived(&TypedEventHandler::new(
-                move |_,
-                      _args: windows::core::Ref<
-                    '_,
-                    MediaPlaybackCommandManagerPreviousReceivedEventArgs,
-                >| {
-                    let _ = app_handle_prev.emit("smtc:previous", ());
-                    Ok(())
-                },
-            ));
-        }
+                let app_handle_pause = app_handle_bg.clone();
+                let _ = command_manager.PauseReceived(&TypedEventHandler::new(
+                    move |_,
+                          _args: windows::core::Ref<
+                        '_,
+                        MediaPlaybackCommandManagerPauseReceivedEventArgs,
+                    >| {
+                        let _ = app_handle_pause.emit("smtc:pause", ());
+                        Ok(())
+                    },
+                ));
+
+                let app_handle_next = app_handle_bg.clone();
+                let _ = command_manager.NextReceived(&TypedEventHandler::new(
+                    move |_,
+                          _args: windows::core::Ref<
+                        '_,
+                        MediaPlaybackCommandManagerNextReceivedEventArgs,
+                    >| {
+                        let _ = app_handle_next.emit("smtc:next", ());
+                        Ok(())
+                    },
+                ));
+
+                let app_handle_prev = app_handle_bg.clone();
+                let _ = command_manager.PreviousReceived(&TypedEventHandler::new(
+                    move |_,
+                          _args: windows::core::Ref<
+                        '_,
+                        MediaPlaybackCommandManagerPreviousReceivedEventArgs,
+                    >| {
+                        let _ = app_handle_prev.emit("smtc:previous", ());
+                        Ok(())
+                    },
+                ));
+            }
+            println!("[DEBUG] SMTC init thread finished");
+        });
     }
 
     pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {

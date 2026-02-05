@@ -7,7 +7,13 @@ use crate::utils::path::normalize_windows_path;
 /// 获取视频时长
 pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f64>, String> {
     let input_os = normalize_windows_path(input_path);
-    let output = std::process::Command::new(ffprobe)
+    let mut cmd = std::process::Command::new(ffprobe);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd
         .args([
             "-v",
             "error",
@@ -37,7 +43,13 @@ pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f6
 /// 获取视频编码格式
 pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option<String>, String> {
     let input_os = normalize_windows_path(input_path);
-    let output = std::process::Command::new(ffprobe)
+    let mut cmd = std::process::Command::new(ffprobe);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd
         .args([
             "-v",
             "error",
@@ -68,7 +80,13 @@ pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option
 /// 获取音频编码格式
 pub fn run_ffprobe_audio_codec(ffprobe: &str, input_path: &str) -> Result<Option<String>, String> {
     let input_os = normalize_windows_path(input_path);
-    let output = std::process::Command::new(ffprobe)
+    let mut cmd = std::process::Command::new(ffprobe);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd
         .args([
             "-v",
             "error",
@@ -103,7 +121,13 @@ pub fn check_browser_compatible(
     supports_hevc: bool,
 ) -> Result<bool, String> {
     let input_os = normalize_windows_path(input_path);
-    let output = std::process::Command::new(ffprobe)
+    let mut cmd = std::process::Command::new(ffprobe);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let output = cmd
         .args([
             "-v", "error",
             "-select_streams", "v:0",
@@ -176,7 +200,14 @@ pub fn try_remux(
         output_path.to_string(),
     ]);
 
-    let status = std::process::Command::new(ffmpeg)
+    let mut cmd = std::process::Command::new(ffmpeg);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    let status = cmd
         .args(&args)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())

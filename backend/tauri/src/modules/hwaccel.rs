@@ -54,8 +54,13 @@ pub fn detect_hardware_encoder(ffmpeg: &str) -> HwAccelType {
 }
 
 fn test_encoder(ffmpeg: &str, encoder_name: &str) -> bool {
-    std::process::Command::new(ffmpeg)
-        .args(["-f", "lavfi", "-i", "testsrc", "-t", "1", "-c:v", encoder_name, "-f", "null", "-"])
+    let mut cmd = std::process::Command::new(ffmpeg);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    cmd.args(["-f", "lavfi", "-i", "testsrc", "-t", "1", "-c:v", encoder_name, "-f", "null", "-"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()

@@ -122,8 +122,13 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
 }
 
 fn generate_thumbnail_with_ffmpeg(ffmpeg_path: &str, input_path: &str, output_path: &Path) -> bool {
-    let status = std::process::Command::new(ffmpeg_path)
-        .args([
+    let mut cmd = std::process::Command::new(ffmpeg_path);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+    let status = cmd.args([
             "-y",
             "-i",
             input_path,

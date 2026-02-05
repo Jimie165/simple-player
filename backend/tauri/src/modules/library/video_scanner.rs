@@ -87,7 +87,14 @@ fn parse_frame_rate(fr_str: &str) -> Option<f64> {
 
 fn get_video_details_ffprobe(path: &str) -> Result<(i64, Option<u32>, Option<u32>, Option<f64>, Option<u8>), String> {
     // ffprobe -v quiet -print_format json -show_format -show_streams input.mp4
-    let output = Command::new("ffprobe")
+    let mut cmd = Command::new("ffprobe");
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    let output = cmd
         .args([
             "-v", "quiet",
             "-print_format", "json",

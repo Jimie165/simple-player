@@ -133,7 +133,14 @@ pub fn transcode_with_hw(
         output_path.to_string(),
     ]);
 
-    let mut child = std::process::Command::new(ffmpeg)
+    let mut cmd = std::process::Command::new(ffmpeg);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000);
+    }
+
+    let mut child = cmd
         .args(&ffmpeg_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
