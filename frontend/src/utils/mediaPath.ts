@@ -1,4 +1,4 @@
-import { readFile } from '@tauri-apps/plugin-fs';
+// import { readFile } from '@tauri-apps/plugin-fs';
 import { appDataDir, appCacheDir, join } from '@tauri-apps/api/path';
 import { convertFileSrc } from '@tauri-apps/api/core';
 import type { SongMetadata } from '@/types';
@@ -36,10 +36,8 @@ export async function resolveLocalPath(relativePath: string): Promise<string | n
         const normalizedPath = relativePath.replace(/\\/g, '/');
         const fullPath = await join(baseDir, normalizedPath);
 
-        // 尝试读取
-        const data = await readFile(fullPath);
-        const blob = new Blob([data]);
-        return URL.createObjectURL(blob);
+        // 直接转换为 asset 协议 URL，让浏览器去加载
+        return convertFileSrc(fullPath, 'asset');
     } catch (error) {
         console.warn(`[resolveLocalPath] Failed for path: "${relativePath}"`, error);
         return null;

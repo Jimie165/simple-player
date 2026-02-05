@@ -89,6 +89,15 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
     hasher.update(video_path.as_bytes());
     let hash = format!("{:x}", hasher.finalize())[..16].to_string();
 
+    // Optimization: Check if thumbnail already exists
+    let common_exts = ["jpg", "png", "webp", "img", "bmp"];
+    for ext in common_exts {
+        let cached_path = thumbs_dir.join(format!("{}.{}", hash, ext));
+        if cached_path.exists() {
+             return Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)));
+        }
+    }
+
     let file_path = normalize_windows_path(video_path);
 
     let (bytes, mime) = match read_thumbnail_bytes(&file_path, 512) {
