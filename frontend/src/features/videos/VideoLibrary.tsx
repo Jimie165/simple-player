@@ -368,7 +368,7 @@ export const VideoLibrary: React.FC = () => {
 
 const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
     const { setVideoMode, setIsPlaying, setVideoMetadata, setVideoQueue } = usePlayerStore();
-    const { isSelectionMode, toggleSelection, selectedIds } = useSelectionStore();
+    const { isSelectionMode, toggleSelection, toggleSelectionMode, selectedIds } = useSelectionStore();
     const { openProperties } = useDialogStore();
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; video: VideoMetadata } | null>(null);
 
@@ -456,6 +456,14 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; v
         openProperties(songMeta);
     };
 
+    const handleToggleSelection = (id: string, type: 'video', data: VideoMetadata) => {
+        if (isSelectionMode) {
+            toggleSelection(id, type, data);
+        } else {
+            toggleSelectionMode({ id, type, data });
+        }
+    };
+
     if (virtualized) {
         return (
             <>
@@ -472,7 +480,7 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; v
                                 isSelected={selectedIds.has(id)}
                                 isSelectionMode={isSelectionMode}
                                 onPlay={handlePlayVideo}
-                                onToggleSelection={toggleSelection}
+                                onToggleSelection={handleToggleSelection}
                                 onContextMenu={handleContextMenu}
                                 onShowProperties={handleShowProperties}
                             />
@@ -505,7 +513,7 @@ const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; v
                         isSelected={selectedIds.has(id)}
                         isSelectionMode={isSelectionMode}
                         onPlay={handlePlayVideo}
-                        onToggleSelection={toggleSelection}
+                        onToggleSelection={handleToggleSelection}
                         onContextMenu={handleContextMenu}
                         onShowProperties={handleShowProperties}
                     />
