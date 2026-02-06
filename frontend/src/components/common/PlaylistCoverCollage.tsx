@@ -34,7 +34,7 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
             // 取前4首不同封面的歌曲
             const uniqueCovers = new Map<string, SongMetadata>();
             for (const song of songs) {
-                const key = song.cover_path || song.cover || song.path || '';
+                const key = song.cover_path || song.path || '';
                 if (key && !uniqueCovers.has(key) && uniqueCovers.size < 4) {
                     uniqueCovers.set(key, song);
                 }

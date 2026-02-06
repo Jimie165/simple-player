@@ -129,7 +129,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 ...existing,
                 path: existing.path || path,
                 cover_path: existing.cover_path || meta.cover_path || null,
-                cover: existing.cover || meta.cover || null,
+                cover: null,
                 lastPlayed: Date.now(),
                 // 如果旧数据缺少描述（例如显示为 Unknown Artist），也可以在这里顺便优化
                 description: (existing.description === "Unknown Artist" || !existing.description)
@@ -142,7 +142,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
             type: 'file',
             title: meta.title,
             description: isVideo ? formatTime(meta.duration) : meta.artist,
-            cover: meta.cover || null,
+            cover: null,
             cover_path: meta.cover_path || null,
             path,
             lastPlayed: Date.now(),
@@ -159,7 +159,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
 
             const safeMeta = meta || {
                 title: path.split(/[\\/]/).pop() || 'Unknown',
-                artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, path: path
+                artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, cover_path: null, path: path
             };
 
             // 检测是否为视频文件
@@ -199,7 +199,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         type: 'folder',
         title: folderName,
         description: `${items.length} ${label}`,
-        cover: items[0]?.cover || null,
+        cover: null,
         cover_path: items[0]?.cover_path || null,
         path: folderPath,
         lastPlayed: Date.now(),
@@ -500,7 +500,7 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                                                     album: '',
                                                     duration: 0,
                                                     path: item.path,
-                                                    cover: item.cover,
+                                                    cover: null,
                                                     cover_path: item.cover_path
                                                 }}
                                                 className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"

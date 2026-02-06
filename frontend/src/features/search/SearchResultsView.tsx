@@ -127,7 +127,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 const albums = new Set(songs.map(s => s.album).filter(Boolean));
                 finalArtists.push({
                     name,
-                    cover: songs.find(s => s.cover)?.cover || null,
+                    cover: songs.find(s => s.cover_path)?.cover_path || null,
                     count: songs.length,
                     albumCount: albums.size,
                     songs
@@ -143,7 +143,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 finalAlbums.push({
                     name: albumName,
                     artist: artistName,
-                    cover: songs.find(s => s.cover)?.cover || null,
+                    cover: songs.find(s => s.cover_path)?.cover_path || null,
                     cover_path: songs.find(s => s.cover_path)?.cover_path || null,
                     songs
                 });
@@ -206,7 +206,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                     type: 'file',
                     title: song.title,
                     description: song.artist,
-                    cover: song.cover || null,
+                        cover: null,
+                        cover_path: song.cover_path || null,
                     path: song.path || '',
                     lastPlayed: Date.now(),
                     artist: song.artist

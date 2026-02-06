@@ -26,7 +26,7 @@ export default function GlobalDetailStack() {
         type: 'file',
         title: song.title,
         description: song.artist,
-        cover: song.cover || null,
+        cover: null,
         cover_path: song.cover_path || null,
         path: song.path || '',
         lastPlayed: Date.now(),
@@ -64,7 +64,7 @@ export default function GlobalDetailStack() {
                     songs: artistSongs,
                     albumCount: albums.size,
                     count: artistSongs.length,
-                    cover: artistSongs[0]?.cover || null
+                    cover: artistSongs[0]?.cover_path || null
                 };
                 useSelectionStore.getState().clearSelection();
                 push({ type: 'artist_detail', data: artistData });
@@ -169,7 +169,8 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
                         setAlbumData({
                             ...initialData,
                             songs: albumSongs,
-                            cover: albumSongs[0].cover || initialData.cover,
+                            cover: albumSongs[0].cover_path || initialData.cover_path || null,
+                            cover_path: albumSongs[0].cover_path || initialData.cover_path || null,
                             artist: albumSongs[0].artist || initialData.artist // refine artist if diverse
                         });
                     }
@@ -193,7 +194,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
                     title: albumData.name,
                     artist: albumData.artist,
                     description: `${songs.length} 首歌曲`,
-                    cover: albumData.cover,
+                    cover: null,
                     cover_path: albumData.cover_path || null,
                     path: songs[0]?.path || '',
                     lastPlayed: Date.now(),
@@ -231,7 +232,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
                             songs: artistSongs,
                             count: artistSongs.length,
                             albumCount: albums.size,
-                            cover: artistSongs[0]?.cover || initialData.cover
+                            cover: artistSongs[0]?.cover_path || initialData.cover
                         });
                     }
                 } catch (e) {
@@ -251,7 +252,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
                 map.set(key, {
                     name: song.album || "Unknown Album",
                     artist: song.artist || "Unknown Artist",
-                    cover: song.cover || null,
+                    cover: song.cover_path || null,
                     cover_path: song.cover_path || null,
                     songs: []
                 });
@@ -276,7 +277,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
             title: album.name,
             artist: album.artist,
             description: `${songs.length} 首歌曲`,
-            cover: album.cover,
+            cover: null,
             cover_path: album.cover_path || null,
             path: songs[0]?.path || '',
             lastPlayed: Date.now(),

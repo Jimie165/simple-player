@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 10;
+const SCHEMA_VERSION: i32 = 11;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -88,6 +88,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 10 {
         migrate_v10(conn)?;
+        set_db_version(conn, 10)?;
+    }
+
+    if current_version < 11 {
+        migrate_v11(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -481,5 +486,11 @@ fn migrate_v10(conn: &Connection) -> Result<()> {
         )",
         [],
     )?;
+    Ok(())
+}
+
+/// 版本 11: 清理旧的 base64 封面字段
+fn migrate_v11(conn: &Connection) -> Result<()> {
+    conn.execute("UPDATE songs SET cover = NULL WHERE cover IS NOT NULL", [])?;
     Ok(())
 }

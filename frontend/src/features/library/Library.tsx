@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
 import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdShuffle } from 'react-icons/md';
@@ -66,6 +67,44 @@ export default function Library() {
         }
     };
 
+    useEffect(() => {
+        let unlisten: (() => void) | undefined;
+        let isMounted = true;
+
+        const setupListeners = async () => {
+            try {
+                const unlistenFn = await listen('library_scan_complete', () => {
+                    if (isMounted) {
+                        refreshLibrary();
+                    }
+                });
+                if (isMounted) {
+                    unlisten = unlistenFn;
+                } else {
+                    unlistenFn();
+                }
+            } catch (err) {
+                console.error('Failed to listen library scan events:', err);
+            }
+        };
+
+        setupListeners();
+
+        return () => {
+            isMounted = false;
+            if (unlisten) {
+                try {
+                    const result = unlisten() as any;
+                    if (result instanceof Promise) {
+                        result.catch((e: any) => console.warn('Failed to unlisten (async)', e));
+                    }
+                } catch (e) {
+                    console.warn('Failed to unlisten (sync)', e);
+                }
+            }
+        };
+    }, []);
+
 
 
 
@@ -94,7 +133,7 @@ export default function Library() {
                 map.set(key, {
                     name: song.album || "Unknown Album",
                     artist: song.artist || "Unknown Artist",
-                    cover: song.cover || null,
+                    cover: song.cover_path || null,
                     cover_path: song.cover_path || null,
                     songs: []
                 });
@@ -140,8 +179,8 @@ export default function Library() {
             artist.count += 1;
 
             // Use first song's cover as artist cover if available and not set
-            if (!artist.cover && song.cover) {
-                artist.cover = song.cover;
+            if (!artist.cover && song.cover_path) {
+                artist.cover = song.cover_path;
             }
         });
 
@@ -197,7 +236,7 @@ export default function Library() {
         type: 'file',
         title: song.title,
         description: song.artist,
-        cover: song.cover || null,
+        cover: null,
         cover_path: song.cover_path || null,
         path: song.path || '',
         lastPlayed: Date.now(),
@@ -378,7 +417,7 @@ export default function Library() {
                                             title: album.name,
                                             artist: album.artist,
                                             description: `${album.songs.length} 首歌曲`,
-                                            cover: album.cover,
+                                            cover: null,
                                             cover_path: album.cover_path || null,
                                             path: album.songs[0]?.path || '',
                                             lastPlayed: Date.now(),

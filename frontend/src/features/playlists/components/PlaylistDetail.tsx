@@ -114,7 +114,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         type: 'file',
         title: song.title,
         description: song.artist,
-        cover: song.cover || null,
+        cover: null,
         cover_path: song.cover_path || null,
         path: song.path || '',
         lastPlayed: Date.now(),

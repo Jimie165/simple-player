@@ -7,6 +7,7 @@ import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import { libraryService } from '@/services/libraryService';
 import { sortSongs } from '@/utils/songSort';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { resolveMediaPath } from '@/utils/mediaPath';
 
 interface RecentItemCardProps {
     item: RecentItem;
@@ -21,10 +22,11 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
 
     // 只有当是 Playlist 且没有预设封面时，才需要动态加载歌曲里的封面
     const [playlistSongs, setPlaylistSongs] = useState<SongMetadata[]>([]);
+    const [coverUrl, setCoverUrl] = useState<string | null>(null);
     const { getPlaylistSettings } = useLibraryStore();
 
     useEffect(() => {
-        if (isPlaylist && !item.cover && !item.cover_path) {
+        if (isPlaylist && !item.cover_path) {
             const loadSongs = async () => {
                 // Parse ID "playlist:123" -> 123
                 const plIdStr = item.id.replace('playlist:', '');
@@ -44,6 +46,18 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
         }
     }, [item, isPlaylist, getPlaylistSettings]);
 
+    useEffect(() => {
+        let isMounted = true;
+        const loadCover = async () => {
+            const url = await resolveMediaPath(item.cover_path);
+            if (isMounted) setCoverUrl(url);
+        };
+        loadCover();
+        return () => {
+            isMounted = false;
+        };
+    }, [item.cover_path]);
+
     return (
         <div
             className="group flex flex-col gap-3 rounded-xl p-3 -mx-3 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer relative"
@@ -52,8 +66,8 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                 onClick={onClick}
                 className="aspect-square w-full rounded-lg shadow-sm bg-neutral-200 dark:bg-neutral-800 group-hover:shadow-md group-hover:scale-[1.02] transition-all duration-300 relative overflow-hidden flex items-center justify-center"
             >
-                {item.cover ? (
-                    <img src={item.cover} alt={item.title} className="w-full h-full object-cover" />
+                {coverUrl ? (
+                    <img src={coverUrl} alt={item.title} className="w-full h-full object-cover" />
                 ) : isPlaylist ? (
                     <PlaylistCoverCollage songs={playlistSongs} className="w-full h-full" />
                 ) : (

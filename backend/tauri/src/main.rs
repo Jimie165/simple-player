@@ -8,11 +8,11 @@ use modules::database;
 use modules::player::AudioState;
 use rusqlite::Connection;
 use std::fs;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 /// 数据库状态，用于 Tauri 状态管理
-pub struct DbState(pub Mutex<Connection>);
+pub struct DbState(pub Arc<Mutex<Connection>>);
 
 fn main() {
     let audio_state = AudioState::new();
@@ -43,7 +43,7 @@ fn main() {
             migrate_old_config(app, &conn);
 
             // 注入数据库状态
-            app.manage(DbState(Mutex::new(conn)));
+            app.manage(DbState(Arc::new(Mutex::new(conn))));
 
             // 初始化 AudioState 的 AppHandle (用于未来的 SMTC 事件)
             let audio_state: tauri::State<AudioState> = app.state();

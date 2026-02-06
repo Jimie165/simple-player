@@ -175,7 +175,8 @@ impl AudioState {
 
             // 4. 如果有元数据，应用到 Item 上
             if let Some(meta) = metadata {
-                let _ = smtc::apply_metadata(&item, &meta);
+                let app_handle = self.app_handle.lock().ok().and_then(|h| h.clone());
+                let _ = smtc::apply_metadata(&item, &meta, app_handle.as_ref());
             }
 
             // 5. 播放 Item

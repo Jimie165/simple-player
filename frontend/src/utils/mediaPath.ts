@@ -83,12 +83,6 @@ export async function resolveCover(song: SongMetadata): Promise<string | null> {
     if (song.cover_path) {
         return await resolveMediaPath(song.cover_path);
     }
-
-    // 2. 降级到 base64（旧数据）
-    if (song.cover) {
-        return song.cover;
-    }
-
-    // 3. 无封面
+    // 2. 无封面
     return null;
 }

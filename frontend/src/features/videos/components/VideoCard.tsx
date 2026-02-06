@@ -35,6 +35,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             onToggleSelection(video.path, 'video', video);
             return;
         }
+        if (video.duration === 0) return; // Disable play for invalid duration
         onPlay(video);
     };
 
@@ -72,7 +73,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 )}
 
                 {/* Play Overlay & Context Menu Trigger */}
-                {!isSelectionMode && (
+                {!isSelectionMode && video.duration > 0 && (
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
                         <CardPlayButton onClick={() => onPlay(video)} title="播放视频" />
 
@@ -89,9 +90,15 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 )}
 
                 {/* Duration Badge */}
-                {video.duration > 0 && (
+                {video.duration > 0 ? (
                     <div className="absolute top-2 right-2 px-1.5 py-0.5 bg-black/60 backdrop-blur-sm rounded text-[10px] text-white font-medium z-10">
                         {formatTime(video.duration)}
+                    </div>
+                ) : (
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-lg">
+                        <span className="text-white text-[10px] font-medium px-2 py-1 bg-black/50 rounded-full animate-pulse border border-white/10">
+                            扫描中...
+                        </span>
                     </div>
                 )}
             </div>

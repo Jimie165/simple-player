@@ -3,6 +3,7 @@ import { useVideoStore } from '@/store/useVideoStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import clsx from 'clsx';
 import { open } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
 import { libraryService } from '@/services/libraryService';
 import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButton';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -22,8 +23,11 @@ import { Virtuoso } from 'react-virtuoso';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { VideoCard } from './components/VideoCard';
 
+import { useVideoScanProgress } from '@/hooks/useVideoScanProgress';
+
 export const VideoLibrary: React.FC = () => {
-    const { videos, fetchVideos, videoFolders, fetchVideoFolders, foldersRefreshing, collapsedFolderIds, toggleFolderCollapse, sortBy, sortOrder, setSortBy, setSortOrder } = useVideoStore();
+    const { scanning, progress } = useVideoScanProgress();
+    const { videos, fetchVideos, setVideos, videoFolders, fetchVideoFolders, foldersRefreshing, collapsedFolderIds, toggleFolderCollapse, sortBy, sortOrder, setSortBy, setSortOrder } = useVideoStore();
     const { currentTab, currentPage, lastVideoTab, setTab } = useNavigationStore();
     const { isSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds, selectItem, deselectItem, selectedIds } = useSelectionStore();
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
@@ -35,6 +39,45 @@ export const VideoLibrary: React.FC = () => {
     useEffect(() => {
         fetchVideos();
         fetchVideoFolders();
+    }, [fetchVideos, fetchVideoFolders]);
+
+    useEffect(() => {
+        let unlisten: (() => void) | undefined;
+        let isMounted = true;
+
+        const setupListeners = async () => {
+            try {
+                const unlistenFn = await listen('video_scan_complete', () => {
+                    if (isMounted) {
+                        fetchVideos();
+                        fetchVideoFolders();
+                    }
+                });
+                if (isMounted) {
+                    unlisten = unlistenFn;
+                } else {
+                    unlistenFn();
+                }
+            } catch (err) {
+                console.error('Failed to listen video scan events:', err);
+            }
+        };
+
+        setupListeners();
+
+        return () => {
+            isMounted = false;
+            if (unlisten) {
+                try {
+                    const result = unlisten() as any;
+                    if (result instanceof Promise) {
+                        result.catch((e: any) => console.warn('Failed to unlisten (async)', e));
+                    }
+                } catch (e) {
+                    console.warn('Failed to unlisten (sync)', e);
+                }
+            }
+        };
     }, [fetchVideos, fetchVideoFolders]);
 
     useEffect(() => {
@@ -104,8 +147,8 @@ export const VideoLibrary: React.FC = () => {
         try {
             const selected = await open({ directory: true, multiple: false });
             if (selected && typeof selected === 'string') {
-                await libraryService.addVideoFolder(selected);
-                await fetchVideos();
+                const updated = await libraryService.addVideoFolder(selected);
+                setVideos(updated);
                 await fetchVideoFolders();
             }
         } catch (err) {
@@ -184,7 +227,20 @@ export const VideoLibrary: React.FC = () => {
         <PageContainer
             title="视频"
             actions={
-                <LibraryHeaderButton onClick={handleAddFolder} />
+                <div className="flex items-center gap-4">
+                    {scanning && progress && (
+                        <div className="flex items-center gap-2 text-xs text-on-surface-variant animate-fade-in bg-surface-container-high px-3 py-1.5 rounded-full">
+                            <div className="w-20 h-1 bg-surface-container-highest rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-primary transition-all duration-300"
+                                    style={{ width: `${(progress.processed / progress.total) * 100}%` }}
+                                />
+                            </div>
+                            <span className="tabular-nums">{progress.processed}/{progress.total}</span>
+                        </div>
+                    )}
+                    <LibraryHeaderButton onClick={handleAddFolder} />
+                </div>
             }
         >
             <div className="h-full flex flex-col animate-fade-in">

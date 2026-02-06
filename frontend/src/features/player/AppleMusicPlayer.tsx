@@ -405,7 +405,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                                                     onClick={() => {
                                                         if (metadata?.album && metadata && typeof (metadata as any).id === 'number') {
                                                             // Use full object structure to match what useSongOperations expects and prevent crashes
-                                                            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover || null, count: 0 } });
+                                                            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover_path || null, count: 0 } });
                                                             onClose();
                                                         }
                                                     }}

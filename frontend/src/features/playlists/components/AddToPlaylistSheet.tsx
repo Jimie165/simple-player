@@ -59,7 +59,7 @@ export default function AddToPlaylistSheet() {
                                 const match = libraryMap.get(s.id)!;
                                 return {
                                     ...s,
-                                    cover: match.cover || s.cover,
+                                    cover: null,
                                     cover_path: match.cover_path || s.cover_path
                                 };
                             }
@@ -254,8 +254,8 @@ export default function AddToPlaylistSheet() {
                             const match = libraryMap.get(s.id)!;
                             return {
                                 ...s,
-                                cover: match.cover || s.cover,
-                                cover_path: match.cover_path || s.cover_path
+                                        cover: null,
+                                        cover_path: match.cover_path || s.cover_path
                             };
                         }
                         return s;

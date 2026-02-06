@@ -347,7 +347,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                     name: albumName,
                     artist: item?.artist,
                     songs: [],
-                    cover: item?.cover || null,
+                    cover: item?.cover_path || null,
                     count: 0
                 }
             });

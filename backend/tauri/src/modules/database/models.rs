@@ -21,7 +21,7 @@ pub struct Song {
     pub artist: String,
     pub album: String,
     pub duration: i64,
-    pub cover: Option<String>,      // 旧字段，保留兼容
+    pub cover: Option<String>,      // Deprecated: 保留字段，不再使用 base64
     pub cover_path: Option<String>, // 新字段：封面文件路径
     pub folder_id: Option<i64>,
     // 扩展元数据

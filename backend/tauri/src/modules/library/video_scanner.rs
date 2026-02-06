@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use serde::{Deserialize, Serialize};
 use crate::utils::path::normalize_db_path;
+use walkdir::WalkDir;
 
 const VIDEO_EXTENSIONS: [&str; 13] = ["mp4", "mkv", "avi", "mov", "webm", "flv", "m4v", "3gp", "ts", "rmvb", "wmv", "asf", "ogv"];
 
@@ -38,39 +39,36 @@ struct FFProbeFormat {
     duration: Option<String>,
 }
 
+fn has_video_extension(ext: &std::ffi::OsStr) -> bool {
+    VIDEO_EXTENSIONS
+        .iter()
+        .any(|e| ext.eq_ignore_ascii_case(e))
+}
+
+fn file_name_has_video_extension(file_name: &std::ffi::OsStr) -> bool {
+    Path::new(file_name)
+        .extension()
+        .map(has_video_extension)
+        .unwrap_or(false)
+}
+
 pub fn scan_video_files_recursive(dir_path: &str) -> Vec<String> {
     let mut video_files = Vec::new();
-    scan_recursive_inner(Path::new(dir_path), &mut video_files);
+    for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
+        if !entry.file_type().is_file() {
+            continue;
+        }
+        if !file_name_has_video_extension(entry.file_name()) {
+            continue;
+        }
+        video_files.push(normalize_db_path(entry.path()));
+    }
     video_files.sort();
     video_files
 }
 
-fn scan_recursive_inner(path: &Path, video_files: &mut Vec<String>) {
-    if !path.is_dir() {
-        return;
-    }
-
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            let entry_path = entry.path();
-
-            if entry_path.is_dir() {
-                scan_recursive_inner(&entry_path, video_files);
-            } else if entry_path.is_file() {
-                if is_video_file(&entry_path) {
-                    video_files.push(normalize_db_path(&entry_path));
-                }
-            }
-        }
-    }
-}
-
 pub fn is_video_file(path: &Path) -> bool {
-    if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
-        VIDEO_EXTENSIONS.contains(&ext.to_lowercase().as_str())
-    } else {
-        false
-    }
+    path.extension().map(has_video_extension).unwrap_or(false)
 }
 
 fn parse_frame_rate(fr_str: &str) -> Option<f64> {

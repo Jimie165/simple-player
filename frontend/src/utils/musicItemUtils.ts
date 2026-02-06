@@ -174,7 +174,7 @@ export async function resolveSongsFromItems(items: any[]): Promise<SongMetadata[
                                 artist: item.artist || item.description || 'Unknown Artist',
                                 album: item.album || 'Unknown Album',
                                 duration: item.duration || 0,
-                                cover: item.cover || null,
+                                cover: null,
                                 cover_path: item.cover_path || null,
                             });
                         }

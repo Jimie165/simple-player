@@ -24,6 +24,7 @@ import type { PageId } from '@/types/index';
 import SearchResultsView from '@/features/search/SearchResultsView';
 import PlaylistsRoot from '@/features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from '@/hooks/useQueuePersistence';
+import { useGlobalEvents } from '@/hooks/useGlobalEvents';
 import SelectionMenuBar from '@/components/common/SelectionMenuBar';
 import AddToPlaylistSheet from '@/features/playlists/components/AddToPlaylistSheet';
 import GlobalDialogLayer from '@/components/common/GlobalDialogLayer';
@@ -90,6 +91,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
 
   useQueuePersistence(); // Activate queue persistence
+  useGlobalEvents(); // Activate global event listeners
 
   const metadata = usePlayerStore((state) => state.metadata);
 

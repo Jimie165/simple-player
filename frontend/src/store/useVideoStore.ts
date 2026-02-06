@@ -17,6 +17,7 @@ interface VideoState {
 
     // Actions
     fetchVideos: () => Promise<void>;
+    setVideos: (videos: VideoMetadata[]) => void;
     fetchVideoFolders: () => Promise<void>;
     scanVideos: () => Promise<void>;
     toggleFolderCollapse: (id: number) => void;
@@ -24,6 +25,7 @@ interface VideoState {
     setSortOrder: (sortOrder: 'asc' | 'desc') => void;
     toggleFavorite: (id: number) => Promise<void>;
     batchDelete: (ids: number[]) => Promise<void>;
+    updateThumbnail: (id: number, thumbnail_path: string) => void;
 }
 
 
@@ -45,6 +47,9 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
         } catch (error) {
             console.error('Failed to fetch videos', error);
         }
+    },
+    setVideos: (videos) => {
+        set({ videos });
     },
     fetchVideoFolders: async () => {
         set({ foldersRefreshing: true });
@@ -107,6 +112,13 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
         } catch (error) {
             console.error('Failed to batch delete videos', error);
         }
+    },
+    updateThumbnail: (id, thumbnail_path) => {
+        set((state) => ({
+            videos: state.videos.map(v =>
+                v.id === id ? { ...v, thumbnail_path } : v
+            )
+        }));
     },
 
 

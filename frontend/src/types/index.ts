@@ -5,8 +5,8 @@ export interface SongMetadata {
     artist: string;
     album: string;
     duration: number; // 秒
-    cover?: string | null; // Base64 (旧版兼容)
-    cover_path?: string | null; // 封面文件路径 (新版)
+    cover?: string | null; // Deprecated: 保留字段，不再使用 base64
+    cover_path?: string | null; // 封面文件路径
     path?: string; // 文件路径
     size?: number; // 字节
     sample_rate?: number; // Hz
@@ -61,7 +61,7 @@ export interface RecentItem {
     type: 'file' | 'folder' | 'album' | 'artist' | 'playlist' | 'video';
     title: string;
     description: string;
-    cover?: string | null;
+    cover?: string | null; // Deprecated: 保留字段，不再使用 base64
     cover_path?: string | null;
     path: string;
     lastPlayed: number; // 时间戳

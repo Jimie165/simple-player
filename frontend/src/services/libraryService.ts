@@ -158,4 +158,8 @@ export const libraryService = {
     clearPlayQueue: async (): Promise<void> => {
         return invoke('clear_play_queue');
     },
+
+    getAllVideos: async (): Promise<VideoMetadata[]> => {
+        return invoke('get_all_videos');
+    },
 };

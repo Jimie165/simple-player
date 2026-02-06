@@ -17,11 +17,11 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 lofty = "0.22.4"
-base64 = "0.22.1"
 url = "2.5" # 需要用来处理文件路径转 URI
 rusqlite = { version = "0.32", features = ["bundled"] } # SQLite 数据库
 chrono = { version = "0.4", features = ["serde"] } # 时间处理
 sha2 = "0.10" # 封面哈希
+walkdir = "2.5.0"
 
 [dependencies.windows]
 version = "0.61"

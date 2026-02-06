@@ -6,7 +6,14 @@ use crate::DbState;
 use crate::modules::database::{VideoRepo, Video};
 use crate::modules::library::video_thumbnails;
 use crate::utils::path::normalize_windows_path;
-use tauri::State;
+use serde::Serialize;
+use tauri::{Emitter, Manager, State};
+
+#[derive(Serialize, Clone)]
+struct ThumbnailReadyPayload {
+    video_id: i64,
+    thumbnail_path: String,
+}
 
 #[tauri::command]
 pub fn get_all_videos(
@@ -14,36 +21,55 @@ pub fn get_all_videos(
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<Video>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let mut videos = VideoRepo::get_all(&conn).map_err(|e| e.to_string())?;
+    let videos = VideoRepo::get_all(&conn).map_err(|e| e.to_string())?;
 
-    for v in &mut videos {
-        let needs_thumb = match &v.thumbnail_path {
+    let missing_thumbnails: Vec<Video> = videos
+        .iter()
+        .filter(|v| match &v.thumbnail_path {
             None => true,
             Some(p) => {
                 let win_path = normalize_windows_path(p);
                 !Path::new(&win_path).exists()
             }
-        };
+        })
+        .cloned()
+        .collect();
 
-        if !needs_thumb {
-            continue;
-        }
+    if !missing_thumbnails.is_empty() {
+        let app_handle = app_handle.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let db_state = app_handle.state::<DbState>();
+            for v in missing_thumbnails {
+                let thumbnail_path = video_thumbnails::ensure_video_thumbnail(&app_handle, &v.path)
+                    .ok()
+                    .flatten();
+                let Some(tp) = thumbnail_path else {
+                    continue;
+                };
 
-        let thumbnail_path = video_thumbnails::ensure_video_thumbnail(&app_handle, &v.path)?;
-        if let Some(tp) = thumbnail_path {
-            let _ = VideoRepo::upsert(
-                &conn,
-                &v.path,
-                &v.title,
-                v.duration,
-                v.size,
-                v.width,
-                v.height,
-                Some(tp.as_str()),
-                v.folder_id,
-            );
-            v.thumbnail_path = Some(tp);
-        }
+                if let Ok(conn) = db_state.0.lock() {
+                    let _ = VideoRepo::upsert(
+                        &conn,
+                        &v.path,
+                        &v.title,
+                        v.duration,
+                        v.size,
+                        v.width,
+                        v.height,
+                        Some(tp.as_str()),
+                        v.folder_id,
+                    );
+                }
+
+                let _ = app_handle.emit(
+                    "video_thumbnail_ready",
+                    ThumbnailReadyPayload {
+                        video_id: v.id,
+                        thumbnail_path: tp,
+                    },
+                );
+            }
+        });
     }
     Ok(videos)
 }

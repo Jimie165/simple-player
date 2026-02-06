@@ -1,5 +1,7 @@
 use crate::modules::library::SongMetadata;
-use base64::Engine;
+use crate::utils::paths::{is_app_relative_path, resolve_app_path};
+use std::path::PathBuf;
+use tauri::AppHandle;
 use windows::Media::MediaPlaybackType;
 use windows::Media::Playback::MediaPlaybackItem;
 use windows::Storage::Streams::{
@@ -9,7 +11,11 @@ use windows::core::HSTRING;
 
 /// 将元数据直接绑定到 MediaPlaybackItem
 /// 这样 MediaPlayer 播放此 Item 时，会自动显示这些信息
-pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows::core::Result<()> {
+pub fn apply_metadata(
+    item: &MediaPlaybackItem,
+    meta: &SongMetadata,
+    app_handle: Option<&AppHandle>,
+) -> windows::core::Result<()> {
     // 1. 获取该媒体项的显示属性
     let props = item.GetDisplayProperties()?;
 
@@ -25,18 +31,16 @@ pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows:
     // 4. 设置封面
     let mut thumbnail_set = false;
 
-    // A. 尝试 Base64 (旧兼容)
-    if let Some(cover_base64) = &meta.cover {
-        if let Some(stream_ref) = base64_to_stream_ref(cover_base64) {
-            props.SetThumbnail(&stream_ref)?;
-            thumbnail_set = true;
-        }
-    } 
-    
-    // B. 尝试文件路径 (如果未设置)
-    if !thumbnail_set {
-        if let Some(path) = &meta.cover_path {
-            if let Ok(bytes) = std::fs::read(path) {
+    // 尝试文件路径
+    if let Some(path) = &meta.cover_path {
+        let resolved: Option<PathBuf> = if is_app_relative_path(path) {
+            app_handle.and_then(|handle| resolve_app_path(handle, path))
+        } else {
+            Some(PathBuf::from(path))
+        };
+
+        if let Some(full_path) = resolved {
+            if let Ok(bytes) = std::fs::read(full_path) {
                 if let Some(stream_ref) = bytes_to_stream_ref(&bytes) {
                     props.SetThumbnail(&stream_ref)?;
                     thumbnail_set = true;
@@ -53,20 +57,6 @@ pub fn apply_metadata(item: &MediaPlaybackItem, meta: &SongMetadata) -> windows:
     item.ApplyDisplayProperties(&props)?;
 
     Ok(())
-}
-
-/// 将 Data URI (Base64) 转为 Windows RandomAccessStreamReference
-fn base64_to_stream_ref(data_uri: &str) -> Option<RandomAccessStreamReference> {
-    // 1. 去掉前缀
-    let parts: Vec<&str> = data_uri.split(',').collect();
-    let base64_data = if parts.len() == 2 { parts[1] } else { data_uri };
-
-    // 2. 解码
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64_data)
-        .ok()?;
-
-    bytes_to_stream_ref(&bytes)
 }
 
 /// 将字节数组转为 Windows RandomAccessStreamReference

@@ -1,4 +1,3 @@
-use base64::prelude::*;
 use lofty::prelude::*;
 use lofty::read_from_path;
 use serde::{Deserialize, Serialize};
@@ -12,7 +11,7 @@ pub struct SongMetadata {
     pub artist: String,
     pub album: String,
     pub duration: u64,
-    pub cover: Option<String>,      // base64 data URL (兼容旧版)
+    pub cover: Option<String>,      // Deprecated: 保留字段，不再使用 base64
     pub cover_path: Option<String>, // 封面文件路径
     pub path: Option<String>,
     pub size: Option<u64>,
@@ -154,27 +153,27 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
     let channels = properties.channels();
 
     // 获取封面图片
-    let mut cover_base64 = None;
     let mut resolved_cover_path = None;
     
     if let Some(t) = tag {
         if let Some(picture) = t.pictures().first() {
-            let b64 = BASE64_STANDARD.encode(picture.data());
             let mime_type = picture
                 .mime_type()
                 .map(|m| m.as_str())
                 .unwrap_or("image/jpeg");
-            let data_url = format!("data:{};base64,{}", mime_type, b64);
             
             if let Some(dir) = app_cache_dir {
                  // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
                  // 使用 crate 绝对路径引用 covers
-                 if let Some(path) = crate::modules::library::covers::save_cover(dir, &album, &artist, &data_url) {
+                 if let Some(path) = crate::modules::library::covers::save_cover_bytes(
+                     dir,
+                     &album,
+                     &artist,
+                     picture.data(),
+                     mime_type,
+                 ) {
                       resolved_cover_path = Some(path);
                  }
-                 // 既然已经缓存了路径，就不再返回 base64 数据
-            } else {
-                 cover_base64 = Some(data_url);
             }
         }
     }
@@ -185,7 +184,7 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         artist,
         album,
         duration,
-        cover: cover_base64,
+        cover: None,
         cover_path: resolved_cover_path,
         path: Some(normalize_db_path(&path_obj)),
         size,

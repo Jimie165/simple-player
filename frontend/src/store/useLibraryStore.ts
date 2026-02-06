@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import type { RecentItem, SongMetadata } from '@/types/index';
+import type { VideoMetadata } from '@/types/video';
+import { formatTime } from '@/utils/time';
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 type SortOrder = 'asc' | 'desc';
@@ -20,6 +22,7 @@ interface LibraryState {
     favoriteSet: Set<number>;
     pathMap: Map<string, number>; // Cache for path -> id
     refreshFavorites: () => Promise<void>;
+    refreshRecentHistory: () => Promise<void>;
     isFavorite: (song: SongMetadata | { id?: number | string, path?: string }) => boolean;
 
     addToRecent: (item: RecentItem) => void;
@@ -81,12 +84,10 @@ import { usePlayerStore } from '@/store/usePlayerStore'; // Assuming we need to 
 
 const MAX_RECENT_ITEMS = 50;
 
-const sanitizeRecentItem = (item: RecentItem): RecentItem => {
-    if (typeof item.cover === 'string' && item.cover.length > 1024) {
-        return { ...item, cover: null };
-    }
-    return item;
-};
+const sanitizeRecentItem = (item: RecentItem): RecentItem => ({
+    ...item,
+    cover: null
+});
 
 const safeStorage = createJSONStorage(() => ({
     getItem: (name) => localStorage.getItem(name),
@@ -159,6 +160,71 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
             set({ favoriteSet: ids, pathMap: currentPathMap });
         } catch (e) { console.error('Failed to refresh favorites', e); }
+    },
+
+    refreshRecentHistory: async () => {
+        try {
+            const { recentHistory } = get();
+            if (recentHistory.length === 0) return;
+
+            // Fetch latest data safely
+            const [allSongs, allVideos] = await Promise.all([
+                libraryService.getLibrarySongs().catch(() => [] as SongMetadata[]),
+                libraryService.getAllVideos().catch(() => [] as VideoMetadata[])
+            ]);
+
+            // Create lookup maps for faster access
+            const songMap = new Map<string, SongMetadata>();
+            allSongs.forEach((s: SongMetadata) => {
+                if (s.path) songMap.set(s.path.replace(/[\\/]/g, '/').toLowerCase(), s);
+            });
+
+            const videoMap = new Map<string, VideoMetadata>();
+            allVideos.forEach((v: VideoMetadata) => {
+                if (v.path) videoMap.set(v.path.replace(/[\\/]/g, '/').toLowerCase(), v);
+            });
+
+
+            const newRecent = recentHistory.map(item => {
+                if (item.type === 'file' || item.type === 'video') {
+                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+
+                    // Try finding in videos
+                    if (item.type === 'video') {
+                        const found = videoMap.get(normPath);
+                        if (found) {
+                            return {
+                                ...item,
+                                title: found.title || item.title,
+                                description: found.duration ? formatTime(found.duration) : item.description,
+                                cover_path: found.thumbnail_path || item.cover_path,
+                            } as RecentItem;
+                        }
+                    }
+
+                    // Try finding in songs
+                    if (item.type === 'file' || (item.type !== 'video' && !videoMap.has(normPath))) {
+                        const found = songMap.get(normPath);
+                        if (found) {
+                            return {
+                                ...item,
+                                title: found.title || item.title,
+                                artist: found.artist || item.artist,
+                                album: found.album || item.album,
+                                cover_path: found.cover_path || item.cover_path,
+                                description: found.artist || item.description,
+                                isLibraryItem: true
+                            } as RecentItem;
+                        }
+                    }
+                }
+                return item;
+            });
+
+            set({ recentHistory: newRecent });
+        } catch (e) {
+            console.error('Failed to refresh recent history', e);
+        }
     },
 
     addToRecent: (item) => set((state) => {
