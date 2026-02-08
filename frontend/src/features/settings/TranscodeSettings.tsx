@@ -83,6 +83,13 @@ export default function TranscodeSettings() {
     if (!info) return null;
 
     const usagePercent = Math.min((info.total_size_mb / limit) * 100, 100);
+    const limitMin = 1024; // 1GB
+    const limitMax = 51200; // 50GB
+    const limitStep = 1024; // 1GB steps
+    const limitPercent = Math.min(
+        Math.max(((limit - limitMin) / (limitMax - limitMin)) * 100, 0),
+        100
+    );
 
     return (
         <section className="space-y-4">
@@ -139,10 +146,10 @@ export default function TranscodeSettings() {
 
                     {/* 使用量进度条 */}
                     <div className="space-y-1">
-                        <div className="h-2 w-full bg-surface-container-highest rounded-full overflow-hidden">
+                        <div className="h-2 w-full bg-primary/20 rounded-full overflow-hidden">
                             <div
                                 className={clsx(
-                                    "h-full rounded-full transition-all duration-500",
+                                    "h-full rounded-full transition-all duration-500 ease-out",
                                     usagePercent > 90 ? "bg-error" : "bg-primary"
                                 )}
                                 style={{ width: `${usagePercent}%` }}
@@ -155,8 +162,8 @@ export default function TranscodeSettings() {
                     </div>
 
                     {/* 限制滑块 */}
-                    <div className="pt-2">
-                        <div className="flex justify-between items-center mb-2">
+                    <div className="pt-2 pb-1">
+                        <div className="flex justify-between items-center mb-3">
                             <label className="text-xs font-medium text-on-surface-variant">
                                 最大缓存占用
                             </label>
@@ -164,20 +171,50 @@ export default function TranscodeSettings() {
                                 {(limit / 1024).toFixed(1)} GB
                             </span>
                         </div>
-                        <input
-                            type="range"
-                            min="1024" // 1GB
-                            max="51200" // 50GB
-                            step="1024" // 1GB steps
-                            value={limit}
-                            onChange={handleLimitChange}
-                            onMouseUp={handleLimitCommit}
-                            onTouchEnd={handleLimitCommit}
-                            className="w-full h-1.5 bg-surface-container-highest rounded-lg appearance-none cursor-pointer accent-primary"
-                        />
-                        <p className="mt-2 text-[10px] text-on-surface-variant/60 leading-tight">
-                            当缓存超过限制时，最旧的视频将被自动删除。增加限制可以减少重复转码，但会占用更多磁盘空间。
-                        </p>
+
+                        <div className="relative h-7 w-full group flex items-center">
+                            {/* Track Background (Right side - Empty part) */}
+                            <div
+                                className="absolute right-0 top-1/2 h-3 -translate-y-1/2 rounded-r-full bg-primary/20 transition-all duration-300 ease-out"
+                                style={{
+                                    left: `calc(${limitPercent}% + 6px)`,
+                                    right: 0
+                                }}
+                            />
+
+                            {/* Track Foreground (Left side - Filled part) */}
+                            <div
+                                className="absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-l-full bg-primary transition-all duration-300 ease-out"
+                                style={{
+                                    width: `calc(${limitPercent}% - 6px)`
+                                }}
+                            />
+
+                            {/* Thumb (Vertical Line) */}
+                            <div
+                                className="absolute top-1/2 h-9 w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm pointer-events-none transition-all duration-300 ease-out"
+                                style={{ left: `${limitPercent}%` }}
+                            />
+
+                            <input
+                                type="range"
+                                min={limitMin}
+                                max={limitMax}
+                                step={limitStep}
+                                value={limit}
+                                onChange={handleLimitChange}
+                                onMouseUp={handleLimitCommit}
+                                onTouchEnd={handleLimitCommit}
+                                onBlur={handleLimitCommit}
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                            />
+                        </div>
+
+                        {/* Labels below slider */}
+                        <div className="flex justify-between mt-1 text-[10px] font-medium text-primary">
+                            <span>{(limitMin / 1024).toFixed(0)} GB</span>
+                            <span>{(limitMax / 1024).toFixed(0)} GB</span>
+                        </div>
                     </div>
                 </div>
             </div>
