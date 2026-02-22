@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { MdVolumeUp, MdVolumeOff, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
+import { MdVolumeUp, MdVolumeDown, MdVolumeMute, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import VolumePopup from '@/components/common/VolumePopup';
@@ -12,8 +12,14 @@ interface ExtraControlsProps {
 
 export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
     const { volume } = usePlayerStore();
+    const [localVolume, setLocalVolume] = useState(volume);
     const [showVolumePopup, setShowVolumePopup] = useState(false);
     const [showQueuePopup, setShowQueuePopup] = useState(false); // 队列弹窗状态
+
+    // 当全局 volume 因为其他原因本身发生改变（比如松开手保存后，或初始化时），同步给外部按钮显示
+    useEffect(() => {
+        setLocalVolume(volume);
+    }, [volume]);
 
     const volumeRef = useRef<HTMLDivElement>(null);
     const queueRef = useRef<HTMLDivElement>(null);
@@ -61,8 +67,8 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
 
             {/* 2. 音量 */}
             <div className="relative" ref={volumeRef}>
-                <VolumePopup show={showVolumePopup} />
-                <CustomTooltip text={`音量: ${volume}%`}>
+                <VolumePopup show={showVolumePopup} onChange={setLocalVolume} />
+                <CustomTooltip text={`音量: ${localVolume}%`}>
                     <button
                         onClick={() => setShowVolumePopup(!showVolumePopup)}
                         className={clsx(
@@ -70,7 +76,11 @@ export default function ExtraControls({ onInfoClick }: ExtraControlsProps) {
                             showVolumePopup ? "bg-neutral-100 text-primary dark:bg-white/10" : "text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200"
                         )}
                     >
-                        {volume === 0 ? <MdVolumeOff className="text-xl" /> : <MdVolumeUp className="text-xl" />}
+                        {(() => {
+                            if (localVolume === 0) return <MdVolumeMute className="text-xl" />;
+                            if (localVolume <= 50) return <MdVolumeDown className="text-xl" />;
+                            return <MdVolumeUp className="text-xl" />;
+                        })()}
                     </button>
                 </CustomTooltip>
             </div>

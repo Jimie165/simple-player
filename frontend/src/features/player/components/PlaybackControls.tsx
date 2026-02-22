@@ -426,8 +426,8 @@ export default function PlaybackControls() {
             <div className="w-full max-w-lg flex items-center gap-3 text-xs text-neutral-500 font-medium">
                 <span className="w-8 text-right tabular-nums">{formatTime(currentTime)}</span>
                 <div className="flex-1 relative h-4 group flex items-center">
-                    <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-all group-hover:h-1.5"></div>
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-all group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
+                    <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-[height] group-hover:h-1.5"></div>
+                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-[height] group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
                     <div
                         className={clsx(
                             "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",

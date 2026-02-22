@@ -175,7 +175,7 @@ export default function TranscodeSettings() {
                         <div className="relative h-7 w-full group flex items-center">
                             {/* Track Background (Right side - Empty part) */}
                             <div
-                                className="absolute right-0 top-1/2 h-3 -translate-y-1/2 rounded-r-full bg-primary/20 transition-all duration-300 ease-out"
+                                className="absolute right-0 top-1/2 h-3 -translate-y-1/2 rounded-r-full bg-primary/20"
                                 style={{
                                     left: `calc(${limitPercent}% + 6px)`,
                                     right: 0
@@ -184,7 +184,7 @@ export default function TranscodeSettings() {
 
                             {/* Track Foreground (Left side - Filled part) */}
                             <div
-                                className="absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-l-full bg-primary transition-all duration-300 ease-out"
+                                className="absolute left-0 top-1/2 h-3 -translate-y-1/2 rounded-l-full bg-primary"
                                 style={{
                                     width: `calc(${limitPercent}% - 6px)`
                                 }}
@@ -192,7 +192,7 @@ export default function TranscodeSettings() {
 
                             {/* Thumb (Vertical Line) */}
                             <div
-                                className="absolute top-1/2 h-9 w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm pointer-events-none transition-all duration-300 ease-out"
+                                className="absolute top-1/2 h-9 w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm pointer-events-none"
                                 style={{ left: `${limitPercent}%` }}
                             />
 

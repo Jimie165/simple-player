@@ -32,7 +32,7 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                 // 只有折叠时显示 Tooltip (以免遮挡输入框)
                 disabled={!collapsed}
                 placement="bottom" // 文字在下方
-                className="w-full" // 确保外层容器撑满
+                className={clsx(collapsed ? "w-12" : "w-full")} // 折叠时宽度缩小跟随搜索圆圈，居中计算就准了
             >
                 <div
                     onClick={handleSearchClick}

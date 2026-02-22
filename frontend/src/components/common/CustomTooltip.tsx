@@ -1,12 +1,11 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 
 interface CustomTooltipProps {
     text: string;
     children: React.ReactNode;
-    /* 修复 1: 添加 show 属性解决 TS 报错 */
     show?: boolean;
-    /* disabled: 某些情况（如侧边栏展开时）可能想完全禁用 */
     disabled?: boolean;
     placement?: 'top' | 'right' | 'bottom';
     className?: string;
@@ -15,38 +14,134 @@ interface CustomTooltipProps {
 export default function CustomTooltip({
     text,
     children,
-    show, // 接收 show
+    show,
     disabled = false,
-    // 默认改成 top
     placement = 'top',
     className
 }: CustomTooltipProps) {
-    const [isClicked, setIsClicked] = React.useState(false);
+    const [isVisible, setIsVisible] = useState(false);
+    const [isRendered, setIsRendered] = useState(false);
+    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const triggerRef = useRef<HTMLDivElement>(null);
+
+    // 计算弹窗位置
+    const updatePosition = () => {
+        if (!triggerRef.current) return;
+        const rect = triggerRef.current.getBoundingClientRect();
+
+        let top = 0;
+        let left = 0;
+
+        // 留出一定的间距，基础配置
+        const offset = 8;
+
+        if (placement === 'top') {
+            top = rect.top - offset;
+            left = rect.left + rect.width / 2;
+        } else if (placement === 'right') {
+            top = rect.top + rect.height / 2;
+            left = rect.right + offset;
+        } else if (placement === 'bottom') {
+            top = rect.bottom + offset;
+            left = rect.left + rect.width / 2;
+        }
+
+        setCoords({ top, left });
+    };
+    const hoverTimeoutRef = useRef<number | null>(null);
+    const leaveTimeoutRef = useRef<number | null>(null);
+
+    const handleMouseEnter = () => {
+        if (disabled) return;
+        if (leaveTimeoutRef.current) {
+            clearTimeout(leaveTimeoutRef.current);
+            leaveTimeoutRef.current = null;
+        }
+        hoverTimeoutRef.current = setTimeout(() => {
+            updatePosition();
+            setIsRendered(true);
+            // 给 React 渲染一帧的时间，然后再赋予 isVisible 去触发 opacity transition
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => setIsVisible(true));
+            });
+        }, 800);
+    };
+
+    const handleMouseLeave = () => {
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+        }
+        setIsVisible(false);
+        // 延时 200ms 以匹配过渡动画时间
+        leaveTimeoutRef.current = setTimeout(() => {
+            setIsRendered(false);
+        }, 200) as unknown as number;
+    };
+
+    // 清理定时器防泄漏
+    useEffect(() => {
+        return () => {
+            if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+            if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
+        };
+    }, []);
+    // 如果父组件强制 show，也需要更新位置和渲染状态
+    useEffect(() => {
+        if (show === true) {
+            updatePosition();
+            setIsRendered(true);
+            requestAnimationFrame(() => setIsVisible(true));
+        } else if (show === false) {
+            setIsVisible(false);
+            leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
+        }
+    }, [show]);
+
+    useEffect(() => {
+        if (isVisible || show) {
+            window.addEventListener('resize', updatePosition);
+            window.addEventListener('scroll', updatePosition, true);
+        }
+        return () => {
+            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('scroll', updatePosition, true);
+        };
+    }, [isVisible, show]);
+
+    const shouldRender = isRendered || show === true;
 
     return (
         <div
+            ref={triggerRef}
             className={clsx("group/tooltip relative flex items-center justify-center", className)}
-            onClick={() => setIsClicked(true)}
-            onMouseLeave={() => setIsClicked(false)}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            // 避免点击后仍然顽固显示的情况
+            onClick={handleMouseLeave}
         >
             {children}
 
-            {!disabled && !isClicked && (
-                <div className={clsx(
-                    "absolute z-[9999] px-2.5 py-1.5 pointer-events-none",
-                    "bg-primary/90 text-on-primary backdrop-blur-sm",
-                    "text-xs font-medium rounded-md shadow-sm whitespace-nowrap",
-                    "tooltip-animation", // 使用 CSS 类控制延迟 (进入有延迟)
+            {shouldRender && createPortal(
+                <div
+                    className={clsx(
+                        "fixed z-[99999] px-2.5 py-1.5 pointer-events-none",
+                        "bg-primary/90 text-on-primary backdrop-blur-sm",
+                        "text-xs font-medium rounded-md shadow-sm whitespace-nowrap",
+                        // 定位基准点变换
+                        placement === 'top' && "-translate-x-1/2 -translate-y-full origin-bottom",
+                        placement === 'right' && "-translate-y-1/2 origin-left",
+                        placement === 'bottom' && "-translate-x-1/2 origin-top",
 
-                    // 如果传入了 show，则听 show 的强制覆盖
-                    show === true && "!opacity-100 !scale-100 !delay-0",
-                    show === false && "!opacity-0 !scale-95 !delay-0",
-
-                    // --- 位置逻辑 ---
-                    placement === 'top' && "bottom-full mb-1 left-1/2 -translate-x-1/2 origin-bottom",
-                    placement === 'right' && "left-full ml-1.5 top-1/2 -translate-y-1/2 origin-left",
-                    placement === 'bottom' && "top-full mt-1 left-1/2 -translate-x-1/2 origin-top",
-                )}>
+                        // 动画过渡
+                        "transition-all duration-200 ease-out",
+                        (isVisible) ? "opacity-100 scale-100" : "opacity-0 scale-95"
+                    )}
+                    style={{
+                        top: coords.top,
+                        left: coords.left,
+                    }}
+                >
                     {text}
 
                     {/* 小三角箭头 */}
@@ -59,7 +154,8 @@ export default function CustomTooltip({
                     {placement === 'bottom' && (
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-[1px] border-4 border-transparent border-b-primary/90" />
                     )}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
