@@ -45,8 +45,8 @@ simple-player/
 ## 环境准备
 
 - **操作系统**：Windows 10（1803+）或 Windows 11
-- **Node.js**：\ge 20.0.0 (推荐使用 LTS 版本)
-- **pnpm**：项目使用 pnpm workspace，确保 pnpm 版本 \ge 9.0.0
+- **Node.js**：$\ge$ 20.0.0 (推荐使用 LTS 版本)
+- **pnpm**：项目使用 pnpm workspace，确保 pnpm 版本 $\ge$ 9.0.0
 - **Rust 工具链**：`stable`（Tauri 构建依赖）
 - **WebView2**：Windows 上 Tauri 的运行时依赖，通常系统已预装；若未安装请前往 [Microsoft 官网](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/) 下载
 - **FFmpeg/FFprobe sidecar（开发构建建议）**：
