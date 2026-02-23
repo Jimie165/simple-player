@@ -284,7 +284,7 @@ export default function Settings() {
                                 这是一个基于 Tauri v2 和 React 构建的本地音乐播放器。
                             </p>
                             <div className="mt-4 flex gap-4 text-xs text-on-surface-variant/70">
-                                <span>Version: {appVersion || '0.1.0'}</span>
+                                <span>Version: {appVersion}</span>
                                 <span>•</span>
                                 <span>Made by Jimie165</span>
                             </div>
