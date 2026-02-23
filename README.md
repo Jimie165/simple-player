@@ -1,80 +1,86 @@
 # Simple Player
 
-Simple Player 是一个基于 Tauri + React 的本地音乐/视频播放器，面向桌面端使用场景。项目包含前端界面与后端本地能力，支持媒体库管理、搜索、播放队列、播放列表与视频库等功能。
+Simple Player 是一个基于 Tauri + React 的本地音乐/视频播放器，面向桌面端使用场景。支持媒体库管理、播放队列、播放列表与视频库等功能。
 
-**功能概览**
+> **平台支持**：目前仅支持 **Windows**。
+
+## 功能概览
+
 - 本地音乐库扫描与管理
 - 搜索（歌曲/艺人/专辑/视频）
 - 播放控制与播放队列
-- 播放列表（含收藏/喜爱歌曲等）
+- 播放列表（含收藏/喜爱歌曲）
 - 视频库与视频播放
-- 设置面板（包含与视频相关的管理项）
+- 设置面板
 
-**技术栈**
-- Tauri 2.x
-- React 19 + Vite
-- Zustand（状态管理）
-- Tailwind CSS 4.x
-- react-virtuoso（虚拟列表）
-- ffmpeg / ffprobe（随应用打包的二进制）
+## 技术栈
 
-**目录结构**
-- `frontend/` 前端应用（React + Vite）
-- `backend/tauri/` Tauri 后端与桌面配置
-- `backend/tauri/src/commands/` Tauri 命令入口
-- `backend/tauri/src/modules/` 后端核心模块（库扫描、视频、数据库等）
-- `backend/tauri/tauri.conf.json` Tauri 应用配置与打包设置
+| 组件 | 版本 |
+|------|------|
+| Tauri | 2.x |
+| React + Vite | 19.x |
+| Zustand | 状态管理 |
+| Tailwind CSS | 4.x |
+| react-virtuoso | 虚拟列表 |
+| FFmpeg / FFprobe | 随应用打包 |
 
-**环境准备**
-- Node.js（建议与前端依赖兼容的 LTS 版本）
-- pnpm（项目使用 pnpm workspace 管理依赖）
-- Rust 工具链（Tauri 构建依赖）
-- 平台依赖：请根据系统安装 Tauri 官方文档要求的系统依赖
+## 目录结构
 
-**快速开始**
-1. 安装依赖
-```bash
-pnpm install
 ```
-2. 启动开发环境（Tauri 桌面应用）
+simple-player/
+├── frontend/                        # 前端应用（React + Vite）
+│   └── src/
+├── backend/
+│   └── tauri/
+│       ├── src/
+│       │   ├── commands/            # Tauri 命令入口
+│       │   └── modules/             # 后端核心模块
+│       └── tauri.conf.json          # Tauri 应用配置
+├── scripts/                         # 工具脚本（版本号管理等）
+└── package.json
+```
+
+## 环境准备
+
+- **Node.js**：推荐使用 LTS 最新版
+- **pnpm**：项目使用 pnpm workspace 管理依赖
+- **Rust 工具链**：Tauri 构建依赖
+- **WebView2**：Windows 上 Tauri 的运行时依赖，通常系统已预装；若未安装请前往 [Microsoft 官网](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/) 下载
+
+## 快速开始
+
 ```bash
+# 1. 安装依赖
+pnpm install
+
+# 2. 启动开发模式（Tauri 桌面应用）
 pnpm dev
 ```
-该命令会启动前端 Vite 服务并启动 Tauri 桌面壳。
 
-**常用脚本**
-根目录脚本（`package.json`）：
-- `pnpm dev` 启动 Tauri 开发模式
-- `pnpm build` 构建桌面应用（含前端构建）
-- `pnpm preview` 仅预览前端（不启动 Tauri）
-- `pnpm lint` 前端代码检查
+## 常用脚本
 
-前端脚本（`frontend/package.json`）：
-- `pnpm --filter frontend dev` 启动前端开发服务
-- `pnpm --filter frontend build` 构建前端产物
-- `pnpm --filter frontend preview` 预览前端产物
+| 命令 | 说明 |
+|------|------|
+| `pnpm dev` | 启动 Tauri 开发模式 |
+| `pnpm build` | 构建桌面应用（含前端打包） |
+| `pnpm preview` | 仅预览前端（不启动 Tauri） |
+| `pnpm lint` | 前端代码检查 |
+| `pnpm bump` | 更新版本号 |
 
-**配置说明**
-- 应用基本信息与窗口设置：`backend/tauri/tauri.conf.json`
-- 前端入口与路由：`frontend/src/App.tsx`
-- 搜索结果视图：`frontend/src/features/search/SearchResultsView.tsx`
-- 视频相关逻辑：`frontend/src/features/videos/` 与 `backend/tauri/src/commands/video.rs`
+## 构建与打包
 
-**开发建议**
-- 列表渲染已使用虚拟化组件，继续保持对大数据量列表的性能关注
-- 涉及异步请求和播放状态切换的逻辑建议补充错误提示与边界处理
-- 建议补齐最小测试集，覆盖搜索、播放队列、播放列表的核心路径
-
-**构建与打包**
 ```bash
 pnpm build
 ```
-构建完成后，Tauri 会按默认规则生成对应平台的安装包或可执行文件。
 
-**常见问题排查**
-- 端口占用：Tauri 开发模式默认使用 `http://localhost:5173`，确保端口可用
-- 依赖安装失败：确认 Node.js 与 pnpm 版本
-- 构建失败：确认 Rust 与平台依赖安装完整
+构建完成后，Tauri 会在 `backend/tauri/target/release/bundle/` 下生成对应的安装包。
 
-**许可证**
-ISC
+## 常见问题
+
+详见 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)。
+
+## 许可证
+
+本项目以 [GPL-3.0](LICENSE) 许可证开源。
+
+> 本应用随附打包了 FFmpeg / FFprobe 二进制文件，其以 LGPL/GPL 授权发布。为确保合规，本项目整体采用 GPL-3.0 协议。
