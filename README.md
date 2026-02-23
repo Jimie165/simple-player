@@ -15,14 +15,16 @@ Simple Player 是一个基于 Tauri + React 的本地音乐/视频播放器，�
 
 ## 技术栈
 
-| 组件 | 版本 |
-|------|------|
+| 组件 | 版本/说明 |
+|------|-----------|
 | Tauri | 2.x |
-| React + Vite | 19.x |
-| Zustand | 状态管理 |
+| React | 19.x |
+| Vite | 7.x |
+| Rust | Edition 2024 |
+| Zustand | 5.x |
 | Tailwind CSS | 4.x |
-| react-virtuoso | 虚拟列表 |
-| FFmpeg / FFprobe | 随应用打包 |
+| react-virtuoso | 4.x（虚拟列表） |
+| FFmpeg / FFprobe | Windows sidecar 随应用打包 |
 
 ## 目录结构
 
@@ -42,10 +44,22 @@ simple-player/
 
 ## 环境准备
 
-- **Node.js**：推荐使用 LTS 最新版
-- **pnpm**：项目使用 pnpm workspace 管理依赖
-- **Rust 工具链**：Tauri 构建依赖
+- **操作系统**：Windows 10（1803+）或 Windows 11
+- **Node.js**：\ge 20.0.0 (推荐使用 LTS 版本)
+- **pnpm**：项目使用 pnpm workspace，确保 pnpm 版本 \ge 9.0.0
+- **Rust 工具链**：`stable`（Tauri 构建依赖）
 - **WebView2**：Windows 上 Tauri 的运行时依赖，通常系统已预装；若未安装请前往 [Microsoft 官网](https://developer.microsoft.com/zh-cn/microsoft-edge/webview2/) 下载
+- **FFmpeg/FFprobe sidecar（开发构建建议）**：
+  - 参考 `backend/tauri/binaries/README.md`
+  - 当前仓库默认使用 `backend/tauri/binaries/ffmpeg-<target-triple>.exe` 与 `ffprobe-<target-triple>.exe`
+
+可选环境自检：
+
+```bash
+node -v
+pnpm -v
+rustc --version
+```
 
 ## 快速开始
 
@@ -66,6 +80,12 @@ pnpm dev
 | `pnpm preview` | 仅预览前端（不启动 Tauri） |
 | `pnpm lint` | 前端代码检查 |
 | `pnpm bump` | 更新版本号 |
+
+## 媒体格式支持（当前实现）
+
+- 音频扫描扩展名：`mp3`、`flac`、`wav`、`ogg`、`m4a`
+- 视频扫描扩展名：`mp4`、`mkv`、`avi`、`mov`、`webm`、`flv`、`m4v`、`3gp`、`ts`、`rmvb`、`wmv`、`asf`、`ogv`
+- 说明：扩展名被扫描到不代表一定可原生播放；不兼容编码会在播放前触发封装转换或转码
 
 ## 构建与打包
 
