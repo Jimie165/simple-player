@@ -92,7 +92,7 @@ export default function SongListView({
 
     // Selection Store
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, clearSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
-    const { toggleFavorite, isFavorite, favoriteSet } = useLibraryStore();
+    const { toggleFavorite, isFavorite, favoriteSet, optimisticallyDeletedSongIds } = useLibraryStore();
 
     // Context Menu State
     type ContextMenuState = {
@@ -114,9 +114,14 @@ export default function SongListView({
         return `${m}:${s.toString().padStart(2, '0')}`;
     };
 
+    const visibleSongs = useMemo(() => {
+        if (optimisticallyDeletedSongIds.size === 0) return songs;
+        return songs.filter((song) => !(typeof song.id === 'number' && optimisticallyDeletedSongIds.has(song.id)));
+    }, [songs, optimisticallyDeletedSongIds]);
+
     const sortedSongs = useMemo(() => {
-        if (!sortKey || sortKey === 'manual') return songs;
-        return [...songs].sort((a, b) => {
+        if (!sortKey || sortKey === 'manual') return visibleSongs;
+        return [...visibleSongs].sort((a, b) => {
             let valA = a[sortKey];
             let valB = b[sortKey];
             if (valA === undefined || valA === null) valA = '';
@@ -137,7 +142,7 @@ export default function SongListView({
             if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [songs, sortKey, sortOrder]);
+    }, [visibleSongs, sortKey, sortOrder]);
 
     // Update Selectable IDs
     useEffect(() => {
@@ -294,6 +299,10 @@ export default function SongListView({
                                 e.stopPropagation();
                                 toggleFavorite(song);
                             }}
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                            }}
                             className={clsx(
                                 "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
                                 isFav
@@ -334,11 +343,16 @@ export default function SongListView({
                             !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
                         )}
                         onClick={(e) => {
+                            if (e.detail !== 1) return;
                             if (isSelectionMode) return;
                             if (onOpenArtist && song.artist) {
                                 e.stopPropagation();
                                 onOpenArtist(song.artist);
                             }
+                        }}
+                        onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                         }}
                     >
                         {song.artist}
@@ -353,11 +367,16 @@ export default function SongListView({
                             !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
                         )}
                         onClick={(e) => {
+                            if (e.detail !== 1) return;
                             if (isSelectionMode) return;
                             if (onOpenAlbum && song.album) {
                                 e.stopPropagation();
                                 onOpenAlbum(song.album);
                             }
+                        }}
+                        onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                         }}
                     >
                         {song.album}

@@ -84,7 +84,24 @@ export default function CustomTooltip({
         return () => {
             if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
             if (leaveTimeoutRef.current) clearTimeout(leaveTimeoutRef.current);
+            // 组件卸载时强制隐藏（防止快速点击导致 mouseleave 丢失残留）
+            setIsVisible(false);
+            setIsRendered(false);
         };
+    }, []);
+
+    // 全局 mousedown：任何点击都立即关闭 tooltip（兼容 React 重绘后 mouseleave 丢失的情况）
+    useEffect(() => {
+        const forceHide = () => {
+            if (hoverTimeoutRef.current) {
+                clearTimeout(hoverTimeoutRef.current);
+                hoverTimeoutRef.current = null;
+            }
+            setIsVisible(false);
+            leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
+        };
+        window.addEventListener('mousedown', forceHide);
+        return () => window.removeEventListener('mousedown', forceHide);
     }, []);
     // 如果父组件强制 show，也需要更新位置和渲染状态
     useEffect(() => {

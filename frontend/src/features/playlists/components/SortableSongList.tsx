@@ -59,8 +59,9 @@ interface SortableSongListProps {
 
 
 const getSongId = (song: SongMetadata, index: number) => {
-    if (song.id !== undefined && song.id !== null) return song.id.toString();
-    return song.path ? song.path : `temp-${index}`;
+    if (song.unique_id !== undefined && song.unique_id !== null) return song.unique_id.toString();
+    if (song.id !== undefined && song.id !== null) return `${song.id}-${index}`;
+    return song.path ? `${song.path}-${index}` : `temp-${index}`;
 };
 
 // Pure UI Component
@@ -83,7 +84,8 @@ const SongListItem = memo(({
     onMenuOpen,
     toggleSelection,
     playlistId,
-    context // Added
+    context, // Added
+    isFav // Added
 }: any) => {
     const { push } = useNavigationStore();
     return (
@@ -133,20 +135,24 @@ const SongListItem = memo(({
             {/* Heart Icon Column */}
             {(
                 <div className="flex justify-center items-center">
-                    <CustomTooltip text={song.is_favorite ? "取消喜爱" : "喜爱"} placement="top">
+                    <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
                         <button
                             onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFavorite && toggleFavorite(song);
                             }}
+                            onDoubleClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                            }}
                             className={clsx(
                                 "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
-                                song.is_favorite
+                                isFav
                                     ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
                                     : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
                             )}
                         >
-                            {song.is_favorite ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
+                            {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
                         </button>
                     </CustomTooltip>
                 </div>
@@ -176,9 +182,14 @@ const SongListItem = memo(({
                         !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
                     )}
                     onClick={(e) => {
+                        if (e.detail !== 1) return;
                         if (isSelectionMode) return;
                         e.stopPropagation();
                         push({ type: 'artist_detail', data: { name: song.artist } });
+                    }}
+                    onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
                     }}
                 >
                     {song.artist}
@@ -193,9 +204,14 @@ const SongListItem = memo(({
                             !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
                         )}
                         onClick={(e) => {
+                            if (e.detail !== 1) return;
                             if (isSelectionMode) return;
                             e.stopPropagation();
                             push({ type: 'album_detail', data: { name: song.album, artist: song.artist } });
+                        }}
+                        onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
                         }}
                     >
                         {song.album}
@@ -322,8 +338,10 @@ const ContextMenuResolver = memo(({
         return contextMenu.song ? [contextMenu.song] : [];
     }, [contextMenu]);
 
-    const getSelectionId = (song: SongMetadata) => {
-        return song.id ? song.id.toString() : (song.path || '');
+    const getSelectionId = (song: SongMetadata, index?: number) => {
+        if (song.unique_id !== undefined && song.unique_id !== null) return song.unique_id.toString();
+        if (song.id !== undefined && song.id !== null) return index !== undefined ? `${song.id}-${index}` : song.id.toString();
+        return song.path ? (index !== undefined ? `${song.path}-${index}` : song.path) : '';
     };
 
     const { menuItems } = useSongOperations({
@@ -332,15 +350,15 @@ const ContextMenuResolver = memo(({
         playlistId,
         isSelected: contextMenu?.type === 'batch'
             ? true
-            : (contextMenu?.song ? selectedIds.has(getSelectionId(contextMenu.song)) : false),
+            : (contextMenu?.song ? selectedIds.has(getSelectionId(contextMenu.song, contextMenu.index)) : false),
         onSelect: () => {
             if (contextMenu?.type === 'batch') {
                 items.forEach((s: SongMetadata) => {
-                    const id = getSelectionId(s);
+                    const id = getSelectionId(s, contextMenu.songs?.indexOf(s));
                     if (id) toggleSelection(id, 'song', s);
                 });
             } else if (contextMenu?.song) {
-                const id = getSelectionId(contextMenu.song);
+                const id = getSelectionId(contextMenu.song, contextMenu.index);
                 if (!isSelectionMode) {
                     toggleSelectionMode({ id, type: 'song', data: contextMenu.song });
                 } else {
@@ -374,7 +392,11 @@ export default function SortableSongList({
 
 
     // Use the songs prop directly as sorting is now handled by the parent component
-    const displaySongs = songs;
+    const optimisticallyDeletedSongIds = useLibraryStore((s) => s.optimisticallyDeletedSongIds);
+    const displaySongs = useMemo(() => {
+        if (optimisticallyDeletedSongIds.size === 0) return songs;
+        return songs.filter((song) => !(typeof song.id === 'number' && optimisticallyDeletedSongIds.has(song.id)));
+    }, [songs, optimisticallyDeletedSongIds]);
 
     const HeaderCell = ({ label, className, alignRight = false }: { label: React.ReactNode, className?: string, alignRight?: boolean }) => (
         <div
@@ -396,7 +418,9 @@ export default function SortableSongList({
     }, []);
 
     // Use LibraryStore for Favorites
-    const { toggleFavorite } = useLibraryStore();
+    const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
+    const favoriteSet = useLibraryStore(state => state.favoriteSet);
+    const isFavoriteStoreFn = useLibraryStore(state => state.isFavorite);
 
     // Destructure all needed SelectionStore values
     const {
@@ -569,18 +593,9 @@ export default function SortableSongList({
 
     const isSelected = (id: string | undefined) => id ? selectedIds.has(id) : false;
 
-    const handleItemClick = (e: React.MouseEvent, song: SongMetadata) => {
-        e.stopPropagation();
-        if (e.button !== 0) return; // Only allow left click
-        const id = song.id ? song.id.toString() : song.path;
-        if (isSelectionMode && id) {
-            toggleSelection(id, 'song', song);
-        }
-    };
-
-    const handleCheckboxClick = (e: React.MouseEvent | null, song: SongMetadata) => {
+    const handleCheckboxClick = (e: React.MouseEvent | null, song: SongMetadata, index: number) => {
         if (e) e.stopPropagation();
-        const id = song.id ? song.id.toString() : song.path;
+        const id = getSongId(song, index);
         if (!id) return;
         if (!isSelectionMode) {
             toggleSelectionMode({ id, type: 'song', data: song });
@@ -647,6 +662,10 @@ export default function SortableSongList({
 
     const itemContent = (index: number, song: SongMetadata) => {
         const uniqueId = getSongId(song, index);
+        const isFav = (song.id !== undefined && typeof song.id === 'number')
+            ? favoriteSet.has(song.id)
+            : isFavoriteStoreFn(song as any);
+
         return (
             <SortableItem
                 key={uniqueId}
@@ -656,14 +675,19 @@ export default function SortableSongList({
                 isSelectionMode={isSelectionMode}
                 selected={isSelected(uniqueId)}
                 onPlay={onPlay}
-                handleItemClick={handleItemClick}
-                handleCheckboxClick={handleCheckboxClick}
+                handleItemClick={(e: React.MouseEvent, s: SongMetadata) => {
+                    e.stopPropagation();
+                    if (e.button !== 0) return;
+                    if (isSelectionMode) toggleSelection(uniqueId, 'song', s);
+                }}
+                handleCheckboxClick={(e: React.MouseEvent | null, s: SongMetadata) => handleCheckboxClick(e, s, index)}
                 handleContextMenu={handleContextMenu}
                 hideAlbum={shouldHideAlbum}
                 formatDuration={formatDuration}
-                onSelect={(s: SongMetadata) => handleCheckboxClick(null, s)}
+                onSelect={(s: SongMetadata) => handleCheckboxClick(null, s, index)}
                 onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
                 toggleFavorite={toggleFavorite}
+                isFav={isFav}
                 toggleSelection={toggleSelection}
                 onMenuOpen={() => {
                     setContextMenu(null);

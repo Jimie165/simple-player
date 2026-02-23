@@ -195,29 +195,43 @@ impl SongRepo {
         Ok(())
     }
 
-    /// 软删除歌曲（标记为归档）
+    /// 从音乐库彻底删除歌曲，并清理所有关联状态
     pub fn delete(conn: &Connection, id: i64) -> Result<()> {
-        conn.execute(
-            "UPDATE songs SET status = 'archived', updated_at = datetime('now') WHERE id = ?1",
-            params![id],
-        )?;
+        conn.execute("DELETE FROM playlist_songs WHERE song_id = ?1", params![id])?;
+        conn.execute("DELETE FROM play_queue WHERE song_id = ?1", params![id])?;
+        conn.execute("DELETE FROM songs WHERE id = ?1", params![id])?;
         Ok(())
     }
 
-    /// 批量软删除歌曲
+    /// 批量从音乐库彻底删除歌曲，并清理所有关联状态
     pub fn batch_delete(conn: &Connection, ids: &[i64]) -> Result<()> {
         if ids.is_empty() {
             return Ok(());
         }
+
         let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let sql = format!(
-            "UPDATE songs SET status = 'archived', updated_at = datetime('now') WHERE id IN ({})",
+        let params_refs: Vec<&dyn rusqlite::ToSql> = ids
+            .iter()
+            .map(|id| id as &dyn rusqlite::ToSql)
+            .collect();
+
+        let delete_playlist_songs_sql = format!(
+            "DELETE FROM playlist_songs WHERE song_id IN ({})",
             placeholders
         );
-        let mut stmt = conn.prepare(&sql)?;
-        let params_refs: Vec<&dyn rusqlite::ToSql> =
-            ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
-        stmt.execute(params_refs.as_slice())?;
+        let mut delete_playlist_songs_stmt = conn.prepare(&delete_playlist_songs_sql)?;
+        delete_playlist_songs_stmt.execute(params_refs.as_slice())?;
+
+        let delete_play_queue_sql = format!(
+            "DELETE FROM play_queue WHERE song_id IN ({})",
+            placeholders
+        );
+        let mut delete_play_queue_stmt = conn.prepare(&delete_play_queue_sql)?;
+        delete_play_queue_stmt.execute(params_refs.as_slice())?;
+
+        let delete_songs_sql = format!("DELETE FROM songs WHERE id IN ({})", placeholders);
+        let mut delete_songs_stmt = conn.prepare(&delete_songs_sql)?;
+        delete_songs_stmt.execute(params_refs.as_slice())?;
         Ok(())
     }
 

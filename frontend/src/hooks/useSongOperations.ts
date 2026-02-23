@@ -61,7 +61,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     } = options;
 
     // Stores
-    const { isFavorite, triggerLibraryUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
+    const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const {
         setShuffleState, isShuffling, isPlaying, setIsPlaying,
@@ -213,8 +213,26 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 } else {
                     const songsToDelete = await resolveSongsFromItems(items);
                     const ids = songsToDelete.map(s => s.id).filter(id => typeof id === 'number') as number[];
+                    const store = useLibraryStore.getState();
                     if (ids.length > 0) {
-                        await libraryService.batchDeleteSongs(ids);
+                        store.markSongsAsOptimisticallyDeleted(ids);
+                    }
+                    if (ids.length > 0) {
+                        try {
+                            await libraryService.batchDeleteSongs(ids);
+                            songsToDelete.forEach((song) => {
+                                if (song.path) {
+                                    store.removeSongFromPlaylist(song.path);
+                                }
+                            });
+                            // Keep optimistic hidden state a little longer until async refresh returns.
+                            window.setTimeout(() => {
+                                useLibraryStore.getState().clearOptimisticallyDeletedSongs(ids);
+                            }, 1500);
+                        } catch (error) {
+                            store.clearOptimisticallyDeletedSongs(ids);
+                            throw error;
+                        }
                     }
                 }
 
@@ -225,6 +243,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 });
 
                 triggerLibraryUpdate();
+                triggerPlaylistUpdate();
             },
             context === 'video'
                 ? `确定要从视频库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`
@@ -232,7 +251,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             context === 'video' ? '从视频库删除' : '从音乐库删除',
             '删除'
         );
-    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, clearSelection, removeFromRecent, context]);
+    }, [items, count, openDeleteConfirm, triggerLibraryUpdate, triggerPlaylistUpdate, clearSelection, removeFromRecent, context]);
 
     // 5. 删除或从播放列表移除
     const handleDeleteOrRemove = useCallback(async () => {
@@ -261,6 +280,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                         }
                     }
                     triggerLibraryUpdate();
+                    triggerPlaylistUpdate();
                 },
                 `确定要删除选中的 ${count} 个播放列表吗？`,
                 '删除播放列表',
@@ -279,6 +299,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                         try {
                             await libraryService.batchRemovePlaylistItems(playlistId, uniqueIds);
                             triggerLibraryUpdate();
+                            triggerPlaylistUpdate();
                         } catch (e) {
                             console.error('Failed to remove playlist items', e);
                         }
@@ -289,6 +310,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                             try {
                                 await libraryService.batchRemoveFromPlaylist(playlistId, songIds);
                                 triggerLibraryUpdate();
+                                triggerPlaylistUpdate();
                             } catch (e) {
                                 console.error('Failed to remove from playlist', e);
                             }

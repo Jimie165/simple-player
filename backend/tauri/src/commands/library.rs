@@ -456,7 +456,7 @@ pub async fn refresh_library(
     scan_library(db, app_handle, false).await
 }
 
-/// 从库中移除单首歌曲（归档）
+/// 从库中删除单首歌曲（同时清理收藏、播放列表关联等状态）
 #[tauri::command]
 pub fn delete_song(db: State<'_, DbState>, id: i64) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -473,7 +473,7 @@ pub fn restore_song(db: State<'_, DbState>, id: i64) -> Result<(), String> {
     Ok(())
 }
 
-/// 批量删除歌曲（归档）
+/// 批量删除歌曲（同时清理收藏、播放列表关联等状态）
 #[tauri::command]
 pub fn batch_delete_songs(db: State<'_, DbState>, ids: Vec<i64>) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;

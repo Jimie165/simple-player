@@ -69,7 +69,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Store Actions
     // Store Actions
-    const { libraryVersion, triggerLibraryUpdate } = useLibraryStore();
+    const { triggerLibraryUpdate, playlistVersion, triggerPlaylistUpdate, favoriteSet } = useLibraryStore();
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
@@ -104,7 +104,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             setLoading(false);
             initialLoadRef.current = false;
         }
-    }, [id, libraryVersion, sortKey, sortOrder]);
+    }, [id, sortKey, sortOrder, playlistVersion]);
 
     useEffect(() => { loadData(); }, [loadData]);
 
@@ -191,6 +191,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             const songIds = newOrder.map(s => s.id!);
             await libraryService.reorderPlaylistSongs(id as number, songIds);
             triggerLibraryUpdate();
+            triggerPlaylistUpdate();
         }
     };
 
@@ -219,12 +220,19 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Sort & Filter Songs
     const sortedSongs = useMemo(() => {
-        // 对于喜爱歌曲的"播放列表顺序"，后端已经返回了正确的顺序，不需要前端再排序
-        if (isFavorites && sortKey === 'manual') {
-            return songs;
+        let listToProcess = songs;
+
+        if (isFavorites) {
+            // 实时过滤掉已取消喜爱的歌曲，避免在“喜爱歌曲”页面中残留
+            listToProcess = listToProcess.filter(s => s.id && favoriteSet.has(s.id));
+
+            // 对于喜爱歌曲的"播放列表顺序"，后端已经返回了正确的顺序，不需要前端再排序
+            if (sortKey === 'manual') {
+                return listToProcess;
+            }
         }
-        return sortSongs(songs, sortKey, sortOrder);
-    }, [songs, sortKey, sortOrder, isFavorites]);
+        return sortSongs(listToProcess, sortKey, sortOrder);
+    }, [songs, sortKey, sortOrder, isFavorites, favoriteSet]);
 
 
     const filteredSongs = useMemo(() => {
@@ -502,7 +510,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         songs={filteredSongs}
                         onPlay={handlePlaySong}
                         onReorder={handleReorder}
-                        disableReorder={(id !== 'favorites' && typeof id !== 'number') || !!searchQuery}
+                        disableReorder={id === 'favorites' || !!searchQuery}
                         sortKey={sortKey}
                         sortOrder={sortOrder}
                         playlistId={typeof id === 'number' ? id : undefined}

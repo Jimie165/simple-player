@@ -21,6 +21,9 @@ interface LibraryState {
     currentSongIndex: number;
     favoriteSet: Set<number>;
     pathMap: Map<string, number>; // Cache for path -> id
+    optimisticallyDeletedSongIds: Set<number>;
+    markSongsAsOptimisticallyDeleted: (ids: number[]) => void;
+    clearOptimisticallyDeletedSongs: (ids?: number[]) => void;
     refreshFavorites: () => Promise<void>;
     refreshRecentHistory: () => Promise<void>;
     isFavorite: (song: SongMetadata | { id?: number | string, path?: string }) => boolean;
@@ -67,6 +70,10 @@ interface LibraryState {
     // Library Version for Sync
     libraryVersion: number;
     triggerLibraryUpdate: () => void;
+
+    // Playlist Version for Sync (Add/Remove songs)
+    playlistVersion: number;
+    triggerPlaylistUpdate: () => void;
 
     // Favorites
     toggleFavorite: (song: SongMetadata) => Promise<void>;
@@ -131,6 +138,24 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
     pathMap: new Map<string, number>(),
+    optimisticallyDeletedSongIds: new Set<number>(),
+
+    markSongsAsOptimisticallyDeleted: (ids) => set((state) => {
+        if (ids.length === 0) return {};
+        const next = new Set(state.optimisticallyDeletedSongIds);
+        ids.forEach((id) => next.add(id));
+        return { optimisticallyDeletedSongIds: next };
+    }),
+
+    clearOptimisticallyDeletedSongs: (ids) => set((state) => {
+        if (!ids || ids.length === 0) {
+            if (state.optimisticallyDeletedSongIds.size === 0) return {};
+            return { optimisticallyDeletedSongIds: new Set<number>() };
+        }
+        const next = new Set(state.optimisticallyDeletedSongIds);
+        ids.forEach((id) => next.delete(id));
+        return { optimisticallyDeletedSongIds: next };
+    }),
 
     isFavorite: (song) => {
         const { favoriteSet, pathMap } = get();
@@ -600,6 +625,9 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
     libraryVersion: 0,
     triggerLibraryUpdate: () => set((state) => ({ libraryVersion: state.libraryVersion + 1 })),
+
+    playlistVersion: 0,
+    triggerPlaylistUpdate: () => set((state) => ({ playlistVersion: state.playlistVersion + 1 })),
 
     toggleFavorite: async (song) => {
         let songId: number | undefined;

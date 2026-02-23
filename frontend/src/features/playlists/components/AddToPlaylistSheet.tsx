@@ -242,6 +242,7 @@ export default function AddToPlaylistSheet() {
         }
         clearSelection();
         useLibraryStore.getState().triggerLibraryUpdate();
+        useLibraryStore.getState().triggerPlaylistUpdate();
 
         // Reload all playlist songs to update covers
         try {
@@ -254,8 +255,8 @@ export default function AddToPlaylistSheet() {
                             const match = libraryMap.get(s.id)!;
                             return {
                                 ...s,
-                                        cover: null,
-                                        cover_path: match.cover_path || s.cover_path
+                                cover: null,
+                                cover_path: match.cover_path || s.cover_path
                             };
                         }
                         return s;
