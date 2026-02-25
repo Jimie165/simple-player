@@ -1,6 +1,6 @@
 import MusicContextMenu from './MusicContextMenu';
-import { useSongOperations } from '@/hooks/useSongOperations';
-import type { MusicMenuContext } from '@/hooks/useSongOperations';
+import { useSongOperations } from '@/hooks/menu/useSongOperations';
+import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import type { MusicItem } from '@/utils/musicItemUtils';
 
 interface SmartMusicContextMenuProps {

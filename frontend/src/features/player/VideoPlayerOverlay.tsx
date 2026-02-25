@@ -1,184 +1,117 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { formatTime } from '@/utils/time';
 import {
     MdPlayArrow, MdPause,
     MdVolumeUp, MdVolumeOff, MdFullscreen, MdFullscreenExit,
-    MdArrowBack, MdSkipPrevious, MdSkipNext, MdPlaylistPlay, MdClose
+    MdArrowBack, MdSkipPrevious, MdSkipNext, MdPlaylistPlay
 } from 'react-icons/md';
 import { AnimatePresence, motion } from 'framer-motion';
 import MusicSlider from '@/components/common/MusicSlider';
-import { getCurrentWindow } from '@tauri-apps/api/window';
-import { convertFileSrc, invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { systemService } from '@/services/systemService';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
-import CoverImage from '@/components/common/CoverImage';
-import { resolveMediaPath } from '@/utils/mediaPath';
+import { VideoPlaylistDrawer } from './video/VideoPlaylistDrawer';
+import { useVideoPlayback } from './hooks/useVideoPlayback';
+import { useVideoControls } from './hooks/useVideoControls';
 
 export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const { videoMetadata, videoQueue, currentVideoIndex, playNextVideo, playPreviousVideo, setVideoQueue } = usePlayerStore();
-
-    // Video Play State (Independent from Music)
-    const [isPlaying, setIsPlaying] = useState(false);
-
-    // UI State
-    const [isControlsVisible, setIsControlsVisible] = useState(true);
-    const [currentTime, setCurrentTime] = useState(0);
-    const [duration, setDuration] = useState(0);
-    const [isDragging, setIsDragging] = useState(false);
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const [isMaximized, setIsMaximized] = useState(false);
-    const [isCompact, setIsCompact] = useState(false);
-    const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-
-    useEffect(() => {
-        const checkMaximized = async () => setIsMaximized(await systemService.isMaximized());
-        checkMaximized();
-        const unlisten = systemService.onResize(checkMaximized);
-        return () => { unlisten.then(f => f && f()); };
-    }, []);
-
-    useEffect(() => {
-        const updateCompact = () => {
-            const w = window.innerWidth;
-            const h = window.innerHeight;
-            setIsCompact(w < 520 || h < 360);
-        };
-
-        updateCompact();
-        window.addEventListener('resize', updateCompact);
-        const unlisten = systemService.onResize(updateCompact);
-
-        return () => {
-            window.removeEventListener('resize', updateCompact);
-            unlisten.then(f => f && f());
-        };
-    }, []);
-
-    const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const lastClickTimeRef = useRef<number>(0);
+    const {
+        videoMetadata: metadata,
+        videoQueue,
+        currentVideoIndex,
+        playNextVideo,
+        playPreviousVideo,
+        setVideoQueue,
+        volume,
+        setVolume,
+    } = usePlayerStore();
     const videoRef = useRef<HTMLVideoElement>(null);
-    const [error, setError] = useState<string | null>(null);
-    const [showError, setShowError] = useState(false);
-    const [isBuffering, setIsBuffering] = useState(true);
-    const [preparedPath, setPreparedPath] = useState<string | null>(null);
-    const [prepareStage, setPrepareStage] = useState<string | null>(null);
-    const [preparePercent, setPreparePercent] = useState<number | null>(null);
-    const [isPreparing, setIsPreparing] = useState(false);
+    const [isControlsVisible, setIsControlsVisible] = useState(true);
+    const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const isPlayingRef = useRef(false);
+    const isDraggingRef = useRef(false);
 
-    // Use videoMetadata instead of global metadata
-    const metadata = videoMetadata;
-    const isMkv = useMemo(() => (metadata?.path ?? '').toLowerCase().endsWith('.mkv'), [metadata?.path]);
-    const supportsHevc = useMemo(() => {
-        if (typeof document === 'undefined') return false;
-        const v = document.createElement('video');
-        const candidates = [
-            'video/mp4; codecs="hvc1.1.6.L123.B0, mp4a.40.2"',
-            'video/mp4; codecs="hev1.1.6.L123.B0, mp4a.40.2"',
-            'video/mp4; codecs="hvc1"',
-            'video/mp4; codecs="hev1"',
-        ];
-        return candidates.some((c) => v.canPlayType(c) !== '');
-    }, []);
-    const supportedAudioCodecs = useMemo(() => {
-        if (typeof document === 'undefined') return ['aac', 'mp3']; // Fallback
-        const v = document.createElement('video');
-        const codecs = new Set<string>(['aac']); // AAC is always supported in standard MP4
-
-        // MP3
-        if (v.canPlayType('audio/mpeg') !== '') codecs.add('mp3');
-
-        // FLAC
-        if (v.canPlayType('audio/flac') !== '' || v.canPlayType('video/mp4; codecs="flac"') !== '') {
-            codecs.add('flac');
-        }
-
-        // AC3 / E-AC3
-        const ac3Candidates = [
-            'video/mp4; codecs="ac-3"', 'video/mp4; codecs="ec-3"',
-            'audio/ac3', 'audio/ac-3', 'audio/eac3', 'audio/ec-3'
-        ];
-        if (ac3Candidates.some(c => v.canPlayType(c) !== '')) {
-            codecs.add('ac3');
-            codecs.add('eac3');
-        }
-
-        // Opus
-        if (v.canPlayType('audio/ogg; codecs=opus') !== '' || v.canPlayType('video/mp4; codecs="opus"') !== '') {
-            codecs.add('opus');
-        }
-
-        // Vorbis
-        if (v.canPlayType('audio/ogg; codecs=vorbis') !== '') {
-            codecs.add('vorbis');
-        }
-
-        return Array.from(codecs);
-    }, []);
-
-    const videoSrc = useMemo(() => {
-        if (!metadata?.path) return '';
-        const p = preparedPath ?? metadata.path;
-        return convertFileSrc(p, 'asset');
-    }, [metadata?.path, preparedPath]);
-
-    const videoMimeType = useMemo(() => {
-        const p = (preparedPath ?? metadata?.path ?? '').toLowerCase();
-        if (p.endsWith('.mp4')) return 'video/mp4';
-        if (p.endsWith('.webm')) return 'video/webm';
-        if (p.endsWith('.mov')) return 'video/quicktime';
-        if (p.endsWith('.avi')) return 'video/x-msvideo';
-        if (p.endsWith('.mkv')) return 'video/x-matroska';
-        if (p.endsWith('.flv')) return 'video/x-flv';
-        return undefined;
-    }, [metadata?.path, preparedPath]);
-
-
-
-    const [posterUrl, setPosterUrl] = useState<string | undefined>(undefined);
-
-    useEffect(() => {
-        let active = true;
-        const loadPoster = async () => {
-            if (!metadata) {
-                if (active) setPosterUrl(undefined);
-                return;
-            }
-            const path = (metadata as any).thumbnail_path || metadata.cover_path;
-            if (path) {
-                try {
-                    const url = await resolveMediaPath(path);
-                    if (active && url) setPosterUrl(url);
-                } catch (e) {
-                    console.error("Failed to resolve poster:", e);
-                }
-            } else {
-                if (active) setPosterUrl(undefined);
-            }
-        };
-        loadPoster();
-        return () => { active = false; };
-    }, [metadata]);
+    const {
+        isFullscreen,
+        isMaximized,
+        isCompact,
+        isPlaylistOpen,
+        setIsPlaylistOpen,
+        toggleAppFullscreen,
+    } = useVideoControls();
 
     const autoHideEnabled = true;
-
-    // Auto-hide controls
     const showControls = () => {
         setIsControlsVisible(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
 
         if (isOpen && autoHideEnabled) {
             controlsTimeoutRef.current = setTimeout(() => {
-                if (!isDragging && isPlaying) {
+                if (!isDraggingRef.current && isPlayingRef.current) {
                     setIsControlsVisible(false);
                 }
             }, 3000);
         }
     };
 
-    // 使用全局事件监听器确保鼠标/指针活动都能触发控件显示
+    const clearHideTimer = () => {
+        if (controlsTimeoutRef.current) {
+            clearTimeout(controlsTimeoutRef.current);
+            controlsTimeoutRef.current = null;
+        }
+    };
+
+    const {
+        isPlaying,
+        setIsPlaying,
+        currentTime,
+        duration,
+        isDragging,
+        error,
+        showError,
+        isBuffering,
+        prepareStage,
+        preparePercent,
+        isPreparing,
+        posterUrl,
+        videoSrc,
+        videoMimeType,
+        handleTogglePlay,
+        handleSmartClick,
+        onTimeUpdate,
+        onLoadedMetadata,
+        onEnded,
+        handleSeekChange,
+        handleSeekStart,
+        handleSeekEnd,
+        onLoadStart,
+        onWaiting,
+        onCanPlay,
+        onPlaying,
+        onError,
+    } = useVideoPlayback({
+        isOpen,
+        metadata,
+        videoRef,
+        volume,
+        videoQueueLength: videoQueue.length,
+        playPreviousVideo,
+        playNextVideo,
+        showControls,
+        clearHideTimer,
+        setIsControlsVisible,
+        toggleAppFullscreen,
+    });
+
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+    }, [isPlaying]);
+
+    useEffect(() => {
+        isDraggingRef.current = isDragging;
+    }, [isDragging]);
+
     useEffect(() => {
         if (!isOpen) return;
 
@@ -200,349 +133,24 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
             window.removeEventListener('pointerdown', onGlobalActivity, options);
             window.removeEventListener('focus', onGlobalActivity, options);
         };
-    }, [isOpen, isDragging, isPlaying, isCompact]);
+    }, [isOpen, isCompact]);
 
-    useEffect(() => {
-        let unlistenFn: null | (() => void) = null;
-        let cancelled = false;
-
-        const run = async () => {
-            if (!isOpen || !metadata?.path || !isMkv) {
-                setPreparedPath(null);
-                setIsPreparing(false);
-                setPrepareStage(null);
-                setPreparePercent(null);
-                return;
-            }
-
-            setPreparedPath(null);
-            setIsPreparing(true);
-            setPrepareStage('start');
-            setPreparePercent(null);
-            setError(null);
-
-            unlistenFn = await listen<{ path: string; stage: string; percent?: number; message?: string }>(
-                'video:prepare-progress',
-                (event) => {
-                    if (event.payload.path !== metadata.path) return;
-                    setPrepareStage(event.payload.stage);
-                    setPreparePercent(event.payload.percent ?? null);
-                }
-            );
-
-            try {
-                console.log('[VideoPlayer] 开始准备视频:', metadata.path);
-                const outPath = await invoke<string>('prepare_video_for_playback', {
-                    path: metadata.path,
-                    supportsHevc: supportsHevc,
-                    supportedAudioCodecs: supportedAudioCodecs,
-                });
-                console.log('[VideoPlayer] 视频准备完成:', outPath);
-                if (cancelled) return;
-                setPreparedPath(outPath);
-            } catch (e) {
-                console.error('[VideoPlayer] 视频准备失败:', e);
-                if (cancelled) return;
-                setError(String(e));
-                setShowError(true);
-            } finally {
-                if (cancelled) return;
-                setIsPreparing(false);
-            }
-        };
-
-        run();
-
-        return () => {
-            cancelled = true;
-            if (unlistenFn) unlistenFn();
-        };
-    }, [isOpen, metadata?.path, isMkv]);
-
-    // Auto Play when opened with new metadata
-    useEffect(() => {
-        const srcReady = !isMkv || !!preparedPath;
-        if (isOpen && metadata?.path && videoRef.current && srcReady) {
-            // Reset state
-            setIsPlaying(true);
-            videoRef.current.currentTime = 0;
-            videoRef.current.load();
-            videoRef.current.play().catch(() => setIsPlaying(false));
-        }
-    }, [isOpen, metadata?.path, preparedPath, isMkv]);
-
-    // Keyboard Shortcuts
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (!videoRef.current) return;
-
-            switch (e.code) {
-                case 'Space':
-                    e.preventDefault();
-                    if (videoRef.current.paused) {
-                        videoRef.current.play();
-                        setIsPlaying(true);
-                        showControls();
-                    } else {
-                        videoRef.current.pause();
-                        setIsPlaying(false);
-                        setIsControlsVisible(true);
-                    }
-                    break;
-                case 'ArrowLeft':
-                    e.preventDefault();
-                    // Seek back 5s
-                    if (videoRef.current) {
-                        const newTime = Math.max(0, videoRef.current.currentTime - 5);
-                        videoRef.current.currentTime = newTime;
-                        setCurrentTime(newTime);
-                        showControls();
-                    }
-                    break;
-                case 'ArrowRight':
-                    e.preventDefault();
-                    // Seek forward 5s
-                    if (videoRef.current) {
-                        // Use current video duration directly
-                        const d = videoRef.current.duration || duration || 0;
-                        const newTime = Math.min(d, videoRef.current.currentTime + 5);
-                        videoRef.current.currentTime = newTime;
-                        setCurrentTime(newTime);
-                        showControls();
-                    }
-                    break;
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, duration]); // Re-bind if duration changes, though videoRef.duration is safer source of truth
-
-
-    // Close Logic
     const handleClose = async () => {
         if (videoRef.current) {
             videoRef.current.pause();
             setIsPlaying(false);
         }
 
-        // Clear MediaSession when closing video player
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
         }
 
-        // Exit fullscreen if needed
-        const win = getCurrentWindow();
-        if (await win.isFullscreen()) {
-            await win.setFullscreen(false);
-            setIsFullscreen(false);
-        }
-
         onClose();
     };
 
-
-    // Local Play Control
-    const handleTogglePlay = async () => {
-        if (!videoRef.current) return;
-
-        if (videoRef.current.paused) {
-            await videoRef.current.play();
-            setIsPlaying(true);
-            showControls(); // Restart hide timer
-        } else {
-            videoRef.current.pause();
-            setIsPlaying(false);
-            setIsControlsVisible(true); // Always show controls when paused
-        }
-    };
-
-    const handleSmartClick = (e: React.MouseEvent) => {
-        // Always toggle play immediately
-        e.stopPropagation();
-        handleTogglePlay();
-
-        const now = Date.now();
-        // Check for double click with tighter threshold (250ms)
-        if (now - lastClickTimeRef.current < 250) {
-            toggleAppFullscreen();
-            lastClickTimeRef.current = 0; // Prevent triple-click triggering again
-        } else {
-            lastClickTimeRef.current = now;
-        }
-    };
-
-    // Video Events
-    const onTimeUpdate = () => {
-        if (videoRef.current) {
-            if (!isDragging) {
-                setCurrentTime(videoRef.current.currentTime);
-            }
-
-            // If video is actually playing (progressing), clear any false-positive errors
-            if (error && videoRef.current.currentTime > 0.1 && !videoRef.current.paused) {
-                setError(null);
-            }
-        }
-    };
-
-    const onLoadedMetadata = () => {
-        if (videoRef.current) {
-            setDuration(videoRef.current.duration || metadata?.duration || 0);
-        }
-    };
-
-    const onEnded = () => {
-        setIsPlaying(false);
-        setIsControlsVisible(true);
-    };
-
-
-    // Seek
-    const handleSeekChange = (val: number) => {
-        setCurrentTime(val);
-        if (videoRef.current) {
-            videoRef.current.currentTime = val;
-        }
-    };
-
-    const handleSeekStart = () => {
-        setIsDragging(true);
-        setIsControlsVisible(true);
-        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
-    };
-
-    const handleSeekEnd = () => {
-        setIsDragging(false);
-        if (videoRef.current && isPlaying) {
-            showControls();
-        }
-    };
-
-    // Volume Sync (Optional: Sync video volume with global volume because we don't carry separate video volume)
-    // Actually, we can just use the global volume state but NOT set global volume if we want.
-    // Ideally video player should have its own volume or share system volume. Sharing is fine.
-    // But modifying volume here will modify global music volume too. Accepted behavior for now?
-    // User said "separate", but volume is usually global for the app. I'll keep it shared.
-    const { volume, setVolume } = usePlayerStore();
     const useNativeControls = isCompact;
     const videoFitClass = 'object-contain';
-
-    useEffect(() => {
-        if (videoRef.current) {
-            videoRef.current.volume = volume / 100;
-        }
-    }, [volume]);
-
-    // MediaSession API for Video (SMTC on Windows, media controls on other platforms)
-    useEffect(() => {
-        if (!isOpen || !metadata || !('mediaSession' in navigator)) return;
-
-        // Set metadata
-        const artwork: MediaImage[] = [];
-        if (posterUrl) {
-            artwork.push({
-                src: posterUrl,
-                sizes: '512x512',
-                type: 'image/jpeg'
-            });
-        }
-
-        navigator.mediaSession.metadata = new MediaMetadata({
-            title: metadata.title || '未知视频',
-            artist: 'Video',
-            album: '',
-            artwork
-        });
-
-        // Set playback state
-        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
-        // Set action handlers
-        navigator.mediaSession.setActionHandler('play', () => {
-            if (videoRef.current) {
-                videoRef.current.play();
-                setIsPlaying(true);
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-            if (videoRef.current) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-            if (videoQueue.length > 1) {
-                playPreviousVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-            if (videoQueue.length > 1) {
-                playNextVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (videoRef.current && details.seekTime !== undefined) {
-                videoRef.current.currentTime = details.seekTime;
-                setCurrentTime(details.seekTime);
-            }
-        });
-
-        // Update position state periodically
-        const updatePositionState = () => {
-            if (videoRef.current && !isNaN(videoRef.current.duration) && videoRef.current.duration > 0) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration: videoRef.current.duration,
-                        playbackRate: videoRef.current.playbackRate,
-                        position: videoRef.current.currentTime
-                    });
-                } catch (e) {
-                    // Ignore errors (some browsers don't support this)
-                }
-            }
-        };
-
-        const positionInterval = setInterval(updatePositionState, 1000);
-        updatePositionState();
-
-        return () => {
-            clearInterval(positionInterval);
-            // Clear action handlers when video player closes
-            navigator.mediaSession.setActionHandler('play', null);
-            navigator.mediaSession.setActionHandler('pause', null);
-            navigator.mediaSession.setActionHandler('previoustrack', null);
-            navigator.mediaSession.setActionHandler('nexttrack', null);
-            navigator.mediaSession.setActionHandler('seekto', null);
-        };
-    }, [isOpen, metadata, isPlaying, videoQueue.length, playPreviousVideo, playNextVideo, posterUrl]);
-
-
-    const toggleAppFullscreen = async () => {
-        const win = getCurrentWindow();
-        const isFull = await win.isFullscreen();
-
-        if (!isFull) {
-            // Fix: If maximized, unmaximize first to ensure taskbar is covered
-            if (await win.isMaximized()) {
-                await win.unmaximize();
-                // Update local state locally since resize event might lag
-                setIsMaximized(false);
-            }
-            await win.setFullscreen(true);
-            setIsFullscreen(true);
-        } else {
-            await win.setFullscreen(false);
-            setIsFullscreen(false);
-        }
-    };
 
 
     if (!isOpen || !metadata) return null;
@@ -575,41 +183,11 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                     onTimeUpdate={onTimeUpdate}
                     onLoadedMetadata={onLoadedMetadata}
                     onEnded={onEnded}
-                    onLoadStart={() => {
-                        setIsBuffering(true);
-                        setError(null);
-                        setShowError(false);
-                    }}
-                    onWaiting={() => setIsBuffering(true)}
-                    onCanPlay={() => setIsBuffering(false)}
-                    onPlaying={() => {
-                        setIsBuffering(false);
-                        setIsPlaying(true);
-                        if (error) {
-                            setError(null);
-                            setShowError(false);
-                        }
-                    }}
-                    onError={(e) => {
-                        const target = e.target as HTMLVideoElement;
-                        const err = target.error;
-                        let msg = "未知播放错误";
-                        if (err) {
-                            switch (err.code) {
-                                case 1: msg = "取回过程被中止 (MEDIA_ERR_ABORTED)"; break;
-                                case 2: msg = "下载时发生网络错误 (MEDIA_ERR_NETWORK)"; break;
-                                case 3: msg = "解码错误 (MEDIA_ERR_DECODE)"; break;
-                                case 4: msg = "不支持的视频格式 (MEDIA_ERR_SRC_NOT_SUPPORTED)"; break;
-                            }
-                        }
-                        console.error("Video Error:", err, "Path:", metadata.path);
-                        setError(msg);
-                        setTimeout(() => {
-                            if (videoRef.current && (videoRef.current.error || error)) {
-                                setShowError(true);
-                            }
-                        }, 500);
-                    }}
+                    onLoadStart={onLoadStart}
+                    onWaiting={onWaiting}
+                    onCanPlay={onCanPlay}
+                    onPlaying={onPlaying}
+                    onError={onError}
                     onClick={handleSmartClick}
                 >
                     {videoSrc ? <source src={videoSrc} type={videoMimeType} /> : null}
@@ -832,78 +410,13 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                 {/* 4. Playlist Drawer */}
                 <AnimatePresence>
-                    {isPlaylistOpen && (
-                        <>
-                            {/* Backdrop - Click to Close */}
-                            <motion.div
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                className="absolute inset-0 z-[60]"
-                                onClick={() => setIsPlaylistOpen(false)}
-                            />
-
-                            {/* Drawer */}
-                            <motion.div
-                                initial={{ x: '100%' }}
-                                animate={{ x: 0 }}
-                                exit={{ x: '100%' }}
-                                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                                className="absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-xl border-l border-white/10 z-[70] flex flex-col shadow-2xl pointer-events-auto"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <div className="flex items-center justify-between p-4 border-b border-white/10">
-                                    <h2 className="text-white font-medium text-lg">播放列表</h2>
-                                    <button
-                                        onClick={() => setIsPlaylistOpen(false)}
-                                        className="p-2 text-white/70 hover:text-white rounded-full hover:bg-white/10 transition-colors"
-                                    >
-                                        <MdClose className="text-xl" />
-                                    </button>
-                                </div>
-
-                                <div className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
-                                    {videoQueue.map((video, index) => (
-                                        <div
-                                            key={video.id + '_' + index}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                setVideoQueue(videoQueue, index);
-                                            }}
-                                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors group/item ${index === currentVideoIndex
-                                                ? 'bg-primary/20 hover:bg-primary/30'
-                                                : 'hover:bg-white/5'
-                                                }`}
-                                        >
-                                            {/* Thumbnail or Icon */}
-                                            <div className="w-16 aspect-video bg-black/40 rounded overflow-hidden shrink-0 relative">
-                                                <CoverImage
-                                                    song={video}
-                                                    src={video.cover_path}
-                                                    className="w-full h-full object-cover"
-                                                    iconClassName="text-white/30"
-                                                />
-                                                {index === currentVideoIndex && (
-                                                    <div className="absolute inset-0 bg-primary/40 flex items-center justify-center">
-                                                        <div className="w-2 h-2 bg-primary animate-pulse rounded-full" />
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="flex-1 min-w-0">
-                                                <div className={`text-sm font-medium truncate ${index === currentVideoIndex ? 'text-primary' : 'text-white/90'}`}>
-                                                    {video.title}
-                                                </div>
-                                                <div className="text-xs text-white/50 truncate">
-                                                    {formatTime(video.duration)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </motion.div>
-                        </>
-                    )}
+                    <VideoPlaylistDrawer
+                        isOpen={isPlaylistOpen}
+                        onClose={() => setIsPlaylistOpen(false)}
+                        videoQueue={videoQueue}
+                        currentVideoIndex={currentVideoIndex}
+                        onSelectVideo={(index) => setVideoQueue(videoQueue, index)}
+                    />
                 </AnimatePresence>
 
             </motion.div>

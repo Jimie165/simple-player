@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { open } from '@tauri-apps/plugin-dialog';
 import clsx from 'clsx';
 import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdVideocam } from 'react-icons/md';
 import PageContainer from '@/components/layout/PageContainer';
@@ -7,11 +6,7 @@ import OpenFileMenu from './components/OpenFileMenu';
 import EmptyState from './components/EmptyState';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { usePlayerStore } from '@/store/usePlayerStore';
-import { fileService } from '@/services/fileService';
 import { libraryService } from '@/services/libraryService';
-import { audioService } from '@/services/audioService';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
 
 import type { RecentItem } from '@/types';
 import type { SongMetadata } from '@/types';
@@ -20,12 +15,9 @@ import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import { sortSongs } from '@/utils/songSort';
-import { formatTime } from '@/utils/time';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
-
-// 视频文件扩展名常量
-const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
+import { useRecentPlayback } from './hooks/useRecentPlayback';
 
 interface MusicGridProps {
     onNavigateToLibrary?: () => void;
@@ -63,22 +55,21 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
 export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }: MusicGridProps) {
     // Store Actions
     const { recentHistory } = useLibraryStore();
-    const { playSong, playList } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
-
-    // Context Menu State
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
-    const [pendingFolderPlay, setPendingFolderPlay] = useState<{
-        folderPath: string;
-        folderName: string;
-        audioSongs: SongMetadata[];
-        videoSongs: SongMetadata[];
-    } | null>(null);
-
-    const handleContextMenu = (e: React.MouseEvent, item: RecentItem) => {
-        e.preventDefault();
-        setContextMenu({ x: e.clientX, y: e.clientY, item });
-    };
+    const {
+        contextMenu,
+        setContextMenu,
+        pendingFolderPlay,
+        setPendingFolderPlay,
+        isVideoFile,
+        handleContextMenu,
+        handleItemClick,
+        handleOpenFolder,
+        handleOpenFile,
+        buildFolderRecentItem,
+        playVideoList,
+        playAudioList,
+    } = useRecentPlayback();
 
     useEffect(() => {
         if (selectAllRequested && isSelectionMode) {
@@ -92,315 +83,6 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
         if (!isSelectionMode) return;
         setSelectableIds(recentHistory.map(item => item.id));
     }, [isSelectionMode, recentHistory, setSelectableIds]);
-
-    // Helper: Check if file is video
-    const isVideoFile = (path: string): boolean => {
-        const ext = path.split('.').pop()?.toLowerCase() || '';
-        return VIDEO_EXTENSIONS.includes(ext);
-    };
-
-    // Helper: Play Video File
-    const playVideoFile = async (path: string, meta: SongMetadata) => {
-        const queue: SongMetadata[] = [{
-            ...meta,
-            path: path
-        }];
-
-        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
-
-        setVideoQueue(queue, 0);
-        setVideoMetadata(queue[0]);
-        setVideoMode(true);
-
-        // 暂停音乐
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
-    };
-
-    // Helper: Play Single File
-    const buildRecentForFile = (path: string, meta: SongMetadata, isLibraryItem: boolean, existing?: RecentItem): RecentItem => {
-        const isVideo = isVideoFile(path);
-
-        if (existing) {
-            // 关键修复：即便项已存在，也要确保 path 和 cover_path 被补全/更新
-            return {
-                ...existing,
-                path: existing.path || path,
-                cover_path: existing.cover_path || meta.cover_path || null,
-                cover: null,
-                lastPlayed: Date.now(),
-                // 如果旧数据缺少描述（例如显示为 Unknown Artist），也可以在这里顺便优化
-                description: (existing.description === "Unknown Artist" || !existing.description)
-                    ? (isVideo ? formatTime(meta.duration) : meta.artist)
-                    : existing.description
-            };
-        }
-        return {
-            id: path,
-            type: 'file',
-            title: meta.title,
-            description: isVideo ? formatTime(meta.duration) : meta.artist,
-            cover: null,
-            cover_path: meta.cover_path || null,
-            path,
-            lastPlayed: Date.now(),
-            artist: isVideo ? "" : meta.artist,
-            album: isVideo ? "" : meta.album,
-            isLibraryItem
-        };
-    };
-
-    const playSingleFile = async (path: string, isLibraryItem = false, existingRecent?: RecentItem) => {
-        try {
-            let meta: SongMetadata | null = null;
-            try { meta = await fileService.getMetadata(path); } catch { /* ignore metadata errors */ }
-
-            const safeMeta = meta || {
-                title: path.split(/[\\/]/).pop() || 'Unknown',
-                artist: 'Unknown Artist', album: 'Unknown Album', duration: 0, cover: null, cover_path: null, path: path
-            };
-
-            // 检测是否为视频文件
-            if (isVideoFile(path)) {
-                // 添加到最近使用
-                const recentItem = buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent);
-                useLibraryStore.getState().addToRecent(recentItem);
-                // 播放视频
-                await playVideoFile(path, safeMeta);
-            } else {
-                // 播放音频
-                await playSong({
-                    song: safeMeta,
-                    index: 0,
-                    playlist: [safeMeta],
-                    options: {
-                        restartIfCurrent: true,
-                        recentItem: buildRecentForFile(path, safeMeta, isLibraryItem, existingRecent)
-                    },
-                    context: {
-                        type: 'home',
-                        name: '主页',
-                        id: 'home'
-                    }
-                });
-            }
-        } catch (err) { console.error("Play single file failed", err); }
-    };
-
-    const buildFolderRecentItem = (
-        folderPath: string,
-        folderName: string,
-        items: SongMetadata[],
-        label: string,
-    ): RecentItem => ({
-        id: folderPath,
-        type: 'folder',
-        title: folderName,
-        description: `${items.length} ${label}`,
-        cover: null,
-        cover_path: items[0]?.cover_path || null,
-        path: folderPath,
-        lastPlayed: Date.now(),
-    });
-
-    const playVideoList = async (videos: SongMetadata[], recentItem: RecentItem) => {
-        if (videos.length === 0) return;
-        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
-        setVideoQueue(videos, 0);
-        setVideoMetadata(videos[0]);
-        setVideoMode(true);
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
-        useLibraryStore.getState().addToRecent(recentItem);
-    };
-
-    const playAudioList = async (songs: SongMetadata[], recentItem: RecentItem) => {
-        if (songs.length === 0) return;
-        await playList({
-            songs,
-            startIndex: 0,
-            options: {
-                restartIfCurrent: true,
-                recentItem,
-            },
-            context: {
-                type: 'home',
-                name: '主页',
-                id: 'home',
-            }
-        });
-    };
-
-    const playFolderItems = async (folderPath: string, songs: SongMetadata[], folderName: string) => {
-        const audioSongs = songs.filter(s => s.path && !isVideoFile(s.path));
-        const videoSongs = songs.filter(s => s.path && isVideoFile(s.path));
-
-        if (audioSongs.length > 0 && videoSongs.length > 0) {
-            setPendingFolderPlay({
-                folderPath,
-                folderName,
-                audioSongs,
-                videoSongs,
-            });
-            return;
-        }
-
-        if (videoSongs.length > 0) {
-            const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
-            await playVideoList(videoSongs, recentItem);
-            return;
-        }
-
-        if (audioSongs.length > 0) {
-            const recentItem = buildFolderRecentItem(folderPath, folderName, audioSongs, "首歌曲");
-            await playAudioList(audioSongs, recentItem);
-        }
-    };
-
-    // Core: Handle Recent Item Click (Primary Action)
-    const handleItemClick = async (item: RecentItem, e?: React.MouseEvent) => {
-        const id = item.id;
-
-        // Selection Mode Logic
-        if (isSelectionMode) {
-            e?.stopPropagation();
-            toggleSelection(id, item.type, item);
-            return;
-        }
-
-        // Helper to play a list
-        const playListHelper = async (songs: SongMetadata[]) => {
-            if (songs.length === 0) return;
-            const firstSong = songs[0];
-            if (!firstSong.path) return;
-
-            // 检测第一个文件是否为视频
-            if (isVideoFile(firstSong.path)) {
-                // 播放视频
-                const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
-
-                setVideoQueue(songs, 0);
-                setVideoMetadata(songs[0]);
-                setVideoMode(true);
-
-                // 暂停音乐
-                if (usePlayerStore.getState().isPlaying) {
-                    await audioService.pause();
-                    setIsPlaying(false);
-                }
-
-                // 添加到最近使用
-                useLibraryStore.getState().addToRecent({ ...item, lastPlayed: Date.now() });
-            } else {
-                // 播放音频
-                await playList({
-                    songs,
-                    startIndex: 0,
-                    options: {
-                        restartIfCurrent: true,
-                        recentItem: { ...item, lastPlayed: Date.now() }
-                    },
-                    context: {
-                        type: 'home',
-                        name: '主页',
-                        id: 'home'
-                    }
-                });
-            }
-        };
-
-        // Normal Playback Logic
-        if (item.type === 'folder') {
-            try {
-                const songs = await fileService.readFolder(item.path);
-                const folderName = item.title || item.path.split(/[\\/]/).pop() || "Unknown Folder";
-                await playFolderItems(item.path, songs, folderName);
-            } catch (e) {
-                console.error("Failed to play folder", e);
-            }
-        } else if (item.type === 'album') {
-            try {
-                const allSongs = await libraryService.scanLibrary();
-                const albumSongs = allSongs.filter(s =>
-                    s.album === item.title &&
-                    (item.artist ? s.artist === item.artist : true)
-                );
-                await playListHelper(albumSongs);
-            } catch (err) {
-                console.error("Failed to play recent album", err);
-            }
-        } else if (item.type === 'playlist') {
-            try {
-                // Parse ID "playlist:123" -> 123
-                const plIdStr = item.id.replace('playlist:', '');
-                let songs: SongMetadata[] = [];
-
-                if (plIdStr === 'favorites') {
-                    songs = await libraryService.getFavorites();
-                } else {
-                    const plId = parseInt(plIdStr);
-                    if (!isNaN(plId)) {
-                        const rawSongs = await libraryService.getPlaylistSongs(plId);
-                        const { getPlaylistSettings } = useLibraryStore.getState();
-                        const settings = getPlaylistSettings(plIdStr);
-                        songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
-                    }
-                }
-                await playListHelper(songs);
-            } catch (err) {
-                console.error("Failed to play recent playlist", err);
-            }
-        } else if (item.type === 'video') {
-            try {
-                // 构造基本的 SongMetadata 进行播放
-                const meta: SongMetadata = {
-                    id: -1, // 临时 ID
-                    title: item.title,
-                    artist: item.artist || 'Unknown',
-                    album: item.album || 'Unknown',
-                    duration: 0, // 可能需要从 ID 或其他地方恢复，或者不重要
-                    path: item.path,
-                    cover_path: item.cover_path,
-                };
-                await playVideoFile(item.path, meta);
-            } catch (e) {
-                console.error("Failed to play recent video", e);
-            }
-        } else {
-            playSingleFile(item.path, item.isLibraryItem, item);
-        }
-    };
-
-    const handleOpenFolder = async () => {
-        try {
-            const selected = await open({ directory: true, multiple: false });
-            if (selected && typeof selected === 'string') {
-                const songs = await fileService.readFolder(selected);
-                if (songs.length === 0) return;
-                const folderName = selected.split(/[\\/]/).pop() || "Unknown Folder";
-                await playFolderItems(selected, songs, folderName);
-            }
-        } catch (err) {
-            console.error('Failed to open folder:', err);
-        }
-    };
-
-    const handleOpenFile = async () => {
-        const selected = await open({
-            multiple: false,
-            filters: [
-                { name: 'Audio', extensions: ['mp3', 'flac', 'wav', 'ogg', 'm4a'] },
-                { name: 'Video', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv'] }
-            ]
-        });
-        if (selected && typeof selected === 'string') {
-            playSingleFile(selected);
-        }
-    };
 
     return (
         <PageContainer

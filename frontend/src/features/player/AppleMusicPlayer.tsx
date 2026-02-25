@@ -1,30 +1,21 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import {
-    IoPlay, IoPause,
-    IoShuffle, IoRepeat,
-    IoVolumeOff, IoVolumeLow, IoVolumeMedium, IoVolumeHigh,
-    IoList, IoStar, IoStarOutline, IoEllipsisHorizontal,
-    IoPlayBack, IoPlayForward
-} from 'react-icons/io5';
-import { FiMaximize2, FiMinimize2 } from 'react-icons/fi';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
-import { useSongOperations } from '@/hooks/useSongOperations';
-import type { SongMetadata } from '@/types';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { audioService } from '@/services/audioService';
-import { formatTime } from '@/utils/time';
 import { resolveCover } from '@/utils/mediaPath';
 import CoverImage from '@/components/common/CoverImage';
-import MusicContextMenu from '@/components/common/MusicContextMenu';
-import MusicSlider from '@/components/common/MusicSlider';
-import AppleMusicQueue from './AppleMusicQueue';
+import { PlayerBackground } from './apple/PlayerBackground';
+import ApplePlayerControlsSection from './apple/ApplePlayerControlsSection';
+import ApplePlayerTopBar from './apple/ApplePlayerTopBar';
+import ApplePlayerQueuePanel from './apple/ApplePlayerQueuePanel';
+import ApplePlayerQueueToggle from './apple/ApplePlayerQueueToggle';
 
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {
@@ -319,26 +310,13 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             className="absolute inset-0 z-[200] flex flex-col overflow-hidden bg-neutral-900"
         >
             {/* Background Layer - Memoized to prevent re-renders during drag */}
-            <BackgroundLayer src={bgImageSrc} />
+            <PlayerBackground src={bgImageSrc} />
 
-            {/* Top Bar (Drag Region) - Fixed Height */}
-            <div
-                data-tauri-drag-region={isFullscreen ? undefined : ""}
-                className="w-full h-16 z-50 flex justify-center items-center flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity relative"
-            >
-                <button
-                    onClick={onClose}
-                    className="w-12 h-1.5 bg-white/40 rounded-full hover:bg-white/60 transition-colors cursor-pointer"
-                />
-
-                {/* Fullscreen Toggle */}
-                <button
-                    onClick={toggleFullscreen}
-                    className="absolute right-6 p-2 rounded-full text-white/40 hover:text-white hover:bg-white/10 transition-all backdrop-blur-md"
-                >
-                    {isFullscreen ? <FiMinimize2 className="text-xl" /> : <FiMaximize2 className="text-xl" />}
-                </button>
-            </div>
+            <ApplePlayerTopBar
+                isFullscreen={isFullscreen}
+                onClose={onClose}
+                toggleFullscreen={toggleFullscreen}
+            />
 
             {/* Content Layer - Responsive Flex Layout */}
             <div className="relative z-20 flex-1 flex w-full min-h-0 px-8 pb-10">
@@ -382,360 +360,46 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                         </div>
 
                         {/* Controls Container - Fixed Height */}
-                        <div
-                            ref={controlsRef}
-                            className="flex flex-col gap-2 flex-shrink-0 transition-[width] duration-0 ease-linear" // duration-0 as we drive it manually? Actually keeping transition might fight with JS. Let's make it instant or very fast to follow JS.
-                            // If we drive it frame-by-frame, we don't want CSS transition smoothing it out and lagging.
-                            style={{ width: '100%' }} // Initial fallback, will be overridden by JS immediately
-                        >
-
-                            {/* Title & Artist Row */}
-                            <div className="flex items-center justify-between px-0.5 mt-2">
-                                <div className="flex flex-col min-w-0 pr-4 w-[75%]">
-                                    <h1 className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white truncate drop-shadow-md leading-tight">
-                                        {metadata?.title || "未播放音乐"}
-                                    </h1>
-                                    <div className="text-[clamp(0.75rem,2vmin,1.25rem)] text-white/60 truncate font-medium leading-tight mt-1 flex items-center gap-1">
-                                        <span
-                                            onClick={() => {
-                                                if (metadata?.artist && metadata && typeof (metadata as any).id === 'number') {
-                                                    push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
-                                                    onClose();
-                                                }
-                                            }}
-                                            className={clsx(
-                                                "transition-colors",
-                                                metadata && typeof (metadata as any).id === 'number'
-                                                    ? "hover:underline hover:text-white/80 cursor-pointer"
-                                                    : "cursor-default"
-                                            )}
-                                        >
-                                            {metadata?.artist || "Simple Player"}
-                                        </span>
-                                        {metadata?.album && (
-                                            <>
-                                                <span>—</span>
-                                                <span
-                                                    onClick={() => {
-                                                        if (metadata?.album && metadata && typeof (metadata as any).id === 'number') {
-                                                            // Use full object structure to match what useSongOperations expects and prevent crashes
-                                                            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover_path || null, count: 0 } });
-                                                            onClose();
-                                                        }
-                                                    }}
-                                                    className={clsx(
-                                                        "transition-colors",
-                                                        metadata && typeof (metadata as any).id === 'number'
-                                                            ? "hover:underline hover:text-white/80 cursor-pointer"
-                                                            : "cursor-default"
-                                                    )}
-                                                >
-                                                    {metadata.album}
-                                                </span>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2 flex-shrink-0">
-                                    <button
-                                        onClick={() => {
-                                            if (metadata && typeof (metadata as any).id === 'number') {
-                                                toggleFavorite(metadata);
-                                            }
-                                        }}
-                                        disabled={!metadata || typeof (metadata as any).id !== 'number'}
-                                        className={clsx(
-                                            "w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] flex-shrink-0 rounded-full flex items-center justify-center transition-all backdrop-blur-md",
-                                            metadata && typeof (metadata as any).id === 'number'
-                                                ? "bg-white/10 ring-1 ring-white/10 hover:bg-white/20 text-white/50 hover:text-red-500 cursor-pointer"
-                                                : "bg-white/5 ring-1 ring-white/5 text-white/20 cursor-default"
-                                        )}
-                                    >
-                                        {metadata?.is_favorite ? <IoStar className="w-[60%] h-[60%] text-red-500" /> : <IoStarOutline className="w-[60%] h-[60%]" />}
-                                    </button>
-
-                                    {/* Unified Context Menu */}
-                                    <MenuWrapper metadata={metadata} onClose={onClose} />
-                                </div>
-                            </div>
-
-                            {/* Progress Bar */}
-                            <div className="flex flex-col gap-1.5 mt-2">
-                                <MusicSlider
-                                    value={currentTime}
-                                    min={0}
-                                    max={metadata?.duration || 0}
-                                    disabled={!metadata}
-                                    onChange={handleSeekChange}
-                                    onMouseDown={handleSeekStart}
-                                    onMouseUp={handleSeekEnd}
-                                    trackHeightClass="h-[clamp(4px,1vmin,8px)]"
-                                    hoverHeightClass="group-hover:h-[clamp(7px,1.75vmin,14px)]"
-                                    activeHeightClass="group-active:h-[clamp(8px,2vmin,16px)]"
-                                />
-                                <div className="flex justify-between text-[11px] font-medium text-white/40 select-none">
-                                    <span>{formatTime(currentTime)}</span>
-                                    <span>-{formatTime((metadata?.duration || 0) - currentTime)}</span>
-                                </div>
-                            </div>
-
-                            {/* Main Controls - Responsive */}
-                            <div className="flex items-center justify-between mt-[2%] w-full">
-                                <button
-                                    onClick={toggleShuffle}
-                                    className={clsx(
-                                        "w-[11.25%] flex-shrink-0 aspect-square max-w-[40px] flex items-center justify-center rounded-lg transition-colors hover:bg-white/10",
-                                        isShuffling ? "text-primary" : "text-white/40 hover:text-white"
-                                    )}
-                                >
-                                    <IoShuffle className="w-[60%] h-[60%]" />
-                                </button>
-
-                                <button onClick={() => playPrev(currentTime)} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
-                                    <IoPlayBack className="w-[70%] h-[70%]" />
-                                </button>
-
-                                <button
-                                    onClick={togglePlay}
-                                    className="flex-shrink-0 w-[18%] max-w-[64px] aspect-square rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
-                                >
-                                    {isPlaying ? <IoPause className="w-[75%] h-[75%]" /> : <IoPlay className="w-[75%] h-[75%] ml-[4%]" />}
-                                </button>
-
-                                <button onClick={playNext} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
-                                    <IoPlayForward className="w-[70%] h-[70%]" />
-                                </button>
-
-                                <button
-                                    onClick={toggleRepeat}
-                                    className={clsx(
-                                        "w-[11.25%] flex-shrink-0 aspect-square max-w-[40px] flex items-center justify-center rounded-lg transition-colors relative hover:bg-white/10",
-                                        repeatMode !== 'off' ? "text-primary" : "text-white/40 hover:text-white"
-                                    )}
-                                >
-                                    {repeatMode === 'one' ? (
-                                        <div className="relative w-full h-full flex items-center justify-center">
-                                            <IoRepeat className="w-[60%] h-[60%]" />
-                                            <span className="absolute top-[18%] right-[18%] text-[8px] font-bold">1</span>
-                                        </div>
-                                    ) : (
-                                        <IoRepeat className="w-[60%] h-[60%]" />
-                                    )}
-                                </button>
-                            </div>
-
-                            {/* Volume Slider */}
-                            <div className="flex items-center gap-3 mt-6 px-1">
-                                {(() => {
-                                    if (localVolume === 0) return <IoVolumeOff className="text-white/40 text-xs" />;
-                                    if (localVolume <= 33) return <IoVolumeLow className="text-white/40 text-xs" />;
-                                    if (localVolume <= 66) return <IoVolumeMedium className="text-white/40 text-xs" />;
-                                    return <IoVolumeHigh className="text-white/40 text-xs" />;
-                                })()}
-                                <MusicSlider
-                                    value={localVolume}
-                                    min={0}
-                                    max={100}
-                                    onChange={handleVolumeChange}
-                                    onMouseDown={handleVolumeSeekStart}
-                                    onMouseUp={handleVolumeSeekEnd}
-                                    trackHeightClass="h-[clamp(3px,0.75vmin,6px)]"
-                                    hoverHeightClass="group-hover:h-[clamp(5px,1.25vmin,10px)]"
-                                    activeHeightClass="group-active:h-[clamp(6px,1.5vmin,12px)]"
-                                    className="flex-1"
-                                />
-                                <IoVolumeHigh className="text-white/40 text-xs" />
-                            </div>
-
-                        </div>
+                        <ApplePlayerControlsSection
+                            controlsRef={controlsRef}
+                            metadata={metadata}
+                            onClose={onClose}
+                            push={push}
+                            toggleFavorite={toggleFavorite}
+                            currentTime={currentTime}
+                            handleSeekChange={handleSeekChange}
+                            handleSeekStart={handleSeekStart}
+                            handleSeekEnd={handleSeekEnd}
+                            isShuffling={isShuffling}
+                            toggleShuffle={toggleShuffle}
+                            playPrev={() => playPrev(currentTime)}
+                            togglePlay={togglePlay}
+                            isPlaying={isPlaying}
+                            playNext={playNext}
+                            toggleRepeat={toggleRepeat}
+                            repeatMode={repeatMode}
+                            localVolume={localVolume}
+                            handleVolumeChange={handleVolumeChange}
+                            handleVolumeSeekStart={handleVolumeSeekStart}
+                            handleVolumeSeekEnd={handleVolumeSeekEnd}
+                        />
                     </div>
                 </div>
 
-                {/* Right Side (Queue) - Slide In */}
-                <div
-                    className={clsx(
-                        "flex-1 min-w-0 h-full max-h-[95%] flex flex-col z-30 overflow-hidden justify-center",
-                        "transition-[max-width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                        isQueueOpen ? "max-w-full pl-8 md:pl-9 pr-8" : "max-w-0 pl-0 pr-0"
-                    )}
-                >
-                    <div className="relative flex-1 overflow-hidden">
-                        <motion.div
-                            className={clsx(
-                                "absolute inset-0",
-                                "transition-[opacity,transform] duration-500 ease-[0.32,0.72,0,1]",
-                                isQueueOpen ? "opacity-100 translate-x-0" : "opacity-0 translate-x-5 pointer-events-none"
-                            )}
-                        >
-                            {queueMounted && <AppleMusicQueue onNavigate={onClose} scrollToTopSignal={queueScrollToTopSignal} isOpen={isQueueOpen} />}
-                        </motion.div>
-                    </div>
-                </div>
+                <ApplePlayerQueuePanel
+                    isQueueOpen={isQueueOpen}
+                    queueMounted={queueMounted}
+                    onClose={onClose}
+                    queueScrollToTopSignal={queueScrollToTopSignal}
+                />
             </div>
 
-            {/* Bottom Right Actions (Queue/Lyrics) */}
-            <div className="absolute bottom-8 right-8 z-30">
-                <button className={clsx(
-                    "p-3 rounded-xl transition-all backdrop-blur-md",
-                    // Use conditional border/bg based on isQueueOpen
-                    isQueueOpen
-                        ? "bg-white/10 border border-white/10 text-white shadow-lg"
-                        : "hover:bg-white/10 hover:text-white text-white/50"
-                )}>
-                    <IoList
-                        className={clsx("text-xl", isQueueOpen ? "text-primary" : "")}
-                        onClick={handleToggleQueue}
-                    />
-                </button>
-            </div>
+            <ApplePlayerQueueToggle
+                isQueueOpen={isQueueOpen}
+                onToggle={handleToggleQueue}
+            />
 
 
         </motion.div >
     );
 }
-
-// Sub-component for Menu Logic to keep main component clean
-
-// Helper Component for Menu
-function MenuWrapper({ metadata, onClose }: { metadata: SongMetadata | null, onClose: () => void }) {
-    if (!metadata) return null;
-
-    // We use a small local component to call the hook
-    // This wrapper ensures hook rules are followed
-    return <MenuButton metadata={metadata} onClose={onClose} />;
-}
-
-function MenuButton({ metadata, onClose }: { metadata: SongMetadata, onClose: () => void }) {
-    const ops = useSongOperations({
-        items: [metadata],
-        context: 'other', // Use 'other' or 'player' generic context. 
-        hideSelect: true,
-        onNavigate: onClose,
-    });
-
-    // Filter out Play and Delete as requested
-    const filteredGroups = useMemo(() => {
-        return ops.menuItems.map(group =>
-            group.filter(item => item.id !== 'play' && item.id !== 'delete')
-        ).filter(group => group.length > 0);
-    }, [ops.menuItems]);
-
-    return (
-        <MusicContextMenu
-            groups={filteredGroups}
-            variant="clean"
-            buttonClassName="w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center transition-all backdrop-blur-md text-white/50 hover:text-white"
-        >
-            <IoEllipsisHorizontal className="w-[60%] h-[60%]" />
-        </MusicContextMenu>
-    );
-}
-
-
-// Memoized Background Component to prevent re-renders on progress/volume change
-const BackgroundLayer = React.memo(({ src }: { src: string | null }) => {
-    // 渐变状态管理：保留新老 src 实现短暂 DOM 交叠淡化
-    const [currentSrc, setCurrentSrc] = useState<string | null>(src);
-    const [prevSrc, setPrevSrc] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (src !== currentSrc) {
-            setPrevSrc(currentSrc);
-            setCurrentSrc(src);
-        }
-    }, [src, currentSrc]);
-
-    // Fragment builder for blobs to avoid code duplication across the crossfade layers
-    const renderBlobs = (source: string) => (
-        <div className="absolute inset-0 w-full h-full mix-blend-normal">
-            {/* 块 1: 左上，正向转 28s */}
-            <img
-                src={source}
-                alt=""
-                className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-1 28s infinite linear' }}
-            />
-            {/* 块 2: 右上（稍低），反向转 33s */}
-            <img
-                src={source}
-                alt=""
-                className="absolute top-[0%] -right-[20%] w-[110vmax] h-[110vmax] max-w-none object-cover rounded-[45%] saturate-[1.5] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-2 33s infinite linear' }}
-            />
-            {/* 块 3: 左下，反向转 24s */}
-            <img
-                src={source}
-                alt=""
-                className="absolute -bottom-[20%] -left-[10%] w-[90vmax] h-[90vmax] max-w-none object-cover rounded-[35%] saturate-[1.8] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-3 24s infinite linear' }}
-            />
-            {/* 块 4: 右下，正向转 30s */}
-            <img
-                src={source}
-                alt=""
-                className="absolute -bottom-[15%] -right-[15%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-80"
-                style={{ animation: 'fluid-rotate-4 30s infinite linear' }}
-            />
-        </div>
-    );
-
-    return (
-        <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none bg-[#1a1a1a]">
-            {/* Light frequency noise overlay, removing displacement map as requested */}
-            <svg className="hidden">
-                <defs>
-                    <filter id="fluid-warp" x="-20%" y="-20%" width="140%" height="140%">
-                        {/* 噪点发生器：产生缓慢的云雾状分形噪声 */}
-                        <feTurbulence
-                            type="fractalNoise"
-                            baseFrequency="0.004"
-                            numOctaves="1"
-                            stitchTiles="stitch"
-                            result="noise"
-                        />
-                        {/* 极轻微的颜色矩阵混合，形成细颗粒噪点感 */}
-                        <feColorMatrix type="matrix" values="1 0 0 0 0, 0 1 0 0 0, 0 0 1 0 0, 0 0 0 0.05 0" />
-                    </filter>
-                </defs>
-            </svg>
-
-            {/* Background Image Layers with Crossfade */}
-            <div
-                className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
-                style={{
-                    filter: 'blur(100px)', // 单一外层超强烈模糊，产生色块交融的液化感
-                    transform: 'scale(1.2)' // 放大容器隐藏模糊收缩产生的边缘泛白
-                }}
-            >
-                {/* Previous Image - fades out quickly when a new image arrives */}
-                {prevSrc && (
-                    <div
-                        key={`${prevSrc}-prev`}
-                        className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out opacity-0"
-                    >
-                        {renderBlobs(prevSrc)}
-                    </div>
-                )}
-
-                {/* Current Image - fades in smoothly */}
-                {currentSrc && (
-                    <div
-                        key={`${currentSrc}-curr`}
-                        className="absolute inset-0 w-full h-full animate-in fade-in duration-700 ease-out fill-mode-both"
-                    >
-                        {renderBlobs(currentSrc)}
-                    </div>
-                )}
-            </div>
-
-            {/* Static light noise layer to add analog texture and light perturbation */}
-            <div
-                className="absolute inset-0 z-[5] mix-blend-overlay pointer-events-none"
-                style={{ filter: 'url(#fluid-warp)' }}
-            />
-
-            {/* 顶层半透明覆盖层：轻微整体压暗以保护白色文字，移除容易导致脏乱的底部厚重黑底渐变 */}
-            <div className="absolute inset-0 bg-black/10 z-10" />
-        </div>
-    );
-});

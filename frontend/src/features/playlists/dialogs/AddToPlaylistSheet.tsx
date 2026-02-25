@@ -13,6 +13,7 @@ import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
 import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
 import CreatePlaylistDialog from './CreatePlaylistDialog';
+import { resolveSongsWithLibraryIds, splitDuplicateSongs } from './playlistDuplicateUtils';
 
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();
@@ -132,24 +133,8 @@ export default function AddToPlaylistSheet() {
         if (songsToAdd.length === 0) return;
 
         try {
-            let resolvedSongs = songsToAdd;
-
-            // Ensure songs have IDs (required by backend) by resolving from library using path
-            if (songsToAdd.some(s => !s.id && s.path)) {
-                const librarySongs = await libraryService.getLibrarySongs();
-                const normalizePath = (p: string) => p.replace(/\\/g, '/');
-                const byPath = new Map(
-                    librarySongs
-                        .filter(s => s.path)
-                        .map(s => [normalizePath(s.path as string), s])
-                );
-
-                resolvedSongs = songsToAdd.map(song => {
-                    if (song.id || !song.path) return song;
-                    const match = byPath.get(normalizePath(song.path));
-                    return match?.id ? { ...song, id: match.id } : song;
-                });
-            }
+            const librarySongs = await libraryService.getLibrarySongs();
+            const resolvedSongs = resolveSongsWithLibraryIds(songsToAdd, librarySongs);
 
             // Check for duplicates
             // We need to know what's already in the playlist.
@@ -166,18 +151,7 @@ export default function AddToPlaylistSheet() {
                 setPlaylistSongs(prev => ({ ...prev, [playlistId]: existingSongs }));
             }
 
-            const existingIds = new Set(existingSongs.map(s => s.id));
-            const duplicates: SongMetadata[] = [];
-            const newSongs: SongMetadata[] = [];
-
-            for (const song of resolvedSongs) {
-                if (!song.id) continue;
-                if (existingIds.has(song.id)) {
-                    duplicates.push(song);
-                } else {
-                    newSongs.push(song);
-                }
-            }
+            const { duplicates, newSongs } = splitDuplicateSongs(resolvedSongs, existingSongs);
 
             if (duplicates.length > 0) {
                 // Show dialog

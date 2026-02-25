@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
-import type { MenuItemData } from '@/hooks/useSongOperations';
+import type { MenuItemData } from '@/hooks/menu/useSongOperations';
 import {
     MdPlayArrow,
     MdShuffle,
@@ -179,6 +179,46 @@ function MenuContent({
     );
 }
 
+function MenuLifecycleEffects({
+    open,
+    close,
+    buttonRef,
+}: {
+    open: boolean;
+    close: () => void;
+    buttonRef: React.RefObject<HTMLButtonElement | null>;
+}) {
+    const wasOpenRef = useRef(false);
+
+    useEffect(() => {
+        if (!open) {
+            if (wasOpenRef.current) {
+                requestAnimationFrame(() => {
+                    buttonRef.current?.blur();
+                });
+            }
+            wasOpenRef.current = false;
+            return;
+        }
+
+        wasOpenRef.current = true;
+        const closeAndBlur = () => {
+            close();
+            buttonRef.current?.blur();
+        };
+
+        window.addEventListener('wheel', closeAndBlur, true);
+        window.addEventListener('scroll', closeAndBlur, true);
+
+        return () => {
+            window.removeEventListener('wheel', closeAndBlur, true);
+            window.removeEventListener('scroll', closeAndBlur, true);
+        };
+    }, [open, close, buttonRef]);
+
+    return null;
+}
+
 export default function MusicContextMenu(props: MusicContextMenuProps) {
     const { groups, className, buttonClassName, variant = 'glass', onOpen, suppressCloseEvent } = props;
     const resolvedGroups = groups ?? (props.type ? getMusicMenuGroups(props as MusicMenuOptions) : []);
@@ -230,10 +270,8 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     useEffect(() => {
         const handleResize = () => updateMenuPosition();
         window.addEventListener('resize', handleResize);
-        window.addEventListener('scroll', handleResize, true);
         return () => {
             window.removeEventListener('resize', handleResize);
-            window.removeEventListener('scroll', handleResize, true);
         };
     }, []);
 
@@ -242,8 +280,13 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
             className={className}
         >
             <Menu as="div" className="relative">
-                {({ open }) => (
+                {({ open, close }) => (
                     <>
+                        <MenuLifecycleEffects
+                            open={open}
+                            close={close}
+                            buttonRef={buttonRef}
+                        />
                         <MenuButton
                             ref={buttonRef}
                             className={getButtonClass()}

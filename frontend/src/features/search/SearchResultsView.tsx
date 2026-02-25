@@ -7,7 +7,7 @@ import SongListView from '@/features/library/components/SongListView';
 import ArtistGridView, { type ArtistData } from '@/features/library/components/ArtistGridView';
 import AlbumGridView, { type AlbumData } from '@/features/library/components/AlbumGridView';
 import { MdSearch } from 'react-icons/md';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
@@ -206,8 +206,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                     type: 'file',
                     title: song.title,
                     description: song.artist,
-                        cover: null,
-                        cover_path: song.cover_path || null,
+                    cover: null,
+                    cover_path: song.cover_path || null,
                     path: song.path || '',
                     lastPlayed: Date.now(),
                     artist: song.artist

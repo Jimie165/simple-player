@@ -1,8 +1,8 @@
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
-import { useSongOperations } from '@/hooks/useSongOperations';
-import type { MusicMenuContext } from '@/hooks/useSongOperations';
+import { useSongOperations } from '@/hooks/menu/useSongOperations';
+import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { MdClose, MdCheckBoxOutlineBlank, MdCheckBox, MdMoreHoriz } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 

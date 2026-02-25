@@ -41,6 +41,19 @@ interface NavigationState {
     // Computed
     activeOverlay: ViewState | null; // Top of stack
     hasOverlay: boolean;
+
+    // Internal guard against rapid duplicate overlay pushes
+    _lastPushedOverlayKey: string | null;
+    _lastPushedAt: number;
+}
+
+const OVERLAY_PUSH_DEBOUNCE_MS = 260;
+
+function getOverlayKey(view: ViewState): string {
+    const data = view.data as Record<string, any> | undefined;
+    const idPart = data?.id ?? data?.name ?? '';
+    const artistPart = data?.artist ?? '';
+    return `${view.type}:${String(idPart)}:${String(artistPart)}`;
 }
 
 export const useNavigationStore = create<NavigationState>()((set, get) => ({
@@ -50,6 +63,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     overlayStack: [],
     activeOverlay: null,
     hasOverlay: false,
+    _lastPushedOverlayKey: null,
+    _lastPushedAt: 0,
 
     // Persistent UI State
     lastLibraryTab: 'songs',
@@ -127,11 +142,28 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     setArtistDetailTab: (tab) => set({ lastArtistDetailTab: tab }),
 
     push: (view) => set((state) => {
+        const now = Date.now();
+        const incomingKey = getOverlayKey(view);
+        const top = state.overlayStack[state.overlayStack.length - 1];
+        const topKey = top ? getOverlayKey(top) : null;
+
+        const isSameAsTop = topKey === incomingKey;
+        const isRapidDuplicate = state._lastPushedOverlayKey === incomingKey && (now - state._lastPushedAt) < OVERLAY_PUSH_DEBOUNCE_MS;
+
+        if (isSameAsTop || isRapidDuplicate) {
+            return {
+                _lastPushedOverlayKey: incomingKey,
+                _lastPushedAt: now
+            };
+        }
+
         const newStack = [...state.overlayStack, view];
         return {
             overlayStack: newStack,
             activeOverlay: view,
-            hasOverlay: true
+            hasOverlay: true,
+            _lastPushedOverlayKey: incomingKey,
+            _lastPushedAt: now
         };
     }),
 

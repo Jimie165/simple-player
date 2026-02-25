@@ -1,17 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
-import clsx from 'clsx';
-import { MdMusicNote, MdAlbum, MdPerson, MdSort, MdCheck, MdShuffle } from 'react-icons/md';
 import { AnimatePresence, motion } from 'framer-motion';
-
-import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
 import PageContainer from '@/components/layout/PageContainer';
 import LibraryHeaderButton from './components/LibraryHeaderButton';
 import SongListView from './components/SongListView';
 import AlbumGridView from './components/AlbumGridView';
 import ArtistGridView from './components/ArtistGridView';
+import LibraryTabsAndShuffle from './components/LibraryTabsAndShuffle';
+import AlbumSortMenu from './components/AlbumSortMenu';
 
 import type { AlbumData } from './components/AlbumGridView';
 import type { ArtistData } from './components/ArtistGridView';
@@ -22,11 +20,16 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import type { SongMetadata } from '@/types';
 import type { RecentItem } from '@/types';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
+import { buildAlbums, buildArtists } from './utils/grouping';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
     const { currentTab, setTab } = useNavigationStore();
+    const activeTab: 'songs' | 'albums' | 'artists' =
+        currentTab === 'albums' || currentTab === 'artists' || currentTab === 'songs'
+            ? currentTab
+            : 'songs';
 
     // Initial load: restore logic handled by useNavigationStore
     useEffect(() => {
@@ -125,85 +128,10 @@ export default function Library() {
     // --------------------------------------------------------
 
     // 1. 生成专辑列表 (带排序)
-    const albums = useMemo(() => {
-        const map = new Map<string, AlbumData>();
-        librarySongs.forEach(song => {
-            const key = (song.album || "Unknown Album") + (song.artist || "Unknown Artist");
-            if (!map.has(key)) {
-                map.set(key, {
-                    name: song.album || "Unknown Album",
-                    artist: song.artist || "Unknown Artist",
-                    cover: song.cover_path || null,
-                    cover_path: song.cover_path || null,
-                    songs: []
-                });
-            }
-            map.get(key)!.songs.push(song);
-        });
-
-        let list = Array.from(map.values());
-
-        // Sorting
-        const compare = (a: string, b: string) => {
-            const isAsciiA = /^[a-zA-Z]/.test(a);
-            const isAsciiB = /^[a-zA-Z]/.test(b);
-            if (isAsciiA && !isAsciiB) return -1;
-            if (!isAsciiA && isAsciiB) return 1;
-            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-        };
-
-        if (albumSortKey === 'name') {
-            list.sort((a, b) => compare(a.name, b.name));
-        } else {
-            list.sort((a, b) => compare(a.artist, b.artist));
-        }
-        return list;
-    }, [librarySongs, albumSortKey]);
+    const albums = useMemo(() => buildAlbums(librarySongs, albumSortKey), [librarySongs, albumSortKey]);
 
     // 2. 生成艺人列表 (包含专辑)
-    const artists = useMemo(() => {
-        const map = new Map<string, ArtistData>();
-        librarySongs.forEach(song => {
-            const artistName = song.artist || "Unknown Artist";
-            if (!map.has(artistName)) {
-                map.set(artistName, {
-                    name: artistName,
-                    cover: null, // Initial null
-                    count: 0,
-                    albumCount: 0,
-                    songs: []
-                });
-            }
-            const artist = map.get(artistName)!;
-            artist.songs.push(song);
-            artist.count += 1;
-
-            // Use first song's cover as artist cover if available and not set
-            if (!artist.cover && song.cover_path) {
-                artist.cover = song.cover_path;
-            }
-        });
-
-        const list = Array.from(map.values());
-
-        // Calculate album count for each artist
-        list.forEach(artist => {
-            const artistAlbums = new Set(artist.songs.map(s => s.album));
-            artist.albumCount = artistAlbums.size;
-        });
-
-        // Sort by name (English first)
-        const compare = (a: string, b: string) => {
-            const isAsciiA = /^[a-zA-Z]/.test(a);
-            const isAsciiB = /^[a-zA-Z]/.test(b);
-            if (isAsciiA && !isAsciiB) return -1;
-            if (!isAsciiA && isAsciiB) return 1;
-            return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-        };
-
-        list.sort((a, b) => compare(a.name, b.name));
-        return list;
-    }, [librarySongs]);
+    const artists = useMemo(() => buildArtists(librarySongs), [librarySongs]);
 
 
     // --------------------------------------------------------
@@ -288,101 +216,40 @@ export default function Library() {
 
             {/* Main Content */}
             <div className="flex flex-col h-full">
-                {/* Header: Tabs on left, Shuffle on right */}
-                <div className="flex items-center justify-between mb-6">
-                    {/* Tab 按钮组 */}
-                    <div className="flex items-center gap-1 bg-neutral-100 dark:bg-neutral-800 p-1 rounded-lg">
-                        {[
-                            { id: 'songs', label: '歌曲', icon: MdMusicNote },
-                            { id: 'albums', label: '专辑', icon: MdAlbum },
-                            { id: 'artists', label: '艺人', icon: MdPerson },
-                        ].map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => handleTabChange(tab.id as any)}
-                                className={clsx(
-                                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
-                                    currentTab === tab.id
-                                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-sm"
-                                        : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200"
-                                )}
-                            >
-                                <tab.icon className="text-lg" />
-                                {tab.label}
-                            </button>
-                        ))
-                        }
-                    </div>
-
-                    {/* 随机播放按钮 - 胶囊状，右侧 */}
-                    <button
-                        onClick={() => {
-                            // 根据当前 tab 决定播放哪组歌曲
-                            let songsToPlay: SongMetadata[] = [];
-                            if (currentTab === 'songs') {
-                                songsToPlay = [...librarySongs];
-                            } else if (currentTab === 'albums' && albums.length > 0) {
-                                songsToPlay = albums.flatMap(a => a.songs);
-                            } else if (currentTab === 'artists' && artists.length > 0) {
-                                songsToPlay = artists.flatMap(a => a.songs);
+                <LibraryTabsAndShuffle
+                    currentTab={activeTab}
+                    onTabChange={handleTabChange}
+                    librarySongs={librarySongs}
+                    albums={albums}
+                    artists={artists}
+                    onShufflePlay={(songsToPlay) => {
+                        shufflePlay({
+                            songs: songsToPlay,
+                            options: {
+                                addToRecent: true,
+                                buildRecentItem: buildRecentForSong
+                            },
+                            context: {
+                                type: 'library',
+                                name: '音乐库',
+                                id: 'library'
                             }
-
-                            if (songsToPlay.length > 0) {
-                                shufflePlay({
-                                    songs: songsToPlay,
-                                    options: {
-                                        addToRecent: true,
-                                        buildRecentItem: buildRecentForSong
-                                    },
-                                    context: {
-                                        type: 'library',
-                                        name: '音乐库',
-                                        id: 'library'
-                                    }
-                                });
-                            }
-                        }}
-
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary font-medium text-sm transition-colors shadow-sm active:scale-95"
-                    >
-                        <MdShuffle className="text-lg" />
-                        随机播放
-                    </button>
-                </div>
+                        });
+                    }}
+                />
 
                 {/* Sort for Albums */}
-                {currentTab === 'albums' && (
-                    <div className="flex justify-end mb-4">
-                        <Menu as="div" className="relative">
-                            <MenuButton className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors">
-                                <MdSort className="text-lg" />
-                                排序: {albumSortKey === 'name' ? '名称' : '艺人'}
-                            </MenuButton>
-                            <MenuItems
-                                anchor="bottom end"
-                                className="w-40 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white z-50 mt-2"
-                            >
-                                <MenuItem>
-                                    <button onClick={() => setAlbumSortKey('name')} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
-                                        按名称
-                                        {albumSortKey === 'name' && <MdCheck />}
-                                    </button>
-                                </MenuItem>
-                                <MenuItem>
-                                    <button onClick={() => setAlbumSortKey('artist')} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
-                                        按艺人
-                                        {albumSortKey === 'artist' && <MdCheck />}
-                                    </button>
-                                </MenuItem>
-                            </MenuItems>
-                        </Menu>
-                    </div>
+                {activeTab === 'albums' && (
+                    <AlbumSortMenu
+                        albumSortKey={albumSortKey}
+                        setAlbumSortKey={setAlbumSortKey}
+                    />
                 )}
 
                 {/* Views */}
                 <div className="flex-1 min-h-0 relative">
                     <AnimatePresence mode="wait">
-                        {currentTab === 'songs' && (
+                        {activeTab === 'songs' && (
                             <motion.div
                                 key="songs"
                                 initial={{ opacity: 0, y: 10 }}
@@ -399,7 +266,7 @@ export default function Library() {
                                 />
                             </motion.div>
                         )}
-                        {currentTab === 'albums' && (
+                        {activeTab === 'albums' && (
                             <motion.div
                                 key="albums"
                                 initial={{ opacity: 0, y: 10 }}
@@ -441,7 +308,7 @@ export default function Library() {
                                 />
                             </motion.div>
                         )}
-                        {currentTab === 'artists' && (
+                        {activeTab === 'artists' && (
                             <motion.div
                                 key="artists"
                                 initial={{ opacity: 0, y: 10 }}

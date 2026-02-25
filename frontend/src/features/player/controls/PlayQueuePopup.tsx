@@ -3,12 +3,12 @@ import clsx from 'clsx';
 import { MdMusicNote } from 'react-icons/md';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import type { SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import SongCoverOverlay from '@/components/common/SongCoverOverlay';
-import { useSongOperations } from '@/hooks/useSongOperations';
+import { useSongOperations } from '@/hooks/menu/useSongOperations';
 
 interface PlayQueuePopupProps {
     show: boolean;

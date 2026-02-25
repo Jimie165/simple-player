@@ -20,12 +20,12 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { IoPlay, IoEllipsisHorizontal } from 'react-icons/io5';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { useNavigationStore } from '@/store/useNavigationStore';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
 import MusicContextMenu from '@/components/common/MusicContextMenu';
-import { useSongOperations } from '@/hooks/useSongOperations';
+import { useSongOperations } from '@/hooks/menu/useSongOperations';
+import { navigateFromQueueContext } from './utils/queueContextNavigation';
 
 interface SongRowProps {
     song: SongMetadata;
@@ -312,33 +312,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                             <>
                                 <span>下一首歌来自:</span>
                                 <span
-                                    onClick={() => {
-                                        if (!queueContext || !onNavigate) return;
-                                        const { type, id, name } = queueContext;
-                                        if (id === 'favorites' || id === 'playlist:favorites') {
-                                            useNavigationStore.getState().push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } });
-                                            onNavigate();
-                                        } else if (type === 'playlist' || type === 'playlist_detail') {
-                                            // Assuming id is the playlist id
-                                            const pid = parseInt(id || '0');
-                                            if (pid) {
-                                                useNavigationStore.getState().push({ type: 'playlist_detail', data: { id: pid, name } });
-                                                onNavigate();
-                                            }
-                                        } else if (type === 'artist' || type === 'artist_detail') {
-                                            useNavigationStore.getState().push({ type: 'artist_detail', data: { name, count: 0, albumCount: 0, songs: [], cover: null } });
-                                            onNavigate();
-                                        } else if (type === 'album' || type === 'album_detail') {
-                                            // For album we typically need artist name too for best results, but let's try with just name
-                                            // Often id might store "Artist - Album" or just name. 
-                                            // Let's assume name is the album name.
-                                            useNavigationStore.getState().push({ type: 'album_detail', data: { name, artist: undefined, songs: [], cover: null, count: 0 } });
-                                            onNavigate();
-                                        } else if (type === 'library') {
-                                            useNavigationStore.getState().navigate('library');
-                                            onNavigate();
-                                        }
-                                    }}
+                                    onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
                                     className={clsx(
                                         "truncate text-white/70 transition-colors",
                                         queueContext && "hover:text-primary cursor-pointer hover:underline"

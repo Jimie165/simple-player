@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { MenuItemData } from '@/hooks/useSongOperations';
+import type { MenuItemData } from '@/hooks/menu/useSongOperations';
 
 interface CursorContextMenuProps {
     x: number;

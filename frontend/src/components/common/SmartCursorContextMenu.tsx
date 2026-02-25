@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Portal } from '@headlessui/react';
-import type { MusicMenuContext, MenuItemData } from '@/hooks/useSongOperations';
-import { useSongOperations } from '@/hooks/useSongOperations';
+import type { MusicMenuContext, MenuItemData } from '@/hooks/menu/useSongOperations';
+import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import { getMusicItemId, getMusicItemType } from '@/utils/musicItemUtils';
 import type { MusicItem } from '@/utils/musicItemUtils';
 import { useSelectionStore } from '@/store/useSelectionStore';

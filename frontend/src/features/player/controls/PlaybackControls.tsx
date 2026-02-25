@@ -12,7 +12,7 @@ import { audioService } from '@/services/audioService';
 import { formatTime } from '@/utils/time';
 // Components
 import CustomTooltip from '@/components/common/CustomTooltip';
-import { usePlaybackActions } from '@/hooks/usePlaybackActions';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export default function PlaybackControls() {
     const {
