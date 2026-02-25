@@ -44,7 +44,7 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, getPlaylistSettings, triggerLibraryUpdate } = useLibraryStore();
+    const { addMultipleToNext, libraryVersion, getPlaylistSettings, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
@@ -279,6 +279,7 @@ export default function PlaylistList() {
         await libraryService.updatePlaylistInfo(editPlaylist.id, name, description);
         if (coverPath !== editPlaylist.cover_path) {
             await libraryService.updatePlaylistCover(editPlaylist.id, coverPath || "");
+            updateRecentItemCover(`playlist:${editPlaylist.id}`, coverPath || null);
         }
         triggerLibraryUpdate();
         setEditPlaylist(null);

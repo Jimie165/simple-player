@@ -634,26 +634,108 @@ function MenuButton({ metadata, onClose }: { metadata: SongMetadata, onClose: ()
 
 // Memoized Background Component to prevent re-renders on progress/volume change
 const BackgroundLayer = React.memo(({ src }: { src: string | null }) => {
+    // 渐变状态管理：保留新老 src 实现短暂 DOM 交叠淡化
+    const [currentSrc, setCurrentSrc] = useState<string | null>(src);
+    const [prevSrc, setPrevSrc] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (src !== currentSrc) {
+            setPrevSrc(currentSrc);
+            setCurrentSrc(src);
+        }
+    }, [src, currentSrc]);
+
+    // Fragment builder for blobs to avoid code duplication across the crossfade layers
+    const renderBlobs = (source: string) => (
+        <div className="absolute inset-0 w-full h-full mix-blend-normal">
+            {/* 块 1: 左上，正向转 28s */}
+            <img
+                src={source}
+                alt=""
+                className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-90"
+                style={{ animation: 'fluid-rotate-1 28s infinite linear' }}
+            />
+            {/* 块 2: 右上（稍低），反向转 33s */}
+            <img
+                src={source}
+                alt=""
+                className="absolute top-[0%] -right-[20%] w-[110vmax] h-[110vmax] max-w-none object-cover rounded-[45%] saturate-[1.5] mix-blend-normal opacity-90"
+                style={{ animation: 'fluid-rotate-2 33s infinite linear' }}
+            />
+            {/* 块 3: 左下，反向转 24s */}
+            <img
+                src={source}
+                alt=""
+                className="absolute -bottom-[20%] -left-[10%] w-[90vmax] h-[90vmax] max-w-none object-cover rounded-[35%] saturate-[1.8] mix-blend-normal opacity-90"
+                style={{ animation: 'fluid-rotate-3 24s infinite linear' }}
+            />
+            {/* 块 4: 右下，正向转 30s */}
+            <img
+                src={source}
+                alt=""
+                className="absolute -bottom-[15%] -right-[15%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-80"
+                style={{ animation: 'fluid-rotate-4 30s infinite linear' }}
+            />
+        </div>
+    );
+
     return (
         <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none bg-[#1a1a1a]">
-            {src && (
-                <>
-                    {/* Layer 1: Deep ambient blur - massive scale */}
-                    <img
-                        src={src}
-                        alt=""
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[180vw] h-[180vh] max-w-none object-cover opacity-50 blur-[200px] saturate-[2.5]"
-                    />
-                    {/* Layer 2: Overlay for color richness */}
-                    <img
-                        src={src}
-                        alt=""
-                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[140vw] h-[140vh] max-w-none object-cover opacity-60 blur-[150px] saturate-[2] mix-blend-screen brightness-90"
-                    />
-                </>
-            )}
-            {/* Gradient Overlay for legibility */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/40 z-10" />
+            {/* Light frequency noise overlay, removing displacement map as requested */}
+            <svg className="hidden">
+                <defs>
+                    <filter id="fluid-warp" x="-20%" y="-20%" width="140%" height="140%">
+                        {/* 噪点发生器：产生缓慢的云雾状分形噪声 */}
+                        <feTurbulence
+                            type="fractalNoise"
+                            baseFrequency="0.004"
+                            numOctaves="1"
+                            stitchTiles="stitch"
+                            result="noise"
+                        />
+                        {/* 极轻微的颜色矩阵混合，形成细颗粒噪点感 */}
+                        <feColorMatrix type="matrix" values="1 0 0 0 0, 0 1 0 0 0, 0 0 1 0 0, 0 0 0 0.05 0" />
+                    </filter>
+                </defs>
+            </svg>
+
+            {/* Background Image Layers with Crossfade */}
+            <div
+                className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
+                style={{
+                    filter: 'blur(100px)', // 单一外层超强烈模糊，产生色块交融的液化感
+                    transform: 'scale(1.2)' // 放大容器隐藏模糊收缩产生的边缘泛白
+                }}
+            >
+                {/* Previous Image - fades out quickly when a new image arrives */}
+                {prevSrc && (
+                    <div
+                        key={`${prevSrc}-prev`}
+                        className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out opacity-0"
+                    >
+                        {renderBlobs(prevSrc)}
+                    </div>
+                )}
+
+                {/* Current Image - fades in smoothly */}
+                {currentSrc && (
+                    <div
+                        key={`${currentSrc}-curr`}
+                        className="absolute inset-0 w-full h-full animate-in fade-in duration-700 ease-out fill-mode-both"
+                    >
+                        {renderBlobs(currentSrc)}
+                    </div>
+                )}
+            </div>
+
+            {/* Static light noise layer to add analog texture and light perturbation */}
+            <div
+                className="absolute inset-0 z-[5] mix-blend-overlay pointer-events-none"
+                style={{ filter: 'url(#fluid-warp)' }}
+            />
+
+            {/* 顶层半透明覆盖层：轻微整体压暗以保护白色文字，移除容易导致脏乱的底部厚重黑底渐变 */}
+            <div className="absolute inset-0 bg-black/10 z-10" />
         </div>
     );
 });

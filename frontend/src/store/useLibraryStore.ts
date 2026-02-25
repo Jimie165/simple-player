@@ -30,6 +30,7 @@ interface LibraryState {
 
     addToRecent: (item: RecentItem) => void;
     removeFromRecent: (id: string) => void;
+    updateRecentItemCover: (id: string, newCoverPath: string | null) => void;
     setPlaylist: (songs: SongMetadata[]) => void;
     setCurrentSongIndex: (index: number) => void;
     pushHistory: (index: number) => void;
@@ -262,6 +263,12 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
     removeFromRecent: (id) => set((state) => ({
         recentHistory: state.recentHistory.filter(i => i.id !== id)
+    })),
+
+    updateRecentItemCover: (id, newCoverPath) => set((state) => ({
+        recentHistory: state.recentHistory.map(i =>
+            i.id === id ? { ...i, cover_path: newCoverPath } : i
+        )
     })),
 
     setPlaylist: (songs) => set({

@@ -243,3 +243,32 @@ body {
   50% { height: 100%; }
   100% { height: 33%; }
 }
+
+/* Fluid Background Animations - 4 asynchronous overlapping layers */
+@keyframes fluid-rotate-1 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(3%, -3%) scale(1.05) rotate(120deg); }
+  66% { transform: translate(-3%, 3%) scale(0.95) rotate(240deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(360deg); }
+}
+
+@keyframes fluid-rotate-2 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(-4%, 4%) scale(1.02) rotate(-120deg); }
+  66% { transform: translate(4%, -4%) scale(0.98) rotate(-240deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(-360deg); }
+}
+
+@keyframes fluid-rotate-3 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(4%, 4%) scale(1.04) rotate(-120deg); }
+  66% { transform: translate(-4%, -4%) scale(0.96) rotate(-240deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(-360deg); }
+}
+
+@keyframes fluid-rotate-4 {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  33% { transform: translate(-3%, -3%) scale(1.03) rotate(120deg); }
+  66% { transform: translate(3%, 3%) scale(0.97) rotate(240deg); }
+  100% { transform: translate(0, 0) scale(1) rotate(360deg); }
+}
