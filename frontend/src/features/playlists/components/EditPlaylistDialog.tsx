@@ -118,7 +118,7 @@ export default function EditPlaylistDialog({
                                                 )}
 
                                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity duration-200 backdrop-blur-[2px]">
-                                                    <div className="w-10 h-10 rounded-full bg-red-500/90 text-white flex items-center justify-center shadow-lg">
+                                                    <div className="w-10 h-10 rounded-full bg-primary/90 text-white flex items-center justify-center shadow-lg">
                                                         <MdAdd className="text-xl" />
                                                     </div>
                                                 </div>
@@ -180,7 +180,7 @@ export default function EditPlaylistDialog({
                                         <button
                                             type="submit"
                                             disabled={!name.trim() || loading}
-                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-white bg-[#ef4444] hover:bg-[#dc2626] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {loading ? '保存中...' : '完成'}
                                         </button>
