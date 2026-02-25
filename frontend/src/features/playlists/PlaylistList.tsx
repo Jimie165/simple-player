@@ -19,6 +19,7 @@ import EditPlaylistDialog from './components/EditPlaylistDialog';
 import CreatePlaylistDialog from './components/CreatePlaylistDialog';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
 
 type SortKey = 'name' | 'recently_added' | 'recently_played';
@@ -43,7 +44,7 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, getPlaylistSettings } = useLibraryStore();
+    const { addMultipleToNext, libraryVersion, getPlaylistSettings, triggerLibraryUpdate } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
@@ -138,16 +139,15 @@ export default function PlaylistList() {
 
     // Removal of handleDelete since we use hook's global confirm now
 
-    const handleCreate = async (name: string, _description?: string) => {
-        await libraryService.createPlaylist(name);
-        // If we support description in creation, we'd update it here too 
-        // but currently createPlaylist only takes name. 
-        // We could call updatePlaylistInfo immediately if description is provided,
-        // but createPlaylist doesn't return ID immediately in frontend service (it does return Playlist obj).
-        // Let's rely on standard create for now.
-        // Actually the service returns Playlist!
-        // To be perfect, we should update description if provided.
-        // But for now let's just reload.
+    const handleCreate = async (name: string, _description?: string, coverPath?: string) => {
+        const newPl = await libraryService.createPlaylist(name);
+        if (_description) {
+            await libraryService.updatePlaylistInfo(newPl.id, name, _description);
+        }
+        if (coverPath) {
+            await libraryService.updatePlaylistCover(newPl.id, coverPath);
+        }
+        triggerLibraryUpdate();
         loadPlaylists();
     };
 
@@ -280,6 +280,7 @@ export default function PlaylistList() {
         if (coverPath !== editPlaylist.cover_path) {
             await libraryService.updatePlaylistCover(editPlaylist.id, coverPath || "");
         }
+        triggerLibraryUpdate();
         setEditPlaylist(null);
         loadPlaylists();
     };
@@ -332,16 +333,14 @@ export default function PlaylistList() {
                 onConfirm={handleCreate}
             />
 
-            {editPlaylist && (
-                <EditPlaylistDialog
-                    isOpen={!!editPlaylist}
-                    onClose={() => setEditPlaylist(null)}
-                    onConfirm={handleUpdatePlaylist}
-                    initialName={editPlaylist.name}
-                    initialDescription={editPlaylist.description || ''}
-                    initialCover={editPlaylist.cover_path || undefined}
-                />
-            )}
+            <EditPlaylistDialog
+                isOpen={!!editPlaylist}
+                onClose={() => setEditPlaylist(null)}
+                onConfirm={handleUpdatePlaylist}
+                initialName={editPlaylist?.name || ''}
+                initialDescription={editPlaylist?.description || ''}
+                initialCover={editPlaylist?.cover_path || undefined}
+            />
 
             {/* Toolbar */}
             <div className="flex items-center justify-between mb-4">
@@ -481,14 +480,18 @@ export default function PlaylistList() {
                         >
                             {/* Artwork */}
                             <div className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-all">
-                                <PlaylistCoverCollage
-                                    songs={(() => {
-                                        const rawSongs = playlistSongs[pl.id] || [];
-                                        const settings = getPlaylistSettings(pl.id.toString());
-                                        return sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
-                                    })()}
-                                    className="transition-transform duration-500 group-hover:scale-105"
-                                />
+                                {pl.cover_path ? (
+                                    <CoverImage src={pl.cover_path} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                ) : (
+                                    <PlaylistCoverCollage
+                                        songs={(() => {
+                                            const rawSongs = playlistSongs[pl.id] || [];
+                                            const settings = getPlaylistSettings(pl.id.toString());
+                                            return sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
+                                        })()}
+                                        className="transition-transform duration-500 group-hover:scale-105"
+                                    />
+                                )}
 
                                 {/* Selection Checkbox */}
                                 {isSelectionMode && (

@@ -204,6 +204,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             if (coverPath !== playlistInfo?.cover_path) {
                 await libraryService.updatePlaylistCover(id as number, coverPath || "");
             }
+            triggerLibraryUpdate();
             loadData();
         }
     };

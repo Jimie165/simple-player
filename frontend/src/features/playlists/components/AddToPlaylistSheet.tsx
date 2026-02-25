@@ -9,6 +9,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import { libraryService } from '@/services/libraryService';
 import type { Playlist, SongMetadata } from '@/types';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
+import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
 import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
 import CreatePlaylistDialog from './CreatePlaylistDialog';
@@ -336,11 +337,15 @@ export default function AddToPlaylistSheet() {
                                                         className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left"
                                                     >
                                                         <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
-                                                            <PlaylistCoverCollage
-                                                                key={coverKey}
-                                                                songs={songs}
-                                                                className="w-full h-full"
-                                                            />
+                                                            {pl.cover_path ? (
+                                                                <CoverImage src={pl.cover_path} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <PlaylistCoverCollage
+                                                                    key={coverKey}
+                                                                    songs={songs}
+                                                                    className="w-full h-full"
+                                                                />
+                                                            )}
                                                         </div>
                                                         <div className="flex flex-col">
                                                             <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
