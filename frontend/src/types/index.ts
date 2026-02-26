@@ -77,4 +77,4 @@ export type RepeatMode = 'off' | 'all' | 'one';
 // 页面 ID
 export type PageId = 'home' | 'library' | 'videos' | 'playlists' | 'settings' | 'search';
 
-export * from './video';
+export * from '@/types/video';

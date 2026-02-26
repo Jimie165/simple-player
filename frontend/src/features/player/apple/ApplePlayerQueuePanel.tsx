@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import AppleMusicQueue from '../AppleMusicQueue';
+import AppleMusicQueue from '@/features/player/AppleMusicQueue';
 
 interface ApplePlayerQueuePanelProps {
     isQueueOpen: boolean;

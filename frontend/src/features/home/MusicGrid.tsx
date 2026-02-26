@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import clsx from 'clsx';
 import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdVideocam } from 'react-icons/md';
 import PageContainer from '@/components/layout/PageContainer';
-import OpenFileMenu from './components/OpenFileMenu';
-import EmptyState from './components/EmptyState';
+import OpenFileMenu from '@/features/home/components/OpenFileMenu';
+import EmptyState from '@/features/home/components/EmptyState';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { libraryService } from '@/services/libraryService';
@@ -17,7 +17,7 @@ import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import { sortSongs } from '@/utils/songSort';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
-import { useRecentPlayback } from './hooks/useRecentPlayback';
+import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 
 interface MusicGridProps {
     onNavigateToLibrary?: () => void;

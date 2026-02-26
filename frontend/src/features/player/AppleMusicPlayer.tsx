@@ -11,11 +11,11 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { audioService } from '@/services/audioService';
 import { resolveCover } from '@/utils/mediaPath';
 import CoverImage from '@/components/common/CoverImage';
-import { PlayerBackground } from './apple/PlayerBackground';
-import ApplePlayerControlsSection from './apple/ApplePlayerControlsSection';
-import ApplePlayerTopBar from './apple/ApplePlayerTopBar';
-import ApplePlayerQueuePanel from './apple/ApplePlayerQueuePanel';
-import ApplePlayerQueueToggle from './apple/ApplePlayerQueueToggle';
+import { PlayerBackground } from '@/features/player/apple/PlayerBackground';
+import ApplePlayerControlsSection from '@/features/player/apple/ApplePlayerControlsSection';
+import ApplePlayerTopBar from '@/features/player/apple/ApplePlayerTopBar';
+import ApplePlayerQueuePanel from '@/features/player/apple/ApplePlayerQueuePanel';
+import ApplePlayerQueueToggle from '@/features/player/apple/ApplePlayerQueueToggle';
 
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {

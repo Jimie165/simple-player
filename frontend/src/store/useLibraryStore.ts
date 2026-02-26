@@ -12,8 +12,8 @@ import {
     removeSongFromPlaylistFn,
     reorderPlaylistFn,
     toggleShuffleListFn,
-} from './actions/queueActions';
-import { isFavoriteFn, refreshFavoritesFn, toggleFavoriteFn } from './actions/favoriteActions';
+} from '@/store/actions/queueActions';
+import { isFavoriteFn, refreshFavoritesFn, toggleFavoriteFn } from '@/store/actions/favoriteActions';
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 type SortOrder = 'asc' | 'desc';

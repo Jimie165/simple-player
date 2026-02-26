@@ -1,9 +1,9 @@
 import clsx from 'clsx';
 import { MdHomeFilled, MdLibraryMusic, MdVideoLibrary, MdFeaturedPlayList, MdSettings } from 'react-icons/md';
-import SidebarHeader from './sidebar/SidebarHeader';
-import SidebarSearch from './sidebar/SidebarSearch';
-import SidebarNavButton from './sidebar/SidebarNavButton';
-import type { NavItem } from './sidebar/SidebarNavButton';
+import SidebarHeader from '@/components/layout/sidebar/SidebarHeader';
+import SidebarSearch from '@/components/layout/sidebar/SidebarSearch';
+import SidebarNavButton from '@/components/layout/sidebar/SidebarNavButton';
+import type { NavItem } from '@/components/layout/sidebar/SidebarNavButton';
 
 interface SidebarProps {
     activeId: string;

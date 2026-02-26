@@ -19,5 +19,19 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              // 覆盖所有可能的相对路径写法
+              group: ['.', '..', './**', '../**'],
+              message: '请使用 @/ 别名导入，不允许相对路径导入。',
+            },
+          ],
+        },
+      ],
+    },
   },
 ])

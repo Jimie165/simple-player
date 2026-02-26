@@ -10,7 +10,7 @@ import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
-import { VideoCard } from './VideoCard';
+import { VideoCard } from '@/features/videos/components/VideoCard';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
     const { setVideoMode, setIsPlaying, setVideoMetadata, setVideoQueue } = usePlayerStore();

@@ -8,8 +8,8 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { useAddToPlaylistStore } from '@/store/useAddToPlaylistStore';
-import { SongListItem } from './SongListItem';
-import { SortableSongListContextMenu, type ContextMenuState } from './SortableSongListContextMenu';
+import { SongListItem } from '@/features/playlists/songlist/SongListItem';
+import { SortableSongListContextMenu, type ContextMenuState } from '@/features/playlists/songlist/SortableSongListContextMenu';
 
 import {
     DndContext,
@@ -40,7 +40,7 @@ import {
     formatDuration,
     getGridTemplateColumns,
     getSongId,
-} from './sortableSongListUtils';
+} from '@/features/playlists/songlist/sortableSongListUtils';
 
 export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';

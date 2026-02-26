@@ -1,4 +1,4 @@
-import MusicContextMenu from './MusicContextMenu';
+import MusicContextMenu from '@/components/common/MusicContextMenu';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import type { MusicItem } from '@/utils/musicItemUtils';

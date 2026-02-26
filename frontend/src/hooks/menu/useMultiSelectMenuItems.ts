@@ -1,6 +1,6 @@
 import type { MusicItem } from '@/utils/musicItemUtils';
 import { getMusicItemType } from '@/utils/musicItemUtils';
-import type { MenuItemData, MusicMenuContext } from './useSongOperations';
+import type { MenuItemData, MusicMenuContext } from '@/hooks/menu/useSongOperations';
 
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 

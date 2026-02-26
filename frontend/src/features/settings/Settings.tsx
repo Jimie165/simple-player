@@ -12,7 +12,7 @@ import {
     MdWeb
 } from 'react-icons/md';
 import clsx from 'clsx';
-import TranscodeSettings from './TranscodeSettings';
+import TranscodeSettings from '@/features/settings/TranscodeSettings';
 import { getName, getVersion } from '@tauri-apps/api/app';
 
 export default function Settings() {

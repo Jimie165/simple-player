@@ -5,14 +5,14 @@ import CustomTooltip from '@/components/common/CustomTooltip';
 import { useScrollBlur } from '@/hooks/useScrollBlur';
 
 
-import SortableSongList from '../songlist/SortableSongList';
+import SortableSongList from '@/features/playlists/songlist/SortableSongList';
 import type { SortKey, SortOrder } from '@/utils/songSort';
 import { sortSongs } from '@/utils/songSort';
-import EditPlaylistDialog from '../dialogs/EditPlaylistDialog';
+import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
 import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
-import PlaylistSearchControl from './PlaylistSearchControl';
-import PlaylistSortControl from './PlaylistSortControl';
+import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
+import PlaylistSortControl from '@/features/playlists/detail/PlaylistSortControl';
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';

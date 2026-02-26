@@ -4,7 +4,7 @@ import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import VolumePopup from '@/components/common/VolumePopup';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import PlayQueuePopup from './PlayQueuePopup'; // 引入新组件
+import PlayQueuePopup from '@/features/player/controls/PlayQueuePopup'; // 引入新组件
 
 interface ExtraControlsProps {
     onInfoClick: () => void;

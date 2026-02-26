@@ -25,14 +25,14 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { IoEllipsisHorizontal } from 'react-icons/io5';
 import CoverImage from '@/components/common/CoverImage';
-import { navigateFromQueueContext } from './utils/queueContextNavigation';
-import { SortableQueueItem, QUEUE_ROW_HEIGHT } from './queue/SortableQueueItem';
+import { navigateFromQueueContext } from '@/features/player/utils/queueContextNavigation';
+import { SortableQueueItem, QUEUE_ROW_HEIGHT } from '@/features/player/queue/SortableQueueItem';
 import {
     type QueueEntry,
     getQueueItemId,
     splitQueueEntries,
     VIRTUOSO_OVERSCAN,
-} from './queue/queueHelpers';
+} from '@/features/player/queue/queueHelpers';
 
 interface AppleMusicQueueProps {
     onNavigate?: () => void;

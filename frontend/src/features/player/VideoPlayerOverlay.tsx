@@ -12,9 +12,9 @@ import MusicSlider from '@/components/common/MusicSlider';
 import { systemService } from '@/services/systemService';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
-import { VideoPlaylistDrawer } from './video/VideoPlaylistDrawer';
-import { useVideoPlayback } from './hooks/useVideoPlayback';
-import { useVideoControls } from './hooks/useVideoControls';
+import { VideoPlaylistDrawer } from '@/features/player/video/VideoPlaylistDrawer';
+import { useVideoPlayback } from '@/features/player/hooks/useVideoPlayback';
+import { useVideoControls } from '@/features/player/hooks/useVideoControls';
 
 export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const {

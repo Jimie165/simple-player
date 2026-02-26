@@ -4,15 +4,15 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import PageContainer from '@/components/layout/PageContainer';
-import LibraryHeaderButton from './components/LibraryHeaderButton';
-import SongListView from './components/SongListView';
-import AlbumGridView from './components/AlbumGridView';
-import ArtistGridView from './components/ArtistGridView';
-import LibraryTabsAndShuffle from './components/LibraryTabsAndShuffle';
-import AlbumSortMenu from './components/AlbumSortMenu';
+import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButton';
+import SongListView from '@/features/library/components/SongListView';
+import AlbumGridView from '@/features/library/components/AlbumGridView';
+import ArtistGridView from '@/features/library/components/ArtistGridView';
+import LibraryTabsAndShuffle from '@/features/library/components/LibraryTabsAndShuffle';
+import AlbumSortMenu from '@/features/library/components/AlbumSortMenu';
 
-import type { AlbumData } from './components/AlbumGridView';
-import type { ArtistData } from './components/ArtistGridView';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
+import type { ArtistData } from '@/features/library/components/ArtistGridView';
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -21,7 +21,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import type { SongMetadata } from '@/types';
 import type { RecentItem } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
-import { buildAlbums, buildArtists } from './utils/grouping';
+import { buildAlbums, buildArtists } from '@/features/library/utils/grouping';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation

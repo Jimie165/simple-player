@@ -11,11 +11,11 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
-import EditPlaylistDialog from './dialogs/EditPlaylistDialog';
-import CreatePlaylistDialog from './dialogs/CreatePlaylistDialog';
-import PlaylistListActions from './list/PlaylistListActions';
-import PlaylistSortMenu, { type PlaylistSortKey } from './list/PlaylistSortMenu';
-import PlaylistCardsGrid from './list/PlaylistCardsGrid';
+import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
+import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
+import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
+import PlaylistSortMenu, { type PlaylistSortKey } from '@/features/playlists/list/PlaylistSortMenu';
+import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
 
 type SortKey = PlaylistSortKey;
 

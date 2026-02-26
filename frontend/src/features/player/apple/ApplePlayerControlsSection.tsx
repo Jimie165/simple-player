@@ -16,7 +16,7 @@ import {
 import type { SongMetadata } from '@/types';
 import { formatTime } from '@/utils/time';
 import MusicSlider from '@/components/common/MusicSlider';
-import { PlayerMenuWrapper } from './PlayerMenuButton';
+import { PlayerMenuWrapper } from '@/features/player/apple/PlayerMenuButton';
 
 interface ApplePlayerControlsSectionProps {
     controlsRef: React.RefObject<HTMLDivElement | null>;

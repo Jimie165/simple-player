@@ -1,6 +1,6 @@
 import type { SongMetadata } from '@/types';
-import type { AlbumData } from '../components/AlbumGridView';
-import type { ArtistData } from '../components/ArtistGridView';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
+import type { ArtistData } from '@/features/library/components/ArtistGridView';
 
 const compareAlphaNum = (a: string, b: string) => {
     const isAsciiA = /^[a-zA-Z]/.test(a);

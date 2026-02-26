@@ -11,9 +11,9 @@ import type { Playlist, SongMetadata } from '@/types';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
-import DuplicateSongConfirmDialog from './DuplicateSongConfirmDialog';
-import CreatePlaylistDialog from './CreatePlaylistDialog';
-import { resolveSongsWithLibraryIds, splitDuplicateSongs } from './playlistDuplicateUtils';
+import DuplicateSongConfirmDialog from '@/features/playlists/dialogs/DuplicateSongConfirmDialog';
+import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
+import { resolveSongsWithLibraryIds, splitDuplicateSongs } from '@/features/playlists/dialogs/playlistDuplicateUtils';
 
 export default function AddToPlaylistSheet() {
     const { isOpen, close, songsToAdd } = useAddToPlaylistStore();

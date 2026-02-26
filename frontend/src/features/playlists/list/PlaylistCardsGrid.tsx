@@ -6,7 +6,7 @@ import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
-import { FavoritesCardMenu, PlaylistCardMenu } from './PlaylistCardMenus';
+import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/PlaylistCardMenus';
 
 interface PlaylistCardsGridProps {
     filteredPlaylists: Playlist[];

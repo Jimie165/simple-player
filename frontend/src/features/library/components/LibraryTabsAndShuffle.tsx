@@ -1,8 +1,8 @@
 import clsx from 'clsx';
 import { MdMusicNote, MdAlbum, MdPerson, MdShuffle } from 'react-icons/md';
 import type { SongMetadata } from '@/types';
-import type { AlbumData } from './AlbumGridView';
-import type { ArtistData } from './ArtistGridView';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
+import type { ArtistData } from '@/features/library/components/ArtistGridView';
 
 interface LibraryTabsAndShuffleProps {
     currentTab: 'songs' | 'albums' | 'artists';

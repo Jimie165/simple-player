@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { resolveMediaPath } from '@/utils/mediaPath';
-import { detectHevcSupport, detectSupportedAudioCodecs } from '../utils/codecDetection';
-import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '../utils/videoSource';
-import { useMkvPrepare } from './useMkvPrepare';
+import { detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
+import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
+import { useMkvPrepare } from '@/features/player/hooks/useMkvPrepare';
 
 type VideoMetadataLike = {
     path?: string;

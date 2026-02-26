@@ -3,9 +3,9 @@ import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
 // 引入子组件
-import SongInfo from './controls/SongInfo';
-import PlaybackControls from './controls/PlaybackControls';
-import ExtraControls from './controls/ExtraControls';
+import SongInfo from '@/features/player/controls/SongInfo';
+import PlaybackControls from '@/features/player/controls/PlaybackControls';
+import ExtraControls from '@/features/player/controls/ExtraControls';
 
 // 引入 Common 组件
 import InfoDialog from '@/components/common/InfoDialog';

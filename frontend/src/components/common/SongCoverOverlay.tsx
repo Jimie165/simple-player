@@ -3,8 +3,8 @@ import { MdPlayArrow, MdPause } from 'react-icons/md';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
 import type { SongMetadata } from '@/types';
-import CoverImage from './CoverImage';
-import Equalizer from './Equalizer';
+import CoverImage from '@/components/common/CoverImage';
+import Equalizer from '@/components/common/Equalizer';
 
 interface SongCoverOverlayProps {
     song: SongMetadata;

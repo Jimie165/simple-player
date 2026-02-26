@@ -5,7 +5,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { fileService } from '@/services/fileService';
 import { formatTime } from '@/utils/time';
 import type { SongMetadata } from '@/types';
-import CoverImage from './CoverImage';
+import CoverImage from '@/components/common/CoverImage';
 
 interface InfoDialogProps {
     isOpen: boolean;

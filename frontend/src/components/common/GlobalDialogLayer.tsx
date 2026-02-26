@@ -1,5 +1,5 @@
-import ConfirmDialog from './ConfirmDialog';
-import InfoDialog from './InfoDialog';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
+import InfoDialog from '@/components/common/InfoDialog';
 import { useDialogStore } from '@/store/useDialogStore';
 
 /**

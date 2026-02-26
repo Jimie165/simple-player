@@ -11,10 +11,10 @@ import { audioService } from '@/services/audioService';
 import { resolveSongsFromItems, getMusicItemType } from '@/utils/musicItemUtils';
 import type { MusicItem } from '@/utils/musicItemUtils';
 import type { SongMetadata } from '@/types';
-import { handleDeleteFromLibraryAction, handleDeleteOrRemoveAction } from './menuActions';
-import { filterMenuGroupsByContext } from './useMultiSelectMenuItems';
-import { buildSongMenuGroups } from './songMenuFactory';
-import { handlePropertiesAction, handleShowAlbumAction, handleShowArtistAction } from './songInfoActions';
+import { handleDeleteFromLibraryAction, handleDeleteOrRemoveAction } from '@/hooks/menu/menuActions';
+import { filterMenuGroupsByContext } from '@/hooks/menu/useMultiSelectMenuItems';
+import { buildSongMenuGroups } from '@/hooks/menu/songMenuFactory';
+import { handlePropertiesAction, handleShowAlbumAction, handleShowArtistAction } from '@/hooks/menu/songInfoActions';
 
 // 菜单上下文类型
 export type MusicMenuContext = 'library' | 'playlist' | 'folder' | 'recent' | 'album_detail' | 'artist_detail' | 'playlist_list' | 'queue' | 'video' | 'other';

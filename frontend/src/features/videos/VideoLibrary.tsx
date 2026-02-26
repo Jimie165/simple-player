@@ -13,7 +13,7 @@ import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdSort, MdCheck, MdExpandMore, MdExpandLess } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { Virtuoso } from 'react-virtuoso';
-import { VideoGrid } from './components/VideoGrid';
+import { VideoGrid } from '@/features/videos/components/VideoGrid';
 
 import { useVideoScanProgress } from '@/hooks/useVideoScanProgress';
 

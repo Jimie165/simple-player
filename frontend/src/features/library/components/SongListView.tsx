@@ -7,7 +7,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
-import { SongListRow } from './SongListRow';
+import { SongListRow } from '@/features/library/components/SongListRow';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
