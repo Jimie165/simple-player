@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
@@ -30,6 +30,11 @@ export function useMkvPrepare({
     const [prepareStage, setPrepareStage] = useState<string | null>(null);
     const [preparePercent, setPreparePercent] = useState<number | null>(null);
     const [isPreparing, setIsPreparing] = useState(false);
+    const onPrepareErrorRef = useRef<typeof onPrepareError>(onPrepareError);
+
+    useEffect(() => {
+        onPrepareErrorRef.current = onPrepareError;
+    }, [onPrepareError]);
 
     useEffect(() => {
         let unlistenFn: null | (() => void) = null;
@@ -68,7 +73,7 @@ export function useMkvPrepare({
             } catch (error) {
                 console.error('[VideoPlayer] 视频准备失败:', error);
                 if (cancelled) return;
-                onPrepareError?.(error);
+                onPrepareErrorRef.current?.(error);
             } finally {
                 if (cancelled) return;
                 setIsPreparing(false);
@@ -81,7 +86,7 @@ export function useMkvPrepare({
             cancelled = true;
             if (unlistenFn) unlistenFn();
         };
-    }, [isOpen, sourcePath, isMkv, supportsHevc, supportedAudioCodecs, onPrepareError]);
+    }, [isOpen, sourcePath, isMkv, supportsHevc, supportedAudioCodecs]);
 
     return {
         preparedPath,

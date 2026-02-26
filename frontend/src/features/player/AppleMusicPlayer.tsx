@@ -319,11 +319,11 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             />
 
             {/* Content Layer - Responsive Flex Layout */}
-            <div className="relative z-20 flex-1 flex w-full min-h-0 px-8 pb-10">
+            <div className="relative z-20 flex-1 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(1.5rem,3vw,2.5rem)]">
 
                 <div className={clsx(
                     "flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                    isQueueOpen ? "w-[42%] pr-4" : "w-full px-12"
+                    isQueueOpen ? "w-[42%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
                 )}>
                     {/* Content Wrapper: Controls vertical spacing */}
                     <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">

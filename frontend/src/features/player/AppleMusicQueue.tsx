@@ -56,13 +56,13 @@ const SongRow = React.memo(function SongRow({ song, isActive, onPlay, style, ite
             {...(isDraggable ? dragAttributes : {})}
             {...(isDraggable ? dragListeners : {})}
             className={clsx(
-                "group flex items-center gap-3 py-2 px-3 rounded-md transition-colors select-none",
+                "group flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] rounded-md transition-colors select-none",
                 isActive ? "bg-white/10" : "hover:bg-white/5"
             )}
         >
             {/* Cover */}
             <div
-                className="relative w-10 h-10 rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
+                className="relative w-[clamp(2rem,4vw,2.5rem)] h-[clamp(2rem,4vw,2.5rem)] rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
                 onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking play
                 onClick={(e) => {
                     e.stopPropagation();
@@ -80,12 +80,12 @@ const SongRow = React.memo(function SongRow({ song, isActive, onPlay, style, ite
             {/* Info */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 h-full py-1.5 border-b border-white/5 group-last:border-none">
                 <div className={clsx(
-                    "text-sm font-medium truncate leading-tight",
+                    "text-[clamp(0.75rem,1.5vw,0.875rem)] font-medium truncate leading-tight",
                     isActive ? "text-primary" : "text-white/90"
                 )}>
                     {song.title}
                 </div>
-                <div className="text-xs text-white/50 truncate leading-tight">
+                <div className="text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/50 truncate leading-tight">
                     {song.artist}
                 </div>
             </div>
@@ -252,8 +252,8 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
     return (
         <div className="h-full flex flex-col bg-transparent relative overflow-hidden">
             {/* Fixed Top Header Area */}
-            <div className="w-full h-14 z-50 flex-shrink-0 flex items-center justify-between px-3">
-                <span className="text-lg font-bold text-white">播放队列</span>
+            <div className="w-full h-[clamp(2.5rem,4.5vw,3.5rem)] z-50 flex-shrink-0 flex items-center justify-between px-[clamp(0.5rem,1.5vw,0.75rem)]">
+                <span className="text-[clamp(1rem,2vw,1.125rem)] font-bold text-white">播放队列</span>
             </div>
 
             {/* Sortable List */}
@@ -276,11 +276,11 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                     {/* Section 1: User Queue */}
                     {queueList.length > 0 && (
                         <div className="mb-4">
-                            <div className="px-3 py-2 flex items-center justify-between">
-                                <span className="text-sm font-bold text-white">队列中的下一首歌</span>
+                            <div className="px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] flex items-center justify-between">
+                                <span className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">队列中的下一首歌</span>
                                 <button
                                     onClick={clearUserQueue}
-                                    className="text-xs font-bold text-white/60 hover:text-white transition-colors"
+                                    className="text-[clamp(0.625rem,1.2vw,0.75rem)] font-bold text-white/60 hover:text-white transition-colors"
                                 >
                                     清空队列
                                 </button>
@@ -305,7 +305,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                     {/* Section 2: Next From Context */}
                     {/* Section 2: Next From Context */}
                     {/* Section 2: Next From Context */}
-                    <div className="px-3 py-2 flex items-center gap-1 text-sm font-bold text-white">
+                    <div className="px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] flex items-center gap-1 text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">
                         {queueContext?.type === 'home' ? (
                             <span>下一首</span>
                         ) : (
@@ -326,7 +326,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
 
                     <SortableContext items={nextFromList.map(item => `${item.originalIndex}-${item.song.id || item.song.path}`)} strategy={verticalListSortingStrategy}>
                         <div className="flex flex-col min-h-[100px]">
-                            {nextFromList.length === 0 && queueList.length === 0 && (<div className="text-white/30 py-8 text-sm text-center italic">没有待播放的歌曲</div>)}
+                            {nextFromList.length === 0 && queueList.length === 0 && (<div className="text-white/30 py-8 text-[clamp(0.75rem,1.5vw,0.875rem)] text-center italic">没有待播放的歌曲</div>)}
                             {nextFromList.map((item) => (
                                 <SortableQueueItem
                                     key={`${item.originalIndex}-${item.song.id || item.song.path}`}

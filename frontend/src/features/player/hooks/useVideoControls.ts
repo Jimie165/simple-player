@@ -9,6 +9,20 @@ export function useVideoControls() {
     const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
 
     useEffect(() => {
+        const syncFullscreen = async () => {
+            const win = getCurrentWindow();
+            setIsFullscreen(await win.isFullscreen());
+        };
+
+        syncFullscreen();
+        const unlisten = systemService.onResize(syncFullscreen);
+
+        return () => {
+            unlisten.then(f => f && f());
+        };
+    }, []);
+
+    useEffect(() => {
         const checkMaximized = async () => setIsMaximized(await systemService.isMaximized());
         checkMaximized();
         const unlisten = systemService.onResize(checkMaximized);

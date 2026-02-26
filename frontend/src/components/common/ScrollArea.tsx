@@ -6,9 +6,10 @@ interface ScrollAreaProps {
     children: ReactNode;
     className?: string;
     topOffset?: number;
+    resetOnKeyChange?: any;
 }
 
-export default function ScrollArea({ children, className, topOffset = 0 }: ScrollAreaProps) {
+export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange }: ScrollAreaProps) {
     const viewportRef = useRef<HTMLDivElement>(null);
     const thumbRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -70,6 +71,13 @@ export default function ScrollArea({ children, className, topOffset = 0 }: Scrol
             requestRef.current = undefined;
         });
     };
+
+    useEffect(() => {
+        if (viewportRef.current) {
+            viewportRef.current.scrollTop = 0;
+            updateThumb();
+        }
+    }, [resetOnKeyChange]);
 
     useEffect(() => {
         const viewport = viewportRef.current;

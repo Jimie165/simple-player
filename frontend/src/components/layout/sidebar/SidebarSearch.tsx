@@ -15,7 +15,15 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
     const handleSearchClick = () => {
         if (collapsed) {
             onToggle();
-            setTimeout(() => searchInputRef.current?.focus(), 300);
+            setTimeout(() => {
+                const input = searchInputRef.current;
+                if (!input) return;
+                try {
+                    input.focus({ preventScroll: true });
+                } catch {
+                    input.focus();
+                }
+            }, 300);
         }
     };
 

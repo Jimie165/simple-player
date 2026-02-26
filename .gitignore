@@ -38,6 +38,7 @@ logs/
 
 # IDE和编辑器
 .vscode/*
+.agent/
 !.vscode/extensions.json
 !.vscode/settings.json
 .idea/

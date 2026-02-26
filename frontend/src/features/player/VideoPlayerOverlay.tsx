@@ -7,9 +7,10 @@ import {
     MdVolumeUp, MdVolumeOff, MdFullscreen, MdFullscreenExit,
     MdArrowBack, MdSkipPrevious, MdSkipNext, MdPlaylistPlay
 } from 'react-icons/md';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import MusicSlider from '@/components/common/MusicSlider';
 import { systemService } from '@/services/systemService';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
 import { VideoPlaylistDrawer } from './video/VideoPlaylistDrawer';
 import { useVideoPlayback } from './hooks/useVideoPlayback';
@@ -71,7 +72,6 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         error,
         showError,
         isBuffering,
-        prepareStage,
         preparePercent,
         isPreparing,
         posterUrl,
@@ -141,6 +141,15 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
             setIsPlaying(false);
         }
 
+        try {
+            const win = getCurrentWindow();
+            if (await win.isFullscreen()) {
+                await win.setFullscreen(false);
+            }
+        } catch (error) {
+            console.error('[VideoPlayer] 退出全屏失败:', error);
+        }
+
         if ('mediaSession' in navigator) {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
@@ -203,11 +212,39 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                 {/* Preparing Overlay */}
                 {isPreparing && (
-                    <div className="col-start-1 row-start-1 w-full h-full z-40 flex flex-col items-center justify-center bg-black/70 text-white pointer-events-none">
-                        <div className="text-lg font-medium mb-2">正在准备播放</div>
-                        <div className="text-white/70 text-sm">
-                            {prepareStage ? `阶段：${prepareStage}` : null}
-                            {preparePercent !== null ? `  ${Math.round(preparePercent)}%` : null}
+                    <div className="col-start-1 row-start-1 w-full h-full z-40 flex flex-col items-center justify-center bg-black/70 text-white pointer-events-none backdrop-blur-sm">
+                        <div className="flex flex-col items-center max-w-sm w-full px-6">
+                            <div className="text-lg font-medium mb-3 tracking-wide">正在准备播放</div>
+
+                            {/* Progress Bar Container */}
+                            <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3 relative">
+                                {preparePercent !== null ? (
+                                    <motion.div
+                                        className="h-full bg-primary rounded-full"
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${Math.max(0, Math.min(100, preparePercent))}%` }}
+                                        transition={{ duration: 0.3 }}
+                                    />
+                                ) : (
+                                    <motion.div
+                                        className="h-full bg-primary/80 rounded-full w-1/3 absolute left-0"
+                                        animate={{
+                                            x: ["-100%", "300%"],
+                                        }}
+                                        transition={{
+                                            duration: 1.5,
+                                            repeat: Infinity,
+                                            ease: "easeInOut"
+                                        }}
+                                    />
+                                )}
+                            </div>
+
+                            <div className="flex justify-end w-full text-white/70 text-xs font-medium">
+                                <span>
+                                    {preparePercent !== null ? `${Math.round(preparePercent)}%` : ''}
+                                </span>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -409,15 +446,13 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 </div>
 
                 {/* 4. Playlist Drawer */}
-                <AnimatePresence>
-                    <VideoPlaylistDrawer
-                        isOpen={isPlaylistOpen}
-                        onClose={() => setIsPlaylistOpen(false)}
-                        videoQueue={videoQueue}
-                        currentVideoIndex={currentVideoIndex}
-                        onSelectVideo={(index) => setVideoQueue(videoQueue, index)}
-                    />
-                </AnimatePresence>
+                <VideoPlaylistDrawer
+                    isOpen={isPlaylistOpen}
+                    onClose={() => setIsPlaylistOpen(false)}
+                    videoQueue={videoQueue}
+                    currentVideoIndex={currentVideoIndex}
+                    onSelectVideo={(index) => setVideoQueue(videoQueue, index)}
+                />
 
             </motion.div>
 

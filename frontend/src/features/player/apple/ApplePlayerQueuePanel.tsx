@@ -20,7 +20,7 @@ export default function ApplePlayerQueuePanel({
             className={clsx(
                 'flex-1 min-w-0 h-full max-h-[95%] flex flex-col z-30 overflow-hidden justify-center',
                 'transition-[max-width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]',
-                isQueueOpen ? 'max-w-full pl-8 md:pl-9 pr-8' : 'max-w-0 pl-0 pr-0'
+                isQueueOpen ? 'max-w-full pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]' : 'max-w-0 pl-0 pr-0'
             )}
         >
             <div className="relative flex-1 overflow-hidden">

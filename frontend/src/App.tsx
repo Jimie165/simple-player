@@ -161,7 +161,7 @@ function App() {
         className="absolute top-0 left-0 right-0 h-12 bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl z-40 border-b border-outline-variant/5"
       />
 
-      <ScrollArea className="flex-1 relative" topOffset={48}>
+      <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
         <div className="pt-12 min-h-full">
           <AnimatePresence mode="wait">
             <motion.div
@@ -200,7 +200,7 @@ function App() {
             activeId={currentPage}
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onToggle={() => setSidebarCollapsed((prev) => !prev)}
             canGoBack={mainHistory.length > 0 || hasOverlay || isFullScreen}
             onBack={handleBack}
             onSearch={handleSearch}

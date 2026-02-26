@@ -38,10 +38,10 @@ export default function TranscodeSettings() {
             const deletedCount = await invoke<number>('clear_transcode_cache');
             console.log(`已清理 ${deletedCount} 个缓存文件`);
             await fetchInfo(); // Refresh stats
-            toast.success(`已清理 ${deletedCount} 个缓存文件`);
+            toast.success(`已清理 ${deletedCount} 个缓存文件`, { id: 'clear-cache-toast' });
         } catch (error) {
             console.error('Failed to clear cache:', error);
-            toast.error('清理缓存失败');
+            toast.error('清理缓存失败', { id: 'clear-cache-toast' });
         } finally {
             setClearing(false);
         }
@@ -58,10 +58,10 @@ export default function TranscodeSettings() {
         try {
             await invoke('set_transcode_cache_limit', { limitMb: limit });
             await fetchInfo();
-            toast.success('缓存设置已保存');
+            toast.success('缓存设置已保存', { id: 'save-cache-limit-toast' });
         } catch (error) {
             console.error('Failed to set cache limit:', error);
-            toast.error('保存设置失败');
+            toast.error('保存设置失败', { id: 'save-cache-limit-toast' });
         } finally {
             setSaving(false);
         }
