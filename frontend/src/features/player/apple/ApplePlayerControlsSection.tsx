@@ -153,7 +153,7 @@ export default function ApplePlayerControlsSection({
                 />
                 <div className="flex justify-between text-[11px] font-medium text-white/40 select-none">
                     <span>{formatTime(currentTime)}</span>
-                    <span>-{formatTime((metadata?.duration || 0) - currentTime)}</span>
+                    <span>-{formatTime(Math.max(0, (metadata?.duration || 0) - currentTime))}</span>
                 </div>
             </div>
 

@@ -1,12 +1,16 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import clsx from 'clsx';
+import { Virtuoso, type Components } from 'react-virtuoso';
 import {
     DndContext,
+    DragOverlay,
     closestCenter,
     KeyboardSensor,
     PointerSensor,
     useSensor,
     useSensors,
+    type DragStartEvent,
     type Modifier,
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -15,134 +19,51 @@ import {
     SortableContext,
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
-    useSortable
+    type SortableContextProps,
 } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-import { IoPlay, IoEllipsisHorizontal } from 'react-icons/io5';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
-import type { SongMetadata } from '@/types';
+import { IoEllipsisHorizontal } from 'react-icons/io5';
 import CoverImage from '@/components/common/CoverImage';
-import MusicContextMenu from '@/components/common/MusicContextMenu';
-import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import { navigateFromQueueContext } from './utils/queueContextNavigation';
+import { SortableQueueItem, QUEUE_ROW_HEIGHT } from './queue/SortableQueueItem';
+import {
+    type QueueEntry,
+    getQueueItemId,
+    splitQueueEntries,
+    VIRTUOSO_OVERSCAN,
+} from './queue/queueHelpers';
 
-interface SongRowProps {
-    song: SongMetadata;
-    isActive?: boolean;
-    onPlay: () => void;
-    style?: React.CSSProperties;
-    itemRef?: (node: HTMLElement | null) => void;
-    dragAttributes?: any;
-    dragListeners?: any;
-    isDraggable?: boolean;
-    onRemove?: () => void; // Callback to remove item
-    onNavigate?: () => void; // Callback on navigation
+interface AppleMusicQueueProps {
+    onNavigate?: () => void;
+    scrollToTopSignal?: number;
+    isOpen?: boolean;
 }
 
-const SongRow = React.memo(function SongRow({ song, isActive, onPlay, style, itemRef, dragAttributes, dragListeners, isDraggable, onRemove, onNavigate }: SongRowProps) {
-    // Generate menu operations
-    const ops = useSongOperations({
-        items: [song],
-        context: 'queue',
-        onDelete: onRemove, // Map remove callback to delete action for queue context
-        onNavigate: onNavigate
+function createSortableList(items: string[]) {
+    return forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function SortableList(
+        { children, ...props },
+        ref
+    ) {
+        return (
+            <SortableContext
+                items={items as SortableContextProps['items']}
+                strategy={verticalListSortingStrategy}
+            >
+                <div ref={ref} {...props}>{children}</div>
+            </SortableContext>
+        );
     });
-
-    return (
-        <div
-            ref={itemRef}
-            style={style}
-            {...(isDraggable ? dragAttributes : {})}
-            {...(isDraggable ? dragListeners : {})}
-            className={clsx(
-                "group flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] rounded-md transition-colors select-none",
-                isActive ? "bg-white/10" : "hover:bg-white/5"
-            )}
-        >
-            {/* Cover */}
-            <div
-                className="relative w-[clamp(2rem,4vw,2.5rem)] h-[clamp(2rem,4vw,2.5rem)] rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
-                onPointerDown={(e) => e.stopPropagation()} // Prevent drag start when clicking play
-                onClick={(e) => {
-                    e.stopPropagation();
-                    onPlay();
-                }}
-            >
-                <CoverImage song={song} className="w-full h-full object-cover" />
-                <div
-                    className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                    <IoPlay className="text-white text-base" />
-                </div>
-            </div>
-
-            {/* Info */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 h-full py-1.5 border-b border-white/5 group-last:border-none">
-                <div className={clsx(
-                    "text-[clamp(0.75rem,1.5vw,0.875rem)] font-medium truncate leading-tight",
-                    isActive ? "text-primary" : "text-white/90"
-                )}>
-                    {song.title}
-                </div>
-                <div className="text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/50 truncate leading-tight">
-                    {song.artist}
-                </div>
-            </div>
-
-            {/* Context Menu Button */}
-            <div
-                className="p-1 -mr-2"
-                onPointerDown={(e) => e.stopPropagation()}
-            >
-                <MusicContextMenu
-                    groups={ops.menuItems}
-                    variant="clean"
-                    buttonClassName="w-8 h-8 flex items-center justify-center text-white/50 hover:text-white transition-colors cursor-pointer"
-                >
-                    <IoEllipsisHorizontal />
-                </MusicContextMenu>
-            </div>
-        </div>
-    );
-});
-
-function SortableQueueItem({ song, index, isActive, onPlay, onRemove, onNavigate }: { song: SongMetadata; index: number; isActive?: boolean; onPlay: () => void, onRemove?: () => void, onNavigate?: () => void }) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging
-    } = useSortable({ id: `${index}-${song.id || song.path}` });
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 100 : 'auto',
-        opacity: isDragging ? 0.5 : 1,
-        touchAction: 'none' // Important for pointer events
-    };
-
-    return (
-        <SongRow
-            song={song}
-            isActive={isActive}
-            onPlay={onPlay}
-            style={style}
-            itemRef={setNodeRef}
-            dragAttributes={attributes}
-            dragListeners={listeners}
-            isDraggable={true}
-            onRemove={onRemove}
-            onNavigate={onNavigate}
-        />
-    );
 }
 
-export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen }: { onNavigate?: () => void; scrollToTopSignal?: number; isOpen?: boolean }) {
+/**
+ * Apple 风格播放队列面板，负责队列分区、拖拽与虚拟渲染编排。
+ */
+export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen }: AppleMusicQueueProps) {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    const [activeDragId, setActiveDragId] = useState<string | null>(null);
+    const [draggedItemWidth, setDraggedItemWidth] = useState<number | undefined>(undefined);
     const {
         playlist,
         currentSongIndex,
@@ -152,6 +73,12 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
         removeQueueItem
     } = useLibraryStore();
     const { playQueueItem } = usePlaybackActions();
+
+    useEffect(() => {
+        if (scrollContainerRef.current) {
+            setScrollParent(scrollContainerRef.current);
+        }
+    }, []);
 
     useEffect(() => {
         if (!scrollContainerRef.current) return;
@@ -186,28 +113,30 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
     // 2. Next Up (Context) (is_queue_item = false)
     // filtering only items AFTER currentSongIndex.
 
-    const { queueList, nextFromList } = useMemo(() => {
-        // Limit the Lookahead to 100 items (similar to Apple Music)
-        // This is a direct performance optimization to prevent rendering thousands of items
-        const nextItems = playlist.slice(currentSongIndex + 1, currentSongIndex + 1 + 100);
-        const queue: { song: SongMetadata; originalIndex: number }[] = [];
-        const nextFrom: { song: SongMetadata; originalIndex: number }[] = [];
+    const { queueList, nextFromList } = useMemo(
+        () => splitQueueEntries(playlist, currentSongIndex),
+        [playlist, currentSongIndex]
+    );
 
-        nextItems.forEach((song, i) => {
-            const originalIndex = currentSongIndex + 1 + i;
-            if (song.is_queue_item) {
-                queue.push({ song, originalIndex });
-            } else {
-                nextFrom.push({ song, originalIndex });
-            }
-        });
+    const queueSortableItems = useMemo(() => queueList.map(getQueueItemId), [queueList]);
+    const nextFromSortableItems = useMemo(() => nextFromList.map(getQueueItemId), [nextFromList]);
+    const allQueueEntries = useMemo(() => [...queueList, ...nextFromList], [queueList, nextFromList]);
 
-        return { queueList: queue, nextFromList: nextFrom };
-    }, [playlist, currentSongIndex]);
+    const QueueVirtuosoList = useMemo(() => createSortableList(queueSortableItems), [queueSortableItems]);
+    const NextVirtuosoList = useMemo(() => createSortableList(nextFromSortableItems), [nextFromSortableItems]);
 
+
+    const handleDragStart = useCallback((event: DragStartEvent) => {
+        setActiveDragId(String(event.active.id));
+        const initialRect = event.active.rect.current.initial;
+        if (initialRect) {
+            setDraggedItemWidth(initialRect.width);
+        }
+    }, []);
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, over } = event;
+        setActiveDragId(null);
         if (active.id !== over?.id) {
             const oldIndexStr = String(active.id).split('-')[0];
             const newIndexStr = String(over!.id).split('-')[0];
@@ -217,18 +146,23 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
         }
     };
 
-    const handlePlay = (globalIndex: number) => {
+    const handleDragCancel = useCallback(() => {
+        setActiveDragId(null);
+    }, []);
+
+    const handlePlay = useCallback((globalIndex: number) => {
         playQueueItem({ song: playlist[globalIndex], index: globalIndex, restartIfCurrent: true });
-    };
+    }, [playQueueItem, playlist]);
+
+    const handleRemove = useCallback((globalIndex: number) => {
+        removeQueueItem(globalIndex);
+    }, [removeQueueItem]);
 
     // Custom modifier to restrict dragging within scroll viewport
     const restrictToQueueViewport: Modifier = ({ transform, draggingNodeRect, containerNodeRect }) => {
         if (!draggingNodeRect || !containerNodeRect) return transform;
-
-        const viewport = document.querySelector('[data-queue-viewport]');
-        if (!viewport) return transform;
-
-        const viewportRect = viewport.getBoundingClientRect();
+        const viewportRect = scrollContainerRef.current?.getBoundingClientRect();
+        if (!viewportRect) return transform;
 
         const draggedTop = draggingNodeRect.top + transform.y;
         const draggedBottom = draggingNodeRect.bottom + transform.y;
@@ -248,6 +182,37 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
             y: adjustedY,
         };
     };
+
+    const renderQueueItem = useCallback((_: number, item: QueueEntry) => {
+        return (
+            <SortableQueueItem
+                key={getQueueItemId(item)}
+                song={item.song}
+                index={item.originalIndex}
+                onPlayIndex={handlePlay}
+                onRemoveIndex={handleRemove}
+                onNavigate={onNavigate}
+            />
+        );
+    }, [handlePlay, handleRemove, onNavigate]);
+
+    const renderNextFromItem = useCallback((_: number, item: QueueEntry) => {
+        return (
+            <SortableQueueItem
+                key={getQueueItemId(item)}
+                song={item.song}
+                index={item.originalIndex}
+                onPlayIndex={handlePlay}
+                onRemoveIndex={handleRemove}
+                onNavigate={onNavigate}
+            />
+        );
+    }, [handlePlay, handleRemove, onNavigate]);
+
+    const activeDragEntry = useMemo(() => {
+        if (!activeDragId) return null;
+        return allQueueEntries.find(entry => getQueueItemId(entry) === activeDragId) || null;
+    }, [activeDragId, allQueueEntries]);
 
     return (
         <div className="h-full flex flex-col bg-transparent relative overflow-hidden">
@@ -270,12 +235,14 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                 <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
+                    onDragStart={handleDragStart}
                     onDragEnd={handleDragEnd}
+                    onDragCancel={handleDragCancel}
                     modifiers={[restrictToVerticalAxis, restrictToQueueViewport]}
                 >
                     {/* Section 1: User Queue */}
                     {queueList.length > 0 && (
-                        <div className="mb-4">
+                        <div className="mb-6">
                             <div className="px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] flex items-center justify-between">
                                 <span className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">队列中的下一首歌</span>
                                 <button
@@ -285,20 +252,20 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                                     清空队列
                                 </button>
                             </div>
-                            <SortableContext items={queueList.map(item => `${item.originalIndex}-${item.song.id || item.song.path}`)} strategy={verticalListSortingStrategy}>
-                                <div className="flex flex-col">
-                                    {queueList.map((item) => (
-                                        <SortableQueueItem
-                                            key={`${item.originalIndex}-${item.song.id || item.song.path}`}
-                                            song={item.song}
-                                            index={item.originalIndex}
-                                            onPlay={() => handlePlay(item.originalIndex)}
-                                            onRemove={() => removeQueueItem(item.originalIndex)}
-                                            onNavigate={onNavigate}
-                                        />
-                                    ))}
-                                </div>
-                            </SortableContext>
+                            {scrollParent ? (
+                                <Virtuoso
+                                    data={queueList}
+                                    customScrollParent={scrollParent}
+                                    useWindowScroll={false}
+                                    fixedItemHeight={QUEUE_ROW_HEIGHT}
+                                    overscan={VIRTUOSO_OVERSCAN}
+                                    className="w-full"
+                                    components={{ List: QueueVirtuosoList as Components['List'] }}
+                                    itemContent={renderQueueItem}
+                                />
+                            ) : (
+                                <div className="flex flex-col opacity-0" />
+                            )}
                         </div>
                     )}
 
@@ -324,21 +291,56 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
                         )}
                     </div>
 
-                    <SortableContext items={nextFromList.map(item => `${item.originalIndex}-${item.song.id || item.song.path}`)} strategy={verticalListSortingStrategy}>
-                        <div className="flex flex-col min-h-[100px]">
-                            {nextFromList.length === 0 && queueList.length === 0 && (<div className="text-white/30 py-8 text-[clamp(0.75rem,1.5vw,0.875rem)] text-center italic">没有待播放的歌曲</div>)}
-                            {nextFromList.map((item) => (
-                                <SortableQueueItem
-                                    key={`${item.originalIndex}-${item.song.id || item.song.path}`}
-                                    song={item.song}
-                                    index={item.originalIndex}
-                                    onPlay={() => handlePlay(item.originalIndex)}
-                                    onRemove={() => removeQueueItem(item.originalIndex)}
-                                    onNavigate={onNavigate}
+                    <div className="flex flex-col min-h-[100px]">
+                        {nextFromList.length === 0 && (<div className="text-white/30 py-8 text-[clamp(0.75rem,1.5vw,0.875rem)] text-center italic">没有待播放的歌曲</div>)}
+                        {nextFromList.length > 0 && (
+                            scrollParent ? (
+                                <Virtuoso
+                                    data={nextFromList}
+                                    customScrollParent={scrollParent}
+                                    useWindowScroll={false}
+                                    fixedItemHeight={QUEUE_ROW_HEIGHT}
+                                    overscan={VIRTUOSO_OVERSCAN}
+                                    className="w-full"
+                                    components={{ List: NextVirtuosoList as Components['List'] }}
+                                    itemContent={renderNextFromItem}
                                 />
-                            ))}
-                        </div>
-                    </SortableContext>
+                            ) : (
+                                <div className="flex flex-col opacity-0" />
+                            )
+                        )}
+                    </div>
+
+                    {typeof document !== 'undefined' && createPortal(
+                        <DragOverlay>
+                            {activeDragEntry ? (
+                                <div
+                                    className="pointer-events-none"
+                                    style={{
+                                        width: draggedItemWidth ? `${draggedItemWidth}px` : 'auto',
+                                    }}
+                                >
+                                    <div className="group flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] bg-white/10 rounded-md shadow-xl backdrop-blur-sm">
+                                        <div className="relative w-[clamp(2rem,4vw,2.5rem)] h-[clamp(2rem,4vw,2.5rem)] rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800">
+                                            <CoverImage song={activeDragEntry.song} className="w-full h-full object-cover" />
+                                        </div>
+                                        <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 py-1.5">
+                                            <div className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-medium text-white truncate leading-tight">
+                                                {activeDragEntry.song.title}
+                                            </div>
+                                            <div className="text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/60 truncate leading-tight">
+                                                {activeDragEntry.song.artist}
+                                            </div>
+                                        </div>
+                                        <div className="w-8 h-8 flex items-center justify-center text-white/50 -mr-2">
+                                            <IoEllipsisHorizontal />
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </DragOverlay>,
+                        document.body
+                    )}
 
                 </DndContext>
             </div>

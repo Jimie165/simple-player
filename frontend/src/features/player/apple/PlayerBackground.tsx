@@ -13,30 +13,50 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
 
     const renderBlobs = (source: string) => (
         <div className="absolute inset-0 w-full h-full mix-blend-normal">
-            <img
-                src={source}
-                alt=""
-                className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-90"
+            <div
+                className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] rounded-[40%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-90"
                 style={{ animation: 'fluid-rotate-1 28s infinite linear' }}
-            />
-            <img
-                src={source}
-                alt=""
-                className="absolute top-[0%] -right-[20%] w-[110vmax] h-[110vmax] max-w-none object-cover rounded-[45%] saturate-[1.5] mix-blend-normal opacity-90"
+            >
+                <img
+                    src={source}
+                    alt=""
+                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
+                    style={{ animation: 'fluid-pan-1 35s infinite alternate ease-in-out' }}
+                />
+            </div>
+            <div
+                className="absolute top-[0%] -right-[20%] w-[110vmax] h-[110vmax] rounded-[45%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-90"
                 style={{ animation: 'fluid-rotate-2 33s infinite linear' }}
-            />
-            <img
-                src={source}
-                alt=""
-                className="absolute -bottom-[20%] -left-[10%] w-[90vmax] h-[90vmax] max-w-none object-cover rounded-[35%] saturate-[1.8] mix-blend-normal opacity-90"
+            >
+                <img
+                    src={source}
+                    alt=""
+                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
+                    style={{ animation: 'fluid-pan-2 42s infinite alternate ease-in-out' }}
+                />
+            </div>
+            <div
+                className="absolute -bottom-[20%] -left-[10%] w-[90vmax] h-[90vmax] rounded-[35%] overflow-hidden saturate-[1.8] mix-blend-normal opacity-90"
                 style={{ animation: 'fluid-rotate-3 24s infinite linear' }}
-            />
-            <img
-                src={source}
-                alt=""
-                className="absolute -bottom-[15%] -right-[15%] w-[100vmax] h-[100vmax] max-w-none object-cover rounded-[40%] saturate-[1.5] mix-blend-normal opacity-80"
+            >
+                <img
+                    src={source}
+                    alt=""
+                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
+                    style={{ animation: 'fluid-pan-3 38s infinite alternate ease-in-out' }}
+                />
+            </div>
+            <div
+                className="absolute -bottom-[15%] -right-[15%] w-[100vmax] h-[100vmax] rounded-[40%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-80"
                 style={{ animation: 'fluid-rotate-4 30s infinite linear' }}
-            />
+            >
+                <img
+                    src={source}
+                    alt=""
+                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
+                    style={{ animation: 'fluid-pan-4 45s infinite alternate ease-in-out' }}
+                />
+            </div>
         </div>
     );
 

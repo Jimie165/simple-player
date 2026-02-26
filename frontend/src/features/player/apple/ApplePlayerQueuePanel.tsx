@@ -31,7 +31,7 @@ export default function ApplePlayerQueuePanel({
                         isQueueOpen ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-5 pointer-events-none'
                     )}
                 >
-                    {queueMounted && (
+                    {queueMounted && isQueueOpen && (
                         <AppleMusicQueue
                             onNavigate={onClose}
                             scrollToTopSignal={queueScrollToTopSignal}

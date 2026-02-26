@@ -67,15 +67,6 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
     }, [isOpen, isQueueOpen]);
 
-    // Preload queue after a short delay to ensure smooth entry animation
-    // This allows the queue to be ready in the DOM before the user even clicks the button
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            setQueueMounted(true);
-        }, 600); // 600ms delay to avoid impacting the heavy entry animation
-        return () => clearTimeout(timer);
-    }, []);
-
     // Layout sizing state
     const coverRef = useRef<HTMLDivElement>(null);
     const coverShellRef = useRef<HTMLDivElement>(null);

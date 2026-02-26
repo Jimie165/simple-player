@@ -39,6 +39,10 @@ export default function SelectionMenuBar() {
 
     // Determine Context
     const context = useMemo<MusicMenuContext>(() => {
+        // Home page selection should always be treated as recent history,
+        // even when selected items are videos.
+        if (currentPage === 'home') return 'recent';
+
         // Preference 1: Explicit selection type from store
         if (selectionType === 'video') return 'video';
         if (selectionType === 'playlist') {
@@ -51,7 +55,6 @@ export default function SelectionMenuBar() {
         if (activeOverlay?.type === 'playlist_detail') return 'playlist';
         if (activeOverlay?.type === 'album_detail') return 'album_detail';
         if (activeOverlay?.type === 'artist_detail') return 'artist_detail';
-        if (currentPage === 'home') return 'recent'; // Home page uses recent context for history
         if (currentPage === 'library') return 'library';
         if (currentPage === 'videos') return 'video';
         return 'other'; // generic
