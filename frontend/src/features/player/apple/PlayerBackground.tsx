@@ -1,18 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export const PlayerBackground = React.memo(({ src }: { src: string | null }) => {
-    const [currentSrc, setCurrentSrc] = useState<string | null>(src);
-    const [prevSrc, setPrevSrc] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (src !== currentSrc) {
-            setPrevSrc(currentSrc);
-            setCurrentSrc(src);
-        }
-    }, [src, currentSrc]);
-
     const renderBlobs = (source: string) => (
-        <div className="absolute inset-0 w-full h-full mix-blend-normal">
+        <div
+            className="absolute inset-0 w-full h-full mix-blend-normal"
+            style={{ filter: 'url(#fluid-warp)' }}
+        >
             <div
                 className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] rounded-[40%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-90"
                 style={{ animation: 'fluid-rotate-1 50s infinite linear' }}
@@ -67,12 +61,17 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
                     <filter id="fluid-warp" x="-20%" y="-20%" width="140%" height="140%">
                         <feTurbulence
                             type="fractalNoise"
-                            baseFrequency="0.004"
-                            numOctaves="1"
-                            stitchTiles="stitch"
+                            baseFrequency="0.005"
+                            numOctaves="2"
                             result="noise"
                         />
-                        <feColorMatrix type="matrix" values="1 0 0 0 0, 0 1 0 0 0, 0 0 1 0 0, 0 0 0 0.05 0" />
+                        <feDisplacementMap
+                            in="SourceGraphic"
+                            in2="noise"
+                            scale="30"
+                            xChannelSelector="R"
+                            yChannelSelector="G"
+                        />
                     </filter>
                 </defs>
             </svg>
@@ -84,29 +83,21 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
                     transform: 'scale(1.2)'
                 }}
             >
-                {prevSrc && (
-                    <div
-                        key={`${prevSrc}-prev`}
-                        className="absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out opacity-0"
-                    >
-                        {renderBlobs(prevSrc)}
-                    </div>
-                )}
-
-                {currentSrc && (
-                    <div
-                        key={`${currentSrc}-curr`}
-                        className="absolute inset-0 w-full h-full animate-in fade-in duration-700 ease-out fill-mode-both"
-                    >
-                        {renderBlobs(currentSrc)}
-                    </div>
-                )}
+                <AnimatePresence mode="popLayout">
+                    {src && (
+                        <motion.div
+                            key={src}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 1.5, ease: "easeInOut" }}
+                            className="absolute inset-0 w-full h-full"
+                        >
+                            {renderBlobs(src)}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
-
-            <div
-                className="absolute inset-0 z-[5] mix-blend-overlay pointer-events-none"
-                style={{ filter: 'url(#fluid-warp)' }}
-            />
 
             <div className="absolute inset-0 bg-black/10 z-10" />
         </div>
