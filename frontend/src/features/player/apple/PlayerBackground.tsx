@@ -1,87 +1,343 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export const PlayerBackground = React.memo(({ src }: { src: string | null }) => {
-    const renderBlobs = (source: string) => (
-        <div
-            className="absolute inset-0 w-full h-full mix-blend-normal"
-            style={{ filter: 'url(#fluid-warp)' }}
-        >
-            <div
-                className="absolute -top-[20%] -left-[20%] w-[100vmax] h-[100vmax] rounded-[40%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-1 50s infinite linear' }}
-            >
-                <img
-                    src={source}
-                    alt=""
-                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
-                    style={{ animation: 'fluid-pan-1 65s infinite alternate ease-in-out' }}
-                />
-            </div>
-            <div
-                className="absolute top-[0%] -right-[20%] w-[110vmax] h-[110vmax] rounded-[45%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-2 58s infinite linear' }}
-            >
-                <img
-                    src={source}
-                    alt=""
-                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
-                    style={{ animation: 'fluid-pan-2 72s infinite alternate ease-in-out' }}
-                />
-            </div>
-            <div
-                className="absolute -bottom-[20%] -left-[10%] w-[90vmax] h-[90vmax] rounded-[35%] overflow-hidden saturate-[1.8] mix-blend-normal opacity-90"
-                style={{ animation: 'fluid-rotate-3 42s infinite linear' }}
-            >
-                <img
-                    src={source}
-                    alt=""
-                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
-                    style={{ animation: 'fluid-pan-3 68s infinite alternate ease-in-out' }}
-                />
-            </div>
-            <div
-                className="absolute -bottom-[15%] -right-[15%] w-[100vmax] h-[100vmax] rounded-[40%] overflow-hidden saturate-[1.5] mix-blend-normal opacity-80"
-                style={{ animation: 'fluid-rotate-4 55s infinite linear' }}
-            >
-                <img
-                    src={source}
-                    alt=""
-                    className="absolute top-0 left-0 w-[200%] h-[200%] max-w-none object-cover will-change-transform"
-                    style={{ animation: 'fluid-pan-4 80s infinite alternate ease-in-out' }}
-                />
-            </div>
-        </div>
-    );
+// --- WebGL Shaders ---
+
+const VERTEX_SHADER = `
+  attribute vec2 a_position;
+  attribute vec2 a_texCoord;
+  varying vec2 v_texCoord;
+  void main() {
+    // 渲染全屏四边形
+    gl_Position = vec4(a_position, 0.0, 1.0);
+    v_texCoord = a_texCoord;
+  }
+`;
+
+// 片段着色器：超低频 2D 面片大幅揉挤流动（完美对标图 2 大色块无波纹）
+const FRAGMENT_SHADER = `
+  precision highp float;
+  
+  uniform sampler2D u_image;
+  uniform float u_time;
+  uniform vec2 u_resolution;
+  
+  varying vec2 v_texCoord;
+
+  // 基础 2D 噪声函数
+  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
+  vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
+  
+  float snoise(vec2 v) {
+    const vec4 C = vec4(0.211324865405187, 0.366025403784439, -0.577350269189626, 0.024390243902439);
+    vec2 i  = floor(v + dot(v, C.yy) );
+    vec2 x0 = v -   i + dot(i, C.xx);
+    vec2 i1;
+    i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
+    vec4 x12 = x0.xyxy + C.xxzz;
+    x12.xy -= i1;
+    i = mod289(i);
+    vec3 p = permute( permute( i.y + vec3(0.0, i1.y, 1.0 )) + i.x + vec3(0.0, i1.x, 1.0 ));
+    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
+    m = m*m; m = m*m;
+    vec3 x = 2.0 * fract(p * C.www) - 1.0;
+    vec3 h = abs(x) - 0.5;
+    vec3 ox = floor(x + 0.5);
+    vec3 a0 = x - ox;
+    m *= 1.79284291400159 - 0.85373472095314 * ( a0*a0 + h*h );
+    vec3 g;
+    g.x  = a0.x  * x0.x  + h.x  * x0.y;
+    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
+    return 130.0 * dot(m, g);
+  }
+
+  void main() {
+      // 极慢的光滑位移
+      float time = u_time * 0.0001;
+      
+      // 我们将采样坐标适度放大（相当于向内 Zoom），以避免采样到边缘死黑
+      // 这里 0.7 的系数意味着我们取图的中心 70% 作为画布，为变形流出30%的安全边界
+      vec2 p = (v_texCoord - 0.5) * 0.7;
+      
+      // 经典的无尽缠绕流体扭曲（Iterative Sine Warp）
+      // 这是一套极其温和稳定的流体力学算法，它不会像 snoise + cos 一样形成孤立的斑点（细胞感）
+      // 它的本质是利用正弦波长远大于画面的性质，在全屏进行极度开阔的“风偏”
+      vec2 newp = p;
+      for (float i = 1.0; i <= 3.0; i++) {
+          newp.x += 0.15 / i * sin(i * p.y + time + 0.3);
+          newp.y += 0.15 / i * cos(i * p.x + time + 0.3);
+          p = newp;
+      }
+      
+      // 我们再利用这种大尺度的无尽缠绕，通过加上极低频的噪声，彻底揉碎图形结构，呈现为巨大的云彩流体色块
+      float dx = snoise(p + vec2(time, 0.0)) * 0.2;
+      float dy = snoise(p + vec2(0.0, time * 0.8)) * 0.2;
+      
+      // 提取颜色，采用平滑宽容的映射，绝对不折返
+      vec2 sampleUV = clamp(p + vec2(dx, dy) + 0.5, 0.0, 1.0);
+      
+      vec4 color = texture2D(u_image, sampleUV);
+      
+      // Apple Music 特有的轻微提亮，杜绝发灰发泥
+      color.rgb = mix(vec3(0.5), color.rgb, 1.25) * 1.05;
+      
+      gl_FragColor = vec4(color.rgb, 1.0);
+  }
+`;
+
+// --- WebGL Helper ---
+
+const createShader = (gl: WebGLRenderingContext, type: number, source: string) => {
+    const shader = gl.createShader(type);
+    if (!shader) return null;
+    gl.shaderSource(shader, source);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        console.error('Shader compile error:', gl.getShaderInfoLog(shader));
+        gl.deleteShader(shader);
+        return null;
+    }
+    return shader;
+};
+
+// 基础 1x1 像素占位图，防止 WebGL 纹理报错
+const TRANSPARENT_PIXEL = new Uint8Array([0, 0, 0, 255]);
+
+// --- React Component ---
+
+const WebGLCanvas = ({ src }: { src: string | null }) => {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const glRef = useRef<WebGLRenderingContext | null>(null);
+    const programRef = useRef<WebGLProgram | null>(null);
+    const textureRef = useRef<WebGLTexture | null>(null);
+    const requestRef = useRef<number>(0);
+    const lastFrameRef = useRef<number>(0);
+    const isVisibleRef = useRef<boolean>(true);
+    const scaleRef = useRef<number>(0.3);
+    const imgRef = useRef<HTMLImageElement>(new Image());
+
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const BASE_SCALE = 0.3;
+        const FULLSCREEN_SCALE = 0.22;
+        const LARGE_SCREEN_SCALE = 0.25;
+        const LOW_MEMORY_SCALE = 0.22;
+        const MIN_SCALE = 0.18;
+        const TARGET_FPS = 30;
+        const FRAME_INTERVAL = 1000 / TARGET_FPS;
+
+        const getResolutionScale = () => {
+            const area = window.innerWidth * window.innerHeight;
+            const isFullscreen = !!document.fullscreenElement;
+            const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 8;
+
+            let scale = BASE_SCALE;
+            if (area >= 1920 * 1080) scale = LARGE_SCREEN_SCALE;
+            if (isFullscreen) scale = Math.min(scale, FULLSCREEN_SCALE);
+            if (deviceMemory <= 4) scale = Math.min(scale, LOW_MEMORY_SCALE);
+
+            return Math.max(scale, MIN_SCALE);
+        };
+
+        const gl = canvas.getContext('webgl', {
+            alpha: false,
+            antialias: false,
+            depth: false,
+            desynchronized: true,
+            powerPreference: 'low-power',
+        });
+
+        if (!gl) {
+            console.error('WebGL not supported');
+            return;
+        }
+        glRef.current = gl;
+
+        // 初始化着色器
+        const vShader = createShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+        const fShader = createShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+        if (!vShader || !fShader) return;
+
+        const program = gl.createProgram();
+        if (!program) return;
+        gl.attachShader(program, vShader);
+        gl.attachShader(program, fShader);
+        gl.linkProgram(program);
+
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+            console.error('Program link error:', gl.getProgramInfoLog(program));
+            return;
+        }
+        programRef.current = program;
+        gl.useProgram(program);
+
+        // 设置全屏矩形顶点位置
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([
+                -1.0, -1.0,
+                1.0, -1.0,
+                -1.0, 1.0,
+                -1.0, 1.0,
+                1.0, -1.0,
+                1.0, 1.0,
+            ]),
+            gl.STATIC_DRAW
+        );
+
+        const positionLocation = gl.getAttribLocation(program, 'a_position');
+        gl.enableVertexAttribArray(positionLocation);
+        gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // 设置纹理坐标
+        const texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.bufferData(
+            gl.ARRAY_BUFFER,
+            new Float32Array([
+                0.0, 1.0,
+                1.0, 1.0,
+                0.0, 0.0,
+                0.0, 0.0,
+                1.0, 1.0,
+                1.0, 0.0,
+            ]),
+            gl.STATIC_DRAW
+        );
+
+        const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+        gl.enableVertexAttribArray(texCoordLocation);
+        gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
+
+        // 初始化纹理
+        const texture = gl.createTexture();
+        textureRef.current = texture;
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        // 使用占位符避免未加载时报错
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, TRANSPARENT_PIXEL);
+
+        // 恢复为 CLAMP_TO_EDGE 避免镜面折叠造成的“油膜反波浪线”
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+        // Uniform 变量位置
+        const timeLocation = gl.getUniformLocation(program, 'u_time');
+        const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
+
+        // 绑定窗口变化事件
+        const updateSize = () => {
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight;
+            scaleRef.current = getResolutionScale();
+            // 降低渲染分辨率
+            canvas.width = Math.floor(width * scaleRef.current);
+            canvas.height = Math.floor(height * scaleRef.current);
+            gl.viewport(0, 0, canvas.width, canvas.height);
+            gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+        };
+        updateSize();
+        window.addEventListener('resize', updateSize);
+        document.addEventListener('fullscreenchange', updateSize);
+
+        // 渲染循环
+        const render = (time: number) => {
+            if (!gl || !program) return;
+            if (!isVisibleRef.current) return;
+            if (time - lastFrameRef.current < FRAME_INTERVAL) {
+                requestRef.current = requestAnimationFrame(render);
+                return;
+            }
+            lastFrameRef.current = time;
+            gl.uniform1f(timeLocation, time);
+            gl.drawArrays(gl.TRIANGLES, 0, 6);
+            requestRef.current = requestAnimationFrame(render);
+        };
+        const handleVisibility = () => {
+            isVisibleRef.current = !document.hidden;
+            if (isVisibleRef.current) {
+                lastFrameRef.current = performance.now();
+                requestRef.current = requestAnimationFrame(render);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        requestRef.current = requestAnimationFrame(render);
+
+        return () => {
+            window.removeEventListener('resize', updateSize);
+            document.removeEventListener('fullscreenchange', updateSize);
+            document.removeEventListener('visibilitychange', handleVisibility);
+            cancelAnimationFrame(requestRef.current);
+            if (gl) {
+                if (textureRef.current) gl.deleteTexture(textureRef.current);
+                if (program) gl.deleteProgram(program);
+            }
+        };
+    }, []);
+
+    // 监听 src 变化，加载纹理
+    useEffect(() => {
+        const gl = glRef.current;
+        const texture = textureRef.current;
+        if (!gl || !texture || !src) return;
+
+        // 重用 Image 对象
+        const img = imgRef.current;
+        img.crossOrigin = "anonymous";
+
+        const handleLoad = () => {
+            // 直接准备一张包含整张封面原图各区域色彩分布的离屏画布，并实施高斯模糊打底
+            const size = 256; // 稍微提高一点离屏画质，以便宽广平滑后不断层
+            
+            const offscreen = document.createElement('canvas');
+            offscreen.width = size;
+            offscreen.height = size;
+            const ctx = offscreen.getContext('2d');
+
+            if (ctx) {
+                // 这个模糊直接消灭了封面图中所有的线条和具象细节，只剩“块面”色彩
+                ctx.filter = 'blur(40px) saturate(200%)';
+                
+                // 向外微调扩围一点点（16px 代表只吃掉绝对黑边），保留绝大部分封面的边缘主色
+                ctx.drawImage(img, -16, -16, size + 32, size + 32);
+
+                // 绑定给 WebGL 中进行最后的二维拉扯挤压
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, offscreen);
+            }
+        };
+
+        img.onload = handleLoad;
+        img.src = src;
+
+        return () => {
+            img.onload = null;
+        };
+    }, [src]);
 
     return (
+        <canvas
+            ref={canvasRef}
+            className="w-full h-full object-cover"
+        />
+    );
+};
+
+
+export const PlayerBackground = React.memo(({ src }: { src: string | null }) => {
+    return (
         <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none bg-[#1a1a1a]">
-            <svg className="hidden">
-                <defs>
-                    <filter id="fluid-warp" x="-20%" y="-20%" width="140%" height="140%">
-                        <feTurbulence
-                            type="fractalNoise"
-                            baseFrequency="0.005"
-                            numOctaves="2"
-                            result="noise"
-                        />
-                        <feDisplacementMap
-                            in="SourceGraphic"
-                            in2="noise"
-                            scale="30"
-                            xChannelSelector="R"
-                            yChannelSelector="G"
-                        />
-                    </filter>
-                </defs>
-            </svg>
 
             <div
-                className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
-                style={{
-                    filter: 'blur(100px)',
-                    transform: 'scale(1.2)'
-                }}
+                className="absolute inset-0 w-full h-full"
+                // 放大一点掩盖边缘
+                style={{ transform: 'scale(1.1)' }}
             >
                 <AnimatePresence mode="popLayout">
                     {src && (
@@ -91,15 +347,18 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 1.5, ease: "easeInOut" }}
-                            className="absolute inset-0 w-full h-full"
+                            className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
                         >
-                            {renderBlobs(src)}
+                            <WebGLCanvas src={src} />
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
 
-            <div className="absolute inset-0 bg-black/10 z-10" />
+            {/* 增加一层弱弱的深冷色底色，用于全局防刺眼 */}
+            <div className="absolute inset-0 bg-[#0a0a0c]/20 z-10 pointer-events-none" />
+            {/* 正片叠底遮罩：专门针对纯白色像素进行压暗，而不让整体变得死黑 */}
+            <div className="absolute inset-0 bg-black/18 z-10 pointer-events-none mix-blend-multiply" />
         </div>
     );
 });
