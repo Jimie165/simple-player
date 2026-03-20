@@ -21,6 +21,7 @@ const FRAGMENT_SHADER = `
   uniform sampler2D u_image;
   uniform float u_time;
   uniform vec2 u_resolution;
+    uniform float u_ditherStrength;
   
   varying vec2 v_texCoord;
 
@@ -52,6 +53,10 @@ const FRAGMENT_SHADER = `
     return 130.0 * dot(m, g);
   }
 
+    float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+    }
+
   void main() {
       // 极慢的光滑位移
       float time = u_time * 0.0001;
@@ -64,23 +69,33 @@ const FRAGMENT_SHADER = `
       // 这是一套极其温和稳定的流体力学算法，它不会像 snoise + cos 一样形成孤立的斑点（细胞感）
       // 它的本质是利用正弦波长远大于画面的性质，在全屏进行极度开阔的“风偏”
       vec2 newp = p;
-      for (float i = 1.0; i <= 3.0; i++) {
-          newp.x += 0.15 / i * sin(i * p.y + time + 0.3);
-          newp.y += 0.15 / i * cos(i * p.x + time + 0.3);
+      for (float i = 1.0; i <= 2.0; i++) {
+          newp.x += 0.13 / i * sin(i * p.y + time + 0.3);
+          newp.y += 0.13 / i * cos(i * p.x + time + 0.3);
           p = newp;
       }
       
       // 我们再利用这种大尺度的无尽缠绕，通过加上极低频的噪声，彻底揉碎图形结构，呈现为巨大的云彩流体色块
-      float dx = snoise(p + vec2(time, 0.0)) * 0.2;
-      float dy = snoise(p + vec2(0.0, time * 0.8)) * 0.2;
+      float dx = snoise(p + vec2(time, 0.0)) * 0.14;
+      float dy = snoise(p + vec2(0.0, time * 0.8)) * 0.14;
       
       // 提取颜色，采用平滑宽容的映射，绝对不折返
       vec2 sampleUV = clamp(p + vec2(dx, dy) + 0.5, 0.0, 1.0);
       
-      vec4 color = texture2D(u_image, sampleUV);
-      
-      // Apple Music 特有的轻微提亮，杜绝发灰发泥
-      color.rgb = mix(vec3(0.5), color.rgb, 1.25) * 1.05;
+            vec4 color = texture2D(u_image, sampleUV);
+
+            // 温和提亮，避免过度拉伸导致的色阶压缩
+            color.rgb = clamp(color.rgb * 1.08 + vec3(0.015), 0.0, 1.0);
+
+            // 轻量抖动：把可见色带打散为细微颗粒
+            vec2 px = gl_FragCoord.xy;
+            vec3 dither = vec3(
+                hash(px + vec2(0.0, 0.0)),
+                hash(px + vec2(13.1, 7.7)),
+                hash(px + vec2(31.7, 19.3))
+            );
+            color.rgb += (dither - 0.5) * u_ditherStrength;
+            color.rgb = clamp(color.rgb, 0.0, 1.0);
       
       gl_FragColor = vec4(color.rgb, 1.0);
   }
@@ -113,6 +128,9 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
     const textureRef = useRef<WebGLTexture | null>(null);
     const requestRef = useRef<number>(0);
     const lastFrameRef = useRef<number>(0);
+    const emaFrameTimeRef = useRef<number>(1000 / 30);
+    const adaptiveScaleFactorRef = useRef<number>(1);
+    const adaptCheckCounterRef = useRef<number>(0);
     const isVisibleRef = useRef<boolean>(true);
     const scaleRef = useRef<number>(0.3);
     const imgRef = useRef<HTMLImageElement>(new Image());
@@ -121,11 +139,18 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         const canvas = canvasRef.current;
         if (!canvas) return;
 
-        const BASE_SCALE = 0.3;
-        const FULLSCREEN_SCALE = 0.22;
-        const LARGE_SCREEN_SCALE = 0.25;
-        const LOW_MEMORY_SCALE = 0.22;
-        const MIN_SCALE = 0.18;
+        const BASE_SCALE = 0.34;
+        const FULLSCREEN_SCALE = 0.30;
+        const LARGE_SCREEN_SCALE = 0.32;
+        const LOW_MEMORY_SCALE = 0.26;
+        const MIN_SCALE = 0.24;
+        const ABS_MIN_SCALE = 0.2;
+        const ADAPTIVE_MIN_FACTOR = 0.78;
+        const ADAPTIVE_MAX_FACTOR = 1.0;
+        const ADAPTIVE_STEP = 0.03;
+        const ADAPTIVE_HIGH_MS = 44;
+        const ADAPTIVE_LOW_MS = 34;
+        const ADAPTIVE_CHECK_EVERY = 20;
         const TARGET_FPS = 30;
         const FRAME_INTERVAL = 1000 / TARGET_FPS;
 
@@ -230,12 +255,17 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         // Uniform 变量位置
         const timeLocation = gl.getUniformLocation(program, 'u_time');
         const resolutionLocation = gl.getUniformLocation(program, 'u_resolution');
+        const ditherStrengthLocation = gl.getUniformLocation(program, 'u_ditherStrength');
 
         // 绑定窗口变化事件
         const updateSize = () => {
             const width = canvas.clientWidth;
             const height = canvas.clientHeight;
-            scaleRef.current = getResolutionScale();
+            const baseScale = getResolutionScale();
+            scaleRef.current = Math.max(
+                ABS_MIN_SCALE,
+                baseScale * adaptiveScaleFactorRef.current
+            );
             // 降低渲染分辨率
             canvas.width = Math.floor(width * scaleRef.current);
             canvas.height = Math.floor(height * scaleRef.current);
@@ -250,12 +280,44 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         const render = (time: number) => {
             if (!gl || !program) return;
             if (!isVisibleRef.current) return;
+
+            const elapsed = time - lastFrameRef.current;
+
+            // 使用 EMA 统计当前帧耗时，驱动自适应降级。
+            if (lastFrameRef.current > 0) {
+                emaFrameTimeRef.current = emaFrameTimeRef.current * 0.9 + elapsed * 0.1;
+                adaptCheckCounterRef.current += 1;
+                if (adaptCheckCounterRef.current >= ADAPTIVE_CHECK_EVERY) {
+                    adaptCheckCounterRef.current = 0;
+                    const ema = emaFrameTimeRef.current;
+                    let nextFactor = adaptiveScaleFactorRef.current;
+                    if (ema > ADAPTIVE_HIGH_MS) {
+                        nextFactor = Math.max(ADAPTIVE_MIN_FACTOR, nextFactor - ADAPTIVE_STEP);
+                    } else if (ema < ADAPTIVE_LOW_MS) {
+                        nextFactor = Math.min(ADAPTIVE_MAX_FACTOR, nextFactor + ADAPTIVE_STEP * 0.5);
+                    }
+
+                    if (Math.abs(nextFactor - adaptiveScaleFactorRef.current) > 0.001) {
+                        adaptiveScaleFactorRef.current = nextFactor;
+                        updateSize();
+                    }
+                }
+            }
+
             if (time - lastFrameRef.current < FRAME_INTERVAL) {
                 requestRef.current = requestAnimationFrame(render);
                 return;
             }
+
             lastFrameRef.current = time;
             gl.uniform1f(timeLocation, time);
+
+            if (ditherStrengthLocation) {
+                const ditherStrength =
+                    scaleRef.current <= 0.28 ? 0.0 : (scaleRef.current <= 0.32 ? 0.5 / 255.0 : 1.0 / 255.0);
+                gl.uniform1f(ditherStrengthLocation, ditherStrength);
+            }
+
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             requestRef.current = requestAnimationFrame(render);
         };
@@ -263,6 +325,8 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
             isVisibleRef.current = !document.hidden;
             if (isVisibleRef.current) {
                 lastFrameRef.current = performance.now();
+                emaFrameTimeRef.current = FRAME_INTERVAL;
+                adaptCheckCounterRef.current = 0;
                 requestRef.current = requestAnimationFrame(render);
             }
         };
@@ -294,7 +358,7 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         const handleLoad = () => {
             // 直接准备一张包含整张封面原图各区域色彩分布的离屏画布，并实施高斯模糊打底
             const size = 256; // 稍微提高一点离屏画质，以便宽广平滑后不断层
-            
+
             const offscreen = document.createElement('canvas');
             offscreen.width = size;
             offscreen.height = size;
@@ -302,8 +366,8 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
 
             if (ctx) {
                 // 这个模糊直接消灭了封面图中所有的线条和具象细节，只剩“块面”色彩
-                ctx.filter = 'blur(40px) saturate(200%)';
-                
+                ctx.filter = 'blur(34px) saturate(170%)';
+
                 // 向外微调扩围一点点（16px 代表只吃掉绝对黑边），保留绝大部分封面的边缘主色
                 ctx.drawImage(img, -16, -16, size + 32, size + 32);
 
@@ -356,9 +420,9 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
             </div>
 
             {/* 增加一层弱弱的深冷色底色，用于全局防刺眼 */}
-            <div className="absolute inset-0 bg-[#0a0a0c]/20 z-10 pointer-events-none" />
+            <div className="absolute inset-0 bg-[#0a0a0c]/14 z-10 pointer-events-none" />
             {/* 正片叠底遮罩：专门针对纯白色像素进行压暗，而不让整体变得死黑 */}
-            <div className="absolute inset-0 bg-black/18 z-10 pointer-events-none mix-blend-multiply" />
+            <div className="absolute inset-0 bg-black/10 z-10 pointer-events-none mix-blend-multiply" />
         </div>
     );
 });
