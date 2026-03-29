@@ -81,12 +81,12 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                 className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-300 ease-out data-[closed]:opacity-0"
             />
 
-            <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+            <div className="fixed inset-0 flex w-screen items-center justify-center p-3 sm:p-4">
                 <DialogPanel
                     transition
-                    className="w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-8 text-left align-middle shadow-xl border border-neutral-200 dark:border-neutral-700 transition-all duration-300 ease-out data-[closed]:scale-95 data-[closed]:opacity-0"
+                    className="w-full max-w-2xl max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-4 sm:p-6 lg:p-8 text-left align-middle shadow-xl border border-neutral-200 dark:border-neutral-700 transition-all duration-300 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 flex flex-col"
                 >
-                    <div className="flex justify-between items-start mb-6 gap-4">
+                    <div className="flex justify-between items-start mb-4 sm:mb-6 gap-4 shrink-0">
                         <DialogTitle as="h3" className="text-xl font-bold leading-6 text-neutral-900 dark:text-white whitespace-nowrap">
                             属性
                         </DialogTitle>
@@ -95,28 +95,28 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                         </button>
                     </div>
 
-                    <div className="space-y-6">
+                    <div className="space-y-5 sm:space-y-6 overflow-y-auto pr-1 sm:pr-2 min-h-0 overscroll-contain">
                         {/* 上半部分：封面 + 核心信息 */}
                         <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                            <div className="w-40 h-40 rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden shadow-md shrink-0 border border-neutral-200/30">
+                            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden shadow-md shrink-0 border border-neutral-200/30">
                                 <CoverImage song={displayMeta} className="w-full h-full" iconClassName="text-5xl" />
                             </div>
 
-                            <div className="flex-1 grid grid-cols-[auto_1fr] gap-x-4 gap-y-3 text-[13px] w-full items-center">
-                                <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">标题</div>
+                            <div className="flex-1 grid grid-cols-[auto_1fr] gap-x-3 sm:gap-x-4 gap-y-3 text-[13px] w-full items-center">
+                                <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right font-medium">标题</div>
                                 <div className="font-semibold text-neutral-900 dark:text-neutral-100 select-text break-all text-base">{displayMeta?.title || "未知"}</div>
 
                                 {!isVideo && (
                                     <>
-                                        <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">艺人</div>
+                                        <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right font-medium">艺人</div>
                                         <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.artist || "未知"}</div>
 
-                                        <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">专辑</div>
+                                        <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right font-medium">专辑</div>
                                         <div className="text-neutral-900 dark:text-neutral-100 select-text break-all">{displayMeta?.album || "未知"}</div>
                                     </>
                                 )}
 
-                                <div className="text-neutral-500 dark:text-neutral-400 text-right font-medium">时长</div>
+                                <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right font-medium">时长</div>
                                 <div className="text-neutral-900 dark:text-neutral-100 font-mono">{formatTime(displayMeta?.duration || 0)}</div>
                             </div>
                         </div>
@@ -124,11 +124,11 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                         <div className="h-px bg-neutral-200 dark:bg-neutral-700/50 w-full" />
 
                         {/* 下半部分：详细技术信息 */}
-                        <div className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2 text-xs w-full">
+                        <div className="grid grid-cols-[auto_1fr] gap-x-4 sm:gap-x-6 gap-y-2 text-xs w-full">
                             {/* 仅视频显示分辨率 */}
                             {(displayMeta?.width && displayMeta?.height) && (
                                 <>
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">分辨率</div>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">分辨率</div>
                                     <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
                                         {displayMeta.width} x {displayMeta.height}
                                     </div>
@@ -138,39 +138,39 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                             {/* 仅视频显示帧率 */}
                             {displayMeta?.frame_rate && (
                                 <>
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">帧速率</div>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">帧速率</div>
                                     <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
                                         {displayMeta.frame_rate.toFixed(2)} fps
                                     </div>
                                 </>
                             )}
 
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">声道</div>
+                            <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">声道</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
                                 {formatChannels(displayMeta?.channels)}
                             </div>
 
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">文件大小</div>
+                            <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">文件大小</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSize(displayMeta?.size)}</div>
 
                             {!isVideo && (
                                 <>
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">采样率</div>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">采样率</div>
                                     <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSampleRate(displayMeta?.sample_rate)}</div>
 
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">比特率</div>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">比特率</div>
                                     <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatBitrate(displayMeta?.bitrate)}</div>
                                 </>
                             )}
 
-                            <div className="text-neutral-500 dark:text-neutral-400 text-right whitespace-nowrap">路径</div>
+                            <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">路径</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text break-all">
                                 {displayMeta?.path || '未知'}
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-8 flex justify-end">
+                    <div className="mt-5 sm:mt-8 flex justify-end shrink-0">
                         <button
                             type="button"
                             className="w-full inline-flex justify-center rounded-xl px-4 py-2 text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 dark:bg-primary/20 dark:text-primary dark:hover:bg-primary/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
