@@ -10,7 +10,7 @@ export default function ApplePlayerLyricsToggle({ isLyricsOpen, hasLyrics, onTog
     const isDisabled = !hasLyrics;
 
     return (
-        <div title={isDisabled ? '此歌曲无歌词' : '歌词'}>
+        <div title={isDisabled ? '此歌曲无歌词' : undefined}>
             <button
                 type="button"
                 onClick={() => {
@@ -27,7 +27,7 @@ export default function ApplePlayerLyricsToggle({ isLyricsOpen, hasLyrics, onTog
                     isDisabled
                         ? 'text-white/20 cursor-not-allowed'
                         : isLyricsOpen
-                            ? 'bg-white/20 text-white shadow-lg backdrop-blur-md'
+                            ? 'bg-white/20 text-primary shadow-lg backdrop-blur-md'
                             : 'hover:bg-white/10 hover:text-white text-white/50 backdrop-blur-md'
                 )}
             >

@@ -1,51 +1,20 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir, appCacheDir } from '@tauri-apps/api/path';
-import type { LyricsData, LyricsLine, SongMetadata } from '@/types';
+import type { LyricsData, SongMetadata } from '@/types';
+import { enrichLyricsLines, parseLrcStrings } from '@/utils/lyricsParser';
 
-// fallback for raw lrc
+// Fallback / post-processing for lyrics returned from the backend.
+//   - Pre-timed (ID3 SYLT etc.): run translation enrichment only.
+//   - Raw LRC text without timestamps yet: run the full LRC parser.
 function tryParseLrc(data: LyricsData): LyricsData {
-    if (data.has_timestamps) return data;
-
-    let hasTimestamps = false;
-    const parsedLines: LyricsLine[] = [];
-    const timeRegExp = /\[(\d{2,}):(\d{2})(?:[\.:](\d{2,3}))?\]/g;
-
-    for (const lineObj of data.lines) {
-        const text = lineObj.text;
-        const matches = [...text.matchAll(timeRegExp)];
-
-        if (matches.length > 0) {
-            hasTimestamps = true;
-            const cleanText = text.replace(timeRegExp, '').trim();
-
-            for (const m of matches) {
-                const minutes = parseInt(m[1], 10);
-                const seconds = parseInt(m[2], 10);
-                const fractionStr = m[3] || '0';
-                // Handle different lengths of fraction part
-                const fractionMs = parseInt(fractionStr.padEnd(3, '0').slice(0, 3), 10);
-                const timeMs = minutes * 60000 + seconds * 1000 + fractionMs;
-
-                parsedLines.push({ time_ms: timeMs, text: cleanText });
-            }
-        } else {
-            parsedLines.push({ time_ms: null, text: text.trim() });
-        }
+    if (data.has_timestamps) {
+        return {
+            lines: enrichLyricsLines(data.lines),
+            has_timestamps: true,
+        };
     }
-
-    if (!hasTimestamps) return data;
-
-    parsedLines.sort((a, b) => {
-        if (a.time_ms === null && b.time_ms === null) return 0;
-        if (a.time_ms === null) return -1;
-        if (b.time_ms === null) return 1;
-        return (a.time_ms as number) - (b.time_ms as number);
-    });
-
-    return {
-        lines: parsedLines,
-        has_timestamps: true
-    };
+    const parsed = parseLrcStrings(data.lines);
+    return parsed.has_timestamps ? parsed : data;
 }
 
 let cachedAppDataDir: string | null = null;
@@ -107,6 +76,10 @@ export const audioService = {
             }
         }
         return invoke('play_audio', { path, metadata: resolvedMetadata });
+    },
+
+    load: async (path: string, metadata?: SongMetadata) => {
+        return invoke('load_audio', { path, metadata });
     },
 
     pause: async () => invoke('pause_audio'),

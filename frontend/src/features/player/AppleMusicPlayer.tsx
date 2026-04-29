@@ -212,8 +212,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                     }).catch(() => { });
                 } else {
                     setCurrentTime(prev => {
-                        // If we are past estimated duration, clamp or wait for sync
-                        if (metadata && metadata.duration > 0 && prev >= metadata.duration + 1) return 0; // Optimistic loop? No, let sync handle it.
+                        // If we are past estimated duration, wait for PlaybackControls to handle song end and dispatch seeked event
+                        if (metadata && metadata.duration > 0 && prev >= metadata.duration) return metadata.duration;
                         // Just increment
                         return prev + 0.5;
                     });
@@ -344,7 +344,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             />
 
             {/* Content Layer - Responsive Flex Layout */}
-            <div className="relative z-20 flex-1 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(1.5rem,3vw,2.5rem)]">
+            <div className="relative z-20 flex-1 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]">
 
                 <div className={clsx(
                     "flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",

@@ -35,9 +35,20 @@ export interface SongMetadata {
     channels?: number;
 }
 
+export interface LyricsWord {
+    time_ms: number;
+    text: string;
+}
+
 export interface LyricsLine {
     time_ms: number | null;
     text: string;
+    translation?: string | null;
+    words?: LyricsWord[] | null;
+    // Explicit line-end time, e.g. from a trailing <mm:ss.xx> tag in
+    // enhanced LRC. Used to mark exactly when the previous lyric stops
+    // sounding so interlude dots can appear right after the last word.
+    end_ms?: number | null;
 }
 
 export interface LyricsData {

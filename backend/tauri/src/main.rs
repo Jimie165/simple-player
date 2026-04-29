@@ -65,6 +65,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             // Player commands
             commands::player::play_audio,
+            commands::player::load_audio,
             commands::player::pause_audio,
             commands::player::resume_audio,
             commands::player::set_volume,

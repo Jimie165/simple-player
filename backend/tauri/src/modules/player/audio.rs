@@ -53,7 +53,12 @@ impl AudioState {
         smtc::init(app_handle, hwnd);
     }
 
-    pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {
+    fn open_file(
+        &self,
+        path: String,
+        metadata: Option<SongMetadata>,
+        autoplay: bool,
+    ) -> Result<(), String> {
         let file = File::open(&path).map_err(|e| format!("Failed to open audio file: {}", e))?;
         let source =
             Decoder::try_from(file).map_err(|e| format!("Failed to decode audio file: {}", e))?;
@@ -63,7 +68,11 @@ impl AudioState {
         let player = Player::connect_new(stream.mixer());
         player.set_volume(*self.volume.lock().unwrap());
         player.append(source);
-        player.play();
+        if autoplay {
+            player.play();
+        } else {
+            player.pause();
+        }
 
         let monitor_stop = Arc::new(AtomicBool::new(false));
         let handle = PlaybackHandle {
@@ -85,7 +94,7 @@ impl AudioState {
             let app_handle = self.app_handle.lock().ok().and_then(|h| h.clone());
             let _ = smtc::apply_metadata(meta, app_handle.as_ref());
         }
-        smtc::set_playing(true);
+        smtc::set_playing(autoplay);
 
         if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
             let player_arc = self.player.clone();
@@ -124,6 +133,14 @@ impl AudioState {
         }
 
         Ok(())
+    }
+
+    pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {
+        self.open_file(path, metadata, true)
+    }
+
+    pub fn load_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {
+        self.open_file(path, metadata, false)
     }
 
     pub fn pause(&self) {

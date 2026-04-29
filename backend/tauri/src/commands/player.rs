@@ -13,6 +13,15 @@ pub fn play_audio(
 }
 
 #[tauri::command]
+pub fn load_audio(
+    state: State<'_, AudioState>,
+    path: String,
+    metadata: Option<SongMetadata>,
+) -> Result<(), String> {
+    state.load_file(path, metadata)
+}
+
+#[tauri::command]
 pub fn pause_audio(state: State<'_, AudioState>) {
     state.pause();
 }

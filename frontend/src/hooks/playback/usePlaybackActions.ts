@@ -220,6 +220,14 @@ export function usePlaybackActions() {
 
     // --- New Actions for Controls ---
     const seek = async (time: number) => {
+        const { isAudioLoaded, metadata } = usePlayerStore.getState();
+
+        if (!isAudioLoaded && metadata?.path) {
+            await audioService.load(metadata.path, metadata);
+            setAudioLoaded(true);
+            requestLyricsForPath(metadata.path);
+        }
+
         const actualTime = await audioService.seek(time);
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
         return actualTime;

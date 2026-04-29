@@ -12,6 +12,8 @@ use std::path::Path;
 pub struct LyricsLine {
     pub time_ms: Option<u32>,
     pub text: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub translation: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -62,6 +64,7 @@ fn build_unsynced_lyrics(content: &str) -> Option<LyricsData> {
         .map(|line| LyricsLine {
             time_ms: None,
             text: line.to_string(),
+            translation: None,
         })
         .collect();
 
@@ -97,6 +100,7 @@ fn build_synced_lyrics(frame: &SynchronizedTextFrame<'_>) -> Option<LyricsData> 
         lines.push(LyricsLine {
             time_ms,
             text: trimmed.to_string(),
+            translation: None,
         });
     }
 

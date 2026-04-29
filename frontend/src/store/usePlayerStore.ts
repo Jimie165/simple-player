@@ -64,11 +64,19 @@ interface PlayerState {
 const sanitizeLyricsLines = (data: LyricsData | null): LyricsLine[] | null => {
     if (!data?.lines?.length) return null;
     const lines = data.lines
-        .map((line) => ({
-            time_ms: line.time_ms ?? null,
-            text: line.text.trim()
-        }))
-        .filter((line) => line.text.length > 0);
+        .map((line) => {
+            const translation = line.translation ? line.translation.trim() : '';
+            return {
+                time_ms: line.time_ms ?? null,
+                text: line.text.trim(),
+                translation: translation.length > 0 ? translation : null,
+                words: line.words && line.words.length > 0 ? line.words : null,
+                end_ms: typeof line.end_ms === 'number' ? line.end_ms : null,
+            };
+        })
+        // Keep timed entries even when their text is empty — those serve as
+        // explicit interlude markers. Drop only fully empty untimed lines.
+        .filter((line) => line.text.length > 0 || typeof line.time_ms === 'number');
 
     return lines.length > 0 ? lines : null;
 };

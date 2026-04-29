@@ -53,27 +53,26 @@ export default function PlaybackControls() {
         }
 
         try {
-            // 1. 先播放 (Play First)
-            if (autoPlay) {
-                await audioService.play(song.path, song);
-            } else {
-                // 如果不自动播放（例如列表播完回到开头暂停），只需设置 Metadata
-                // 但为了保险，还是加载但不播？或者只设置 UI
-                // 这里假设不自动播放意味着停止
+            // 1. 先播放或加载 (Play or Load)
+            await audioService.play(song.path, song);
+
+            if (!autoPlay) {
+                // 如果不自动播放（例如列表播完回到开头暂停），马上暂停并重置进度
+                await audioService.pause();
+                await seek(0);
             }
 
             // 2. 成功后更新 UI (Update UI Later)
             setMetadata(song);
             setCurrentSongIndex(index);
             setCurrentTime(0); // 放在成功后，避免视觉跳动
+            window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
 
             if (autoPlay) {
                 setIsPlaying(true);
                 setAudioLoaded(true);
             } else {
                 setIsPlaying(false);
-                // 如果不播，可能需要通知后端暂停或停止
-                await audioService.pause();
             }
 
         } catch (err) {
@@ -144,8 +143,8 @@ export default function PlaybackControls() {
             const nextIdx = getNextIndex(repeatMode);
 
             if (nextIdx === -1) {
-                console.log("Playlist ended, returning to start.");
-                playSongByIndex(0, false);
+                console.log("Playlist ended, returning to start of current song.");
+                playSongByIndex(currentSongIndex, false);
             } else {
                 playSongByIndex(nextIdx);
             }
@@ -347,6 +346,7 @@ export default function PlaybackControls() {
 
         if (restartChanged || songChanged) {
             setCurrentTime(0);
+            window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
             // 这里也加一道解锁保险
             isAutoChanging.current = false;
         }
