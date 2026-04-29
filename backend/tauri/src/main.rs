@@ -26,7 +26,7 @@ fn main() {
             // 初始化数据库
             let app_data_dir = app.path().app_data_dir()?;
             let app_cache_dir = app.path().app_cache_dir()?;
-            
+
             // 迁移 Roaming/cache 到 Local/cache
             migrate_cache_from_roaming(&app_data_dir, &app_cache_dir);
 
@@ -47,7 +47,18 @@ fn main() {
 
             // 初始化 AudioState 的 AppHandle (用于未来的 SMTC 事件)
             let audio_state: tauri::State<AudioState> = app.state();
-            audio_state.init_with_app_handle(app.handle().clone());
+            #[cfg(target_os = "windows")]
+            {
+                if let Some(window) = app.get_webview_window("main") {
+                    let hwnd = window.hwnd().ok();
+                    audio_state.init_with_app_handle(app.handle().clone(), hwnd);
+                } else {
+                    audio_state.init_with_app_handle(app.handle().clone(), None);
+                }
+            }
+
+            #[cfg(not(target_os = "windows"))]
+            audio_state.init_with_app_handle(app.handle().clone(), None);
 
             Ok(())
         })
@@ -169,17 +180,17 @@ fn migrate_cache_from_roaming(roaming_dir: &std::path::Path, local_dir: &std::pa
             match fs::rename(&roaming_cache, &local_cache) {
                 Ok(_) => println!("Successfully migrated cache from Roaming to Local"),
                 Err(e) => {
-                     // 跨驱动器移动可能失败，尝试复制后删除
-                     println!("Failed to rename cache folder (will try copy): {}", e);
-                     // 简单实现：仅移动目录，需更完善的递归复制
-                     // 在 Windows 上 AppData Roaming 和 Local 通常在同一驱动器，rename 应有效
+                    // 跨驱动器移动可能失败，尝试复制后删除
+                    println!("Failed to rename cache folder (will try copy): {}", e);
+                    // 简单实现：仅移动目录，需更完善的递归复制
+                    // 在 Windows 上 AppData Roaming 和 Local 通常在同一驱动器，rename 应有效
                 }
             }
         } else {
             // 目标已存在，尝试移动内容
             // 这是一个简单的迁移，暂不处理复杂的合并冲突
             println!("Local cache already exists, skipping full migration from Roaming");
-             // 可选：遍历 roaming_cache 下的文件移过去
+            // 可选：遍历 roaming_cache 下的文件移过去
         }
     }
 }

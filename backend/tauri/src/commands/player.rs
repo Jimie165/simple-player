@@ -23,7 +23,7 @@ pub fn resume_audio(state: State<'_, AudioState>) {
 }
 
 #[tauri::command]
-pub fn seek_audio(state: State<'_, AudioState>, position: f32) -> Result<(), String> {
+pub fn seek_audio(state: State<'_, AudioState>, position: f32) -> Result<f32, String> {
     state.seek(position)
 }
 

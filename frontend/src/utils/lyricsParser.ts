@@ -14,13 +14,11 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
         const text = lineObj.text;
 
         let match;
-        let lastLastIndex = 0;
         const matches = [];
 
         // Find all timestamps in the same line (e.g. [00:12][00:14] text)
         while ((match = timeRegExp.exec(text)) !== null) {
             matches.push(match);
-            lastLastIndex = timeRegExp.lastIndex;
         }
 
         if (matches.length > 0) {

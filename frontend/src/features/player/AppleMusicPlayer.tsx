@@ -241,9 +241,10 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: val } }));
     };
 
-    const handleSeekEnd = () => {
+    const handleSeekEnd = async () => {
         setIsDragging(false);
-        seek(currentTime);
+        const actualTime = await seek(currentTime);
+        setCurrentTime(actualTime);
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };
 

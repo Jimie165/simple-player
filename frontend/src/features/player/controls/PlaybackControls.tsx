@@ -107,8 +107,8 @@ export default function PlaybackControls() {
 
         // 3秒规则
         if (currentTime > 3) {
-            await audioService.seek(0);
-            setCurrentTime(0);
+            const actualTime = await seek(0);
+            setCurrentTime(actualTime);
             return;
         }
 
@@ -181,6 +181,7 @@ export default function PlaybackControls() {
         let unlistenPrev: (() => void) | undefined;
         let unlistenPlay: (() => void) | undefined;
         let unlistenPause: (() => void) | undefined;
+        let unlistenSeek: (() => void) | undefined;
         let unlistenEnded: (() => void) | undefined;
         let isMounted = true;
 
@@ -251,6 +252,24 @@ export default function PlaybackControls() {
                     pauseFn();
                 }
 
+                const seekFn = await listen<number>('smtc:seek', async (event) => {
+                    const requestedTime = Number(event.payload);
+                    if (!Number.isFinite(requestedTime)) return;
+
+                    try {
+                        const actualTime = await audioService.seek(requestedTime);
+                        setCurrentTime(actualTime);
+                        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
+                    } catch (error) {
+                        console.error("SMTC seek failed:", error);
+                    }
+                });
+                if (isMounted) {
+                    unlistenSeek = seekFn;
+                } else {
+                    seekFn();
+                }
+
                 // --- 核心修复：监听后端发送的播放结束事件 ---
                 const endedFn = await listen('audio:ended', () => {
                     console.log("Audio ended event received from backend.");
@@ -287,6 +306,7 @@ export default function PlaybackControls() {
             safeUnlisten(unlistenPrev);
             safeUnlisten(unlistenPlay);
             safeUnlisten(unlistenPause);
+            safeUnlisten(unlistenSeek);
             safeUnlisten(unlistenEnded);
             window.removeEventListener('playback:seeked', handleSeekEvent);
             window.removeEventListener('playback:dragging', handleRemoteDraggingEvent);
@@ -346,8 +366,8 @@ export default function PlaybackControls() {
     const handleSeekEnd = async (e: React.MouseEvent<HTMLInputElement>) => {
         const newTime = Number((e.currentTarget as HTMLInputElement).value);
         setIsDragging(false);
-        await seek(newTime); // Use hook action to ensure consistent behavior & event dispatch
-        setCurrentTime(newTime);
+        const actualTime = await seek(newTime); // Use hook action to ensure consistent behavior & event dispatch
+        setCurrentTime(actualTime);
     };
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
 

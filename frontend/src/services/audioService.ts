@@ -114,7 +114,7 @@ export const audioService = {
     resume: async () => invoke('resume_audio'),
 
     // 跳转进度 (秒)
-    seek: async (position: number) => invoke('seek_audio', { position }),
+    seek: async (position: number): Promise<number> => invoke('seek_audio', { position }),
 
     // 设置音量 (0.0 - 1.0)
     setVolume: async (volume: number) => invoke('set_volume', { volume }),

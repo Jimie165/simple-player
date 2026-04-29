@@ -41,7 +41,8 @@ export default function SongCoverOverlay({
         if (isCurrent) {
             if (restartOnPlay && song.path) {
                 try {
-                    await audioService.seek(0);
+                    const actualTime = await audioService.seek(0);
+                    window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
                     await audioService.play(song.path, song);
                     setIsPlaying(true);
                 } catch (error) {

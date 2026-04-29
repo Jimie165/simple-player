@@ -85,8 +85,8 @@ export function usePlaybackActions() {
 
         try {
             if (isCurrent && options?.restartIfCurrent) {
-                await audioService.seek(0);
-                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
+                const actualTime = await audioService.seek(0);
+                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
 
             await audioService.play(song.path, song);
@@ -204,7 +204,8 @@ export function usePlaybackActions() {
 
         try {
             if (index === currentSongIndex && restartIfCurrent) {
-                await audioService.seek(0);
+                const actualTime = await audioService.seek(0);
+                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
             await audioService.play(song.path, song);
             setCurrentSongIndex(index);
@@ -219,8 +220,9 @@ export function usePlaybackActions() {
 
     // --- New Actions for Controls ---
     const seek = async (time: number) => {
-        await audioService.seek(time);
-        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time } }));
+        const actualTime = await audioService.seek(time);
+        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
+        return actualTime;
     };
 
     const playNext = async () => {

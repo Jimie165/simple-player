@@ -22,11 +22,16 @@ rusqlite = { version = "0.32", features = ["bundled"] } # SQLite 数据库
 chrono = { version = "0.4", features = ["serde"] } # 时间处理
 sha2 = "0.10" # 封面哈希
 walkdir = "2.5.0"
+cpal = "0.17.3"
+symphonia = { version = "0.5.5", features = ["all"] }
+rodio = "0.22.2"
 
 [dependencies.windows]
 version = "0.61"
 features = [
     "Foundation",
+    "Win32_Foundation",
+    "Win32_System_WinRT",
     "Media",
     "Media_Core",
     "Media_Playback",
