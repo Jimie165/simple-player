@@ -35,6 +35,16 @@ export interface SongMetadata {
     channels?: number;
 }
 
+export interface LyricsLine {
+    time_ms: number | null;
+    text: string;
+}
+
+export interface LyricsData {
+    lines: LyricsLine[];
+    has_timestamps: boolean;
+}
+
 // 库文件夹
 export interface LibraryFolder {
     id: number;

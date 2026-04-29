@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { SongMetadata, RepeatMode } from '@/types/index';
+import type { LyricsData, LyricsLine, RepeatMode, SongMetadata } from '@/types/index';
 import { audioService } from '@/services/audioService';
 
 // 1. 确保接口里定义了所有属性和方法
@@ -36,6 +36,17 @@ interface PlayerState {
     isQueueOpen: boolean;
     toggleQueue: () => void;
 
+    // Lyrics
+    isLyricsOpen: boolean;
+    toggleLyrics: () => void;
+    lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+    lyrics: LyricsLine[] | null;
+    lyricsHasTimestamps: boolean;
+    currentLyricsIndex: number;
+    lyricsRequestId: number;
+    lyricsPath: string | null;
+    requestLyricsForPath: (path?: string) => Promise<void>;
+
     // Video Mode
     isVideoMode: boolean;
     setVideoMode: (enabled: boolean) => void;
@@ -50,6 +61,18 @@ interface PlayerState {
     playPreviousVideo: () => void;
 }
 
+const sanitizeLyricsLines = (data: LyricsData | null): LyricsLine[] | null => {
+    if (!data?.lines?.length) return null;
+    const lines = data.lines
+        .map((line) => ({
+            time_ms: line.time_ms ?? null,
+            text: line.text.trim()
+        }))
+        .filter((line) => line.text.length > 0);
+
+    return lines.length > 0 ? lines : null;
+};
+
 export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     // --- 初始状态 ---
     isPlaying: false,
@@ -59,6 +82,13 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     isShuffling: false,
     repeatMode: 'off',
     isQueueOpen: false,
+    isLyricsOpen: false,
+    lyricsStatus: 'idle',
+    lyrics: null,
+    lyricsHasTimestamps: false,
+    currentLyricsIndex: 0,
+    lyricsRequestId: 0,
+    lyricsPath: null,
     isVideoMode: false,
     videoMetadata: null,
     videoQueue: [],
@@ -138,6 +168,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
                 if (!isAudioLoaded && metadata && metadata.path) {
                     await audioService.play(metadata.path, metadata);
                     set({ isPlaying: true, isAudioLoaded: true });
+                    get().requestLyricsForPath(metadata.path);
                 } else {
                     await audioService.resume();
                     set({ isPlaying: true });
@@ -153,7 +184,56 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     restartSong: () => set((state) => ({ restartTrigger: state.restartTrigger + 1 })),
 
     // UI States
-    toggleQueue: () => set((state) => ({ isQueueOpen: !state.isQueueOpen })),
+    toggleQueue: () => set((state) => {
+        const next = !state.isQueueOpen;
+        return { isQueueOpen: next, isLyricsOpen: next ? false : state.isLyricsOpen };
+    }),
+
+    toggleLyrics: () => set((state) => {
+        const next = !state.isLyricsOpen;
+        return { isLyricsOpen: next, isQueueOpen: next ? false : state.isQueueOpen };
+    }),
+
+    requestLyricsForPath: async (path?: string) => {
+        const { lyricsPath, lyricsStatus } = get();
+        if (path && path === lyricsPath && (lyricsStatus === 'ready' || lyricsStatus === 'loading')) {
+            return;
+        }
+
+        const requestId = get().lyricsRequestId + 1;
+        set({
+            lyricsRequestId: requestId,
+            lyricsPath: path ?? null,
+            lyricsStatus: path ? 'loading' : 'empty',
+            lyrics: null,
+            lyricsHasTimestamps: false,
+            currentLyricsIndex: 0
+        });
+
+        if (!path) return;
+
+        try {
+            const data = await audioService.getLyrics(path);
+            if (get().lyricsRequestId !== requestId) return;
+
+            const lines = sanitizeLyricsLines(data);
+            if (!lines) {
+                set({ lyricsStatus: 'empty', lyrics: null, lyricsHasTimestamps: false });
+                return;
+            }
+
+            set({
+                lyricsStatus: 'ready',
+                lyrics: lines,
+                lyricsHasTimestamps: Boolean(data.has_timestamps),
+                currentLyricsIndex: 0
+            });
+        } catch (error) {
+            console.error('Failed to load lyrics', error);
+            if (get().lyricsRequestId !== requestId) return;
+            set({ lyricsStatus: 'error', lyrics: null, lyricsHasTimestamps: false });
+        }
+    },
 }), {
     name: 'player-store',
     partialize: (state) => ({

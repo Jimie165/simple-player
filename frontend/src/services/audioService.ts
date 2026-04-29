@@ -1,6 +1,52 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir, appCacheDir } from '@tauri-apps/api/path';
-import type { SongMetadata } from '@/types';
+import type { LyricsData, LyricsLine, SongMetadata } from '@/types';
+
+// fallback for raw lrc
+function tryParseLrc(data: LyricsData): LyricsData {
+    if (data.has_timestamps) return data;
+
+    let hasTimestamps = false;
+    const parsedLines: LyricsLine[] = [];
+    const timeRegExp = /\[(\d{2,}):(\d{2})(?:[\.:](\d{2,3}))?\]/g;
+
+    for (const lineObj of data.lines) {
+        const text = lineObj.text;
+        const matches = [...text.matchAll(timeRegExp)];
+
+        if (matches.length > 0) {
+            hasTimestamps = true;
+            const cleanText = text.replace(timeRegExp, '').trim();
+
+            for (const m of matches) {
+                const minutes = parseInt(m[1], 10);
+                const seconds = parseInt(m[2], 10);
+                const fractionStr = m[3] || '0';
+                // Handle different lengths of fraction part
+                const fractionMs = parseInt(fractionStr.padEnd(3, '0').slice(0, 3), 10);
+                const timeMs = minutes * 60000 + seconds * 1000 + fractionMs;
+
+                parsedLines.push({ time_ms: timeMs, text: cleanText });
+            }
+        } else {
+            parsedLines.push({ time_ms: null, text: text.trim() });
+        }
+    }
+
+    if (!hasTimestamps) return data;
+
+    parsedLines.sort((a, b) => {
+        if (a.time_ms === null && b.time_ms === null) return 0;
+        if (a.time_ms === null) return -1;
+        if (b.time_ms === null) return 1;
+        return (a.time_ms as number) - (b.time_ms as number);
+    });
+
+    return {
+        lines: parsedLines,
+        has_timestamps: true
+    };
+}
 
 let cachedAppDataDir: string | null = null;
 let cachedAppCacheDir: string | null = null;
@@ -75,4 +121,10 @@ export const audioService = {
 
     // 获取当前播放进度 (秒)
     getCurrentTime: async (): Promise<number> => invoke('get_audio_position'),
+
+    // 获取歌词 (嵌入歌词)
+    getLyrics: async (path: string): Promise<LyricsData> => {
+        const data: LyricsData = await invoke('get_lyrics', { path });
+        return tryParseLrc(data);
+    },
 };

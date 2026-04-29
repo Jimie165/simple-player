@@ -1,8 +1,24 @@
+use crate::utils::path::normalize_db_path;
+use lofty::id3::v2::{
+    Frame, Id3v2Tag, SyncTextContentType, SynchronizedTextFrame, TimestampFormat,
+};
 use lofty::prelude::*;
 use lofty::read_from_path;
+use lofty::tag::{ItemKey, TagType};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use crate::utils::path::normalize_db_path;
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LyricsLine {
+    pub time_ms: Option<u32>,
+    pub text: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct LyricsData {
+    pub lines: Vec<LyricsLine>,
+    pub has_timestamps: bool,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct SongMetadata {
@@ -36,6 +52,126 @@ pub struct SongMetadata {
     pub height: Option<u32>,
     pub frame_rate: Option<f64>,
     pub channels: Option<u8>,
+}
+
+fn build_unsynced_lyrics(content: &str) -> Option<LyricsData> {
+    let lines: Vec<LyricsLine> = content
+        .lines()
+        .map(|line| line.trim())
+        .filter(|line| !line.is_empty())
+        .map(|line| LyricsLine {
+            time_ms: None,
+            text: line.to_string(),
+        })
+        .collect();
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    Some(LyricsData {
+        lines,
+        has_timestamps: false,
+    })
+}
+
+fn build_synced_lyrics(frame: &SynchronizedTextFrame<'_>) -> Option<LyricsData> {
+    let mut lines = Vec::new();
+    let mut has_timestamps = false;
+
+    for (time, text) in &frame.content {
+        let trimmed = text.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        let time_ms = match frame.timestamp_format {
+            TimestampFormat::MS => Some(*time),
+            TimestampFormat::MPEG => None,
+        };
+
+        if time_ms.is_some() {
+            has_timestamps = true;
+        }
+
+        lines.push(LyricsLine {
+            time_ms,
+            text: trimmed.to_string(),
+        });
+    }
+
+    if lines.is_empty() {
+        return None;
+    }
+
+    Some(LyricsData {
+        lines,
+        has_timestamps,
+    })
+}
+
+fn extract_id3v2_lyrics(tag: &Id3v2Tag) -> Option<LyricsData> {
+    let mut fallback: Option<LyricsData> = None;
+
+    for frame in tag {
+        let Frame::Binary(binary) = frame else {
+            continue;
+        };
+        if binary.id().as_str() != "SYLT" {
+            continue;
+        }
+
+        let Ok(sync_frame) = SynchronizedTextFrame::parse(&binary.data, binary.flags()) else {
+            continue;
+        };
+
+        if let Some(lyrics) = build_synced_lyrics(&sync_frame) {
+            if matches!(
+                sync_frame.content_type,
+                SyncTextContentType::Lyrics | SyncTextContentType::TextTranscription
+            ) {
+                return Some(lyrics);
+            }
+            if fallback.is_none() {
+                fallback = Some(lyrics);
+            }
+        }
+    }
+
+    fallback
+}
+
+pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
+    let path_obj = Path::new(path);
+    let tagged_file =
+        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
+
+    if let Some(tag) = tagged_file.tag(TagType::Id3v2) {
+        let id3v2_tag: Id3v2Tag = tag.clone().into();
+
+        if let Some(lyrics) = extract_id3v2_lyrics(&id3v2_tag) {
+            return Ok(lyrics);
+        }
+
+        if let Some(frame) = id3v2_tag.unsync_text().next() {
+            if let Some(lyrics) = build_unsynced_lyrics(&frame.content) {
+                return Ok(lyrics);
+            }
+        }
+    }
+
+    if let Some(tag) = tagged_file.primary_tag() {
+        if let Some(content) = tag.get_string(&ItemKey::Lyrics) {
+            if let Some(lyrics) = build_unsynced_lyrics(content) {
+                return Ok(lyrics);
+            }
+        }
+    }
+
+    Ok(LyricsData {
+        lines: Vec::new(),
+        has_timestamps: false,
+    })
 }
 
 impl SongMetadata {
@@ -121,29 +257,15 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
 
     let year = tag.as_ref().and_then(|t| t.year()).map(|y| y as i32);
 
-    let genre = tag
-        .as_ref()
-        .and_then(|t| t.genre().map(|s| s.to_string()));
+    let genre = tag.as_ref().and_then(|t| t.genre().map(|s| s.to_string()));
 
-    let track_number = tag
-        .as_ref()
-        .and_then(|t| t.track())
-        .map(|n| n as i32);
+    let track_number = tag.as_ref().and_then(|t| t.track()).map(|n| n as i32);
 
-    let track_total = tag
-        .as_ref()
-        .and_then(|t| t.track_total())
-        .map(|n| n as i32);
+    let track_total = tag.as_ref().and_then(|t| t.track_total()).map(|n| n as i32);
 
-    let disc_number = tag
-        .as_ref()
-        .and_then(|t| t.disk())
-        .map(|n| n as i32);
+    let disc_number = tag.as_ref().and_then(|t| t.disk()).map(|n| n as i32);
 
-    let disc_total = tag
-        .as_ref()
-        .and_then(|t| t.disk_total())
-        .map(|n| n as i32);
+    let disc_total = tag.as_ref().and_then(|t| t.disk_total()).map(|n| n as i32);
 
     // 获取音频属性
     let properties = tagged_file.properties();
@@ -154,26 +276,26 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
 
     // 获取封面图片
     let mut resolved_cover_path = None;
-    
+
     if let Some(t) = tag {
         if let Some(picture) = t.pictures().first() {
             let mime_type = picture
                 .mime_type()
                 .map(|m| m.as_str())
                 .unwrap_or("image/jpeg");
-            
+
             if let Some(dir) = app_cache_dir {
-                 // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
-                 // 使用 crate 绝对路径引用 covers
-                 if let Some(path) = crate::modules::library::covers::save_cover_bytes(
-                     dir,
-                     &album,
-                     &artist,
-                     picture.data(),
-                     mime_type,
-                 ) {
-                      resolved_cover_path = Some(path);
-                 }
+                // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
+                // 使用 crate 绝对路径引用 covers
+                if let Some(path) = crate::modules::library::covers::save_cover_bytes(
+                    dir,
+                    &album,
+                    &artist,
+                    picture.data(),
+                    mime_type,
+                ) {
+                    resolved_cover_path = Some(path);
+                }
             }
         }
     }

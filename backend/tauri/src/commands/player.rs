@@ -1,3 +1,4 @@
+use crate::modules::library::LyricsData;
 use crate::modules::library::SongMetadata;
 use crate::modules::player::AudioState;
 use tauri::State;
@@ -34,4 +35,9 @@ pub fn set_volume(state: State<'_, AudioState>, volume: f32) {
 #[tauri::command]
 pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
     state.get_position()
+}
+
+#[tauri::command]
+pub fn get_lyrics(path: String) -> Result<LyricsData, String> {
+    crate::modules::library::get_lyrics(&path)
 }

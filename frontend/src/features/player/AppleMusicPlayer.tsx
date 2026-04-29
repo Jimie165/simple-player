@@ -16,6 +16,8 @@ import ApplePlayerControlsSection from '@/features/player/apple/ApplePlayerContr
 import ApplePlayerTopBar from '@/features/player/apple/ApplePlayerTopBar';
 import ApplePlayerQueuePanel from '@/features/player/apple/ApplePlayerQueuePanel';
 import ApplePlayerQueueToggle from '@/features/player/apple/ApplePlayerQueueToggle';
+import ApplePlayerLyricsToggle from '@/features/player/apple/ApplePlayerLyricsToggle';
+import ApplePlayerLyricsPanel from '@/features/player/apple/ApplePlayerLyricsPanel';
 
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {
@@ -29,7 +31,19 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
 
     // Local state for UI
-    const { volume, setVolume, isQueueOpen, toggleQueue } = usePlayerStore();
+    const {
+        volume,
+        setVolume,
+        isQueueOpen,
+        toggleQueue,
+        isLyricsOpen,
+        toggleLyrics,
+        lyrics,
+        lyricsStatus,
+        lyricsHasTimestamps,
+        lyricsPath,
+        requestLyricsForPath,
+    } = usePlayerStore();
     const [localVolume, setLocalVolume] = useState(volume);
     const [isVolumeDragging, setIsVolumeDragging] = useState(false);
 
@@ -50,10 +64,15 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const [queueMounted, setQueueMounted] = useState(isQueueOpen);
     const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
     const queueScrollDidMountRef = useRef(false);
+    const [lyricsMounted, setLyricsMounted] = useState(isLyricsOpen);
 
     useEffect(() => {
         if (isQueueOpen) setQueueMounted(true);
     }, [isQueueOpen]);
+
+    useEffect(() => {
+        if (isLyricsOpen) setLyricsMounted(true);
+    }, [isLyricsOpen]);
 
     useEffect(() => {
         if (!queueScrollDidMountRef.current) {
@@ -66,6 +85,15 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     useEffect(() => {
         if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
     }, [isOpen, isQueueOpen]);
+
+    useEffect(() => {
+        if (metadata?.path && metadata.path !== lyricsPath) {
+            requestLyricsForPath(metadata.path);
+        }
+        if (!metadata?.path && lyricsPath !== null) {
+            requestLyricsForPath(undefined);
+        }
+    }, [metadata?.path, lyricsPath, requestLyricsForPath]);
 
     // Layout sizing state
     const coverRef = useRef<HTMLDivElement>(null);
@@ -224,6 +252,11 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         toggleQueue();
     };
 
+    const handleToggleLyrics = () => {
+        if (!lyricsMounted) setLyricsMounted(true);
+        toggleLyrics();
+    };
+
     // Fullscreen Logic
     const [isFullscreen, setIsFullscreen] = useState(false);
     const wasMaximizedBeforeFullscreenRef = useRef(false);
@@ -314,7 +347,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
 
                 <div className={clsx(
                     "flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                    isQueueOpen ? "w-[42%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
+                    (isQueueOpen || isLyricsOpen) ? "w-[42%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
                 )}>
                     {/* Content Wrapper: Controls vertical spacing */}
                     <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
@@ -383,12 +416,29 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                     onClose={onClose}
                     queueScrollToTopSignal={queueScrollToTopSignal}
                 />
+
+                <ApplePlayerLyricsPanel
+                    isLyricsOpen={isLyricsOpen}
+                    lyricsMounted={lyricsMounted}
+                    lyrics={lyrics}
+                    lyricsStatus={lyricsStatus}
+                    hasTimestamps={lyricsHasTimestamps}
+                    currentTime={currentTime}
+                    onSeek={seek}
+                />
             </div>
 
-            <ApplePlayerQueueToggle
-                isQueueOpen={isQueueOpen}
-                onToggle={handleToggleQueue}
-            />
+            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
+                <ApplePlayerLyricsToggle
+                    isLyricsOpen={isLyricsOpen}
+                    hasLyrics={lyricsStatus !== 'empty'}
+                    onToggle={handleToggleLyrics}
+                />
+                <ApplePlayerQueueToggle
+                    isQueueOpen={isQueueOpen}
+                    onToggle={handleToggleQueue}
+                />
+            </div>
 
 
         </motion.div >

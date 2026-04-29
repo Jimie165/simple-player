@@ -49,7 +49,17 @@ const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
 
 export function usePlaybackActions() {
     const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent, setQueueContext } = useLibraryStore();
-    const { setMetadata, setIsPlaying, setShuffleState, setRepeatState, togglePlay, restartSong, toggleShuffle: togglePlayerShuffle, setAudioLoaded } = usePlayerStore();
+    const {
+        setMetadata,
+        setIsPlaying,
+        setShuffleState,
+        setRepeatState,
+        togglePlay,
+        restartSong,
+        toggleShuffle: togglePlayerShuffle,
+        setAudioLoaded,
+        requestLyricsForPath,
+    } = usePlayerStore();
 
     const toggleShuffle = () => {
         const { isShuffling } = usePlayerStore.getState();
@@ -83,6 +93,7 @@ export function usePlaybackActions() {
             setMetadata(song);
             setIsPlaying(true);
             setAudioLoaded(true);
+            requestLyricsForPath(song.path);
 
             if (playlist && playlist.length > 0) {
                 if (options?.disableShuffle) {
@@ -200,6 +211,7 @@ export function usePlaybackActions() {
             setMetadata(song);
             setIsPlaying(true);
             setAudioLoaded(true);
+            requestLyricsForPath(song.path);
         } catch (error) {
             console.error('Queue play failed', error);
         }
