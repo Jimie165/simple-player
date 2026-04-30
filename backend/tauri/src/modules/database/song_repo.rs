@@ -244,6 +244,15 @@ impl SongRepo {
         Ok(())
     }
 
+    /// 归档歌曲（标记为已归档，保留收藏/播放统计/播放列表关联）
+    pub fn archive(conn: &Connection, id: i64) -> Result<()> {
+        conn.execute(
+            "UPDATE songs SET status = 'archived', updated_at = datetime('now') WHERE id = ?1",
+            params![id],
+        )?;
+        Ok(())
+    }
+
     /// 更新歌曲元数据
     #[allow(clippy::too_many_arguments)]
     pub fn update_metadata(

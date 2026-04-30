@@ -1,8 +1,9 @@
 use crate::DbState;
 use crate::modules::database::{FolderRepo, LibraryFolder, SongRepo};
 use crate::modules::library::{self, SongMetadata};
+use crate::utils::path::normalize_folder_path;
 use crate::utils::paths::{is_app_relative_path, is_user_file_path};
-use rusqlite::Connection;
+use rusqlite::{Connection, params};
 use serde::Serialize;
 use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
 use std::path::Path;
@@ -31,6 +32,25 @@ struct SongWorkItem {
 struct SongWorkResult {
     item: SongWorkItem,
     meta: Option<SongMetadata>,
+}
+
+/// 判断 `child` 是否是 `parent` 的子路径（要求两端都已经过 `normalize_folder_path` 处理）。
+/// 不依赖文件系统，仅按字符串前缀比较，对 Windows 盘符做大小写不敏感处理。
+fn is_subpath_of(child: &str, parent: &str) -> bool {
+    if child.len() <= parent.len() {
+        return false;
+    }
+    let (c_head, p_head) = (&child[..parent.len()], parent);
+    let head_match = if cfg!(windows) {
+        c_head.eq_ignore_ascii_case(p_head)
+    } else {
+        c_head == p_head
+    };
+    if !head_match {
+        return false;
+    }
+    // parent 后面必须紧跟分隔符，避免 "D:/Music" 误判为 "D:/MusicExtra" 的前缀
+    child.as_bytes().get(parent.len()) == Some(&b'/')
 }
 
 fn compute_worker_count(total: usize) -> usize {
@@ -159,22 +179,23 @@ async fn scan_library_internal(
         .app_cache_dir()
         .map_err(|e| e.to_string())?;
 
-    let folders: Vec<_> = {
+    let (folders, ignored_dirs): (Vec<_>, Vec<String>) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         let all_folders = FolderRepo::get_by_type(&conn, "music").map_err(|e| e.to_string())?;
-        if let Some(folder_id) = restore_folder_id {
+        let folders = if let Some(folder_id) = restore_folder_id {
             all_folders
                 .into_iter()
                 .filter(|f| f.id == folder_id)
                 .collect()
         } else {
             all_folders
-        }
+        };
+        (folders, load_ignored_dirs(&conn))
     };
     let mut all_songs = Vec::new();
 
     for folder in folders {
-        let files = library::scan_audio_files_recursive(&folder.path);
+        let files = library::scan_audio_files_recursive(&folder.path, &ignored_dirs);
         let mut work_items: Vec<SongWorkItem> = Vec::new();
 
         {
@@ -182,7 +203,9 @@ async fn scan_library_internal(
             let stale_songs = SongRepo::get_songs_not_in_paths(&conn, folder.id, &files)
                 .map_err(|e| e.to_string())?;
             for stale in stale_songs {
-                let _ = SongRepo::hard_delete(&conn, stale.id);
+                if stale.status != "archived" {
+                    let _ = SongRepo::archive(&conn, stale.id);
+                }
             }
 
             for file in files {
@@ -372,13 +395,39 @@ pub async fn add_library_folder(
     app_handle: tauri::AppHandle,
     folder: String,
 ) -> Result<Vec<SongMetadata>, String> {
+    let folder = normalize_folder_path(&folder);
+
     let added_folder_id = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
+
+        // 检查嵌套关系：当前已有的 music 文件夹中是否有此目录的祖先或后代
+        let existing = FolderRepo::get_by_type(&conn, "music").map_err(|e| e.to_string())?;
+        for f in &existing {
+            if f.path == folder {
+                // 已存在同一目录，直接返回当前歌曲列表
+                let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
+                return Ok(songs.iter().map(SongMetadata::from_db_song).collect());
+            }
+            if is_subpath_of(&folder, &f.path) {
+                return Err(format!("该目录已被父目录覆盖：{}", f.path));
+            }
+            if is_subpath_of(&f.path, &folder) {
+                return Err(format!(
+                    "已存在子目录 {}，请先在音乐库中移除该子目录后再添加父目录",
+                    f.path
+                ));
+            }
+        }
+
         let folder_row = FolderRepo::add(&conn, &folder).map_err(|e| e.to_string())?;
         folder_row.id
     };
 
-    let files = library::scan_audio_files_recursive(&folder);
+    let ignored_dirs = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        load_ignored_dirs(&conn)
+    };
+    let files = library::scan_audio_files_recursive(&folder, &ignored_dirs);
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         insert_placeholder_songs(&conn, added_folder_id, &files)?;
@@ -414,7 +463,10 @@ pub fn remove_library_folder(
     folder: String,
 ) -> Result<Vec<LibraryFolder>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    FolderRepo::remove(&conn, &folder).map_err(|e| e.to_string())?;
+    let removed = FolderRepo::remove(&conn, &folder).map_err(|e| e.to_string())?;
+    if !removed {
+        return Err(format!("未找到文件夹记录：{}", folder));
+    }
     let folders = FolderRepo::get_all(&conn).map_err(|e| e.to_string())?;
     Ok(folders)
 }
@@ -527,4 +579,109 @@ pub fn get_favorites(
 pub fn increment_play_count(db: State<'_, DbState>, song_id: i64) -> Result<(), String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     SongRepo::increment_play_count(&conn, song_id).map_err(|e| e.to_string())
+}
+
+const IGNORED_DIRS_KEY: &str = "library.ignored_dirs";
+const DEFAULT_IGNORED_DIRS: &[&str] = &[
+    "node_modules",
+    ".git",
+    "target",
+    "build",
+    ".gradle",
+    "__pycache__",
+    "venv",
+    ".venv",
+    "dist",
+];
+
+fn load_ignored_dirs(conn: &Connection) -> Vec<String> {
+    let raw: Option<String> = conn
+        .query_row(
+            "SELECT value FROM app_settings WHERE key = ?1",
+            params![IGNORED_DIRS_KEY],
+            |row| row.get(0),
+        )
+        .ok();
+    match raw {
+        Some(s) => serde_json::from_str::<Vec<String>>(&s)
+            .unwrap_or_else(|_| DEFAULT_IGNORED_DIRS.iter().map(|s| s.to_string()).collect()),
+        None => DEFAULT_IGNORED_DIRS.iter().map(|s| s.to_string()).collect(),
+    }
+}
+
+/// 获取扫描时忽略的目录名列表（首次读取时返回内置默认值）。
+#[tauri::command]
+pub fn get_ignored_dir_names(db: State<'_, DbState>) -> Result<Vec<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    Ok(load_ignored_dirs(&conn))
+}
+
+/// 设置扫描时忽略的目录名列表。
+#[tauri::command]
+pub fn set_ignored_dir_names(
+    db: State<'_, DbState>,
+    names: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let cleaned: Vec<String> = names
+        .into_iter()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+    let json = serde_json::to_string(&cleaned).map_err(|e| e.to_string())?;
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO app_settings (key, value, updated_at) VALUES (?1, ?2, unixepoch())
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = unixepoch()",
+        params![IGNORED_DIRS_KEY, json],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(cleaned)
+}
+
+#[derive(Serialize)]
+pub struct DebugSongRow {
+    pub id: i64,
+    pub path: String,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub folder_id: Option<i64>,
+    pub status: String,
+    pub created_at: Option<String>,
+}
+
+/// 排查命令：返回 path/title 中含有指定关键字的所有歌曲（任意状态），用于定位"莫名出现的"条目。
+#[tauri::command]
+pub fn debug_dump_test_songs(
+    db: State<'_, DbState>,
+    keyword: Option<String>,
+) -> Result<Vec<DebugSongRow>, String> {
+    let kw = keyword.unwrap_or_else(|| "test".to_string());
+    let pattern = format!("%{}%", kw);
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, path, title, artist, album, folder_id, status, created_at
+             FROM songs
+             WHERE path LIKE ?1 OR title LIKE ?1
+             ORDER BY created_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([&pattern], |row| {
+            Ok(DebugSongRow {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                artist: row.get(3)?,
+                album: row.get(4)?,
+                folder_id: row.get(5)?,
+                status: row.get::<_, Option<String>>(6)?.unwrap_or_else(|| "active".to_string()),
+                created_at: row.get(7)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(rows)
 }

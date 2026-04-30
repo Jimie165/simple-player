@@ -49,9 +49,28 @@ pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
 }
 
 /// 递归扫描文件夹内的音频文件
-pub fn scan_audio_files_recursive(dir_path: &str) -> Vec<String> {
+///
+/// `ignored_dir_names` 中匹配的目录（按目录名比较，大小写不敏感）会被整个剪枝掉。
+/// 根目录本身不会被剪枝，即使它的名字命中了忽略列表。
+pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) -> Vec<String> {
     let mut audio_files = Vec::new();
-    for entry in WalkDir::new(dir_path).into_iter().filter_map(|e| e.ok()) {
+    let walker = WalkDir::new(dir_path).into_iter().filter_entry(|entry| {
+        if entry.depth() == 0 {
+            return true;
+        }
+        if entry.file_type().is_dir() {
+            if let Some(name) = entry.file_name().to_str() {
+                let hit = ignored_dir_names
+                    .iter()
+                    .any(|ig| ig.eq_ignore_ascii_case(name));
+                if hit {
+                    return false;
+                }
+            }
+        }
+        true
+    });
+    for entry in walker.filter_map(|e| e.ok()) {
         if !entry.file_type().is_file() {
             continue;
         }

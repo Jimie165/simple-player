@@ -89,6 +89,9 @@ fn main() {
             commands::library::batch_toggle_favorite,
             commands::library::get_favorites,
             commands::library::increment_play_count,
+            commands::library::debug_dump_test_songs,
+            commands::library::get_ignored_dir_names,
+            commands::library::set_ignored_dir_names,
             // Playlist commands
             commands::playlist::get_playlists,
             commands::playlist::create_playlist,

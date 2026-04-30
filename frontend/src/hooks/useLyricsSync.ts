@@ -40,11 +40,13 @@ export function useLyricsSync({ lyrics, currentTime, enabled, hasTimestamps }: U
         if (!hasTimestamps || lyrics.length === 0) return [];
         // Skip empty-text entries — those are interlude markers, not lines
         // that should ever become the highlighted "current lyric".
-        return lyrics
-            .map((line, index) => ({ time: line.time_ms, index, text: line.text }))
-            .filter((entry): entry is TimedEntry =>
-                typeof entry.time === 'number' && entry.text.length > 0
-            );
+        const timed: TimedEntry[] = [];
+        lyrics.forEach((line, index) => {
+            if (typeof line.time_ms === 'number' && line.text.length > 0) {
+                timed.push({ time: line.time_ms, index });
+            }
+        });
+        return timed;
     }, [lyrics, hasTimestamps]);
 
     // Compute the correct index synchronously on first render so the panel

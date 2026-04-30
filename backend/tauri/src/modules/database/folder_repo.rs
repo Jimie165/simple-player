@@ -3,6 +3,7 @@
 
 use rusqlite::{Connection, Result, params};
 use super::models::LibraryFolder;
+use crate::utils::path::normalize_folder_path;
 
 pub struct FolderRepo;
 
@@ -53,6 +54,7 @@ impl FolderRepo {
         path: &str,
         folder_type: &str,
     ) -> Result<LibraryFolder> {
+        let path = normalize_folder_path(path);
         // 使用 ON CONFLICT 来更新 folder_type，确保类型正确
         conn.execute(
             "INSERT INTO library_folders (path, folder_type) VALUES (?1, ?2)
@@ -74,16 +76,22 @@ impl FolderRepo {
     }
 
     /// 删除文件夹（同时删除关联的歌曲）
-    pub fn remove(conn: &Connection, path: &str) -> Result<()> {
+    /// 直接按传入路径精确匹配 —— 调用方应当传 DB 中存储的原始字符串
+    /// （例如 `get_all` 返回的 `LibraryFolder.path`），不要再做归一化。
+    /// 返回是否真的删除到了行；调用方据此决定是否给用户反馈。
+    pub fn remove(conn: &Connection, path: &str) -> Result<bool> {
         conn.execute(
             "DELETE FROM songs WHERE folder_id = (SELECT id FROM library_folders WHERE path = ?1)",
             params![path],
         )?;
-        conn.execute("DELETE FROM library_folders WHERE path = ?1", params![path])?;
-        Ok(())
+        let affected = conn.execute(
+            "DELETE FROM library_folders WHERE path = ?1",
+            params![path],
+        )?;
+        Ok(affected > 0)
     }
 
-    /// 根据路径获取文件夹
+    /// 根据路径获取文件夹（精确匹配，不做归一化）
     #[allow(dead_code)]
     pub fn get_by_path(conn: &Connection, path: &str) -> Result<Option<LibraryFolder>> {
         let mut stmt = conn.prepare(

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
+import { motion } from 'framer-motion';
 import type { LyricsLine, LyricsWord } from '@/types';
 import { useLyricsSync } from '@/hooks/useLyricsSync';
 
@@ -34,35 +35,64 @@ function KaraokeText({
     currentMs: number;
 }) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    const [currentMs, setCurrentMs] = useState(baseCurrentMs);
-    const lastTick = useRef(performance.now());
-    const lastBaseMs = useRef(baseCurrentMs);
+    
+    // 如果组件较晚挂载（例如由于外部 500ms 刷新率导致的延迟），
+    // 强制它从这句话第一个字的略微提前的时间开始，以便给用户展示一个顺滑的“快速追赶（swoosh）”动画，
+    // 而不是直接让前几个字突兀地变白。
+    const [currentMs, setCurrentMs] = useState(() => {
+        if (words.length > 0) {
+            const firstWordStart = words[0].time_ms;
+            // 如果实际时间已经超过了第一个字，我们从第一个字前 50ms 处起步，触发追赶特效
+            if (baseCurrentMs > firstWordStart) {
+                // 如果落后太多（超过 3 秒），说明可能是跳转，不要从头追赶
+                if (baseCurrentMs - firstWordStart > 3000) {
+                    return baseCurrentMs;
+                }
+                return firstWordStart - 50;
+            }
+        }
+        return baseCurrentMs;
+    });
+
+    const targetMsRef = useRef(baseCurrentMs);
+    const lastTick = useRef(0);
 
     useEffect(() => {
-        // Handle external time updates (seek, or the 500ms sync)
         setCurrentMs(prevMs => {
-            if (Math.abs(baseCurrentMs - prevMs) > 1000) {
-                // Seeked
+            if (Math.abs(baseCurrentMs - prevMs) > 3000) {
+                // 如果差距极大（比如用户手动拉动了进度条），直接跳转，不进行平滑追赶
                 return baseCurrentMs;
-            } else if (Math.abs(baseCurrentMs - prevMs) > 200) {
-                // Gently correct drift
-                return prevMs + (baseCurrentMs - prevMs) * 0.5;
             }
             return prevMs;
         });
-        lastBaseMs.current = baseCurrentMs;
+        targetMsRef.current = baseCurrentMs;
     }, [baseCurrentMs]);
 
     useEffect(() => {
         if (!isPlaying) return;
         let frame: number;
+        
         const tick = (now: number) => {
+            if (!lastTick.current) lastTick.current = now;
             const delta = now - lastTick.current;
             lastTick.current = now;
-            setCurrentMs(prev => prev + delta);
+
+            setCurrentMs(prev => {
+                let nextMs = prev + delta;
+                
+                // 向外部真实时间（targetMsRef.current）进行平滑追赶修正
+                const diff = targetMsRef.current - nextMs;
+                if (diff > 50) {
+                    // 我们落后了（比如组件刚挂载，或者系统更新有延迟），加速追赶
+                    // 每一帧追赶剩余差距的 15%，大约 10 帧（不到 0.2 秒）就能平滑填补前几个字的空白
+                    nextMs += diff * 0.15;
+                }
+                
+                return nextMs;
+            });
             frame = requestAnimationFrame(tick);
         };
-        // Reset tick on start
+        
         lastTick.current = performance.now();
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
@@ -111,6 +141,140 @@ function KaraokeText({
     );
 }
 
+function InterludeItem({ 
+    isActive: isCurrentlyActive,
+    currentTime,
+    startMs,
+    endMs
+}: { 
+    isActive: boolean;
+    currentTime: number;
+    startMs: number;
+    endMs: number;
+}) {
+    const isFirstMount = useRef(true);
+    
+    useEffect(() => {
+        isFirstMount.current = false;
+    }, []);
+
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const [preciseMs, setPreciseMs] = useState(currentTime * 1000);
+    const lastTick = useRef(0);
+
+    // 同步外部时间更新（如拖动进度条）
+    useEffect(() => {
+        setPreciseMs(prev => {
+            const external = currentTime * 1000;
+            if (Math.abs(external - prev) > 200) return external;
+            return prev;
+        });
+    }, [currentTime]);
+
+    // 高精度时间循环，确保动画平滑且可暂停续播
+    useEffect(() => {
+        if (!isPlaying) return;
+        let frame: number;
+        const tick = (now: number) => {
+            const delta = now - lastTick.current;
+            lastTick.current = now;
+            setPreciseMs(prev => prev + delta);
+            frame = requestAnimationFrame(tick);
+        };
+        lastTick.current = performance.now();
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [isPlaying]);
+
+    // 距离间奏结束剩余的毫秒数
+    const remainingMs = endMs - preciseMs;
+    // 强制在剩余 1000ms 时触发离场动画（放大阶段），而外部聚焦会在 600ms 时切换（缩小阶段）
+    const isActuallyActive = isCurrentlyActive && remainingMs > 1000;
+
+    const progress = Math.max(
+        0,
+        Math.min(1, (preciseMs - startMs) / (endMs - startMs))
+    );
+
+    const dotOpacities = [0, 1, 2].map((dotIndex) => {
+        const phaseStart = dotIndex / 3;
+        const normalized = Math.max(0, Math.min(1, (progress - phaseStart) * 3));
+        return 0.24 + normalized * 0.76;
+    });
+
+    // 计算高精度呼吸缩放：4.5s 一个周期，范围 0.85-1.05
+    const BREATH_DURATION = 4500;
+    const cycleProgress = (preciseMs % BREATH_DURATION) / BREATH_DURATION;
+    const currentScale = 0.95 + 0.1 * Math.sin(cycleProgress * 2 * Math.PI - Math.PI / 2);
+
+    // 离场动画参数
+    const EXIT_DURATION = 0.8;
+    const EXIT_PEAK_RATIO = 0.4; // 在 40% 的时间点达到最大缩放
+
+    return (
+        <motion.div
+            className="px-[clamp(1.2rem,2.2vw,2rem)] flex items-center overflow-hidden"
+            aria-hidden={!isActuallyActive}
+            initial={{ height: 0 }}
+            animate={{ 
+                height: isActuallyActive ? 'clamp(2.5rem,6vmin,4rem)' : 0 
+            }}
+            transition={isActuallyActive ? {
+                duration: 0.6,
+                ease: [0.25, 1, 0.5, 1]
+            } : {
+                // 只有在缩小时（达到峰值后）才开始收缩高度
+                delay: EXIT_DURATION * EXIT_PEAK_RATIO,
+                duration: EXIT_DURATION * (1 - EXIT_PEAK_RATIO),
+                ease: "easeIn"
+            }}
+        >
+            <motion.span 
+                className="flex items-center gap-[clamp(0.4rem,1.2vmin,0.8rem)] origin-left" 
+                aria-hidden
+                initial={{ scale: 0 }}
+                animate={isActuallyActive ? {
+                    scale: currentScale
+                } : {
+                    scale: isFirstMount.current ? 0 : [null, 1.15, 0]
+                }}
+                transition={isActuallyActive ? {
+                    duration: 0.05,
+                    ease: "linear"
+                } : {
+                    duration: EXIT_DURATION,
+                    ease: "easeInOut",
+                    times: [0, EXIT_PEAK_RATIO, 1]
+                }}
+            >
+                {[0, 1, 2].map((dotIndex) => (
+                    <motion.span
+                        key={dotIndex}
+                        className="rounded-full bg-white"
+                        style={{
+                            width: 'clamp(0.45rem, 1.6vmin, 1.1rem)',
+                            height: 'clamp(0.45rem, 1.6vmin, 1.1rem)',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={isActuallyActive ? {
+                            opacity: dotOpacities[dotIndex]
+                        } : {
+                            opacity: isFirstMount.current ? 0 : [null, 1, 0]
+                        }}
+                        transition={isActuallyActive ? {
+                            duration: 0.05, ease: "linear" 
+                        } : {
+                            duration: EXIT_DURATION,
+                            ease: "easeInOut",
+                            times: [0, EXIT_PEAK_RATIO, 1]
+                        }}
+                    />
+                ))}
+            </motion.span>
+        </motion.div>
+    );
+}
+
 export default function LyricsPanel({
     isOpen,
     lyrics,
@@ -125,8 +289,8 @@ export default function LyricsPanel({
     // the interlude dots to appear. Below this, the brief silence is too
     // short to bother animating dots — the previous line just stays
     // highlighted until the next one arrives.
-    const interludeThresholdMs = 2000;
-    const lines = lyrics ?? [];
+    const interludeThresholdMs = 5000;
+    const lines = useMemo(() => lyrics ?? [], [lyrics]);
     const currentLyricIndex = useLyricsSync({
         lyrics: lines,
         currentTime,
@@ -305,7 +469,23 @@ export default function LyricsPanel({
                 currentMs < item.endMs
             );
 
-            if (interludeIndex >= 0) return interludeIndex;
+            if (interludeIndex >= 0) {
+                const item = displayItems[interludeIndex] as { type: 'interlude'; endMs: number };
+                // 如果间奏即将结束（剩余 600ms），即点点开始从峰值缩小时，提前聚焦到下一行
+                if (currentMs >= item.endMs - 600) {
+                    return Math.min(displayItems.length - 1, interludeIndex + 1);
+                }
+                return interludeIndex;
+            }
+
+            if (typeof currentLine.end_ms === 'number' && currentMs >= currentLine.end_ms) {
+                const currentDisplayIndex = displayItems.findIndex((item) =>
+                    item.type === 'line' && item.lineIndex === currentLyricIndex
+                );
+                const nextDisplayItem =
+                    currentDisplayIndex >= 0 ? displayItems[currentDisplayIndex + 1] : null;
+                if (nextDisplayItem?.type === 'line') return currentDisplayIndex + 1;
+            }
         }
 
         const lineDisplayIndex = displayItems.findIndex((item) =>
@@ -364,36 +544,13 @@ export default function LyricsPanel({
                         itemContent={(_, item) => {
                             if (item.type === 'interlude') {
                                 const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
-                                const progress = Math.max(
-                                    0,
-                                    Math.min(1, ((currentTime * 1000) - item.startMs) / (item.endMs - item.startMs))
-                                );
-                                const dotOpacities = [0, 1, 2].map((dotIndex) => {
-                                    const phaseStart = dotIndex / 3;
-                                    const normalized = Math.max(0, Math.min(1, (progress - phaseStart) * 3));
-                                    return 0.24 + normalized * 0.76;
-                                });
-
                                 return (
-                                    <div
-                                        className={clsx(
-                                            'overflow-hidden px-[clamp(1.2rem,2.2vw,2rem)] transition-all duration-[600ms] ease-[0.25,1,0.5,1]',
-                                            isActive
-                                                ? 'h-[var(--interlude-height,3.5rem)] opacity-100 scale-100'
-                                                : 'h-0 opacity-0 scale-[0.8] pointer-events-none'
-                                        )}
-                                        aria-hidden={!isActive}
-                                    >
-                                        <span className="flex items-center gap-[0.45rem] h-full" aria-hidden>
-                                            {dotOpacities.map((opacity, dotIndex) => (
-                                                <span
-                                                    key={dotIndex}
-                                                    className="h-[0.7rem] w-[0.7rem] rounded-full bg-white transition-opacity duration-300"
-                                                    style={{ opacity }}
-                                                />
-                                            ))}
-                                        </span>
-                                    </div>
+                                    <InterludeItem 
+                                        isActive={isActive} 
+                                        currentTime={currentTime}
+                                        startMs={item.startMs}
+                                        endMs={item.endMs}
+                                    />
                                 );
                             }
 

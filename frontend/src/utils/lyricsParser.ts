@@ -39,7 +39,8 @@ const isHeaderLine = (text: string) => HEADER_PREFIX_RE.test(text);
  * trailing line-end timestamp.
  * ============================================================ */
 
-const WORD_TIMESTAMP_RE = /<(\d{1,3}):(\d{2})(?:[\.:](\d{1,3}))?>/g;
+const WORD_TIMESTAMP_RE = /<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>/g;
+const LRC_TIMESTAMP_RE = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
 
 interface ExtractedWords {
     words: LyricsWord[];
@@ -47,18 +48,32 @@ interface ExtractedWords {
     endMs: number | null;
 }
 
+interface InlineSquareStamp {
+    idx: number;
+    len: number;
+    ms: number;
+}
+
+interface InlineSquareWords extends ExtractedWords {
+    lineTimeMs: number;
+}
+
+function timestampMs(minutesRaw: string, secondsRaw: string, fractionRaw?: string): number {
+    const minutes = parseInt(minutesRaw, 10);
+    const seconds = parseInt(secondsRaw, 10);
+    const fraction = fractionRaw ? parseInt(fractionRaw.padEnd(3, '0'), 10) : 0;
+    return minutes * 60000 + seconds * 1000 + fraction;
+}
+
 function extractWords(text: string): ExtractedWords | null {
     const stamps: { idx: number; len: number; ms: number }[] = [];
     WORD_TIMESTAMP_RE.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = WORD_TIMESTAMP_RE.exec(text)) !== null) {
-        const minutes = parseInt(m[1], 10);
-        const seconds = parseInt(m[2], 10);
-        const fraction = m[3] ? parseInt(m[3].padEnd(3, '0'), 10) : 0;
         stamps.push({
             idx: m.index,
             len: m[0].length,
-            ms: minutes * 60000 + seconds * 1000 + fraction,
+            ms: timestampMs(m[1], m[2], m[3]),
         });
     }
     if (stamps.length === 0) return null;
@@ -84,6 +99,60 @@ function extractWords(text: string): ExtractedWords | null {
     return { words, cleanText, endMs };
 }
 
+function inlineSquareStampFromMatch(m: RegExpExecArray): InlineSquareStamp {
+    return {
+        idx: m.index,
+        len: m[0].length,
+        ms: timestampMs(m[1], m[2], m[3]),
+    };
+}
+
+function collectInlineSquareStamps(text: string): InlineSquareStamp[] {
+    const stamps: InlineSquareStamp[] = [];
+    LRC_TIMESTAMP_RE.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = LRC_TIMESTAMP_RE.exec(text)) !== null) {
+        stamps.push(inlineSquareStampFromMatch(m));
+    }
+    return stamps;
+}
+
+function isInlineSquareKaraoke(stamps: InlineSquareStamp[], text: string): boolean {
+    if (stamps.length < 2) return false;
+    for (let i = 0; i + 1 < stamps.length; i++) {
+        const between = text.slice(stamps[i].idx + stamps[i].len, stamps[i + 1].idx);
+        if (between.trim().length > 0) return true;
+    }
+    return false;
+}
+
+function tokenizeInlineSquare(stamps: InlineSquareStamp[], text: string): InlineSquareWords | null {
+    if (stamps.length === 0) return null;
+
+    const words: LyricsWord[] = [];
+    let endMs: number | null = null;
+
+    for (let i = 0; i < stamps.length; i++) {
+        const segStart = stamps[i].idx + stamps[i].len;
+        const segEnd = i + 1 < stamps.length ? stamps[i + 1].idx : text.length;
+        const segText = text.slice(segStart, segEnd);
+        if (segText.length === 0) {
+            if (i === stamps.length - 1) endMs = stamps[i].ms;
+            continue;
+        }
+        words.push({ time_ms: stamps[i].ms, text: segText });
+    }
+
+    if (words.length === 0) return null;
+
+    return {
+        words,
+        cleanText: words.map((w) => w.text).join(''),
+        endMs,
+        lineTimeMs: stamps[0].ms,
+    };
+}
+
 /* ============================================================
  * Inline split — DISABLED.
  *
@@ -104,6 +173,7 @@ function extractWords(text: string): ExtractedWords | null {
  * ============================================================ */
 
 function splitInline(_text: string): [string, string] | null {
+    void _text;
     return null;
 }
 
@@ -198,12 +268,20 @@ export function enrichLyricsLines(lines: LyricsLine[]): LyricsLine[] {
             // their text payload — try to extract them here so SYLT-sourced
             // lyrics get the karaoke effect too.
             const extracted = extractWords(l.text);
+            const inlineSquareStamps = extracted ? [] : collectInlineSquareStamps(l.text);
+            const inlineSquare =
+                !extracted && isInlineSquareKaraoke(inlineSquareStamps, l.text)
+                    ? tokenizeInlineSquare(inlineSquareStamps, l.text)
+                    : null;
             timed.push({
-                time_ms: l.time_ms,
-                text: extracted ? extracted.cleanText : l.text,
+                time_ms: inlineSquare ? inlineSquare.lineTimeMs : l.time_ms,
+                text: extracted ? extracted.cleanText : (inlineSquare ? inlineSquare.cleanText : l.text),
                 translation: l.translation ?? null,
-                words: extracted ? extracted.words : (l.words ?? null),
-                end_ms: extracted && extracted.endMs !== null ? extracted.endMs : (l.end_ms ?? null),
+                words: extracted ? extracted.words : (inlineSquare ? inlineSquare.words : (l.words ?? null)),
+                end_ms:
+                    extracted && extracted.endMs !== null
+                        ? extracted.endMs
+                        : (inlineSquare && inlineSquare.endMs !== null ? inlineSquare.endMs : (l.end_ms ?? null)),
                 _raw: l.text,
             });
         } else {
@@ -265,23 +343,37 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
     const entries: ParseEntry[] = [];
     const metaEntries: ParseEntry[] = [];
 
-    const timeRegExp = /\[(\d{2,}):(\d{2})(?:[\.:](\d{2,3}))?\]/g;
     const metaRegExp = /^\[([a-zA-Z]+):(.*?)\].*/;
 
     /* -------- Step A: expand timestamps -------- */
     for (const lineObj of rawLines) {
         const text = lineObj.text;
-        timeRegExp.lastIndex = 0;
+        LRC_TIMESTAMP_RE.lastIndex = 0;
 
         const matches: RegExpExecArray[] = [];
         let m: RegExpExecArray | null;
-        while ((m = timeRegExp.exec(text)) !== null) {
+        while ((m = LRC_TIMESTAMP_RE.exec(text)) !== null) {
             matches.push(m);
         }
 
         if (matches.length > 0) {
             hasTimestamps = true;
-            const cleanRaw = text.replace(timeRegExp, '');
+            const stamps = matches.map(inlineSquareStampFromMatch);
+            const inlineSquare =
+                isInlineSquareKaraoke(stamps, text) ? tokenizeInlineSquare(stamps, text) : null;
+            if (inlineSquare) {
+                entries.push({
+                    time_ms: inlineSquare.lineTimeMs,
+                    text: inlineSquare.cleanText,
+                    translation: null,
+                    words: inlineSquare.words,
+                    end_ms: inlineSquare.endMs,
+                    _raw: text,
+                });
+                continue;
+            }
+
+            const cleanRaw = text.replace(LRC_TIMESTAMP_RE, '');
             const cleanRawTrimmed = cleanRaw.trim();
             // Try to extract per-word enhanced-LRC timestamps. If found,
             // `lineText` is the human-readable text with all <mm:ss.xx>
@@ -292,10 +384,7 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
             const lineEndMs = extracted ? extracted.endMs : null;
 
             for (const mm of matches) {
-                const minutes = parseInt(mm[1], 10);
-                const seconds = parseInt(mm[2], 10);
-                const fraction = mm[3] ? parseInt(mm[3].padEnd(3, '0'), 10) : 0;
-                const timeMs = minutes * 60000 + seconds * 1000 + fraction;
+                const timeMs = timestampMs(mm[1], mm[2], mm[3]);
                 // Empty lines like "[00:27.20]" are kept with text === '' so
                 // downstream code can treat them as explicit "previous lyric
                 // ended" markers (interlude triggers). They are filtered out

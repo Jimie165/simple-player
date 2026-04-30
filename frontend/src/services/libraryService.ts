@@ -33,6 +33,14 @@ export const libraryService = {
         return invoke('refresh_library');
     },
 
+    getIgnoredDirNames: async (): Promise<string[]> => {
+        return invoke('get_ignored_dir_names');
+    },
+
+    setIgnoredDirNames: async (names: string[]): Promise<string[]> => {
+        return invoke('set_ignored_dir_names', { names });
+    },
+
     refreshVideoLibrary: async (): Promise<VideoMetadata[]> => {
         return invoke('scan_videos');
     },
