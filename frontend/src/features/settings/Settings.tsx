@@ -21,8 +21,7 @@ import {
     MdBlockFlipped,
     MdExpandMore,
     MdExpandLess,
-    MdSpeaker,
-    MdCheckCircle
+    MdSpeaker
 } from 'react-icons/md';
 import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/react';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -468,12 +467,12 @@ export default function Settings() {
                                                 {open && (
                                                     <ListboxOptions
                                                         static
+                                                        anchor="bottom"
                                                         as={motion.div}
                                                         initial={{ opacity: 0, y: -10 }}
                                                         animate={{ opacity: 1, y: 0 }}
                                                         exit={{ opacity: 0, y: -10 }}
-                                                        transition={{ duration: 0.2, ease: "easeOut" }}
-                                                        anchor="bottom"
+                                                        {...({ transition: { duration: 0.2, ease: "easeOut" } } as any)}
                                                         className="z-50 w-[var(--button-width)] mt-[-1px] rounded-b-xl border border-primary/50 border-t-0 bg-surface-container-high shadow-xl focus:outline-none overflow-hidden"
                                                     >
                                                         <div className="py-1 max-h-60 overflow-y-auto scrollbar-hidden">
