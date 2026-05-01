@@ -24,6 +24,10 @@ export const libraryService = {
         return invoke('remove_library_folder', { folder });
     },
 
+    removeVideoFolder: async (folder: string): Promise<LibraryFolder[]> => {
+        return invoke('remove_video_folder', { folder });
+    },
+
     // ========== 库扫描 ==========
     scanLibrary: async (forceRestore: boolean = false): Promise<SongMetadata[]> => {
         return invoke('scan_library', { forceRestore });
@@ -39,6 +43,14 @@ export const libraryService = {
 
     setIgnoredDirNames: async (names: string[]): Promise<string[]> => {
         return invoke('set_ignored_dir_names', { names });
+    },
+
+    getScopedIgnoredDirNames: async (): Promise<ScopedIgnoredDirNames> => {
+        return invoke('get_scoped_ignored_dir_names');
+    },
+
+    setScopedIgnoredDirNames: async (names: ScopedIgnoredDirNames): Promise<ScopedIgnoredDirNames> => {
+        return invoke('set_scoped_ignored_dir_names', { names });
     },
 
     refreshVideoLibrary: async (): Promise<VideoMetadata[]> => {
@@ -171,3 +183,9 @@ export const libraryService = {
         return invoke('get_all_videos');
     },
 };
+
+export interface ScopedIgnoredDirNames {
+    common: string[];
+    music: string[];
+    video: string[];
+}

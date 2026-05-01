@@ -4,9 +4,12 @@ use crate::modules::library::{self, SongMetadata};
 use crate::utils::path::normalize_folder_path;
 use crate::utils::paths::{is_app_relative_path, is_user_file_path};
 use rusqlite::{Connection, params};
-use serde::Serialize;
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use tauri::{Emitter, Manager, State};
 
 #[derive(Serialize, Clone)]
@@ -190,7 +193,7 @@ async fn scan_library_internal(
         } else {
             all_folders
         };
-        (folders, load_ignored_dirs(&conn))
+        (folders, load_music_ignored_dirs(&conn))
     };
     let mut all_songs = Vec::new();
 
@@ -245,7 +248,8 @@ async fn scan_library_internal(
                     }
 
                     // 检查是否为占位符数据（Artist 或 Album 为 Unknown）
-                    let is_placeholder = existing.artist == "Unknown" || existing.album == "Unknown";
+                    let is_placeholder =
+                        existing.artist == "Unknown" || existing.album == "Unknown";
 
                     if !needs_migration && !cover_missing && !is_placeholder {
                         // 状态正常、不需要迁移且封面文件存在且不是占位符，直接使用
@@ -273,7 +277,8 @@ async fn scan_library_internal(
             }
         }
 
-        let results = process_song_metadata_parallel(&app_handle, &app_cache_dir, folder.id, work_items);
+        let results =
+            process_song_metadata_parallel(&app_handle, &app_cache_dir, folder.id, work_items);
 
         {
             let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -327,7 +332,8 @@ async fn scan_library_internal(
                             meta.disc_total,
                         );
 
-                        if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &result.item.path) {
+                        if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &result.item.path)
+                        {
                             all_songs.push(SongMetadata::from_db_song(&inserted));
                         } else {
                             let mut result_meta = meta.clone();
@@ -425,7 +431,7 @@ pub async fn add_library_folder(
 
     let ignored_dirs = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
-        load_ignored_dirs(&conn)
+        load_music_ignored_dirs(&conn)
     };
     let files = library::scan_audio_files_recursive(&folder, &ignored_dirs);
     {
@@ -442,7 +448,8 @@ pub async fn add_library_folder(
     let app_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         let db_state = app_handle.state::<DbState>();
-        let result = scan_library_internal(db_state, app_handle.clone(), true, Some(added_folder_id)).await;
+        let result =
+            scan_library_internal(db_state, app_handle.clone(), true, Some(added_folder_id)).await;
         if result.is_ok() {
             let _ = app_handle.emit(
                 "library_scan_complete",
@@ -581,7 +588,10 @@ pub fn increment_play_count(db: State<'_, DbState>, song_id: i64) -> Result<(), 
     SongRepo::increment_play_count(&conn, song_id).map_err(|e| e.to_string())
 }
 
-const IGNORED_DIRS_KEY: &str = "library.ignored_dirs";
+const LEGACY_IGNORED_DIRS_KEY: &str = "library.ignored_dirs";
+const COMMON_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.common";
+const MUSIC_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.music";
+const VIDEO_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.video";
 const DEFAULT_IGNORED_DIRS: &[&str] = &[
     "node_modules",
     ".git",
@@ -594,18 +604,90 @@ const DEFAULT_IGNORED_DIRS: &[&str] = &[
     "dist",
 ];
 
-fn load_ignored_dirs(conn: &Connection) -> Vec<String> {
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ScopedIgnoredDirNames {
+    pub common: Vec<String>,
+    pub music: Vec<String>,
+    pub video: Vec<String>,
+}
+
+fn default_ignored_dirs() -> Vec<String> {
+    DEFAULT_IGNORED_DIRS.iter().map(|s| s.to_string()).collect()
+}
+
+fn clean_ignored_names(names: Vec<String>) -> Vec<String> {
+    let mut cleaned: Vec<String> = Vec::new();
+    for name in names {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if cleaned
+            .iter()
+            .any(|existing| existing.eq_ignore_ascii_case(trimmed))
+        {
+            continue;
+        }
+        cleaned.push(trimmed.to_string());
+    }
+    cleaned
+}
+
+fn load_ignored_dirs_by_key(conn: &Connection, key: &str, fallback: Vec<String>) -> Vec<String> {
     let raw: Option<String> = conn
         .query_row(
             "SELECT value FROM app_settings WHERE key = ?1",
-            params![IGNORED_DIRS_KEY],
+            params![key],
             |row| row.get(0),
         )
         .ok();
     match raw {
         Some(s) => serde_json::from_str::<Vec<String>>(&s)
-            .unwrap_or_else(|_| DEFAULT_IGNORED_DIRS.iter().map(|s| s.to_string()).collect()),
-        None => DEFAULT_IGNORED_DIRS.iter().map(|s| s.to_string()).collect(),
+            .map(clean_ignored_names)
+            .unwrap_or(fallback),
+        None => fallback,
+    }
+}
+
+fn load_common_ignored_dirs(conn: &Connection) -> Vec<String> {
+    let legacy = load_ignored_dirs_by_key(conn, LEGACY_IGNORED_DIRS_KEY, default_ignored_dirs());
+    load_ignored_dirs_by_key(conn, COMMON_IGNORED_DIRS_KEY, legacy)
+}
+
+fn combine_ignored_dirs(common: Vec<String>, scoped: Vec<String>) -> Vec<String> {
+    clean_ignored_names(common.into_iter().chain(scoped).collect())
+}
+
+fn save_ignored_dirs_by_key(conn: &Connection, key: &str, names: &[String]) -> Result<(), String> {
+    let json = serde_json::to_string(names).map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT INTO app_settings (key, value, updated_at) VALUES (?1, ?2, unixepoch())
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = unixepoch()",
+        params![key, json],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub(crate) fn load_music_ignored_dirs(conn: &Connection) -> Vec<String> {
+    combine_ignored_dirs(
+        load_common_ignored_dirs(conn),
+        load_ignored_dirs_by_key(conn, MUSIC_IGNORED_DIRS_KEY, Vec::new()),
+    )
+}
+
+pub(crate) fn load_video_ignored_dirs(conn: &Connection) -> Vec<String> {
+    combine_ignored_dirs(
+        load_common_ignored_dirs(conn),
+        load_ignored_dirs_by_key(conn, VIDEO_IGNORED_DIRS_KEY, Vec::new()),
+    )
+}
+
+fn load_scoped_ignored_dirs(conn: &Connection) -> ScopedIgnoredDirNames {
+    ScopedIgnoredDirNames {
+        common: load_common_ignored_dirs(conn),
+        music: load_ignored_dirs_by_key(conn, MUSIC_IGNORED_DIRS_KEY, Vec::new()),
+        video: load_ignored_dirs_by_key(conn, VIDEO_IGNORED_DIRS_KEY, Vec::new()),
     }
 }
 
@@ -613,7 +695,7 @@ fn load_ignored_dirs(conn: &Connection) -> Vec<String> {
 #[tauri::command]
 pub fn get_ignored_dir_names(db: State<'_, DbState>) -> Result<Vec<String>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    Ok(load_ignored_dirs(&conn))
+    Ok(load_music_ignored_dirs(&conn))
 }
 
 /// 设置扫描时忽略的目录名列表。
@@ -622,19 +704,34 @@ pub fn set_ignored_dir_names(
     db: State<'_, DbState>,
     names: Vec<String>,
 ) -> Result<Vec<String>, String> {
-    let cleaned: Vec<String> = names
-        .into_iter()
-        .map(|s| s.trim().to_string())
-        .filter(|s| !s.is_empty())
-        .collect();
-    let json = serde_json::to_string(&cleaned).map_err(|e| e.to_string())?;
+    let cleaned = clean_ignored_names(names);
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    conn.execute(
-        "INSERT INTO app_settings (key, value, updated_at) VALUES (?1, ?2, unixepoch())
-         ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = unixepoch()",
-        params![IGNORED_DIRS_KEY, json],
-    )
-    .map_err(|e| e.to_string())?;
+    save_ignored_dirs_by_key(&conn, COMMON_IGNORED_DIRS_KEY, &cleaned)?;
+    Ok(cleaned)
+}
+
+#[tauri::command]
+pub fn get_scoped_ignored_dir_names(
+    db: State<'_, DbState>,
+) -> Result<ScopedIgnoredDirNames, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    Ok(load_scoped_ignored_dirs(&conn))
+}
+
+#[tauri::command]
+pub fn set_scoped_ignored_dir_names(
+    db: State<'_, DbState>,
+    names: ScopedIgnoredDirNames,
+) -> Result<ScopedIgnoredDirNames, String> {
+    let cleaned = ScopedIgnoredDirNames {
+        common: clean_ignored_names(names.common),
+        music: clean_ignored_names(names.music),
+        video: clean_ignored_names(names.video),
+    };
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    save_ignored_dirs_by_key(&conn, COMMON_IGNORED_DIRS_KEY, &cleaned.common)?;
+    save_ignored_dirs_by_key(&conn, MUSIC_IGNORED_DIRS_KEY, &cleaned.music)?;
+    save_ignored_dirs_by_key(&conn, VIDEO_IGNORED_DIRS_KEY, &cleaned.video)?;
     Ok(cleaned)
 }
 
@@ -676,7 +773,9 @@ pub fn debug_dump_test_songs(
                 artist: row.get(3)?,
                 album: row.get(4)?,
                 folder_id: row.get(5)?,
-                status: row.get::<_, Option<String>>(6)?.unwrap_or_else(|| "active".to_string()),
+                status: row
+                    .get::<_, Option<String>>(6)?
+                    .unwrap_or_else(|| "active".to_string()),
                 created_at: row.get(7)?,
             })
         })

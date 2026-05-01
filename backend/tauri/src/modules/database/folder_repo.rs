@@ -1,9 +1,9 @@
 // FolderRepo - 文件夹仓库
 // ============================================================================
 
-use rusqlite::{Connection, Result, params};
 use super::models::LibraryFolder;
 use crate::utils::path::normalize_folder_path;
+use rusqlite::{Connection, Result, params};
 
 pub struct FolderRepo;
 
@@ -84,10 +84,8 @@ impl FolderRepo {
             "DELETE FROM songs WHERE folder_id = (SELECT id FROM library_folders WHERE path = ?1)",
             params![path],
         )?;
-        let affected = conn.execute(
-            "DELETE FROM library_folders WHERE path = ?1",
-            params![path],
-        )?;
+        let affected =
+            conn.execute("DELETE FROM library_folders WHERE path = ?1", params![path])?;
         Ok(affected > 0)
     }
 

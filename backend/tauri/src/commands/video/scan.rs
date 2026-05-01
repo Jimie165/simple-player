@@ -2,13 +2,19 @@
 // ============================================================================
 
 use crate::DbState;
+use crate::commands::library::load_video_ignored_dirs;
 use crate::modules::database::VideoRepo;
 use crate::modules::database::{FolderRepo, LibraryFolder, Video};
 use crate::modules::library::video_scanner;
 use crate::modules::library::video_thumbnails;
+use crate::utils::path::normalize_folder_path;
+use rusqlite::params;
 use serde::Serialize;
 use std::path::Path;
-use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use tauri::{Emitter, Manager, State};
 
 #[derive(Serialize, Clone)]
@@ -34,6 +40,23 @@ struct VideoWorkResult {
     item: VideoWorkItem,
     meta: Option<video_scanner::RawVideoMetadata>,
     thumbnail_path: Option<String>,
+}
+
+/// 判断 `child` 是否是 `parent` 的子路径（要求两端都已经过 `normalize_folder_path` 处理）。
+fn is_subpath_of(child: &str, parent: &str) -> bool {
+    if child.len() <= parent.len() {
+        return false;
+    }
+    let (c_head, p_head) = (&child[..parent.len()], parent);
+    let head_match = if cfg!(windows) {
+        c_head.eq_ignore_ascii_case(p_head)
+    } else {
+        c_head == p_head
+    };
+    if !head_match {
+        return false;
+    }
+    child.as_bytes().get(parent.len()) == Some(&b'/')
 }
 
 fn compute_worker_count(total: usize) -> usize {
@@ -76,9 +99,11 @@ fn process_video_metadata_parallel(
                 let mut out = Vec::new();
                 for item in bucket {
                     let meta = video_scanner::get_video_metadata(&item.path).ok();
-                    let thumbnail_path = meta
-                        .as_ref()
-                        .and_then(|m| video_thumbnails::ensure_video_thumbnail(&app_handle, &m.path).ok().flatten());
+                    let thumbnail_path = meta.as_ref().and_then(|m| {
+                        video_thumbnails::ensure_video_thumbnail(&app_handle, &m.path)
+                            .ok()
+                            .flatten()
+                    });
 
                     out.push(VideoWorkResult {
                         item,
@@ -119,22 +144,23 @@ pub(crate) fn scan_videos_internal(
     force_restore: bool,
     restore_folder_id: Option<i64>,
 ) -> Result<Vec<Video>, String> {
-    let folders: Vec<_> = {
+    let (folders, ignored_dirs): (Vec<_>, Vec<String>) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         let all_folders = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
-        if let Some(folder_id) = restore_folder_id {
+        let folders = if let Some(folder_id) = restore_folder_id {
             all_folders
                 .into_iter()
                 .filter(|f| f.id == folder_id)
                 .collect()
         } else {
             all_folders
-        }
+        };
+        (folders, load_video_ignored_dirs(&conn))
     };
 
     // 2. Scan each folder for videos
     for folder in folders {
-        let video_files = video_scanner::scan_video_files_recursive(&folder.path);
+        let video_files = video_scanner::scan_video_files_recursive(&folder.path, &ignored_dirs);
 
         let mut work_items: Vec<VideoWorkItem> = Vec::new();
 
@@ -168,7 +194,7 @@ pub(crate) fn scan_videos_internal(
                         }
                     } else if existing.duration == 0 {
                         // 如果时长为 0，说明可能是占位符或者之前的扫描不完整，强制重新扫描
-                         work_items.push(VideoWorkItem {
+                        work_items.push(VideoWorkItem {
                             path: file_path,
                             folder_id: folder.id,
                             existing_id: Some(existing.id),
@@ -238,11 +264,38 @@ pub async fn add_video_folder(
     app_handle: tauri::AppHandle,
     folder: String,
 ) -> Result<Vec<Video>, String> {
+    let folder = normalize_folder_path(&folder);
+
+    {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let existing = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
+        for f in &existing {
+            if f.path == folder {
+                return VideoRepo::get_all(&conn).map_err(|e| e.to_string());
+            }
+            if is_subpath_of(&folder, &f.path) {
+                return Err(format!("该目录已被父目录覆盖：{}", f.path));
+            }
+            if is_subpath_of(&f.path, &folder) {
+                return Err(format!(
+                    "已存在子目录 {}，请先在视频库中移除该子目录后再添加父目录",
+                    f.path
+                ));
+            }
+        }
+    }
+
+    let ignored_dirs = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        load_video_ignored_dirs(&conn)
+    };
+
     // Phase 1: Fast Scan & Placeholder Insertion
     let (added_folder_id, videos) = {
         let db_conn = db.0.clone();
         let folder_path = folder.clone();
-        
+        let ignored_dirs = ignored_dirs.clone();
+
         tauri::async_runtime::spawn_blocking(move || {
             let mut conn = db_conn.lock().map_err(|e| e.to_string())?;
             let tx = conn.transaction().map_err(|e| e.to_string())?;
@@ -255,8 +308,9 @@ pub async fn add_video_folder(
             };
 
             // 2. Fast Path Scan
-            let video_files = video_scanner::scan_video_files_recursive(&folder_path);
-            
+            let video_files =
+                video_scanner::scan_video_files_recursive(&folder_path, &ignored_dirs);
+
             // 3. Batch Insert Placeholders
             for file_path in &video_files {
                 match VideoRepo::get_by_path_any_status(&tx, file_path) {
@@ -302,7 +356,8 @@ pub async fn add_video_folder(
     tauri::async_runtime::spawn_blocking(move || {
         let db_state = app_handle.state::<DbState>();
         // Re-use logic: scan_videos_internal will pick up placeholder items (duration=0) and process them
-        let result = scan_videos_internal(db_state, app_handle.clone(), true, Some(added_folder_id));
+        let result =
+            scan_videos_internal(db_state, app_handle.clone(), true, Some(added_folder_id));
         if result.is_ok() {
             let _ = app_handle.emit(
                 "video_scan_complete",
@@ -318,10 +373,37 @@ pub async fn add_video_folder(
 
 /// 获取视频文件夹
 #[tauri::command]
-pub fn get_video_folders(
+pub fn get_video_folders(db: State<'_, DbState>) -> Result<Vec<LibraryFolder>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let folders = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
+    Ok(folders)
+}
+
+#[tauri::command]
+pub fn remove_video_folder(
     db: State<'_, DbState>,
+    folder: String,
 ) -> Result<Vec<LibraryFolder>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let folder_id: i64 = conn
+        .query_row(
+            "SELECT id FROM library_folders WHERE path = ?1 AND folder_type = 'video'",
+            params![folder],
+            |row| row.get(0),
+        )
+        .map_err(|_| format!("未找到视频文件夹记录：{}", folder))?;
+
+    conn.execute(
+        "UPDATE videos SET status = 'archived', updated_at = datetime('now') WHERE folder_id = ?1",
+        params![folder_id],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM library_folders WHERE id = ?1 AND folder_type = 'video'",
+        params![folder_id],
+    )
+    .map_err(|e| e.to_string())?;
+
     let folders = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
     Ok(folders)
 }

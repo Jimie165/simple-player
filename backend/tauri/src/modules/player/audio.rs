@@ -8,8 +8,8 @@ use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
 use serde::Serialize;
 use std::fs::File;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc, Mutex,
+    atomic::{AtomicBool, Ordering},
 };
 use std::thread;
 use std::time::Duration;
@@ -148,7 +148,8 @@ impl AudioState {
 
         let stream_error = Arc::new(AtomicBool::new(false));
         let pref_snapshot = preference.lock().unwrap().clone();
-        let (mut stream, picked_name) = Self::open_output_sink(pref_snapshot, stream_error.clone())?;
+        let (mut stream, picked_name) =
+            Self::open_output_sink(pref_snapshot, stream_error.clone())?;
         stream.log_on_drop(false);
         *active_device_name.lock().unwrap() = picked_name;
 
@@ -246,7 +247,10 @@ impl AudioState {
             .and_then(|d| d.name().ok())
     }
 
-    fn emit_output_changed(app_handle: &AppHandle, active_device_name: &Arc<Mutex<Option<String>>>) {
+    fn emit_output_changed(
+        app_handle: &AppHandle,
+        active_device_name: &Arc<Mutex<Option<String>>>,
+    ) {
         let active = active_device_name.lock().ok().and_then(|g| g.clone());
         let _ = app_handle.emit("audio:output-changed", active);
     }
@@ -272,78 +276,77 @@ impl AudioState {
         app_handle: AppHandle,
         monitor_stop: Arc<AtomicBool>,
     ) {
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_millis(250));
-            if monitor_stop.load(Ordering::SeqCst) {
-                break;
-            }
-
-            let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
-            let (ended, position) = {
-                let player_lock = player_arc.lock().unwrap();
-                let Some(handle) = player_lock.as_ref() else {
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_millis(250));
+                if monitor_stop.load(Ordering::SeqCst) {
                     break;
+                }
+
+                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
+                let (ended, position) = {
+                    let player_lock = player_arc.lock().unwrap();
+                    let Some(handle) = player_lock.as_ref() else {
+                        break;
+                    };
+
+                    if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
+                        break;
+                    }
+
+                    let position = handle.player.get_pos().as_secs_f32();
+                    let stream_failed = handle.stream_error.load(Ordering::SeqCst);
+                    let follow_drift = !stream_failed
+                        && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
+                        && Self::system_default_drifted(&active_device_name);
+
+                    if stream_failed || follow_drift {
+                        recovery = Some((
+                            handle.path.clone(),
+                            handle.metadata.clone(),
+                            !handle.player.is_paused(),
+                            position,
+                        ));
+                        (false, position)
+                    } else {
+                        (handle.player.empty(), position)
+                    }
                 };
 
-                if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
+                if let Some((path, metadata, should_play, position)) = recovery {
+                    if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        match Self::recover_output_device(
+                            player_arc.clone(),
+                            volume_arc.clone(),
+                            preference.clone(),
+                            active_device_name.clone(),
+                            app_handle.clone(),
+                            monitor_stop.clone(),
+                            path,
+                            metadata,
+                            should_play,
+                            position,
+                        ) {
+                            Ok(()) => {}
+                            Err(err) => {
+                                eprintln!("Failed to recover audio output: {err}");
+                                smtc::set_playing(false);
+                                let _ = app_handle.emit("audio:output-error", err);
+                            }
+                        }
+                    }
                     break;
                 }
 
-                let position = handle.player.get_pos().as_secs_f32();
-                let stream_failed = handle.stream_error.load(Ordering::SeqCst);
-                let follow_drift = !stream_failed
-                    && matches!(
-                        *preference.lock().unwrap(),
-                        OutputPreference::SystemDefault
-                    )
-                    && Self::system_default_drifted(&active_device_name);
+                smtc::set_position(position);
 
-                if stream_failed || follow_drift {
-                    recovery = Some((
-                        handle.path.clone(),
-                        handle.metadata.clone(),
-                        !handle.player.is_paused(),
-                        position,
-                    ));
-                    (false, position)
-                } else {
-                    (handle.player.empty(), position)
-                }
-            };
-
-            if let Some((path, metadata, should_play, position)) = recovery {
-                if !monitor_stop.swap(true, Ordering::SeqCst) {
-                    match Self::recover_output_device(
-                        player_arc.clone(),
-                        volume_arc.clone(),
-                        preference.clone(),
-                        active_device_name.clone(),
-                        app_handle.clone(),
-                        monitor_stop.clone(),
-                        path,
-                        metadata,
-                        should_play,
-                        position,
-                    ) {
-                        Ok(()) => {}
-                        Err(err) => {
-                            eprintln!("Failed to recover audio output: {err}");
-                            smtc::set_playing(false);
-                            let _ = app_handle.emit("audio:output-error", err);
-                        }
+                if ended {
+                    if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        smtc::set_playing(false);
+                        let _ = app_handle.emit("audio:ended", ());
                     }
+                    break;
                 }
-                break;
-            }
-
-            smtc::set_position(position);
-
-            if ended {
-                if !monitor_stop.swap(true, Ordering::SeqCst) {
-                    smtc::set_playing(false);
-                    let _ = app_handle.emit("audio:ended", ());
-                }
-                break;
             }
         });
     }

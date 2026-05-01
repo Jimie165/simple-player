@@ -1,8 +1,8 @@
 // SongRepo - 歌曲仓库
 // ============================================================================
 
-use rusqlite::{Connection, Result, params};
 use super::models::Song;
+use rusqlite::{Connection, Result, params};
 
 pub struct SongRepo;
 
@@ -210,10 +210,8 @@ impl SongRepo {
         }
 
         let placeholders: String = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
-        let params_refs: Vec<&dyn rusqlite::ToSql> = ids
-            .iter()
-            .map(|id| id as &dyn rusqlite::ToSql)
-            .collect();
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
 
         let delete_playlist_songs_sql = format!(
             "DELETE FROM playlist_songs WHERE song_id IN ({})",
@@ -222,10 +220,8 @@ impl SongRepo {
         let mut delete_playlist_songs_stmt = conn.prepare(&delete_playlist_songs_sql)?;
         delete_playlist_songs_stmt.execute(params_refs.as_slice())?;
 
-        let delete_play_queue_sql = format!(
-            "DELETE FROM play_queue WHERE song_id IN ({})",
-            placeholders
-        );
+        let delete_play_queue_sql =
+            format!("DELETE FROM play_queue WHERE song_id IN ({})", placeholders);
         let mut delete_play_queue_stmt = conn.prepare(&delete_play_queue_sql)?;
         delete_play_queue_stmt.execute(params_refs.as_slice())?;
 

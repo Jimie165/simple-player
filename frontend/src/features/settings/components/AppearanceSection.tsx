@@ -1,0 +1,174 @@
+import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdWeb } from 'react-icons/md';
+import clsx from 'clsx';
+
+import { useTheme } from '@/hooks/useTheme';
+
+type ThemeMode = 'light' | 'dark' | 'system';
+
+function ThemeOption({
+    val,
+    label,
+    current,
+    onSelect,
+}: {
+    val: ThemeMode;
+    label: string;
+    current: ThemeMode;
+    onSelect: (value: ThemeMode) => void;
+}) {
+    return (
+        <button
+            onClick={() => onSelect(val)}
+            className={clsx(
+                "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
+                current === val
+                    ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                    : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+            )}
+        >
+            <span>{label}</span>
+            {current === val && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+        </button>
+    );
+}
+
+export default function AppearanceSection() {
+    const {
+        theme,
+        setTheme,
+        sourceColor,
+        setSourceColor,
+        presetColors,
+        isCustomColor,
+        fullScreenMode,
+        setFullScreenMode,
+    } = useTheme();
+
+    return (
+        <section className="space-y-6">
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
+                <MdBrightness6 className="text-lg" />
+                <span>外观与主题</span>
+            </div>
+
+            {/* Mode Selection */}
+            <div className="space-y-3">
+                <h4 className="text-sm font-medium text-on-surface px-1">主题模式</h4>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <ThemeOption val="light" label="浅色模式" current={theme} onSelect={setTheme} />
+                    <ThemeOption val="dark" label="深色模式" current={theme} onSelect={setTheme} />
+                    <ThemeOption val="system" label="跟随系统" current={theme} onSelect={setTheme} />
+                </div>
+            </div>
+
+            {/* Full Screen Style Selection */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-2 px-1">
+                    <MdWeb className="text-primary text-lg" />
+                    <h4 className="text-sm font-medium text-on-surface">播放页样式</h4>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <button
+                        onClick={() => setFullScreenMode('classic')}
+                        className={clsx(
+                            "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
+                            fullScreenMode === 'classic'
+                                ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                        )}
+                    >
+                        <span>经典</span>
+                        {fullScreenMode === 'classic' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                    </button>
+                    <button
+                        onClick={() => setFullScreenMode('immersive')}
+                        className={clsx(
+                            "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
+                            fullScreenMode === 'immersive'
+                                ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                        )}
+                    >
+                        <span>沉浸</span>
+                        {fullScreenMode === 'immersive' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                    </button>
+                </div>
+            </div>
+
+            {/* Color Selection */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                    <h4 className="text-sm font-medium text-on-surface">应用配色</h4>
+                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 px-2 py-1 rounded-md">
+                        <MdColorLens />
+                        <span>主题颜色</span>
+                    </div>
+                </div>
+
+                <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 p-5">
+                    <div className="flex flex-wrap gap-4 items-center">
+                        {/* Presets */}
+                        {presetColors.map((color) => {
+                            const isSelected = !isCustomColor && sourceColor === color.value;
+                            return (
+                                <button
+                                    key={color.id}
+                                    onClick={() => setSourceColor(color.value, false)}
+                                    className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                                    title={color.name}
+                                >
+                                    <div
+                                        className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
+                                        style={{ backgroundColor: color.value }}
+                                    />
+                                    {isSelected && (
+                                        <MdCheck className="relative z-10 text-white text-xl drop-shadow-md" />
+                                    )}
+                                </button>
+                            );
+                        })}
+
+                        {/* Divider */}
+                        <div className="w-px h-8 bg-outline-variant/30 mx-2" />
+
+                        {/* Custom Picker */}
+                        <div className="relative group">
+                            <div
+                                className={clsx(
+                                    "w-12 h-12 rounded-full flex items-center justify-center border transition-all cursor-pointer overflow-hidden",
+                                    isCustomColor
+                                        ? "border-primary ring-2 ring-primary/30"
+                                        : "border-outline-variant/50 border-dashed hover:border-primary/50"
+                                )}
+                            >
+                                {isCustomColor ? (
+                                    <div
+                                        className="w-full h-full"
+                                        style={{ backgroundColor: sourceColor }}
+                                    />
+                                ) : (
+                                    <MdAdd className="text-2xl text-on-surface-variant" />
+                                )}
+
+                                {/* Invisible Color Input covering the button */}
+                                <input
+                                    type="color"
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    value={sourceColor}
+                                    onChange={(e) => setSourceColor(e.target.value, true)}
+                                    title="自定义颜色"
+                                />
+                            </div>
+                            {isCustomColor && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <MdCheck className="text-white text-xl drop-shadow-md mix-blend-difference" />
+                                </div>
+                            )}
+                        </div>
+                        <span className="text-sm text-on-surface-variant ml-2">自定义</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    );
+}

@@ -1,15 +1,13 @@
+use crate::utils::path::normalize_db_path;
 use std::fs;
 use std::path::Path;
-use crate::utils::path::normalize_db_path;
 use walkdir::WalkDir;
 
 /// 支持的音频格式
 const AUDIO_EXTENSIONS: [&str; 5] = ["mp3", "flac", "wav", "ogg", "m4a"];
 
 fn has_audio_extension(ext: &std::ffi::OsStr) -> bool {
-    AUDIO_EXTENSIONS
-        .iter()
-        .any(|e| ext.eq_ignore_ascii_case(e))
+    AUDIO_EXTENSIONS.iter().any(|e| ext.eq_ignore_ascii_case(e))
 }
 
 fn file_name_has_audio_extension(file_name: &std::ffi::OsStr) -> bool {
@@ -42,7 +40,7 @@ pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
             }
         }
     }
-    
+
     // 按文件名排序
     audio_files.sort();
     audio_files

@@ -95,6 +95,8 @@ fn main() {
             commands::library::debug_dump_test_songs,
             commands::library::get_ignored_dir_names,
             commands::library::set_ignored_dir_names,
+            commands::library::get_scoped_ignored_dir_names,
+            commands::library::set_scoped_ignored_dir_names,
             // Playlist commands
             commands::playlist::get_playlists,
             commands::playlist::create_playlist,
@@ -118,6 +120,7 @@ fn main() {
             commands::video::scan::scan_videos,
             commands::video::scan::add_video_folder,
             commands::video::scan::get_video_folders,
+            commands::video::scan::remove_video_folder,
             commands::video::query::get_all_videos,
             commands::video::query::search_videos,
             commands::video::query::toggle_video_favorite,
