@@ -100,4 +100,24 @@ export const audioService = {
         const data: LyricsData = await invoke('get_lyrics', { path });
         return tryParseLrc(data);
     },
+
+    listAudioOutputs: async (): Promise<AudioOutputInfo[]> =>
+        invoke('list_audio_outputs'),
+
+    getAudioOutput: async (): Promise<AudioOutputState> =>
+        invoke('get_audio_output'),
+
+    setAudioOutput: async (device: string | null): Promise<void> =>
+        invoke('set_audio_output', { device }),
 };
+
+export interface AudioOutputInfo {
+    name: string;
+    is_system_default: boolean;
+    is_active: boolean;
+}
+
+export interface AudioOutputState {
+    preference: string | null;
+    active_device: string | null;
+}

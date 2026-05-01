@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
@@ -50,7 +50,7 @@ export interface MusicContextMenuProps extends Partial<MusicMenuOptions> {
     children?: React.ReactNode; // Custom trigger content
 }
 
-export function getMusicMenuGroups(options: MusicMenuOptions): MenuItemData[][] {
+function getMusicMenuGroups(options: MusicMenuOptions): MenuItemData[][] {
     const {
         onPlay,
         onShuffle,
@@ -144,6 +144,10 @@ function MenuContent({
         return () => cancelAnimationFrame(raf);
     }, [open, resolvedGroups.length, updateMenuPosition]);
 
+    const positionedStyle = menuPosition
+        ? { top: menuPosition.top, left: menuPosition.left, transformOrigin: menuPosition.origin }
+        : { top: 0, left: 0, opacity: 0, pointerEvents: 'none' as const };
+
     return (
         <Portal>
             <MenuItems
@@ -151,7 +155,7 @@ function MenuContent({
                 data-menu-portal="true"
                 transition
                 className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
-                style={menuPosition ? { top: menuPosition!.top, left: menuPosition!.left, transformOrigin: menuPosition!.origin } : undefined}
+                style={positionedStyle}
                 onMouseDown={(e) => e.stopPropagation()}
             >
                 {resolvedGroups.map((group, groupIndex) => (
@@ -226,11 +230,6 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     const menuRef = useRef<HTMLDivElement | null>(null);
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; origin: string } | null>(null);
 
-    // 只有当有内容时才渲染
-    if (!resolvedGroups || resolvedGroups.length === 0 || resolvedGroups.every(g => g.length === 0)) {
-        return null;
-    }
-
     const getButtonClass = () => {
         const baseClass = `flex items-center justify-center transition-colors z-20 ${buttonClassName || 'w-8 h-8'}`;
         if (variant === 'clean') {
@@ -239,7 +238,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
         return `${baseClass} rounded-full bg-white/20 backdrop-blur-md border border-white/20 text-white hover:bg-white/30`;
     };
 
-    const updateMenuPosition = () => {
+    const updateMenuPosition = useCallback(() => {
         const buttonEl = buttonRef.current;
         const menuEl = menuRef.current;
         if (!buttonEl || !menuEl) return;
@@ -264,8 +263,12 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
         }
         if (top < padding) top = padding;
 
-        setMenuPosition({ top, left, origin });
-    };
+        setMenuPosition((prev) =>
+            prev && prev.top === top && prev.left === left && prev.origin === origin
+                ? prev
+                : { top, left, origin }
+        );
+    }, []);
 
     useEffect(() => {
         const handleResize = () => updateMenuPosition();
@@ -274,6 +277,11 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
             window.removeEventListener('resize', handleResize);
         };
     }, []);
+
+    // 只有当有内容时才渲染。放在 hooks 之后，避免条件调用 hooks。
+    if (!resolvedGroups || resolvedGroups.length === 0 || resolvedGroups.every(g => g.length === 0)) {
+        return null;
+    }
 
     return (
         <div
@@ -294,15 +302,11 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 // Stop propagation first to prevent event from triggering row click
                                 e.stopPropagation();
 
-                                // Close any open context menus (right-click menus) before opening this menu
-                                // Dispatch mousedown event synchronously to trigger cleanup handlers
+                                // Close any open right-click (cursor) context menus before opening this menu.
+                                // Use a custom event so Headless UI's own outside-click listeners don't
+                                // see a synthetic mousedown and immediately close this menu again.
                                 if (!suppressCloseEvent) {
-                                    const closeEvent = new MouseEvent('mousedown', {
-                                        bubbles: true,
-                                        cancelable: true,
-                                        view: window
-                                    });
-                                    document.dispatchEvent(closeEvent);
+                                    window.dispatchEvent(new CustomEvent('app:close-cursor-menus'));
                                 }
 
                                 // Notify parent component that menu is opening

@@ -72,6 +72,9 @@ fn main() {
             commands::player::seek_audio,
             commands::player::get_audio_position,
             commands::player::get_lyrics,
+            commands::player::list_audio_outputs,
+            commands::player::get_audio_output,
+            commands::player::set_audio_output,
             // File commands
             commands::files::get_metadata,
             commands::files::read_folder_audio_files,

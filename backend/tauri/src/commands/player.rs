@@ -1,6 +1,6 @@
 use crate::modules::library::LyricsData;
 use crate::modules::library::SongMetadata;
-use crate::modules::player::AudioState;
+use crate::modules::player::{AudioOutputInfo, AudioOutputState, AudioState};
 use tauri::State;
 
 #[tauri::command]
@@ -49,4 +49,22 @@ pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
 #[tauri::command]
 pub fn get_lyrics(path: String) -> Result<LyricsData, String> {
     crate::modules::library::get_lyrics(&path)
+}
+
+#[tauri::command]
+pub fn list_audio_outputs(state: State<'_, AudioState>) -> Result<Vec<AudioOutputInfo>, String> {
+    state.list_outputs()
+}
+
+#[tauri::command]
+pub fn get_audio_output(state: State<'_, AudioState>) -> AudioOutputState {
+    state.get_output_state()
+}
+
+#[tauri::command]
+pub fn set_audio_output(
+    state: State<'_, AudioState>,
+    device: Option<String>,
+) -> Result<(), String> {
+    state.set_output_preference(device)
 }

@@ -106,11 +106,13 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         document.addEventListener('mousedown', handleClickOutside, true);
         window.addEventListener('scroll', onClose, true);
         window.addEventListener('resize', onClose);
+        window.addEventListener('app:close-cursor-menus', onClose);
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside, true);
             window.removeEventListener('scroll', onClose, true);
             window.removeEventListener('resize', onClose);
+            window.removeEventListener('app:close-cursor-menus', onClose);
         };
     }, [onClose]);
 

@@ -4,7 +4,9 @@ import { toast } from 'react-hot-toast';
 import PageContainer from '@/components/layout/PageContainer';
 import { useTheme } from '@/hooks/useTheme';
 import { libraryService } from '@/services/libraryService';
+import { audioService, type AudioOutputInfo } from '@/services/audioService';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useAudioOutputStore } from '@/store/useAudioOutputStore';
 import {
     MdBrightness6,
     MdRefresh,
@@ -18,8 +20,12 @@ import {
     MdClose,
     MdBlockFlipped,
     MdExpandMore,
-    MdExpandLess
+    MdExpandLess,
+    MdSpeaker,
+    MdCheckCircle
 } from 'react-icons/md';
+import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/react';
+import { AnimatePresence, motion } from 'framer-motion';
 import clsx from 'clsx';
 import TranscodeSettings from '@/features/settings/TranscodeSettings';
 import { getName, getVersion } from '@tauri-apps/api/app';
@@ -43,6 +49,30 @@ export default function Settings() {
     const [appName, setAppName] = useState('');
 
     const triggerLibraryUpdate = useLibraryStore((s) => s.triggerLibraryUpdate);
+
+    // 音频输出
+    const preferredDevice = useAudioOutputStore((s) => s.preferredDevice);
+    const activeDevice = useAudioOutputStore((s) => s.activeDevice);
+    const setPreferredDevice = useAudioOutputStore((s) => s.setPreferredDevice);
+    const [audioOutputs, setAudioOutputs] = useState<AudioOutputInfo[]>([]);
+
+    const reloadAudioOutputs = async () => {
+        try {
+            const list = await audioService.listAudioOutputs();
+            setAudioOutputs(list);
+        } catch (e) {
+            console.error('Failed to load audio outputs', e);
+        }
+    };
+
+    const handleAudioOutputChange = async (value: string) => {
+        try {
+            await setPreferredDevice(value === '' ? null : value);
+            await reloadAudioOutputs();
+        } catch (e: any) {
+            toast.error(typeof e === 'string' ? e : e?.message || '切换音频输出失败');
+        }
+    };
 
     // 音乐文件夹管理
     const [musicFolders, setMusicFolders] = useState<LibraryFolder[]>([]);
@@ -140,7 +170,13 @@ export default function Settings() {
     useEffect(() => {
         reloadFolders();
         reloadIgnoredDirs();
+        reloadAudioOutputs();
     }, []);
+
+    // Refresh device list when backend reports active device changed.
+    useEffect(() => {
+        reloadAudioOutputs();
+    }, [activeDevice]);
 
     useEffect(() => {
         const fetchAppInfo = async () => {
@@ -198,10 +234,8 @@ export default function Settings() {
     return (
         <PageContainer title="设置">
             <div className="w-full pb-20">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div className="columns-1 lg:columns-2 gap-6 [&>*]:break-inside-avoid [&>*]:mb-6">
 
-                    {/* Left Column: General & Appearance */}
-                    <div className="space-y-6">
                         {/* 1. 常规设置 (Refresh Library) */}
                         <section className="space-y-4">
                             <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
@@ -389,6 +423,107 @@ export default function Settings() {
                             </div>
                         </section>
 
+                        {/* 1.8 音频输出 */}
+                        <section className="space-y-4">
+                            <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
+                                <MdSpeaker className="text-lg" />
+                                <span>音频输出</span>
+                            </div>
+
+                            <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-high p-4 space-y-3">
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-base font-medium text-on-surface">输出设备</span>
+                                    <span className="text-sm text-on-surface-variant">
+                                        选择「跟随系统默认」时，切换 Windows 默认输出会自动跟随。
+                                    </span>
+                                </div>
+                                <Listbox
+                                    value={preferredDevice ?? ''}
+                                    onChange={handleAudioOutputChange}
+                                >
+                                    {({ open }) => (
+                                        <div className="relative">
+                                            <ListboxButton
+                                                className={clsx(
+                                                    "flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-surface-container text-sm text-on-surface border transition-all duration-200 focus:outline-none",
+                                                    open
+                                                        ? "border-primary/50 ring-1 ring-primary/20 rounded-b-none"
+                                                        : "border-outline-variant/30 hover:border-primary/30"
+                                                )}
+                                            >
+                                                <span className="truncate">
+                                                    {preferredDevice
+                                                        ? preferredDevice
+                                                        : `跟随系统默认${activeDevice ? `（当前：${activeDevice}）` : ''}`}
+                                                </span>
+                                                <MdExpandMore
+                                                    className={clsx(
+                                                        "text-lg text-on-surface-variant transition-transform duration-300",
+                                                        open && "rotate-180"
+                                                    )}
+                                                />
+                                            </ListboxButton>
+
+                                            <AnimatePresence>
+                                                {open && (
+                                                    <ListboxOptions
+                                                        static
+                                                        as={motion.div}
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        transition={{ duration: 0.2, ease: "easeOut" }}
+                                                        anchor="bottom"
+                                                        className="z-50 w-[var(--button-width)] mt-[-1px] rounded-b-xl border border-primary/50 border-t-0 bg-surface-container-high shadow-xl focus:outline-none overflow-hidden"
+                                                    >
+                                                        <div className="py-1 max-h-60 overflow-y-auto scrollbar-hidden">
+                                                            <ListboxOption
+                                                                value=""
+                                                                className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-[focus]:bg-primary/10 data-[selected]:text-primary"
+                                                            >
+                                                                <div className="flex flex-col">
+                                                                    <span>跟随系统默认</span>
+                                                                    {activeDevice && (
+                                                                        <span className="text-[10px] text-on-surface-variant opacity-70">
+                                                                            当前：{activeDevice}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                                {!preferredDevice && <MdCheck className="text-primary" />}
+                                                            </ListboxOption>
+
+                                                            {audioOutputs.map((d) => (
+                                                                <ListboxOption
+                                                                    key={d.name}
+                                                                    value={d.name}
+                                                                    className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-[focus]:bg-primary/10 data-[selected]:text-primary"
+                                                                >
+                                                                    <div className="flex flex-col">
+                                                                        <span>{d.name}</span>
+                                                                        {d.is_system_default && (
+                                                                            <span className="text-[10px] text-on-surface-variant opacity-70">
+                                                                                系统默认设备
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    {preferredDevice === d.name && <MdCheck className="text-primary" />}
+                                                                </ListboxOption>
+                                                            ))}
+                                                        </div>
+                                                    </ListboxOptions>
+                                                )}
+                                            </AnimatePresence>
+                                        </div>
+                                    )}
+                                </Listbox>
+                                {preferredDevice && activeDevice && preferredDevice !== activeDevice && (
+                                    <p className="text-xs text-on-surface-variant/80">
+                                        指定的设备「{preferredDevice}」当前不可用，已临时回落到「{activeDevice}」。
+                                    </p>
+                                )}
+                            </div>
+                        </section>
+
                         {/* 2. 外观设置 (Moved to Left Column) */}
                         <section className="space-y-6">
                             <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
@@ -515,10 +650,7 @@ export default function Settings() {
                                 </div>
                             </div>
                         </section>
-                    </div>
 
-                    {/* Right Column: Transcode Settings & About */}
-                    <div className="space-y-6">
                         <TranscodeSettings />
 
                         {/* About Info */}
@@ -533,7 +665,6 @@ export default function Settings() {
                                 <span>Made by Jimie165</span>
                             </div>
                         </section>
-                    </div>
                 </div>
             </div>
         </PageContainer>

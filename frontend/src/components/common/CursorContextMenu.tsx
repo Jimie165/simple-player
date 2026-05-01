@@ -25,10 +25,12 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
         // Handle window resize
         const handleResize = () => onClose();
         window.addEventListener('resize', handleResize);
+        window.addEventListener('app:close-cursor-menus', onClose);
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
             window.removeEventListener('resize', handleResize);
+            window.removeEventListener('app:close-cursor-menus', onClose);
         };
     }, [onClose]);
 

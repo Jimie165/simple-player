@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
+import { useAudioOutputStore } from '@/store/useAudioOutputStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import clsx from 'clsx';
 import { useNavigationStore } from '@/store/useNavigationStore';
@@ -38,6 +40,17 @@ function App() {
   const setMetadata = usePlayerStore((state) => state.setMetadata);
 
   useEffect(() => initTheme(), [initTheme]);
+
+  // Sync persisted audio output preference to backend on launch and listen for backend-driven changes.
+  useEffect(() => {
+    useAudioOutputStore.getState().syncToBackend();
+    const unlisten = listen<string | null>('audio:output-changed', (e) => {
+      useAudioOutputStore.getState().setActiveDevice(e.payload ?? null);
+    });
+    return () => {
+      unlisten.then((fn) => fn()).catch(() => { });
+    };
+  }, []);
 
   // Restore Session
   const isRestored = useRef(false);
