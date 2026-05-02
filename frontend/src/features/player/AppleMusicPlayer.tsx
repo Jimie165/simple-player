@@ -432,7 +432,9 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
                 <ApplePlayerLyricsToggle
                     isLyricsOpen={isLyricsOpen}
-                    hasLyrics={lyricsStatus !== 'empty'}
+                    // 允许在面板已展开但当前歌曲无歌词时仍可点击按钮关闭面板；
+                    // 只有在面板关闭后才禁用，防止再次打开。
+                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
                     onToggle={handleToggleLyrics}
                 />
                 <ApplePlayerQueueToggle
