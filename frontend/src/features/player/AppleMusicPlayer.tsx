@@ -19,6 +19,8 @@ import ApplePlayerQueueToggle from '@/features/player/apple/ApplePlayerQueueTogg
 import ApplePlayerLyricsToggle from '@/features/player/apple/ApplePlayerLyricsToggle';
 import ApplePlayerLyricsPanel from '@/features/player/apple/ApplePlayerLyricsPanel';
 
+type SidePanel = 'queue' | 'lyrics';
+
 export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
     const {
         metadata, isPlaying, isShuffling, repeatMode,
@@ -65,6 +67,10 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
     const queueScrollDidMountRef = useRef(false);
     const [lyricsMounted, setLyricsMounted] = useState(isLyricsOpen);
+    const [panelFlipTarget, setPanelFlipTarget] = useState<SidePanel | null>(null);
+    const [isPanelFlipping, setIsPanelFlipping] = useState(false);
+    const panelFlipRafRef = useRef<number | null>(null);
+    const panelFlipTimeoutRef = useRef<number | null>(null);
 
     useEffect(() => {
         if (isQueueOpen) setQueueMounted(true);
@@ -85,6 +91,13 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     useEffect(() => {
         if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
     }, [isOpen, isQueueOpen]);
+
+    useEffect(() => {
+        return () => {
+            if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
+            if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
+        };
+    }, []);
 
     useEffect(() => {
         if (metadata?.path && metadata.path !== lyricsPath) {
@@ -248,13 +261,37 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };
 
+    const startPanelFlip = (target: SidePanel, toggle: () => void) => {
+        if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
+        if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
+
+        setPanelFlipTarget(target);
+        setIsPanelFlipping(false);
+        panelFlipRafRef.current = window.requestAnimationFrame(() => {
+            setIsPanelFlipping(true);
+            toggle();
+            panelFlipTimeoutRef.current = window.setTimeout(() => {
+                setIsPanelFlipping(false);
+                setPanelFlipTarget(null);
+            }, 420);
+        });
+    };
+
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
+        if (isLyricsOpen && !isQueueOpen) {
+            startPanelFlip('queue', toggleQueue);
+            return;
+        }
         toggleQueue();
     };
 
     const handleToggleLyrics = () => {
         if (!lyricsMounted) setLyricsMounted(true);
+        if (isQueueOpen && !isLyricsOpen) {
+            startPanelFlip('lyrics', toggleLyrics);
+            return;
+        }
         toggleLyrics();
     };
 
@@ -347,8 +384,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             <div className="relative z-20 flex-1 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]">
 
                 <div className={clsx(
-                    "flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                    (isQueueOpen || isLyricsOpen) ? "w-[42%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
+                    "relative z-20 flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
+                    (isQueueOpen || isLyricsOpen) ? "w-[41%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
                 )}>
                     {/* Content Wrapper: Controls vertical spacing */}
                     <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
@@ -414,6 +451,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                 <ApplePlayerQueuePanel
                     isQueueOpen={isQueueOpen}
                     queueMounted={queueMounted}
+                    panelFlipTarget={panelFlipTarget}
+                    isPanelFlipping={isPanelFlipping}
                     onClose={onClose}
                     queueScrollToTopSignal={queueScrollToTopSignal}
                 />
@@ -421,6 +460,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                 <ApplePlayerLyricsPanel
                     isLyricsOpen={isLyricsOpen}
                     lyricsMounted={lyricsMounted}
+                    panelFlipTarget={panelFlipTarget}
+                    isPanelFlipping={isPanelFlipping}
                     lyrics={lyrics}
                     lyricsStatus={lyricsStatus}
                     hasTimestamps={lyricsHasTimestamps}
