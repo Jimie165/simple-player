@@ -230,7 +230,7 @@ function InterludeItem({
             }}
         >
             <motion.span 
-                className="flex items-center gap-[clamp(0.4rem,1.2vmin,0.8rem)] origin-left" 
+                className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left" 
                 aria-hidden
                 initial={{ scale: 0 }}
                 animate={isActuallyActive ? {
@@ -252,8 +252,8 @@ function InterludeItem({
                         key={dotIndex}
                         className="rounded-full bg-white"
                         style={{
-                            width: 'clamp(0.45rem, 1.6vmin, 1.1rem)',
-                            height: 'clamp(0.45rem, 1.6vmin, 1.1rem)',
+                            width: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
+                            height: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
                         }}
                         initial={{ opacity: 0 }}
                         animate={isActuallyActive ? {
@@ -419,6 +419,20 @@ export default function LyricsPanel({
                 continue;
             }
 
+            if (
+                hasTimestamps &&
+                typeof line.time_ms === 'number' &&
+                lastLyricLineIndex < 0 &&
+                line.time_ms >= interludeThresholdMs
+            ) {
+                items.push({
+                    type: 'interlude',
+                    afterLineIndex: -1,
+                    startMs: 0,
+                    endMs: line.time_ms,
+                });
+            }
+
             items.push({ type: 'line', line, lineIndex: index });
 
             if (
@@ -455,8 +469,23 @@ export default function LyricsPanel({
     const activeDisplayIndex = useMemo(() => {
         if (!displayItems.length) return 0;
 
-        const currentLine = lines[currentLyricIndex];
         const currentMs = currentTime * 1000;
+        const leadingInterludeIndex = displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            item.afterLineIndex === -1 &&
+            currentMs >= item.startMs &&
+            currentMs < item.endMs
+        );
+
+        if (leadingInterludeIndex >= 0) {
+            const item = displayItems[leadingInterludeIndex] as { type: 'interlude'; endMs: number };
+            if (currentMs >= item.endMs - 600) {
+                return Math.min(displayItems.length - 1, leadingInterludeIndex + 1);
+            }
+            return leadingInterludeIndex;
+        }
+
+        const currentLine = lines[currentLyricIndex];
 
         if (currentLine && typeof currentLine.time_ms === 'number') {
             // No buffer needed here: startMs is the explicit "previous line
@@ -574,7 +603,7 @@ export default function LyricsPanel({
                                             : 'text-white scale-[0.9] blur-[0.5px] opacity-40 hover:opacity-75 hover:blur-none hover:scale-[0.92]'
                                     )}
                                 >
-                                    <span className="block font-bold text-[clamp(1.15rem,3.2vmin,2.2rem)] leading-[1.4] tracking-wide relative">
+                                    <span className="block font-bold text-[clamp(1.22rem,3.4vmin,2.35rem)] leading-[1.4] tracking-wide relative">
                                         {isActive && line.words && line.words.length > 0 ? (
                                             <KaraokeText
                                                 words={line.words}
@@ -590,7 +619,7 @@ export default function LyricsPanel({
                                         )}
                                     </span>
                                     {line.translation && (
-                                        <span className="block font-medium text-[clamp(0.9rem,2.4vmin,1.6rem)] leading-[1.35] tracking-wide opacity-90 mt-1">
+                                        <span className="block font-medium text-[clamp(0.9rem,2.4vmin,1.62rem)] leading-[1.35] tracking-wide opacity-90 mt-1">
                                             {line.translation}
                                         </span>
                                     )}
