@@ -284,6 +284,7 @@ export default function LyricsPanel({
     onSeek,
 }: LyricsPanelProps) {
     const topInset = 12;
+    const manualResumeFollowDelayMs = 2000;
     // Minimum duration between an explicit "previous line ended" marker
     // (an empty `[mm:ss.xx]` line in the LRC) and the next sung line for
     // the interlude dots to appear. Below this, the brief silence is too
@@ -306,11 +307,29 @@ export default function LyricsPanel({
     // shows as a visible empty row.
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const [spacerHeight, setSpacerHeight] = useState(0);
+    const viewportSizeRef = useRef<{ width: number; height: number } | null>(null);
+    const [layoutVersion, setLayoutVersion] = useState(0);
+    const [recenterVersion, setRecenterVersion] = useState(0);
+    const firstScrollDoneRef = useRef(false);
+    const lastAutoScrollIndexRef = useRef<number | null>(null);
+    const preferSmoothAutoScrollRef = useRef(false);
 
     useEffect(() => {
         const el = scrollAreaRef.current;
         if (!el) return;
-        const update = () => setSpacerHeight(el.clientHeight / 2);
+        const update = () => {
+            const width = el.clientWidth;
+            const height = el.clientHeight;
+            const prevSize = viewportSizeRef.current;
+
+            setSpacerHeight(height / 2);
+
+            if (prevSize && (prevSize.width !== width || prevSize.height !== height)) {
+                setLayoutVersion(version => version + 1);
+            }
+
+            viewportSizeRef.current = { width, height };
+        };
         update();
         const ro = new ResizeObserver(update);
         ro.observe(el);
@@ -338,21 +357,21 @@ export default function LyricsPanel({
 
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const userScrollTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-    // First scroll-to-current is deferred a frame so Virtuoso has measured
-    // its initial visible window. Without this delay smooth scrolling on a
-    // variable-height list overshoots the target before settling back.
-    const firstScrollDoneRef = useRef(false);
-    const lastAutoScrollIndexRef = useRef<number | null>(null);
 
     const handleUserInteraction = () => {
         setIsUserScrolling(true);
+        // Once the user scrolls away, allow the next "resume following"
+        // moment to snap the current line back into view even if the active
+        // lyric index hasn't changed yet.
+        lastAutoScrollIndexRef.current = null;
+        preferSmoothAutoScrollRef.current = true;
         if (userScrollTimeoutRef.current) {
             clearTimeout(userScrollTimeoutRef.current);
         }
         userScrollTimeoutRef.current = setTimeout(() => {
             setIsUserScrolling(false);
             userScrollTimeoutRef.current = null;
-        }, 2000); // 停止操作2秒后恢复跟随
+        }, manualResumeFollowDelayMs); // 手动滚动后给用户更充裕的浏览时间
     };
 
     useEffect(() => {
@@ -366,7 +385,29 @@ export default function LyricsPanel({
     useEffect(() => {
         firstScrollDoneRef.current = false;
         lastAutoScrollIndexRef.current = null;
+        preferSmoothAutoScrollRef.current = false;
     }, [isOpen, lines]);
+
+    useEffect(() => {
+        if (!isOpen || !hasTimestamps || lines.length === 0) return;
+
+        const timeout = window.setTimeout(() => {
+            // A light second-pass recenter fixes the case where Virtuoso's
+            // first positioning lands the active row merely "visible" during
+            // initial measurement, but not truly centered yet.
+            lastAutoScrollIndexRef.current = null;
+            preferSmoothAutoScrollRef.current = true;
+            setRecenterVersion(version => version + 1);
+        }, 120);
+
+        return () => window.clearTimeout(timeout);
+    }, [hasTimestamps, isOpen, lines]);
+
+    useEffect(() => {
+        if (layoutVersion === 0) return;
+        lastAutoScrollIndexRef.current = null;
+        preferSmoothAutoScrollRef.current = true;
+    }, [layoutVersion]);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -533,14 +574,18 @@ export default function LyricsPanel({
             virtuosoRef.current?.scrollToIndex({
                 index: activeDisplayIndex,
                 align: 'center',
-                behavior: firstScrollDoneRef.current ? 'smooth' : 'auto',
+                behavior:
+                    firstScrollDoneRef.current || preferSmoothAutoScrollRef.current
+                        ? 'smooth'
+                        : 'auto',
             });
             firstScrollDoneRef.current = true;
             lastAutoScrollIndexRef.current = activeDisplayIndex;
+            preferSmoothAutoScrollRef.current = false;
         };
         const raf = requestAnimationFrame(scroll);
         return () => cancelAnimationFrame(raf);
-    }, [activeDisplayIndex, isOpen, hasTimestamps, lines.length, isUserScrolling]);
+    }, [activeDisplayIndex, isOpen, hasTimestamps, lines.length, isUserScrolling, layoutVersion, recenterVersion]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">

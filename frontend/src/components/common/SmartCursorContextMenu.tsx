@@ -104,13 +104,11 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
             }
         };
         document.addEventListener('mousedown', handleClickOutside, true);
-        window.addEventListener('scroll', onClose, true);
         window.addEventListener('resize', onClose);
         window.addEventListener('app:close-cursor-menus', onClose);
 
         return () => {
             document.removeEventListener('mousedown', handleClickOutside, true);
-            window.removeEventListener('scroll', onClose, true);
             window.removeEventListener('resize', onClose);
             window.removeEventListener('app:close-cursor-menus', onClose);
         };
@@ -168,52 +166,69 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
 
     return (
         <Portal>
-            <div
-                ref={menuRef}
-                data-menu-portal="true"
-                className={`fixed z-[9999] w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
-                    ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
-                    : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
-                    }`}
-                style={{
-                    top: position.top,
-                    left: position.left,
-                    opacity: position.opacity,
-                    pointerEvents: position.opacity === 0 ? 'none' : 'auto'
-                }}
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onContextMenu={(e) => e.preventDefault()}
-            >
-                {resolvedGroups.map((group, groupIndex) => (
-                    <React.Fragment key={groupIndex}>
-                        {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-neutral-200/50 dark:bg-white/20'}`} />}
-                        {group.map((mItem) => (
-                            <button
-                                key={mItem.id}
-                                onClick={() => {
-                                    mItem.onClick();
-                                    onClose();
-                                }}
-                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors ${isApple
-                                    ? 'hover:bg-white/10 font-medium text-white'
-                                    : 'hover:bg-neutral-100 dark:hover:bg-white/10'
-                                    } ${!isApple && mItem.variant === 'danger'
-                                        ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
-                                        : ''
-                                    } ${isApple && mItem.variant === 'danger' ? 'text-red-400' : ''
-                                    }`}
-                            >
-                                <div className="flex flex-1 items-center gap-3">
-                                    {mItem.icon && <mItem.icon className={isApple ? 'text-lg opacity-100' : 'text-lg opacity-70'} />}
-                                    <span>{mItem.label}</span>
-                                </div>
-                                {!isApple && mItem.suffix}
-                            </button>
-                        ))}
-                    </React.Fragment>
-                ))}
-            </div>
+            <>
+                <div
+                    className="fixed inset-0 z-[9998]"
+                    style={{ touchAction: 'none' }}
+                    onMouseDown={(e) => {
+                        e.preventDefault();
+                        onClose();
+                    }}
+                    onContextMenu={(e) => {
+                        e.preventDefault();
+                        onClose();
+                    }}
+                    onWheel={(e) => {
+                        e.preventDefault();
+                    }}
+                />
+                <div
+                    ref={menuRef}
+                    data-menu-portal="true"
+                    className={`fixed z-[9999] w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
+                        ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
+                        : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
+                        }`}
+                    style={{
+                        top: position.top,
+                        left: position.left,
+                        opacity: position.opacity,
+                        pointerEvents: position.opacity === 0 ? 'none' : 'auto'
+                    }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onContextMenu={(e) => e.preventDefault()}
+                >
+                    {resolvedGroups.map((group, groupIndex) => (
+                        <React.Fragment key={groupIndex}>
+                            {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-neutral-200/50 dark:bg-white/20'}`} />}
+                            {group.map((mItem) => (
+                                <button
+                                    key={mItem.id}
+                                    onClick={() => {
+                                        mItem.onClick();
+                                        onClose();
+                                    }}
+                                    className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors ${isApple
+                                        ? 'hover:bg-white/10 font-medium text-white'
+                                        : 'hover:bg-neutral-100 dark:hover:bg-white/10'
+                                        } ${!isApple && mItem.variant === 'danger'
+                                            ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                            : ''
+                                        } ${isApple && mItem.variant === 'danger' ? 'text-red-400' : ''
+                                        }`}
+                                >
+                                    <div className="flex flex-1 items-center gap-3">
+                                        {mItem.icon && <mItem.icon className={isApple ? 'text-lg opacity-100' : 'text-lg opacity-70'} />}
+                                        <span>{mItem.label}</span>
+                                    </div>
+                                    {!isApple && mItem.suffix}
+                                </button>
+                            ))}
+                        </React.Fragment>
+                    ))}
+                </div>
+            </>
         </Portal>
     );
 }

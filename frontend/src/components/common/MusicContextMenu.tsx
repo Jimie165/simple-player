@@ -127,12 +127,14 @@ function getMusicMenuGroups(options: MusicMenuOptions): MenuItemData[][] {
  */
 function MenuContent({
     open,
+    close,
     resolvedGroups,
     menuRef,
     menuPosition,
     updateMenuPosition
 }: {
     open: boolean;
+    close: () => void;
     resolvedGroups: MenuItemData[][];
     menuRef: React.RefObject<HTMLDivElement | null>;
     menuPosition: { top: number; left: number; origin: string } | null;
@@ -140,8 +142,20 @@ function MenuContent({
 }) {
     useEffect(() => {
         if (!open) return;
-        const raf = requestAnimationFrame(() => updateMenuPosition());
-        return () => cancelAnimationFrame(raf);
+        let raf = requestAnimationFrame(() => updateMenuPosition());
+        const handleViewportChange = () => {
+            cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(() => updateMenuPosition());
+        };
+
+        window.addEventListener('resize', handleViewportChange);
+        window.addEventListener('scroll', handleViewportChange, true);
+
+        return () => {
+            cancelAnimationFrame(raf);
+            window.removeEventListener('resize', handleViewportChange);
+            window.removeEventListener('scroll', handleViewportChange, true);
+        };
     }, [open, resolvedGroups.length, updateMenuPosition]);
 
     const positionedStyle = menuPosition
@@ -150,47 +164,66 @@ function MenuContent({
 
     return (
         <Portal>
-            <MenuItems
-                ref={menuRef}
-                data-menu-portal="true"
-                transition
-                className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
-                style={positionedStyle}
-                onMouseDown={(e) => e.stopPropagation()}
-            >
-                {resolvedGroups.map((group, groupIndex) => (
-                    <React.Fragment key={groupIndex}>
-                        {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
-                        {group.map((item) => (
-                            <MenuItem key={item.id}>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); item.onClick(); }}
-                                    className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-[focus]:bg-red-50 dark:data-[focus]:bg-red-900/20' : ''
-                                        }`}
-                                >
-                                    <div className="flex flex-1 items-center gap-3">
-                                        {item.icon && <item.icon className="text-lg opacity-70" />}
-                                        {item.label}
-                                    </div>
-                                    {item.suffix}
-                                </button>
-                            </MenuItem>
-                        ))}
-                    </React.Fragment>
-                ))}
-            </MenuItems>
+            <>
+                {open && (
+                    <div
+                        className="fixed inset-0 z-[9998]"
+                        style={{ touchAction: 'none' }}
+                        onMouseDown={(e) => {
+                            e.preventDefault();
+                            close();
+                        }}
+                        onContextMenu={(e) => {
+                            e.preventDefault();
+                            close();
+                        }}
+                        onWheel={(e) => {
+                            e.preventDefault();
+                        }}
+                    />
+                )}
+                <MenuItems
+                    ref={menuRef}
+                    data-menu-portal="true"
+                    transition
+                    className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
+                    style={positionedStyle}
+                    onMouseDown={(e) => e.stopPropagation()}
+                >
+                    {resolvedGroups.map((group, groupIndex) => (
+                        <React.Fragment key={groupIndex}>
+                            {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
+                            {group.map((item) => (
+                                <MenuItem key={item.id}>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); item.onClick(); }}
+                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-[focus]:bg-red-50 dark:data-[focus]:bg-red-900/20' : ''
+                                            }`}
+                                    >
+                                        <div className="flex flex-1 items-center gap-3">
+                                            {item.icon && <item.icon className="text-lg opacity-70" />}
+                                            {item.label}
+                                        </div>
+                                        {item.suffix}
+                                    </button>
+                                </MenuItem>
+                            ))}
+                        </React.Fragment>
+                    ))}
+                </MenuItems>
+            </>
         </Portal>
     );
 }
 
 function MenuLifecycleEffects({
     open,
-    close,
     buttonRef,
+    menuRef,
 }: {
     open: boolean;
-    close: () => void;
     buttonRef: React.RefObject<HTMLButtonElement | null>;
+    menuRef: React.RefObject<HTMLDivElement | null>;
 }) {
     const wasOpenRef = useRef(false);
 
@@ -206,19 +239,54 @@ function MenuLifecycleEffects({
         }
 
         wasOpenRef.current = true;
-        const closeAndBlur = () => {
-            close();
-            buttonRef.current?.blur();
+        return;
+    }, [open, buttonRef]);
+
+    useEffect(() => {
+        if (!open) return;
+
+        const shouldAllowEvent = (target: EventTarget | null) => {
+            const node = target instanceof Node ? target : null;
+            return !!node && !!menuRef.current?.contains(node);
         };
 
-        window.addEventListener('wheel', closeAndBlur, true);
-        window.addEventListener('scroll', closeAndBlur, true);
+        const blockScrollGesture = (event: WheelEvent | TouchEvent) => {
+            if (shouldAllowEvent(event.target)) return;
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        const blockScrollKeys = (event: KeyboardEvent) => {
+            if (shouldAllowEvent(event.target)) return;
+            const blockedKeys = new Set([
+                'ArrowUp',
+                'ArrowDown',
+                'PageUp',
+                'PageDown',
+                'Home',
+                'End',
+                ' ',
+                'Spacebar',
+            ]);
+
+            if (!blockedKeys.has(event.key)) return;
+            event.preventDefault();
+            event.stopPropagation();
+        };
+
+        const nonPassiveCapture = { capture: true, passive: false } as const;
+        const captureOnly = { capture: true } as const;
+
+        window.addEventListener('wheel', blockScrollGesture, nonPassiveCapture);
+        window.addEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
+        window.addEventListener('keydown', blockScrollKeys, captureOnly);
 
         return () => {
-            window.removeEventListener('wheel', closeAndBlur, true);
-            window.removeEventListener('scroll', closeAndBlur, true);
+            window.removeEventListener('wheel', blockScrollGesture, nonPassiveCapture);
+            window.removeEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
+            window.removeEventListener('keydown', blockScrollKeys, captureOnly);
         };
-    }, [open, close, buttonRef]);
+    }, [open, menuRef]);
 
     return null;
 }
@@ -270,14 +338,6 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
         );
     }, []);
 
-    useEffect(() => {
-        const handleResize = () => updateMenuPosition();
-        window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-        };
-    }, []);
-
     // 只有当有内容时才渲染。放在 hooks 之后，避免条件调用 hooks。
     if (!resolvedGroups || resolvedGroups.length === 0 || resolvedGroups.every(g => g.length === 0)) {
         return null;
@@ -292,8 +352,8 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                     <>
                         <MenuLifecycleEffects
                             open={open}
-                            close={close}
                             buttonRef={buttonRef}
+                            menuRef={menuRef}
                         />
                         <MenuButton
                             ref={buttonRef}
@@ -323,6 +383,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                         </MenuButton>
                         <MenuContent
                             open={open}
+                            close={close}
                             resolvedGroups={resolvedGroups}
                             menuRef={menuRef}
                             menuPosition={menuPosition}
