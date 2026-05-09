@@ -35,7 +35,7 @@ function KaraokeText({
     currentMs: number;
 }) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    
+
     // 如果组件较晚挂载（例如由于外部 500ms 刷新率导致的延迟），
     // 强制它从这句话第一个字的略微提前的时间开始，以便给用户展示一个顺滑的“快速追赶（swoosh）”动画，
     // 而不是直接让前几个字突兀地变白。
@@ -71,7 +71,7 @@ function KaraokeText({
     useEffect(() => {
         if (!isPlaying) return;
         let frame: number;
-        
+
         const tick = (now: number) => {
             if (!lastTick.current) lastTick.current = now;
             const delta = now - lastTick.current;
@@ -79,7 +79,7 @@ function KaraokeText({
 
             setCurrentMs(prev => {
                 let nextMs = prev + delta;
-                
+
                 // 向外部真实时间（targetMsRef.current）进行平滑追赶修正
                 const diff = targetMsRef.current - nextMs;
                 if (diff > 50) {
@@ -87,12 +87,12 @@ function KaraokeText({
                     // 每一帧追赶剩余差距的 15%，大约 10 帧（不到 0.2 秒）就能平滑填补前几个字的空白
                     nextMs += diff * 0.15;
                 }
-                
+
                 return nextMs;
             });
             frame = requestAnimationFrame(tick);
         };
-        
+
         lastTick.current = performance.now();
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
@@ -106,7 +106,7 @@ function KaraokeText({
                 const dur = Math.max(80, nextStart - word.time_ms);
                 const raw = (currentMs - word.time_ms) / dur;
                 const progress = raw <= 0 ? 0 : raw >= 1 ? 1 : raw;
-                
+
                 // Add a very small transition zone for a slightly softer edge, 
                 // typical of Apple Music's high quality rendering.
                 const stopVal = progress * 100;
@@ -141,19 +141,19 @@ function KaraokeText({
     );
 }
 
-function InterludeItem({ 
+function InterludeItem({
     isActive: isCurrentlyActive,
     currentTime,
     startMs,
     endMs
-}: { 
+}: {
     isActive: boolean;
     currentTime: number;
     startMs: number;
     endMs: number;
 }) {
     const isFirstMount = useRef(true);
-    
+
     useEffect(() => {
         isFirstMount.current = false;
     }, []);
@@ -216,8 +216,8 @@ function InterludeItem({
             className="px-[clamp(1.2rem,2.2vw,2rem)] flex items-center overflow-hidden"
             aria-hidden={!isActuallyActive}
             initial={{ height: 0 }}
-            animate={{ 
-                height: isActuallyActive ? 'clamp(2.5rem,6vmin,4rem)' : 0 
+            animate={{
+                height: isActuallyActive ? 'clamp(2.5rem,6vmin,4rem)' : 0
             }}
             transition={isActuallyActive ? {
                 duration: 0.6,
@@ -229,8 +229,8 @@ function InterludeItem({
                 ease: "easeIn"
             }}
         >
-            <motion.span 
-                className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left" 
+            <motion.span
+                className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left"
                 aria-hidden
                 initial={{ scale: 0 }}
                 animate={isActuallyActive ? {
@@ -262,7 +262,7 @@ function InterludeItem({
                             opacity: isFirstMount.current ? 0 : [null, 1, 0]
                         }}
                         transition={isActuallyActive ? {
-                            duration: 0.05, ease: "linear" 
+                            duration: 0.05, ease: "linear"
                         } : {
                             duration: EXIT_DURATION,
                             ease: "easeInOut",
@@ -619,8 +619,8 @@ export default function LyricsPanel({
                             if (item.type === 'interlude') {
                                 const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
                                 return (
-                                    <InterludeItem 
-                                        isActive={isActive} 
+                                    <InterludeItem
+                                        isActive={isActive}
                                         currentTime={currentTime}
                                         startMs={item.startMs}
                                         endMs={item.endMs}
@@ -644,11 +644,16 @@ export default function LyricsPanel({
                                         'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] transition-all duration-300 origin-left',
                                         canSeek ? 'cursor-pointer' : 'cursor-default',
                                         isActive
-                                            ? 'text-white scale-100 opacity-100 drop-shadow-xl'
-                                            : 'text-white scale-[0.9] blur-[0.5px] opacity-40 hover:opacity-75 hover:blur-none hover:scale-[0.92]'
+                                            ? 'text-white scale-100 drop-shadow-xl'
+                                            : 'text-white scale-[0.9] blur-[0.5px] hover:blur-none hover:scale-[0.92]'
                                     )}
                                 >
-                                    <span className="block font-bold text-[clamp(1.22rem,3.4vmin,2.35rem)] leading-[1.4] tracking-wide relative">
+                                    <span
+                                        className={clsx(
+                                            'block font-bold text-[clamp(1.22rem,3.4vmin,2.35rem)] leading-[1.4] tracking-wide relative',
+                                            isActive ? 'opacity-100' : 'opacity-40 hover:opacity-75'
+                                        )}
+                                    >
                                         {isActive && line.words && line.words.length > 0 ? (
                                             <KaraokeText
                                                 words={line.words}
@@ -664,7 +669,7 @@ export default function LyricsPanel({
                                         )}
                                     </span>
                                     {line.translation && (
-                                        <span className="block font-medium text-[clamp(0.9rem,2.4vmin,1.62rem)] leading-[1.35] tracking-wide opacity-90 mt-1">
+                                        <span className="block font-medium text-[clamp(0.9rem,2.4vmin,1.62rem)] leading-[1.35] tracking-wide text-white/40 opacity-100 mt-1">
                                             {line.translation}
                                         </span>
                                     )}
