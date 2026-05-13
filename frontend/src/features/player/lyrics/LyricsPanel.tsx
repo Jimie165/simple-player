@@ -283,6 +283,7 @@ export default function LyricsPanel({
     currentTime,
     onSeek,
 }: LyricsPanelProps) {
+    const isPlaying = usePlayerStore(state => state.isPlaying);
     const topInset = 12;
     const manualResumeFollowDelayMs = 2000;
     // Minimum duration between an explicit "previous line ended" marker
@@ -313,6 +314,7 @@ export default function LyricsPanel({
     const firstScrollDoneRef = useRef(false);
     const lastAutoScrollIndexRef = useRef<number | null>(null);
     const preferSmoothAutoScrollRef = useRef(false);
+    const pausedScrollRef = useRef(false);
 
     useEffect(() => {
         const el = scrollAreaRef.current;
@@ -365,6 +367,9 @@ export default function LyricsPanel({
         // lyric index hasn't changed yet.
         lastAutoScrollIndexRef.current = null;
         preferSmoothAutoScrollRef.current = true;
+        // If user interacts while paused, remember that so we can keep
+        // lyrics crisp until playback resumes.
+        if (!isPlaying) pausedScrollRef.current = true;
         if (userScrollTimeoutRef.current) {
             clearTimeout(userScrollTimeoutRef.current);
         }
@@ -408,6 +413,11 @@ export default function LyricsPanel({
         lastAutoScrollIndexRef.current = null;
         preferSmoothAutoScrollRef.current = true;
     }, [layoutVersion]);
+
+    // Clear the paused-scroll marker when playback resumes so blur can come back
+    useEffect(() => {
+        if (isPlaying) pausedScrollRef.current = false;
+    }, [isPlaying]);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -567,6 +577,7 @@ export default function LyricsPanel({
 
     useEffect(() => {
         if (!isOpen || !hasTimestamps || lines.length === 0) return;
+        if (!isPlaying) return;
         if (isUserScrolling) return;
         if (lastAutoScrollIndexRef.current === activeDisplayIndex) return;
 
@@ -585,7 +596,7 @@ export default function LyricsPanel({
         };
         const raf = requestAnimationFrame(scroll);
         return () => cancelAnimationFrame(raf);
-    }, [activeDisplayIndex, isOpen, hasTimestamps, lines.length, isUserScrolling, layoutVersion, recenterVersion]);
+    }, [activeDisplayIndex, isOpen, hasTimestamps, lines.length, isUserScrolling, isPlaying, layoutVersion, recenterVersion]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
@@ -629,6 +640,17 @@ export default function LyricsPanel({
                             }
 
                             const { line } = item;
+                            const displayIndex = displayItems.indexOf(item);
+                            const distanceFromActive =
+                                activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0;
+                            const blurPx = Math.min(2.8, 0.35 + distanceFromActive * 0.55);
+                            const rowOpacity = Math.max(
+                                0.22,
+                                distanceFromActive === 0 ? 1 : 0.82 - distanceFromActive * 0.12
+                            );
+                            const pausedScroll = pausedScrollRef.current;
+                            const rowFilter = isUserScrolling || pausedScroll ? 'none' : `blur(${blurPx}px)`;
+                            const appliedOpacity = isUserScrolling || pausedScroll ? 1 : rowOpacity;
                             const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
                             const canSeek = line.time_ms !== null;
 
@@ -640,17 +662,21 @@ export default function LyricsPanel({
                                         onSeek(line.time_ms! / 1000);
                                     }}
                                     disabled={!canSeek}
+                                    style={{
+                                        filter: rowFilter,
+                                        opacity: appliedOpacity,
+                                    }}
                                     className={clsx(
-                                        'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] transition-all duration-300 origin-left',
+                                        'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] transition-all duration-300 origin-left will-change-[filter,opacity,transform]',
                                         canSeek ? 'cursor-pointer' : 'cursor-default',
                                         isActive
                                             ? 'text-white scale-100 drop-shadow-xl'
-                                            : 'text-white scale-[0.9] blur-[0.5px] hover:blur-none hover:scale-[0.92]'
+                                            : 'text-white scale-[0.9] hover:scale-[0.92]'
                                     )}
                                 >
                                     <span
                                         className={clsx(
-                                            'block font-bold text-[clamp(1.22rem,3.4vmin,2.35rem)] leading-[1.4] tracking-wide relative',
+                                            'block font-bold text-[clamp(1.42rem,3.9vmin,2.7rem)] leading-[1.38] tracking-wide relative',
                                             isActive ? 'opacity-100' : 'opacity-40 hover:opacity-75'
                                         )}
                                     >
@@ -669,7 +695,14 @@ export default function LyricsPanel({
                                         )}
                                     </span>
                                     {line.translation && (
-                                        <span className="block font-medium text-[clamp(0.9rem,2.4vmin,1.62rem)] leading-[1.35] tracking-wide text-white/40 opacity-100 mt-1">
+                                        <span
+                                            className={clsx(
+                                                'block font-medium text-[clamp(1.08rem,2.8vmin,1.92rem)] leading-[1.34] tracking-wide mt-1 transition-all duration-300',
+                                                isActive
+                                                    ? 'text-white/65 opacity-95 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'
+                                                    : 'text-white/32 opacity-80'
+                                            )}
+                                        >
                                             {line.translation}
                                         </span>
                                     )}
