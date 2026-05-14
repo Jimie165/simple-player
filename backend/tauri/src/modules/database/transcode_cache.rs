@@ -78,6 +78,23 @@ impl TranscodeCacheRepo {
             })
         })?.collect()
     }
+
+    /// 获取所有未使用的缓存记录
+    pub fn get_unused_records(conn: &Connection) -> Result<Vec<CacheRecord>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, cache_path, file_size FROM transcoded_cache 
+             WHERE is_in_use = 0 
+             ORDER BY last_accessed_at ASC"
+        )?;
+
+        stmt.query_map([], |row| {
+            Ok(CacheRecord {
+                id: row.get(0)?,
+                cache_path: row.get(1)?,
+                file_size: row.get(2)?,
+            })
+        })?.collect()
+    }
     
     /// 删除记录（通过 ID）
     pub fn delete(conn: &Connection, id: i64) -> Result<()> {

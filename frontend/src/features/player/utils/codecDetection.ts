@@ -10,6 +10,16 @@ export function detectHevcSupport(): boolean {
     return candidates.some((candidate) => video.canPlayType(candidate) !== '');
 }
 
+export function detectAv1Support(): boolean {
+    if (typeof document === 'undefined') return false;
+    const video = document.createElement('video');
+    const candidates = [
+        'video/mp4; codecs="av01.0.05M.08, mp4a.40.2"',
+        'video/mp4; codecs="av01"',
+    ];
+    return candidates.some((candidate) => video.canPlayType(candidate) !== '');
+}
+
 export function detectSupportedAudioCodecs(): string[] {
     if (typeof document === 'undefined') return ['aac', 'mp3'];
     const video = document.createElement('video');

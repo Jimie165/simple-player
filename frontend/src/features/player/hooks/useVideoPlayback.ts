@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { resolveMediaPath } from '@/utils/mediaPath';
-import { detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
+import { detectAv1Support, detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
 import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
 import { useMkvPrepare } from '@/features/player/hooks/useMkvPrepare';
 
@@ -52,6 +52,7 @@ export function useVideoPlayback({
     const isMkv = useMemo(() => isMkvPath(metadata?.path), [metadata?.path]);
 
     const supportsHevc = useMemo(() => detectHevcSupport(), []);
+    const supportsAv1 = useMemo(() => detectAv1Support(), []);
     const supportedAudioCodecs = useMemo(() => detectSupportedAudioCodecs(), []);
 
     const {
@@ -64,6 +65,7 @@ export function useVideoPlayback({
         sourcePath: metadata?.path,
         isMkv,
         supportsHevc,
+        supportsAv1,
         supportedAudioCodecs,
         onPrepareError: (prepareError) => {
             setError(String(prepareError));

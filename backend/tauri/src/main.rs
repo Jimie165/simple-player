@@ -129,6 +129,7 @@ fn main() {
             commands::video::cache::get_transcode_cache_info,
             commands::video::cache::clear_transcode_cache,
             commands::video::cache::set_transcode_cache_limit,
+            commands::video::cache::set_transcode_cache_dir,
             // Debug commands
             commands::debug::get_path_debug_info,
         ])

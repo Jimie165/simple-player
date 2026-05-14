@@ -3,7 +3,7 @@ use crate::utils::path::normalize_db_path;
 use rusqlite::Connection;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 /// 计算源文件哈希（规范化路径 + 文件大小 + mtime）
@@ -37,7 +37,7 @@ pub fn estimate_output_size(input_path: &str) -> Result<i64, String> {
 /// 确保缓存空间足够，提前清理旧文件
 pub fn ensure_cache_space(
     conn: &Connection,
-    app_data_dir: &Path,
+    cache_dir: &Path,
     required_bytes: i64,
     max_cache_mb: i64,
 ) -> Result<(), String> {
@@ -62,7 +62,7 @@ pub fn ensure_cache_space(
         let record = &oldest[0];
         
         // 删除物理文件
-        let full_path = app_data_dir.join(&record.cache_path);
+        let full_path = resolve_cache_file_path(cache_dir, &record.cache_path);
         let _ = fs::remove_file(&full_path);
         
         // 删除数据库记录
@@ -77,7 +77,7 @@ pub fn ensure_cache_space(
 /// 查找缓存，存在则更新访问时间
 pub fn get_cached_video(
     conn: &Connection,
-    app_data_dir: &Path,
+    cache_dir: &Path,
     source_hash: &str,
 ) -> Result<Option<String>, String> {
     if let Some(cache_path) = TranscodeCacheRepo::find_and_touch(conn, source_hash)
@@ -89,7 +89,7 @@ pub fn get_cached_video(
         }
 
         // 验证文件存在且是文件（非目录）
-        let full_path = app_data_dir.join(&cache_path);
+        let full_path = resolve_cache_file_path(cache_dir, &cache_path);
         if full_path.is_file() {
             return Ok(Some(full_path.to_string_lossy().to_string()));
         } else {
@@ -99,4 +99,27 @@ pub fn get_cached_video(
         }
     }
     Ok(None)
+}
+
+pub fn resolve_cache_file_path(cache_dir: &Path, cache_path: &str) -> PathBuf {
+    let path = Path::new(cache_path);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+
+    let direct = cache_dir.join(path);
+    if direct.is_file() {
+        return direct;
+    }
+
+    // 兼容旧记录：以前 cache_path 形如 transcoded_videos/<hash>.mp4，
+    // 现在 cache_dir 本身就是转码 MP4 文件夹。
+    if let Some(file_name) = path.file_name() {
+        let flattened = cache_dir.join(file_name);
+        if flattened.is_file() {
+            return flattened;
+        }
+    }
+
+    direct
 }

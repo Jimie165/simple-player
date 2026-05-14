@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-hot-toast';
-import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings } from 'react-icons/md';
+import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings, MdFolderOpen, MdRestore } from 'react-icons/md';
 import clsx from 'clsx';
 
 interface TranscodeCacheInfo {
@@ -9,6 +10,9 @@ interface TranscodeCacheInfo {
     file_count: number;
     hw_accel_type: string;
     limit_mb: number;
+    cache_dir: string;
+    default_cache_dir: string;
+    is_custom_cache_dir: boolean;
 }
 
 export default function TranscodeSettings() {
@@ -16,14 +20,18 @@ export default function TranscodeSettings() {
     const [clearing, setClearing] = useState(false);
     const [limit, setLimit] = useState(5120); // Local state for slider
     const [saving, setSaving] = useState(false);
+    const [changingDir, setChangingDir] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const fetchInfo = async () => {
         try {
             const data = await invoke<TranscodeCacheInfo>('get_transcode_cache_info');
             setInfo(data);
             setLimit(data.limit_mb);
+            setLoadError(null);
         } catch (error) {
             console.error('Failed to get transcode info:', error);
+            setLoadError(typeof error === 'string' ? error : '无法加载转码缓存设置');
         }
     };
 
@@ -67,6 +75,40 @@ export default function TranscodeSettings() {
         }
     };
 
+    const handleChooseCacheDir = async () => {
+        if (changingDir) return;
+        try {
+            const selected = await open({ directory: true, multiple: false });
+            if (!selected || typeof selected !== 'string') return;
+            setChangingDir(true);
+            const data = await invoke<TranscodeCacheInfo>('set_transcode_cache_dir', { cacheDir: selected });
+            setInfo(data);
+            setLimit(data.limit_mb);
+            toast.success('转码 MP4 文件夹已更新', { id: 'cache-dir-toast' });
+        } catch (error) {
+            console.error('Failed to set cache dir:', error);
+            toast.error(typeof error === 'string' ? error : '更新转码 MP4 文件夹失败', { id: 'cache-dir-toast' });
+        } finally {
+            setChangingDir(false);
+        }
+    };
+
+    const handleResetCacheDir = async () => {
+        if (changingDir || !info?.is_custom_cache_dir) return;
+        setChangingDir(true);
+        try {
+            const data = await invoke<TranscodeCacheInfo>('set_transcode_cache_dir', { cacheDir: null });
+            setInfo(data);
+            setLimit(data.limit_mb);
+            toast.success('已恢复默认转码 MP4 文件夹', { id: 'cache-dir-toast' });
+        } catch (error) {
+            console.error('Failed to reset cache dir:', error);
+            toast.error('恢复默认文件夹失败', { id: 'cache-dir-toast' });
+        } finally {
+            setChangingDir(false);
+        }
+    };
+
     // 格式化硬件加速类型显示
     const getHwAccelLabel = (type: string) => {
         switch (type) {
@@ -80,7 +122,21 @@ export default function TranscodeSettings() {
         }
     };
 
-    if (!info) return null;
+    if (!info) {
+        return (
+            <section className="space-y-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
+                    <MdVideoSettings className="text-lg" />
+                    <span>视频转码设置</span>
+                </div>
+                <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 p-5">
+                    <p className="text-sm text-on-surface-variant">
+                        {loadError ?? '正在加载转码缓存设置...'}
+                    </p>
+                </div>
+            </section>
+        );
+    }
 
     const usagePercent = Math.min((info.total_size_mb / limit) * 100, 100);
     const limitMin = 1024; // 1GB
@@ -142,6 +198,38 @@ export default function TranscodeSettings() {
                             <MdDelete className={clsx("text-base", clearing && "animate-pulse")} />
                             {clearing ? '清理中...' : '清空缓存'}
                         </button>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3 rounded-xl bg-surface-container px-3 py-3">
+                        <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-on-surface-variant mb-1">转码 MP4 文件夹</p>
+                            <p className="text-sm text-on-surface truncate" title={info.cache_dir}>
+                                {info.cache_dir}
+                            </p>
+                            <p className="mt-1 text-[10px] text-on-surface-variant/70">
+                                {info.is_custom_cache_dir ? '自定义位置' : '默认位置'}
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {info.is_custom_cache_dir && (
+                                <button
+                                    onClick={handleResetCacheDir}
+                                    disabled={changingDir}
+                                    className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors active:scale-95 disabled:opacity-50"
+                                    title={`恢复默认文件夹：${info.default_cache_dir}`}
+                                >
+                                    <MdRestore className="text-lg" />
+                                </button>
+                            )}
+                            <button
+                                onClick={handleChooseCacheDir}
+                                disabled={changingDir}
+                                className="flex items-center justify-center w-9 h-9 rounded-full text-primary hover:bg-primary/10 transition-colors active:scale-95 disabled:opacity-50"
+                                title="选择转码 MP4 文件夹"
+                            >
+                                <MdFolderOpen className="text-lg" />
+                            </button>
+                        </div>
                     </div>
 
                     {/* 使用量进度条 */}

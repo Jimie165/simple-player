@@ -7,6 +7,7 @@ interface UseMkvPrepareOptions {
     sourcePath?: string;
     isMkv: boolean;
     supportsHevc: boolean;
+    supportsAv1: boolean;
     supportedAudioCodecs: string[];
     onPrepareError?: (error: unknown) => void;
 }
@@ -23,6 +24,7 @@ export function useMkvPrepare({
     sourcePath,
     isMkv,
     supportsHevc,
+    supportsAv1,
     supportedAudioCodecs,
     onPrepareError,
 }: UseMkvPrepareOptions): UseMkvPrepareResult {
@@ -65,6 +67,7 @@ export function useMkvPrepare({
                 const outPath = await invoke<string>('prepare_video_for_playback', {
                     path: sourcePath,
                     supportsHevc,
+                    supportsAv1,
                     supportedAudioCodecs,
                 });
                 console.log('[VideoPlayer] 视频准备完成:', outPath);
@@ -86,7 +89,7 @@ export function useMkvPrepare({
             cancelled = true;
             if (unlistenFn) unlistenFn();
         };
-    }, [isOpen, sourcePath, isMkv, supportsHevc, supportedAudioCodecs]);
+    }, [isOpen, sourcePath, isMkv, supportsHevc, supportsAv1, supportedAudioCodecs]);
 
     return {
         preparedPath,

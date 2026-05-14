@@ -114,40 +114,18 @@ pub fn run_ffprobe_audio_codec(ffprobe: &str, input_path: &str) -> Result<Option
     Ok(Some(s))
 }
 
-/// 检查视频是否已经是浏览器兼容的格式 (H.264/AAC)
-pub fn check_browser_compatible(
-    ffprobe: &str,
-    input_path: &str,
+pub fn is_browser_compatible_video_codec(
+    video_codec: &str,
     supports_hevc: bool,
-) -> Result<bool, String> {
-    let input_os = normalize_windows_path(input_path);
-    let mut cmd = std::process::Command::new(ffprobe);
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        cmd.creation_flags(0x08000000);
-    }
-    let output = cmd
-        .args([
-            "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=codec_name",
-            "-of", "default=nw=1:nk=1",
-            &input_os,
-        ])
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output()
-        .map_err(|e| e.to_string())?;
-    
-    let video_codec = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
-    eprintln!("[check_browser_compatible] 检测到视频编码: {}", video_codec);
-    
+    supports_av1: bool,
+) -> bool {
     let hevc_ok = supports_hevc && (video_codec == "hevc" || video_codec == "h265");
+    let av1_ok = supports_av1 && video_codec == "av1";
 
     // 只有 H.264/AVC 是广泛兼容的
     // HEVC 仅在系统支持时允许直通
-    Ok(video_codec == "h264" || video_codec == "avc" || hevc_ok)
+    // AV1 在当前 WebView 支持时允许直通，避免高成本重编码
+    video_codec == "h264" || video_codec == "avc" || hevc_ok || av1_ok
 }
 
 /// 尝试快速 remux（仅重新封装，不转码视频）

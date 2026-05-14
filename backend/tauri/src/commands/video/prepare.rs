@@ -1,9 +1,9 @@
 // 视频播放准备相关命令
 // ============================================================================
 
-use super::cache::get_setting;
+use super::cache::{get_setting, resolve_transcoded_video_dir};
 use super::ffprobe::{
-    check_browser_compatible, run_ffprobe_audio_codec, run_ffprobe_duration,
+    is_browser_compatible_video_codec, run_ffprobe_audio_codec, run_ffprobe_duration,
     run_ffprobe_video_codec, try_remux,
 };
 use super::transcode::{VideoPrepareProgress, transcode_with_hw};
@@ -35,7 +35,7 @@ fn get_or_create_prepare_lock(source_hash: &str) -> Result<Arc<SourcePrepareMute
         .clone())
 }
 
-pub(crate) fn resolve_cache_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
+pub(crate) fn resolve_default_cache_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let mut dir = app_handle
         .path()
         .app_cache_dir()
@@ -52,6 +52,7 @@ pub async fn prepare_video_for_playback(
     app_handle: tauri::AppHandle,
     path: String,
     supports_hevc: bool,
+    supports_av1: bool,
     supported_audio_codecs: Vec<String>,
 ) -> Result<String, String> {
     // 1. 计算源文件哈希
@@ -62,11 +63,14 @@ pub async fn prepare_video_for_playback(
     let source_prepare_lock = get_or_create_prepare_lock(&source_hash)?;
     let _prepare_guard = source_prepare_lock.lock().await;
 
-    // 2. 获取缓存目录 (AppData/Local)
-    let app_cache_dir = resolve_cache_root(&app_handle).map_err(|e| {
-        eprintln!("[prepare_video_for_playback] 获取缓存目录失败: {}", e);
-        e
-    })?;
+    // 2. 获取转码 MP4 缓存目录
+    let app_cache_dir = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        resolve_transcoded_video_dir(&conn, &app_handle).map_err(|e| {
+            eprintln!("[prepare_video_for_playback] 获取缓存目录失败: {}", e);
+            e
+        })?
+    };
     eprintln!("[prepare_video_for_playback] 缓存目录: {:?}", app_cache_dir);
 
     //3. 查找缓存
@@ -99,8 +103,8 @@ pub async fn prepare_video_for_playback(
     }
 
     // 6. 生成缓存路径（使用临时文件）
-    let cache_path = format!("transcoded_videos/{}.mp4", &source_hash[..16]);
-    let temp_path = format!("transcoded_videos/{}.tmp.mp4", &source_hash[..16]);
+    let cache_path = format!("{}.mp4", &source_hash[..16]);
+    let temp_path = format!("{}.tmp.mp4", &source_hash[..16]);
     let cache_full_path = app_cache_dir.join(&cache_path);
     let temp_full_path = app_cache_dir.join(&temp_path);
 
@@ -154,19 +158,19 @@ pub async fn prepare_video_for_playback(
         "[prepare_video_for_playback] 前端 HEVC 支持: {}",
         supports_hevc
     );
+    eprintln!(
+        "[prepare_video_for_playback] 前端 AV1 支持: {}",
+        supports_av1
+    );
 
-    let is_compatible = check_browser_compatible(&ffprobe, &path, supports_hevc)
-        .map(|compatible| {
-            eprintln!(
-                "[prepare_video_for_playback] 浏览器兼容性检查: {}",
-                compatible
-            );
-            compatible
-        })
-        .unwrap_or_else(|e| {
-            eprintln!("[prepare_video_for_playback] 兼容性检查失败: {}", e);
-            false
-        });
+    let is_compatible = video_codec
+        .as_deref()
+        .map(|codec| is_browser_compatible_video_codec(codec, supports_hevc, supports_av1))
+        .unwrap_or(false);
+    eprintln!(
+        "[prepare_video_for_playback] 浏览器兼容性检查: {}",
+        is_compatible
+    );
 
     let audio_compatible = matches!(audio_codec.as_deref(), Some("aac") | None)
         || (audio_codec.is_some()
