@@ -103,7 +103,7 @@ export default function ApplePlayerControlsSection({
                         resetToken={`meta-${marqueeResetToken}-${metadata?.path || metadata?.artist || 'empty'}`}
                         behavior="auto-then-hover"
                         className="mt-1 text-[clamp(0.75rem,2vmin,1.25rem)] font-medium leading-tight text-white/60"
-                        contentClassName="flex items-center gap-1 whitespace-nowrap"
+                        contentClassName="flex w-max items-center gap-1 whitespace-nowrap"
                     >
                         <span
                             onClick={(e) => {

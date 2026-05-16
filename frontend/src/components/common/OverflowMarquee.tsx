@@ -62,7 +62,7 @@ export default function OverflowMarquee({
         return () => {
             resizeObserver.disconnect();
         };
-    }, [gapPx]);
+    }, [children, gapPx]);
 
     useLayoutEffect(() => {
         if (behavior === 'auto-then-hover') {
