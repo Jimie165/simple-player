@@ -3,6 +3,8 @@ import { MdFavorite } from 'react-icons/md';
 
 import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
+import OverflowMarquee from '@/components/common/OverflowMarquee';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
@@ -14,9 +16,11 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 
 export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }: SongInfoProps) {
     const { setVideoMode } = usePlayerStore();
+    const { push } = useNavigationStore();
+    const canNavigate = !!metadata && typeof metadata.id === 'number';
 
     return (
-        <div className="w-[30%] min-w-0 flex justify-start">
+        <div className="flex min-w-0 justify-start">
             <button
                 onClick={() => {
                     const isVideo = metadata?.path?.match(/\.(mp4|mkv|webm|avi|mov|flv)$/i);
@@ -26,13 +30,13 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                         onToggleFullScreen();
                     }
                 }}
-                className="group flex items-center text-left rounded-lg p-2 -ml-2 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors relative overflow-visible w-auto max-w-full"
+                className="group relative flex h-16 min-w-0 max-w-full items-start overflow-hidden rounded-md p-1 pt-1.5 pr-3 text-left transition-colors hover:bg-black/[0.025] dark:hover:bg-white/[0.045]"
             >
                 <div className={clsx(
-                    "relative shrink-0 flex items-center justify-center bg-neutral-200 dark:bg-neutral-700 overflow-hidden shadow-sm transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "relative shrink-0 flex items-center justify-center overflow-hidden bg-neutral-200 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] dark:bg-neutral-800",
                     isFullScreen
                         ? "w-0 h-14 opacity-0 -translate-y-12 scale-150 mr-0"
-                        : "w-14 h-14 opacity-100 translate-y-0 scale-100 mr-4 rounded-md"
+                        : "w-14 h-14 opacity-100 translate-y-0 scale-100 mr-3 rounded-md"
                 )}>
                     <CoverImage
                         song={metadata}
@@ -41,14 +45,37 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                     />
                 </div>
 
-                <div className="min-w-0 flex-1 flex flex-col justify-center transition-all duration-500 pr-4">
-                    <div className="font-semibold text-sm text-neutral-900 dark:text-neutral-100 group-hover:text-primary dark:group-hover:text-primary-light transition-colors w-full flex items-center gap-2 min-w-0">
-                        <span className="truncate">{metadata?.title || "未播放音乐"}</span>
+                <div className="flex min-w-0 max-w-[min(34vw,420px)] flex-1 flex-col justify-start pr-2 pt-0.5 transition-all duration-500 max-md:max-w-[min(28vw,220px)]">
+                    <div className="flex w-full min-w-0 items-center gap-2 text-sm font-semibold leading-4 text-neutral-950 transition-colors dark:text-neutral-100">
+                        <OverflowMarquee
+                            className="flex-1"
+                            resetToken={`title-${metadata?.path || metadata?.title || 'empty'}`}
+                        >
+                            <span className="whitespace-nowrap">{metadata?.title || "未播放音乐"}</span>
+                        </OverflowMarquee>
                         {metadata?.is_favorite && <MdFavorite className="text-red-500 text-xs shrink-0" />}
                     </div>
-                    <div className="text-xs text-neutral-500 group-hover:text-neutral-700 dark:group-hover:text-neutral-300 transition-colors truncate w-full mt-0.5">
-                        {metadata?.artist || "Simple Player"}
-                    </div>
+                    <OverflowMarquee
+                        className="mt-0.5 w-full text-xs leading-4 text-neutral-500 dark:text-neutral-400"
+                        contentClassName="flex w-max min-w-full items-center whitespace-nowrap"
+                        resetToken={`meta-${metadata?.path || metadata?.artist || 'empty'}`}
+                    >
+                        <span
+                            onClick={(e) => {
+                                if (!canNavigate || !metadata?.artist) return;
+                                e.stopPropagation();
+                                e.preventDefault();
+                                push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
+                            }}
+                            className={clsx(
+                                canNavigate && metadata?.artist
+                                    ? "cursor-pointer hover:text-neutral-700 hover:underline dark:hover:text-neutral-200"
+                                    : "cursor-default"
+                            )}
+                        >
+                            {metadata?.artist || "Simple Player"}
+                        </span>
+                    </OverflowMarquee>
                 </div>
             </button>
         </div>

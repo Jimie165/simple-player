@@ -14,12 +14,15 @@ import { audioService } from '@/services/audioService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 
 interface SearchResultsViewProps {
     query: string;
 }
 
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
+    const mainContentWidth = useMainContentWidth();
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
     const [loading, setLoading] = useState(false);
@@ -299,7 +302,10 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     {videoResults.length}
                                 </span>
                             </h2>
-                            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                            <div
+                                className="grid content-grid-video gap-4"
+                                style={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
+                            >
                                 {videoResults.map((video) => (
                                     <div
                                         key={video.id}

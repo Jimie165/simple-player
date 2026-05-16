@@ -223,7 +223,7 @@ export default function ArtistDetailView({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 px-2 pb-8">
+            <div className="flex-1 px-2 pb-20">
                 <AnimatePresence mode="wait">
                     {activeTab === 'albums' ? (
                         <motion.div
@@ -258,7 +258,7 @@ export default function ArtistDetailView({
                                     overscan={{ main: 1200, reverse: 1200 }}
                                     components={{
                                         Header: () => <div className="mt-4" />,
-                                        Footer: () => <div className="h-8" />
+                                        Footer: () => <div className="h-20 w-full" />
                                     }}
                                     itemContent={(index, album) => (
                                         <div className={index === sortedAlbums.length - 1 ? "" : "mb-12"}>

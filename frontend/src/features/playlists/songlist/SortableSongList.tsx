@@ -41,6 +41,7 @@ import {
     getGridTemplateColumns,
     getSongId,
 } from '@/features/playlists/songlist/sortableSongListUtils';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 
 export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';
@@ -101,7 +102,8 @@ export default function SortableSongList({
     playlistId,
     context = 'playlist' // Default to playlist
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
-    const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
+    const mainContentWidth = useMainContentWidth();
+    const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
 
 
     // Use the songs prop directly as sorting is now handled by the parent component
@@ -122,13 +124,6 @@ export default function SortableSongList({
             {label}
         </div>
     );
-
-    useEffect(() => {
-        const checkWidth = () => setShouldHideAlbum(window.innerWidth < HIDE_ALBUM_BREAKPOINT);
-        checkWidth();
-        window.addEventListener('resize', checkWidth);
-        return () => window.removeEventListener('resize', checkWidth);
-    }, []);
 
     // Use LibraryStore for Favorites
     const toggleFavorite = useLibraryStore(state => state.toggleFavorite);

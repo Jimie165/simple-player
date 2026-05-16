@@ -110,7 +110,7 @@ export default function AlbumDetailView({
             </div>
 
             {/* Song List */}
-            <div className="flex-1">
+            <div className="flex-1 pb-20">
                 <SongListView
                     songs={album.songs}
                     onPlay={onPlay}

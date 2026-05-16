@@ -6,6 +6,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { useTheme } from '@/hooks/useTheme';
 
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { audioService } from '@/services/audioService';
@@ -46,6 +47,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         lyricsPath,
         requestLyricsForPath,
     } = usePlayerStore();
+    const { fullScreenMode } = useTheme();
     const [localVolume, setLocalVolume] = useState(volume);
     const [isVolumeDragging, setIsVolumeDragging] = useState(false);
 
@@ -67,6 +69,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
     const queueScrollDidMountRef = useRef(false);
     const [lyricsMounted, setLyricsMounted] = useState(isLyricsOpen);
+    const [marqueeResetToken, setMarqueeResetToken] = useState(0);
     const [panelFlipTarget, setPanelFlipTarget] = useState<SidePanel | null>(null);
     const [isPanelFlipping, setIsPanelFlipping] = useState(false);
     const panelFlipRafRef = useRef<number | null>(null);
@@ -91,6 +94,12 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     useEffect(() => {
         if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
     }, [isOpen, isQueueOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            setMarqueeResetToken((v) => v + 1);
+        }
+    }, [isOpen]);
 
     useEffect(() => {
         return () => {
@@ -372,7 +381,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             className="absolute inset-0 z-[200] flex flex-col overflow-hidden bg-neutral-900"
         >
             {/* Background Layer - Memoized to prevent re-renders during drag */}
-            <PlayerBackground src={bgImageSrc} />
+            <PlayerBackground src={bgImageSrc} variant={fullScreenMode === 'immersive' ? 'fluid' : 'blurred'} />
 
             <ApplePlayerTopBar
                 isFullscreen={isFullscreen}
@@ -425,6 +434,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                         <ApplePlayerControlsSection
                             controlsRef={controlsRef}
                             metadata={metadata}
+                            marqueeResetToken={marqueeResetToken}
                             onClose={onClose}
                             push={push}
                             toggleFavorite={toggleFavorite}

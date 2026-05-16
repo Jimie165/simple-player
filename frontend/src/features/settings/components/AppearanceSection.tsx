@@ -77,7 +77,7 @@ export default function AppearanceSection() {
                                 : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
                         )}
                     >
-                        <span>经典</span>
+                        <span>封面背景</span>
                         {fullScreenMode === 'classic' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                     <button
@@ -89,7 +89,7 @@ export default function AppearanceSection() {
                                 : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
                         )}
                     >
-                        <span>沉浸</span>
+                        <span>流体背景</span>
                         {fullScreenMode === 'immersive' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                 </div>

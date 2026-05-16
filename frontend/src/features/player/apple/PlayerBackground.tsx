@@ -84,8 +84,15 @@ const FRAGMENT_SHADER = `
       
             vec4 color = texture2D(u_image, sampleUV);
 
-            // 温和提亮，避免过度拉伸导致的色阶压缩
-            color.rgb = clamp(color.rgb * 1.08 + vec3(0.015), 0.0, 1.0);
+            // 压缩高亮区域，避免白色或浅色封面在流体背景里过分刺眼
+            float luma = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+            float highlightCompress = smoothstep(0.58, 1.0, luma);
+            color.rgb *= mix(0.95, 0.72, highlightCompress);
+            color.rgb = mix(color.rgb, vec3(luma), 0.10 * highlightCompress);
+
+            // 给整体叠一层很轻的冷色调，压白但不直接变脏变黑
+            vec3 coolTint = vec3(0.055, 0.075, 0.11);
+            color.rgb = mix(color.rgb, coolTint, 0.12);
 
             // 轻量抖动：把可见色带打散为细微颗粒
             vec2 px = gl_FragCoord.xy;
@@ -393,8 +400,46 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
     );
 };
 
+function BlurredCoverBackground({ src }: { src: string | null }) {
+    return (
+        <AnimatePresence mode="popLayout">
+            {src && (
+                <motion.div
+                    key={src}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.9, ease: "easeInOut" }}
+                    className="absolute inset-0 w-full h-full opacity-85 dark:opacity-70"
+                >
+                    <div className="absolute inset-[-10%]">
+                        <img
+                            src={src}
+                            alt=""
+                            className="w-full h-full object-cover scale-[1.08] blur-[58px] saturate-[1.15] contrast-[0.98] opacity-45"
+                        />
+                    </div>
+                    <div className="absolute inset-[-4%] flex items-center justify-center overflow-hidden">
+                        <img
+                            src={src}
+                            alt=""
+                            className="w-full h-full object-contain scale-[1.08] blur-[78px] saturate-[1.45] contrast-[1.04]"
+                        />
+                    </div>
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_48%)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03),transparent_48%)]" />
+                </motion.div>
+            )}
+        </AnimatePresence>
+    );
+}
 
-export const PlayerBackground = React.memo(({ src }: { src: string | null }) => {
+export const PlayerBackground = React.memo(({
+    src,
+    variant = 'fluid'
+}: {
+    src: string | null;
+    variant?: 'fluid' | 'blurred';
+}) => {
     return (
         <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none bg-[#1a1a1a]">
 
@@ -403,26 +448,30 @@ export const PlayerBackground = React.memo(({ src }: { src: string | null }) => 
                 // 放大一点掩盖边缘
                 style={{ transform: 'scale(1.1)' }}
             >
-                <AnimatePresence mode="popLayout">
-                    {src && (
-                        <motion.div
-                            key={src}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 1.5, ease: "easeInOut" }}
-                            className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
-                        >
-                            <WebGLCanvas src={src} />
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+                {variant === 'fluid' ? (
+                    <AnimatePresence mode="popLayout">
+                        {src && (
+                            <motion.div
+                                key={src}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 1.5, ease: "easeInOut" }}
+                                className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
+                            >
+                                <WebGLCanvas src={src} />
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                ) : (
+                    <BlurredCoverBackground src={src} />
+                )}
             </div>
 
-            {/* 增加一层弱弱的深冷色底色，用于全局防刺眼 */}
-            <div className="absolute inset-0 bg-[#0a0a0c]/14 z-10 pointer-events-none" />
-            {/* 正片叠底遮罩：专门针对纯白色像素进行压暗，而不让整体变得死黑 */}
-            <div className="absolute inset-0 bg-black/10 z-10 pointer-events-none mix-blend-multiply" />
+            {/* 轻冷色染色，优先压掉偏白高亮，不用纯黑硬盖 */}
+            <div className="absolute inset-0 bg-[#0b1220]/14 z-10 pointer-events-none" />
+            {/* 用暗角收边，避免整屏均匀压暗产生脏块感 */}
+            <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(4,6,12,0.06)_62%,rgba(4,6,12,0.16)_100%)]" />
         </div>
     );
 });

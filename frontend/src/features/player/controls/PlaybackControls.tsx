@@ -14,7 +14,12 @@ import { formatTime } from '@/utils/time';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
-export default function PlaybackControls() {
+interface PlaybackControlsProps {
+    mode: 'full' | 'compact' | 'mini';
+}
+
+export default function PlaybackControls({ mode }: PlaybackControlsProps) {
+    const isMini = mode === 'mini';
     const {
         isPlaying, metadata,
         isShuffling, repeatMode,
@@ -370,29 +375,38 @@ export default function PlaybackControls() {
         setCurrentTime(actualTime);
     };
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
+    const remainingTime = Math.max((metadata?.duration || 0) - currentTime, 0);
 
     return (
-        <div className="w-[40%] shrink-0 flex flex-col items-center gap-1">
-            <div className="flex items-center gap-6">
+        <>
+            <div className={clsx(
+                "relative z-10 row-start-1 flex min-w-0 items-center gap-1.5",
+                isMini ? "col-start-2 justify-end gap-2" : "col-start-1 justify-center"
+            )}>
 
                 {/* 随机按钮 */}
-                <CustomTooltip text={"随机播放"}>
-                    <button
-                        onClick={handleBtnShuffle}
-                        className={clsx(
-                            "text-xl transition-colors p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10",
-                            isShuffling
-                                ? "text-primary"
-                                : "text-neutral-400 dark:text-neutral-500"
-                        )}
-                    >
-                        <MdShuffle />
-                    </button>
-                </CustomTooltip>
+                <div className={clsx(isMini && "hidden")}>
+                    <CustomTooltip text={"随机播放"}>
+                        <button
+                            onClick={handleBtnShuffle}
+                            className={clsx(
+                                "grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-primary/10",
+                                isShuffling
+                                    ? "text-primary"
+                                    : "text-neutral-500 dark:text-neutral-300"
+                            )}
+                        >
+                            <MdShuffle />
+                        </button>
+                    </CustomTooltip>
+                </div>
 
                 {/* 上一首 */}
                 <CustomTooltip text="上一首">
-                    <button onClick={handlePrev} className="text-2xl text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white p-1">
+                    <button onClick={handlePrev} className={clsx(
+                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-primary transition-colors hover:bg-primary/10",
+                        isMini && "hidden"
+                    )}>
                         <MdSkipPrevious />
                     </button>
                 </CustomTooltip>
@@ -403,10 +417,11 @@ export default function PlaybackControls() {
                         onClick={metadata ? togglePlay : undefined}
                         disabled={!metadata}
                         className={clsx(
-                            "text-5xl transition-transform drop-shadow-md",
+                            "grid place-items-center rounded-full transition-colors",
+                            isMini ? "h-11 w-11 text-[44px]" : "h-8 w-8 text-[32px]",
                             metadata
-                                ? "text-primary hover:scale-105 active:scale-95 cursor-pointer"
-                                : "text-neutral-300 dark:text-neutral-600 cursor-not-allowed"
+                                ? "cursor-pointer text-primary hover:text-primary/90"
+                                : "cursor-not-allowed text-neutral-300 dark:text-neutral-600"
                         )}
                     >
                         {isPlaying ? <MdPauseCircle /> : <MdPlayCircle />}
@@ -415,39 +430,54 @@ export default function PlaybackControls() {
 
                 {/* 下一首 */}
                 <CustomTooltip text="下一首">
-                    <button onClick={handleNext} className="text-2xl text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-white p-1">
+                    <button onClick={handleNext} className={clsx(
+                        "grid place-items-center rounded-full text-primary transition-colors hover:bg-primary/10",
+                        isMini ? "h-10 w-10 text-[34px]" : "h-7 w-7 text-[23px]"
+                    )}>
                         <MdSkipNext />
                     </button>
                 </CustomTooltip>
 
                 {/* 循环按钮 */}
-                <CustomTooltip text={
-                    repeatMode === 'off' ? "重复播放已关闭" :
-                        repeatMode === 'all' ? "重复播放全部" : "单曲循环"
-                }>
-                    <button
-                        onClick={handleBtnRepeat}
-                        className={clsx(
-                            "text-xl transition-colors relative p-2 rounded-full hover:bg-neutral-100 dark:hover:bg-white/10",
-                            repeatMode !== 'off'
-                                ? "text-primary"
-                                : "text-neutral-400 dark:text-neutral-500"
-                        )}
-                    >
-                        <MdRepeat />
-                        {repeatMode === 'one' && (
-                            <span className="absolute top-1.5 right-1.5 text-[8px] font-bold leading-none">1</span>
-                        )}
-                    </button>
-                </CustomTooltip>
+                <div className={clsx(isMini && "hidden")}>
+                    <CustomTooltip text={
+                        repeatMode === 'off' ? "重复播放已关闭" :
+                            repeatMode === 'all' ? "重复播放全部" : "单曲循环"
+                    }>
+                        <button
+                            onClick={handleBtnRepeat}
+                            className={clsx(
+                                "relative grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-primary/10",
+                                repeatMode !== 'off'
+                                    ? "text-primary"
+                                    : "text-neutral-500 dark:text-neutral-300"
+                            )}
+                        >
+                            <MdRepeat />
+                            {repeatMode === 'one' && (
+                                <span className="absolute top-[5px] right-[5px] grid h-2.5 w-2.5 place-items-center rounded-full bg-white text-[7px] font-bold leading-none text-primary dark:bg-neutral-950">1</span>
+                            )}
+                        </button>
+                    </CustomTooltip>
+                </div>
             </div>
 
             {/* 进度条 */}
-            <div className="w-full max-w-lg flex items-center gap-3 text-xs text-neutral-500 font-medium">
-                <span className="w-8 text-right tabular-nums">{formatTime(currentTime)}</span>
-                <div className="flex-1 relative h-4 group flex items-center">
-                    <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-[height] group-hover:h-1.5"></div>
-                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-[height] group-hover:h-1.5" style={{ width: `${progressPercent}%` }} />
+            <div className={clsx(
+                "z-20 col-start-2 col-end-4 row-start-1 mb-1 ml-[68px] flex self-end text-[10px] font-medium text-neutral-500 dark:text-neutral-400",
+                mode === 'full' && "mr-[104px]",
+                mode === 'compact' && "mr-8",
+                isMini && "hidden"
+            )}>
+                <div className="group relative flex h-5 flex-1 items-center">
+                    <span className="pointer-events-none absolute -top-1.5 left-0 text-[10px] font-medium tabular-nums leading-none text-neutral-800 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-neutral-100">
+                        {formatTime(currentTime)}
+                    </span>
+                    <span className="pointer-events-none absolute -top-1.5 right-0 text-[10px] font-medium tabular-nums leading-none text-neutral-800 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-neutral-100">
+                        -{formatTime(remainingTime)}
+                    </span>
+                    <div className="pointer-events-none absolute left-0 right-0 h-[3px] overflow-hidden rounded-full bg-black/10 transition-[height] group-hover:h-1 dark:bg-white/15"></div>
+                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-primary transition-[height] group-hover:h-1" style={{ width: `${progressPercent}%` }} />
                     <div
                         className={clsx(
                             "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
@@ -460,8 +490,7 @@ export default function PlaybackControls() {
                         <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />
                     )}
                 </div>
-                <span className="w-8 tabular-nums">{formatTime(metadata?.duration || 0)}</span>
             </div>
-        </div>
+        </>
     );
 }

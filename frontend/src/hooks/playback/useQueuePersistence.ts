@@ -19,7 +19,9 @@ export function useQueuePersistence() {
 
         const timer = setTimeout(() => {
             if (playlist.length > 0) {
-                const ids = playlist.map(s => s.id).filter((id): id is number => id !== undefined);
+                const ids = playlist
+                    .map(s => s.id)
+                    .filter((id): id is number => typeof id === 'number' && Number.isFinite(id));
                 if (ids.length > 0) {
                     libraryService.savePlayQueue(ids).catch(console.error);
                 }

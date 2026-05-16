@@ -8,6 +8,8 @@ import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义艺人数据结构
@@ -28,6 +30,7 @@ interface ArtistGridViewProps {
 }
 
 export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
+    const mainContentWidth = useMainContentWidth();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
@@ -98,7 +101,8 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
             <VirtualizedGrid
                 data={artists}
                 itemKey={(_index, artist) => getMusicItemId(artist)}
-                listClassName="grid grid-cols-2 gap-4 md:gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pt-4 pb-8"
+                listClassName="grid content-grid-cover gap-4 pt-4 pb-20"
+                listStyle={getSparseGridStyle(mainContentWidth, artists.length, 16, 'cover')}
                 itemContent={(_index, artist) => {
                     const id = getMusicItemId(artist);
                     const isSelected = selectedIds.has(id);

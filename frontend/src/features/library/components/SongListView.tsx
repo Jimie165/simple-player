@@ -8,6 +8,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { SongListRow } from '@/features/library/components/SongListRow';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
@@ -53,16 +54,9 @@ export default function SongListView({
 
     // Header Blur / Context specific class - kept from original if any logic existed, seemingly generic sticky
 
-    // Responsive: auto-hide album column on narrow windows
-    const [shouldHideAlbum, setShouldHideAlbum] = useState(false);
-    useEffect(() => {
-        const checkWidth = () => {
-            setShouldHideAlbum(window.innerWidth < HIDE_ALBUM_BREAKPOINT);
-        };
-        checkWidth();
-        window.addEventListener('resize', checkWidth);
-        return () => window.removeEventListener('resize', checkWidth);
-    }, []);
+    // Responsive: auto-hide album column based on the main content area width.
+    const mainContentWidth = useMainContentWidth();
+    const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
 
     const effectiveHideAlbum = hideAlbum || shouldHideAlbum;
 
@@ -317,6 +311,9 @@ export default function SongListView({
                         itemContent={itemContent}
                         overscan={{ main: 2000, reverse: 2000 }}
                         className="w-full"
+                        components={{
+                            Footer: () => <div className="h-20 w-full" />
+                        }}
                     />
                 ) : (
                     <div className="flex flex-col opacity-0" />

@@ -3,7 +3,6 @@ import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import clsx from 'clsx';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -17,7 +16,6 @@ import MusicGrid from '@/features/home/MusicGrid';
 import Library from '@/features/library/Library';
 import { VideoLibrary } from '@/features/videos/VideoLibrary';
 import Settings from '@/features/settings/Settings';
-import NowPlayingView from '@/features/player/NowPlayingView';
 import PlayerControl from '@/features/player/PlayerControl';
 import AppleMusicPlayer from '@/features/player/AppleMusicPlayer';
 
@@ -34,7 +32,7 @@ import VideoPlayerOverlay from '@/features/player/VideoPlayerOverlay';
 import { Toaster } from 'react-hot-toast';
 
 function App() {
-  const { init: initTheme, fullScreenMode } = useThemeStore();
+  const { init: initTheme } = useThemeStore();
   const playlist = useLibraryStore((state) => state.playlist);
   const currentSongIndex = useLibraryStore((state) => state.currentSongIndex);
   const setMetadata = usePlayerStore((state) => state.setMetadata);
@@ -85,6 +83,7 @@ function App() {
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
+  const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
   // Listen for Full Screen Player Events
@@ -106,19 +105,21 @@ function App() {
   useQueuePersistence(); // Activate queue persistence
   useGlobalEvents(); // Activate global event listeners
 
-  const metadata = usePlayerStore((state) => state.metadata);
-
   // In compact mode, always use overlay sidebar (regardless of collapsed state)
   const isSidebarOverlay = isCompactSidebar;
 
   useEffect(() => {
     const handleResize = () => {
+      setWindowWidth(window.innerWidth);
       setIsCompactSidebar(window.innerWidth < 768);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const sidebarOffset = isSidebarOverlay || sidebarCollapsed ? 72 : 280;
+  const mainContentWidth = windowWidth - sidebarOffset;
+  const playerMode = mainContentWidth < 560 ? 'mini' : mainContentWidth < 820 ? 'compact' : 'full';
   const handleNavigate = (page: string) => {
     const target = page as PageId;
     storeNavigate(target);
@@ -167,7 +168,10 @@ function App() {
   };
 
   const mainContent = (
-    <div className="flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden shadow-sm relative z-0 transition-colors duration-300">
+    <div
+      data-main-content-query
+      className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden shadow-sm relative z-0 transition-colors duration-300"
+    >
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
         data-tauri-drag-region
@@ -175,7 +179,7 @@ function App() {
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className="pt-12 min-h-full">
+        <div className="pt-12 min-h-full pb-24">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}
@@ -208,7 +212,7 @@ function App() {
       <div className="flex flex-1 overflow-hidden relative">
 
         {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
-        <div className="absolute inset-0 z-0 flex">
+        <div className="absolute inset-0 flex">
           <Sidebar
             activeId={currentPage}
             onNavigate={handleNavigate}
@@ -236,26 +240,15 @@ function App() {
         </div>
 
 
-        {/* --- 层级 3: 沉浸模式 (Now Playing Overlay) --- */}
-        <div className={clsx(
-          "absolute inset-0 transition-all duration-500 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
-          // Z-Index Switch: If immersive mode and active, cover EVERYTHING (z-80). Otherwise z-60 (under bottom bar).
-          // Note: Bottom Bar is z-[70].
-          (isFullScreen && fullScreenMode === 'immersive') ? "z-[80]" : "z-[60]",
-          isFullScreen
-            ? "opacity-100 visible translate-y-0"
-            : "opacity-0 invisible translate-y-8 pointer-events-none"
-        )}>
-          <NowPlayingView metadata={metadata} />
-        </div>
-
       </div>
 
       {/* 4. 底部播放控制 - M3 Surface Container */}
-      <div className="bg-surface-container-high border-t border-outline-variant/10 z-[70] relative">
+      <div className="relative z-[70]">
         <PlayerControl
           isFullScreen={isFullScreen}
           onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}
+          sidebarOffset={sidebarOffset}
+          mode={playerMode}
         />
       </div>
       <AddToPlaylistSheet />
@@ -267,7 +260,7 @@ function App() {
       />
 
       <AppleMusicPlayer
-        isOpen={isFullScreen && fullScreenMode === 'immersive'}
+        isOpen={isFullScreen}
         onClose={() => setIsFullScreen(false)}
       />
       <Toaster

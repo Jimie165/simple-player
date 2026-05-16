@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import AppleMusicQueue from '@/features/player/AppleMusicQueue';
 
 interface ApplePlayerQueuePanelProps {
@@ -23,9 +24,10 @@ export default function ApplePlayerQueuePanel({
     const isFlippingIn = panelFlipTarget === 'queue' && isPanelFlipping && isQueueOpen;
     const isFlippingOut = panelFlipTarget === 'lyrics' && isPanelFlipping;
     const isVisible = isQueueOpen && !isFlippingOut;
+    const panelEase = [0.32, 0.72, 0, 1] as const;
 
     // 动画配置
-    const variants = {
+    const variants: Variants = {
         visible: {
             opacity: 1,
             scale: 1,
@@ -33,7 +35,7 @@ export default function ApplePlayerQueuePanel({
             rotateY: 0,
             transition: {
                 duration: isFlippingIn ? 0.36 : 0.5,
-                ease: [0.32, 0.72, 0, 1],
+                ease: panelEase,
                 delay: (panelFlipTarget === null && isQueueOpen) ? 0.22 : (isFlippingIn ? 0.08 : 0)
             }
         },
@@ -44,7 +46,7 @@ export default function ApplePlayerQueuePanel({
             rotateY: isFlipPreparing ? 90 : (isFlippingOut ? -90 : 0),
             transition: {
                 duration: isFlippingOut ? 0.25 : 0.35,
-                ease: [0.32, 0.72, 0, 1]
+                ease: panelEase
             }
         }
     };

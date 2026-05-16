@@ -7,6 +7,8 @@ import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
 import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/PlaylistCardMenus';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 
 interface PlaylistCardsGridProps {
     filteredPlaylists: Playlist[];
@@ -45,8 +47,13 @@ export default function PlaylistCardsGrid({
     getPlaylistSettings,
     playlistSongs,
 }: PlaylistCardsGridProps) {
+    const mainContentWidth = useMainContentWidth();
+
     return (
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pb-8">
+        <div
+            className="grid content-grid-cover gap-6 pb-8"
+            style={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
+        >
             {filteredPlaylists.map(pl => {
                 if (pl.id === 'favorites' as any) {
                     const favoritesSelectionId = getMusicItemId(pl);

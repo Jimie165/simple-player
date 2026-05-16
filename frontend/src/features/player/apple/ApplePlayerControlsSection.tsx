@@ -17,10 +17,12 @@ import type { SongMetadata } from '@/types';
 import { formatTime } from '@/utils/time';
 import MusicSlider from '@/components/common/MusicSlider';
 import { PlayerMenuWrapper } from '@/features/player/apple/PlayerMenuButton';
+import OverflowMarquee from '@/components/common/OverflowMarquee';
 
 interface ApplePlayerControlsSectionProps {
     controlsRef: React.RefObject<HTMLDivElement | null>;
     metadata: SongMetadata | null;
+    marqueeResetToken: number;
     onClose: () => void;
     push: (entry: any) => void;
     toggleFavorite: (song: SongMetadata) => Promise<void>;
@@ -45,6 +47,7 @@ interface ApplePlayerControlsSectionProps {
 export default function ApplePlayerControlsSection({
     controlsRef,
     metadata,
+    marqueeResetToken,
     onClose,
     push,
     toggleFavorite,
@@ -65,6 +68,20 @@ export default function ApplePlayerControlsSection({
     handleVolumeSeekStart,
     handleVolumeSeekEnd,
 }: ApplePlayerControlsSectionProps) {
+    const canNavigate = !!metadata && typeof metadata.id === 'number';
+
+    const handleOpenArtist = () => {
+        if (!metadata?.artist || !canNavigate) return;
+        push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
+        window.setTimeout(() => onClose(), 0);
+    };
+
+    const handleOpenAlbum = () => {
+        if (!metadata?.album || !canNavigate) return;
+        push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover_path || null, count: 0 } });
+        window.setTimeout(() => onClose(), 0);
+    };
+
     return (
         <div
             ref={controlsRef}
@@ -73,23 +90,33 @@ export default function ApplePlayerControlsSection({
         >
             <div className="flex items-center justify-between px-0.5 mt-2">
                 <div className="flex flex-col min-w-0 pr-4 w-[75%]">
-                    <h1 className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white truncate drop-shadow-md leading-tight">
-                        {metadata?.title || '未播放音乐'}
-                    </h1>
-                    <div className="text-[clamp(0.75rem,2vmin,1.25rem)] text-white/60 truncate font-medium leading-tight mt-1 flex items-center gap-1">
+                    <OverflowMarquee
+                        resetToken={`title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
+                        behavior="auto-then-hover"
+                        className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white drop-shadow-md leading-tight"
+                    >
+                        <h1 className="whitespace-nowrap">
+                            {metadata?.title || '未播放音乐'}
+                        </h1>
+                    </OverflowMarquee>
+                    <OverflowMarquee
+                        resetToken={`meta-${marqueeResetToken}-${metadata?.path || metadata?.artist || 'empty'}`}
+                        behavior="auto-then-hover"
+                        className="mt-1 text-[clamp(0.75rem,2vmin,1.25rem)] font-medium leading-tight text-white/60"
+                        contentClassName="flex items-center gap-1 whitespace-nowrap"
+                    >
                         <span
-                            onClick={() => {
-                                if (metadata?.artist && metadata && typeof (metadata as any).id === 'number') {
-                                    push({ type: 'artist_detail', data: { name: metadata.artist, count: 0, albumCount: 0, songs: [], cover: null } });
-                                    onClose();
-                                }
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenArtist();
                             }}
                             className={clsx(
                                 'transition-colors',
-                                metadata && typeof (metadata as any).id === 'number'
+                                canNavigate
                                     ? 'hover:underline hover:text-white/80 cursor-pointer'
                                     : 'cursor-default'
                             )}
+                            role={canNavigate ? 'button' : undefined}
                         >
                             {metadata?.artist || 'Simple Player'}
                         </span>
@@ -97,24 +124,23 @@ export default function ApplePlayerControlsSection({
                             <>
                                 <span>—</span>
                                 <span
-                                    onClick={() => {
-                                        if (metadata?.album && metadata && typeof (metadata as any).id === 'number') {
-                                            push({ type: 'album_detail', data: { name: metadata.album, artist: metadata.artist, songs: [], cover: metadata.cover_path || null, count: 0 } });
-                                            onClose();
-                                        }
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleOpenAlbum();
                                     }}
                                     className={clsx(
                                         'transition-colors',
-                                        metadata && typeof (metadata as any).id === 'number'
+                                        canNavigate
                                             ? 'hover:underline hover:text-white/80 cursor-pointer'
                                             : 'cursor-default'
                                     )}
+                                    role={canNavigate ? 'button' : undefined}
                                 >
                                     {metadata.album}
                                 </span>
                             </>
                         )}
-                    </div>
+                    </OverflowMarquee>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button

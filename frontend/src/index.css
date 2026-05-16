@@ -232,6 +232,48 @@ body {
     @apply bg-glass-surface backdrop-blur-md border border-glass-border active:scale-95 transition-all duration-200;
   }
 
+  .main-content-query {
+    container: main-content / inline-size;
+  }
+
+  .content-grid-cover,
+  .content-grid-video {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  @container main-content (min-width: 520px) {
+    .content-grid-cover,
+    .content-grid-video {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+
+  @container main-content (min-width: 700px) {
+    .content-grid-cover,
+    .content-grid-video {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @container main-content (min-width: 920px) {
+    .content-grid-cover,
+    .content-grid-video {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+  }
+
+  @container main-content (min-width: 1140px) {
+    .content-grid-cover {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+  }
+
+  @container main-content (min-width: 1360px) {
+    .content-grid-cover {
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+    }
+  }
+
   /* 自定义 Tooltip 延迟：进入有延迟，离开无延迟 */
   .tooltip-animation {
     @apply transition-all duration-200 ease-out opacity-0 scale-95;
@@ -248,4 +290,31 @@ body {
   0% { height: 33%; }
   50% { height: 100%; }
   100% { height: 33%; }
+}
+
+@keyframes marquee-pan {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(calc(-1 * var(--marquee-distance, 0px)));
+  }
+}
+
+.marquee-loop {
+  display: inline-flex;
+  min-width: max-content;
+  animation: marquee-pan var(--marquee-duration, 12s) linear infinite;
+  animation-delay: var(--marquee-delay, 2s);
+  will-change: transform;
+}
+
+.marquee-fade {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    black 12px,
+    black calc(100% - 18px),
+    transparent 100%
+  );
 }

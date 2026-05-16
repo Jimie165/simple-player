@@ -13,32 +13,62 @@ import InfoDialog from '@/components/common/InfoDialog';
 interface PlayerControlProps {
     isFullScreen: boolean;
     onToggleFullScreen: () => void;
+    sidebarOffset: number;
+    mode: 'full' | 'compact' | 'mini';
 }
 
-export default function PlayerControl({ isFullScreen, onToggleFullScreen }: PlayerControlProps) {
+export default function PlayerControl({ isFullScreen, onToggleFullScreen, sidebarOffset, mode }: PlayerControlProps) {
     const { metadata } = usePlayerStore();
     const [isInfoOpen, setIsInfoOpen] = useState(false);
+    const isMini = mode === 'mini';
 
     return (
         <>
             <div className={clsx(
-                "flex h-24 w-full flex-col justify-center border-t px-4 z-50 transition-colors duration-300",
-                "border-outline-variant/20 bg-surface-container-high"
-            )}>
-                {/* 30-40-30 布局容器 */}
-                <div className="flex items-center justify-between gap-4">
-
-                    <SongInfo
-                        metadata={metadata}
-                        isFullScreen={isFullScreen}
-                        onToggleFullScreen={onToggleFullScreen}
+                "pointer-events-none fixed bottom-4 right-0 z-[75] flex justify-center px-4 transition-[left] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+            )}
+                style={{ left: sidebarOffset }}
+            >
+                <div className={clsx(
+                    "pointer-events-auto relative grid w-full items-center gap-3 rounded-full border border-white/40 bg-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[48px] backdrop-saturate-[180%] ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] dark:ring-white/10",
+                    mode === 'full' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_178px] px-8",
+                    mode === 'compact' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_40px] px-8",
+                    isMini && "h-[72px] max-w-[460px] grid-cols-[minmax(0,1fr)_104px] px-4"
+                )}>
+                    <button
+                        type="button"
+                        onClick={onToggleFullScreen}
+                        className={clsx(
+                            "absolute top-2 h-8 rounded-full bg-transparent",
+                            mode === 'full' && "left-[172px] right-[128px]",
+                            mode === 'compact' && "left-[172px] right-[92px]",
+                            isMini && "hidden"
+                        )}
+                        aria-label="打开播放页"
                     />
 
-                    <PlaybackControls />
+                    <PlaybackControls mode={mode} />
 
-                    <ExtraControls
-                        onInfoClick={() => setIsInfoOpen(true)}
-                    />
+                    <div className={clsx(
+                        "relative z-10 row-start-1",
+                        isMini ? "col-start-1" : "col-start-2"
+                    )}>
+                        <SongInfo
+                            metadata={metadata}
+                            isFullScreen={isFullScreen}
+                            onToggleFullScreen={onToggleFullScreen}
+                        />
+                    </div>
+
+                    <div className={clsx(
+                        "relative z-10 col-start-3 row-start-1",
+                        isMini && "hidden"
+                    )}>
+                        <ExtraControls
+                            mode={mode}
+                            onInfoClick={() => setIsInfoOpen(true)}
+                        />
+                    </div>
 
                 </div>
             </div>

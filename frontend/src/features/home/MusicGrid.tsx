@@ -18,6 +18,8 @@ import { sortSongs } from '@/utils/songSort';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
+import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 
 interface MusicGridProps {
     onNavigateToLibrary?: () => void;
@@ -53,6 +55,7 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
 }
 
 export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }: MusicGridProps) {
+    const mainContentWidth = useMainContentWidth();
     // Store Actions
     const { recentHistory } = useLibraryStore();
     const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
@@ -139,7 +142,10 @@ export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }:
                 {recentHistory.length === 0 ? (
                     <EmptyState />
                 ) : (
-                    <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7">
+                    <div
+                        className="grid content-grid-cover gap-6"
+                        style={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
+                    >
                         {recentHistory.map((item) => {
                             const isSelected = selectedIds.has(item.id);
 

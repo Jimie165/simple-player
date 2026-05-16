@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import LyricsPanel from '@/features/player/lyrics/LyricsPanel';
 import type { LyricsLine } from '@/types';
 
@@ -31,9 +32,10 @@ export default function ApplePlayerLyricsPanel({
     const isFlippingOut = panelFlipTarget === 'queue' && isPanelFlipping;
     const isVisible = isLyricsOpen && !isFlippingOut;
     const isNormalReveal = isLyricsOpen && panelFlipTarget === null;
+    const panelEase = [0.32, 0.72, 0, 1] as const;
 
     // 动画配置
-    const variants = {
+    const variants: Variants = {
         visible: {
             opacity: 1,
             scale: 1,
@@ -41,7 +43,7 @@ export default function ApplePlayerLyricsPanel({
             rotateY: 0,
             transition: {
                 duration: isFlippingIn ? 0.36 : 0.5,
-                ease: [0.32, 0.72, 0, 1],
+                ease: panelEase,
                 delay: isNormalReveal ? 0.22 : (isFlippingIn ? 0.08 : 0)
             }
         },
@@ -52,7 +54,7 @@ export default function ApplePlayerLyricsPanel({
             rotateY: isFlipPreparing ? 90 : (isFlippingOut ? -90 : 0),
             transition: {
                 duration: isFlippingOut ? 0.25 : 0.35,
-                ease: [0.32, 0.72, 0, 1]
+                ease: panelEase
             }
         }
     };
