@@ -404,7 +404,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 {/* 上一首 */}
                 <CustomTooltip text="上一首">
                     <button onClick={handlePrev} className={clsx(
-                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-primary transition-colors hover:bg-primary/10",
+                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-neutral-900 dark:text-white transition-all active:scale-90",
                         isMini && "hidden"
                     )}>
                         <MdSkipPrevious />
@@ -417,10 +417,10 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                         onClick={metadata ? togglePlay : undefined}
                         disabled={!metadata}
                         className={clsx(
-                            "grid place-items-center rounded-full transition-colors",
+                            "grid place-items-center rounded-full transition-all active:scale-95",
                             isMini ? "h-11 w-11 text-[44px]" : "h-8 w-8 text-[32px]",
                             metadata
-                                ? "cursor-pointer text-primary hover:text-primary/90"
+                                ? "cursor-pointer text-primary hover:text-primary/90 hover:scale-[1.05]"
                                 : "cursor-not-allowed text-neutral-300 dark:text-neutral-600"
                         )}
                     >
@@ -431,7 +431,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 {/* 下一首 */}
                 <CustomTooltip text="下一首">
                     <button onClick={handleNext} className={clsx(
-                        "grid place-items-center rounded-full text-primary transition-colors hover:bg-primary/10",
+                        "grid place-items-center rounded-full text-neutral-900 dark:text-white transition-all active:scale-90",
                         isMini ? "h-10 w-10 text-[34px]" : "h-7 w-7 text-[23px]"
                     )}>
                         <MdSkipNext />

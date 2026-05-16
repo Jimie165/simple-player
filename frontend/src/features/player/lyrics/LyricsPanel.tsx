@@ -36,23 +36,7 @@ function KaraokeText({
 }) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
 
-    // 如果组件较晚挂载（例如由于外部 500ms 刷新率导致的延迟），
-    // 强制它从这句话第一个字的略微提前的时间开始，以便给用户展示一个顺滑的“快速追赶（swoosh）”动画，
-    // 而不是直接让前几个字突兀地变白。
-    const [currentMs, setCurrentMs] = useState(() => {
-        if (words.length > 0) {
-            const firstWordStart = words[0].time_ms;
-            // 如果实际时间已经超过了第一个字，我们从第一个字前 50ms 处起步，触发追赶特效
-            if (baseCurrentMs > firstWordStart) {
-                // 如果落后太多（超过 3 秒），说明可能是跳转，不要从头追赶
-                if (baseCurrentMs - firstWordStart > 3000) {
-                    return baseCurrentMs;
-                }
-                return firstWordStart - 50;
-            }
-        }
-        return baseCurrentMs;
-    });
+    const [currentMs, setCurrentMs] = useState(baseCurrentMs);
 
     const targetMsRef = useRef(baseCurrentMs);
     const lastTick = useRef(0);
