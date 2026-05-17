@@ -30,11 +30,15 @@ export default function PlayerControl({ isFullScreen, onToggleFullScreen, sideba
                 style={{ left: sidebarOffset }}
             >
                 <div className={clsx(
-                    "pointer-events-auto relative grid w-full items-center gap-3 rounded-full border border-white/40 bg-white/40 shadow-[0_8px_32px_rgba(0,0,0,0.12)] backdrop-blur-[48px] backdrop-saturate-[180%] ring-1 ring-black/5 dark:border-white/10 dark:bg-black/40 dark:shadow-[0_8px_32px_rgba(0,0,0,0.4)] dark:ring-white/10",
+                    "pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full border border-black/[0.08] bg-white/[0.72] shadow-[0_10px_30px_rgba(15,23,42,0.14)] backdrop-blur-[22px] backdrop-saturate-[180%] dark:border-transparent dark:bg-[#2b2e35]/[0.78] dark:shadow-[0_18px_42px_rgba(0,0,0,0.38)] dark:ring-1 dark:ring-black/[0.18]",
                     mode === 'full' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_178px] px-8",
                     mode === 'compact' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_40px] px-8",
                     isMini && "h-[72px] max-w-[460px] grid-cols-[minmax(0,1fr)_104px] px-4"
                 )}>
+                    <div
+                        aria-hidden
+                        className="pointer-events-none absolute inset-[1px] hidden rounded-full dark:block dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.022)_42%,rgba(255,255,255,0)_100%)]"
+                    />
                     <button
                         type="button"
                         onClick={onToggleFullScreen}

@@ -24,19 +24,21 @@ export default function OverflowMarquee({
     behavior = 'auto-then-hover',
 }: OverflowMarqueeProps) {
     const containerRef = useRef<HTMLDivElement | null>(null);
-    const contentRef = useRef<HTMLDivElement | null>(null);
+    const measureRef = useRef<HTMLDivElement | null>(null);
     const hoverTimerRef = useRef<number | null>(null);
-    const [metrics, setMetrics] = useState({ overflow: false, distance: 0, duration: 0 });
+    const lastAutoMetricsRef = useRef('');
+    const [metrics, setMetrics] = useState({ overflow: false, distance: 0, duration: 0, containerWidth: 0 });
     const [phase, setPhase] = useState<'idle' | 'initial-delay' | 'hover-delay' | 'animating' | 'finished'>('idle');
     const [animationKey, setAnimationKey] = useState(0);
+    const [autoRequestKey, setAutoRequestKey] = useState(0);
 
     useLayoutEffect(() => {
         const container = containerRef.current;
-        const content = contentRef.current;
-        if (!container || !content) return;
+        const measure = measureRef.current;
+        if (!container || !measure) return;
 
         const update = () => {
-            const contentWidth = content.scrollWidth;
+            const contentWidth = measure.scrollWidth;
             const containerWidth = container.clientWidth;
             const overflow = contentWidth - containerWidth > 14;
             const distance = overflow ? contentWidth + gapPx : 0;
@@ -45,11 +47,12 @@ export default function OverflowMarquee({
                 if (
                     prev.overflow === overflow &&
                     prev.distance === distance &&
-                    prev.duration === duration
+                    prev.duration === duration &&
+                    prev.containerWidth === containerWidth
                 ) {
                     return prev;
                 }
-                return { overflow, distance, duration };
+                return { overflow, distance, duration, containerWidth };
             });
         };
 
@@ -57,7 +60,7 @@ export default function OverflowMarquee({
 
         const resizeObserver = new ResizeObserver(update);
         resizeObserver.observe(container);
-        resizeObserver.observe(content);
+        resizeObserver.observe(measure);
 
         return () => {
             resizeObserver.disconnect();
@@ -67,6 +70,7 @@ export default function OverflowMarquee({
     useLayoutEffect(() => {
         if (behavior === 'auto-then-hover') {
             setPhase('initial-delay');
+            setAutoRequestKey(v => v + 1);
         } else {
             setPhase('idle');
         }
@@ -75,6 +79,24 @@ export default function OverflowMarquee({
             hoverTimerRef.current = null;
         }
     }, [resetToken, behavior]);
+
+    useLayoutEffect(() => {
+        if (!metrics.overflow) {
+            lastAutoMetricsRef.current = '';
+            return;
+        }
+
+        if (behavior !== 'auto-then-hover') return;
+
+        const metricsKey = `${metrics.containerWidth}:${metrics.distance}:${metrics.duration}`;
+        if (lastAutoMetricsRef.current === metricsKey) return;
+
+        lastAutoMetricsRef.current = metricsKey;
+        if (phase !== 'animating') {
+            setPhase('initial-delay');
+            setAutoRequestKey(v => v + 1);
+        }
+    }, [behavior, metrics.containerWidth, metrics.distance, metrics.duration, metrics.overflow, phase]);
 
     useLayoutEffect(() => {
         if (!metrics.overflow) return;
@@ -94,7 +116,7 @@ export default function OverflowMarquee({
             }, startDelaySec * 1000);
             return () => window.clearTimeout(timer);
         }
-    }, [phase, metrics.overflow, startDelaySec]);
+    }, [autoRequestKey, phase, metrics.overflow, startDelaySec]);
 
     const marqueeStyle = metrics.overflow
         ? ({
@@ -138,13 +160,23 @@ export default function OverflowMarquee({
         <div
             ref={containerRef}
             className={clsx(
-                "overflow-hidden min-w-0 transition-all",
+                "relative overflow-hidden min-w-0 transition-all",
                 className
             )}
             style={containerMaskStyle}
             onMouseEnter={startHoverAnimation}
             onMouseLeave={stopHoverAnimation}
         >
+            <div
+                ref={measureRef}
+                aria-hidden="true"
+                className={clsx(
+                    "pointer-events-none invisible absolute left-0 top-0 w-max min-w-0",
+                    contentClassName
+                )}
+            >
+                {children}
+            </div>
             <div
                 key={animationKey}
                 style={marqueeStyle}
@@ -159,7 +191,6 @@ export default function OverflowMarquee({
                 }}
             >
                 <div
-                    ref={contentRef}
                     className={clsx(
                         "min-w-0",
                         shouldAnimate && "inline-flex shrink-0",

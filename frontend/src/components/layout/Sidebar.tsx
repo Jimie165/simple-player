@@ -59,22 +59,30 @@ export default function Sidebar({
             {/* 2. Visual Sidebar Container */}
             <div
                 className={clsx(
-                    "flex flex-col h-full overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
-                    "bg-primary/5 dark:bg-black/20 border-r border-transparent dark:border-outline-variant/10 py-2",
+                    "relative flex flex-col h-full overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
+                    "bg-primary/5 dark:bg-primary/8 border-r border-primary/8 dark:border-primary/10 py-2",
 
                     // 核心修复：Overlay 模式下保持定位一致，只改变宽度和样式
                     isOverlay ? [
                         "absolute left-0 top-0 bottom-0 z-50 shadow-2xl rounded-r-[24px]",
                         collapsed
                             ? "w-[72px] bg-transparent backdrop-blur-0"
-                            : "w-[280px] bg-surface-container/80 dark:bg-surface-container-low/80 backdrop-blur-xl"
+                            : "w-[280px] bg-surface-container/80 dark:bg-surface-container-low/72 backdrop-blur-xl"
                     ] : [
                         "relative w-full"
                     ]
                 )}
             >
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-0 dark:opacity-100"
+                    style={{
+                        backgroundImage:
+                            'linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%)'
+                    }}
+                />
                 {/* 3. Inner Fixed Content (always 280px to prevent wrapping) */}
-                <div className="w-[280px] flex flex-col flex-1 h-full min-h-0">
+                <div className="relative z-10 w-[280px] flex flex-col flex-1 h-full min-h-0">
 
                     {/* Header */}
                     <div className="flex flex-col gap-1 pb-2 shrink-0">

@@ -375,7 +375,9 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         setCurrentTime(actualTime);
     };
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
-    const remainingTime = Math.max((metadata?.duration || 0) - currentTime, 0);
+    const displayCurrentTime = Math.max(0, Math.floor(currentTime));
+    const displayDuration = Math.max(0, Math.floor(metadata?.duration || 0));
+    const remainingTime = Math.max(displayDuration - displayCurrentTime, 0);
 
     return (
         <>
@@ -390,10 +392,10 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                         <button
                             onClick={handleBtnShuffle}
                             className={clsx(
-                                "grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-primary/10",
+                                "grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-black/5 dark:hover:bg-white/10",
                                 isShuffling
                                     ? "text-primary"
-                                    : "text-neutral-500 dark:text-neutral-300"
+                                    : "text-neutral-700 dark:text-white/70"
                             )}
                         >
                             <MdShuffle />
@@ -404,7 +406,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 {/* 上一首 */}
                 <CustomTooltip text="上一首">
                     <button onClick={handlePrev} className={clsx(
-                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-neutral-900 dark:text-white transition-all active:scale-90",
+                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
                         isMini && "hidden"
                     )}>
                         <MdSkipPrevious />
@@ -420,7 +422,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                             "grid place-items-center rounded-full transition-all active:scale-95",
                             isMini ? "h-11 w-11 text-[44px]" : "h-8 w-8 text-[32px]",
                             metadata
-                                ? "cursor-pointer text-primary hover:text-primary/90 hover:scale-[1.05]"
+                                ? "cursor-pointer text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:text-primary/90 hover:scale-[1.04]"
                                 : "cursor-not-allowed text-neutral-300 dark:text-neutral-600"
                         )}
                     >
@@ -431,7 +433,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 {/* 下一首 */}
                 <CustomTooltip text="下一首">
                     <button onClick={handleNext} className={clsx(
-                        "grid place-items-center rounded-full text-neutral-900 dark:text-white transition-all active:scale-90",
+                        "grid place-items-center rounded-full text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
                         isMini ? "h-10 w-10 text-[34px]" : "h-7 w-7 text-[23px]"
                     )}>
                         <MdSkipNext />
@@ -447,10 +449,10 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                         <button
                             onClick={handleBtnRepeat}
                             className={clsx(
-                                "relative grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-primary/10",
+                                "relative grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-black/5 dark:hover:bg-white/10",
                                 repeatMode !== 'off'
                                     ? "text-primary"
-                                    : "text-neutral-500 dark:text-neutral-300"
+                                    : "text-neutral-700 dark:text-white/70"
                             )}
                         >
                             <MdRepeat />
@@ -464,23 +466,23 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
             {/* 进度条 */}
             <div className={clsx(
-                "z-20 col-start-2 col-end-4 row-start-1 mb-1 ml-[68px] flex self-end text-[10px] font-medium text-neutral-500 dark:text-neutral-400",
+                "z-20 col-start-2 col-end-4 row-start-1 mb-1 ml-[68px] flex self-end text-[10px] font-medium text-neutral-500 dark:text-white/50",
                 mode === 'full' && "mr-[104px]",
                 mode === 'compact' && "mr-8",
                 isMini && "hidden"
             )}>
                 <div className="group relative flex h-5 flex-1 items-center">
-                    <span className="pointer-events-none absolute -top-1.5 left-0 text-[10px] font-medium tabular-nums leading-none text-neutral-800 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-neutral-100">
-                        {formatTime(currentTime)}
+                    <span className="pointer-events-none absolute -top-1.5 left-0 text-[10px] font-medium tabular-nums leading-none text-neutral-700 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-white/84">
+                        {formatTime(displayCurrentTime)}
                     </span>
-                    <span className="pointer-events-none absolute -top-1.5 right-0 text-[10px] font-medium tabular-nums leading-none text-neutral-800 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-neutral-100">
+                    <span className="pointer-events-none absolute -top-1.5 right-0 text-[10px] font-medium tabular-nums leading-none text-neutral-700 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-white/84">
                         -{formatTime(remainingTime)}
                     </span>
-                    <div className="pointer-events-none absolute left-0 right-0 h-[3px] overflow-hidden rounded-full bg-black/10 transition-[height] group-hover:h-1 dark:bg-white/15"></div>
-                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-primary transition-[height] group-hover:h-1" style={{ width: `${progressPercent}%` }} />
+                    <div className="pointer-events-none absolute left-0 right-0 h-[3px] overflow-hidden rounded-full bg-black/[0.075] transition-[height] group-hover:h-1 dark:bg-white/[0.12]"></div>
+                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-primary/90 transition-[height] group-hover:h-1" style={{ width: `${progressPercent}%` }} />
                     <div
                         className={clsx(
-                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
+                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary/95 opacity-0 shadow-[0_1px_4px_rgba(0,0,0,0.18)] transition-opacity duration-200 group-hover:opacity-100",
                             isDragging && "opacity-100 scale-125"
                         )}
                         style={{ left: `${progressPercent}%`, marginLeft: '-6px' }}

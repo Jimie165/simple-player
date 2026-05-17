@@ -110,7 +110,7 @@ export default function AlbumDetailView({
             </div>
 
             {/* Song List */}
-            <div className="flex-1 pb-20">
+            <div className="flex-1 pb-16">
                 <SongListView
                     songs={album.songs}
                     onPlay={onPlay}
@@ -122,6 +122,7 @@ export default function AlbumDetailView({
                     disableSort={true}
                     onOpenArtist={onOpenArtistByName}
                     context="album_detail"
+                    footerSpacerClassName="h-16"
                 />
             </div>
         </div>

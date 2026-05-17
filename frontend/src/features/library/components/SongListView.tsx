@@ -27,6 +27,7 @@ interface SongListViewProps {
     onOpenArtist?: (artist: string) => void;
     onOpenAlbum?: (album: string) => void;
     context?: MusicMenuContext;
+    footerSpacerClassName?: string;
 }
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration' | null;
@@ -44,7 +45,8 @@ export default function SongListView({
     virtualize = true,
     onOpenArtist,
     onOpenAlbum,
-    context = 'library'
+    context = 'library',
+    footerSpacerClassName = "h-12"
 }: SongListViewProps) {
     const isLibraryContext = context === 'library';
     const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
@@ -312,7 +314,7 @@ export default function SongListView({
                         overscan={{ main: 2000, reverse: 2000 }}
                         className="w-full"
                         components={{
-                            Footer: () => <div className="h-20 w-full" />
+                            Footer: () => <div className={clsx(footerSpacerClassName, "w-full")} />
                         }}
                     />
                 ) : (

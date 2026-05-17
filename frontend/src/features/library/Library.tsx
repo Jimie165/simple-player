@@ -263,6 +263,7 @@ export default function Library() {
                                     onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
+                                    footerSpacerClassName="h-6"
                                 />
                             </motion.div>
                         )}

@@ -66,7 +66,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-700 transition-colors hover:bg-black/5 hover:text-black dark:text-neutral-100 dark:hover:bg-white/10";
+    const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";
     const controls = (
         <>
             <div className="relative" ref={queueRef}>
@@ -119,7 +119,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
                         onInfoClick();
                         closeCompactMenu();
                     }}
-                    className={clsx(utilityButtonClass, "text-neutral-500 dark:text-neutral-300")}
+                    className={clsx(utilityButtonClass, "text-neutral-500 dark:text-white/58")}
                 >
                     <MdInfoOutline className="text-xl" />
                 </button>
@@ -151,7 +151,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
             </div>
 
             {showCompactMenu && (
-                <div className="absolute bottom-11 right-0 flex items-center gap-1 rounded-full border border-white/55 bg-white/70 px-2 py-1.5 shadow-[0_12px_30px_rgba(0,0,0,0.16)] backdrop-blur-2xl ring-1 ring-black/5 dark:border-white/10 dark:bg-[#2b2b2f]/72 dark:ring-white/10">
+                <div className="absolute right-0 bottom-11 z-30 flex items-center gap-1 rounded-full border border-black/[0.08] bg-white/[0.78] px-2 py-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-[20px] backdrop-saturate-[180%] dark:border-white/[0.14] dark:bg-[#24262c]/[0.78] dark:shadow-[0_16px_34px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] dark:ring-1 dark:ring-white/[0.04]">
                     {controls}
                 </div>
             )}

@@ -104,20 +104,20 @@
   --md-sys-color-on-error: #690005;
 
   /* Fixed Surface Colors (Neutral Dark) */
-  --md-sys-color-surface: #09090b;
+  --md-sys-color-surface: #1f1f1f;
   --md-sys-color-on-surface: #E2E2E6;
-  --md-sys-color-surface-variant: #44474F;
+  --md-sys-color-surface-variant: #4A4D56;
   --md-sys-color-on-surface-variant: #C4C6D0;
 
-  --md-sys-color-outline: #8E9099;
-  --md-sys-color-outline-variant: #44474F;
+  --md-sys-color-outline: #9497A1;
+  --md-sys-color-outline-variant: #4A4D56;
 
   /* Fixed Surface Containers */
-  --md-sys-color-surface-container-lowest: #000000;
-  --md-sys-color-surface-container-low: #101012; 
-  --md-sys-color-surface-container: #121212;
-  --md-sys-color-surface-container-high: #282A2F;
-  --md-sys-color-surface-container-highest: #33353A;
+  --md-sys-color-surface-container-lowest: #1a1a1a;
+  --md-sys-color-surface-container-low: #1f1f1f;
+  --md-sys-color-surface-container: #222222;
+  --md-sys-color-surface-container-high: #2a2a2a;
+  --md-sys-color-surface-container-highest: #333333;
 
   /* Gaussian Blur Button (Dark) */
   --glass-surface: rgba(30, 30, 30, 0.5);
