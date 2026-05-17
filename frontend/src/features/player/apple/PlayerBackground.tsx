@@ -61,9 +61,8 @@ const FRAGMENT_SHADER = `
       // 极慢的光滑位移
       float time = u_time * 0.0001;
       
-      // 我们将采样坐标适度放大（相当于向内 Zoom），以避免采样到边缘死黑
-      // 这里 0.7 的系数意味着我们取图的中心 70% 作为画布，为变形流出30%的安全边界
-      vec2 p = (v_texCoord - 0.5) * 0.7;
+      // 采样接近整张封面，让边缘和底部的色块也参与背景流动。
+      vec2 p = (v_texCoord - 0.5) * 0.94;
       
       // 经典的无尽缠绕流体扭曲（Iterative Sine Warp）
       // 这是一套极其温和稳定的流体力学算法，它不会像 snoise + cos 一样形成孤立的斑点（细胞感）
@@ -90,9 +89,10 @@ const FRAGMENT_SHADER = `
             color.rgb *= mix(0.95, 0.72, highlightCompress);
             color.rgb = mix(color.rgb, vec3(luma), 0.10 * highlightCompress);
 
-            // 给整体叠一层很轻的冷色调，压白但不直接变脏变黑
-            vec3 coolTint = vec3(0.055, 0.075, 0.11);
-            color.rgb = mix(color.rgb, coolTint, 0.12);
+            // 轻微提亮并中和冷色压暗，保持初版质感但整体不那么沉。
+            vec3 softTint = vec3(0.18, 0.18, 0.17);
+            color.rgb = mix(color.rgb, softTint, 0.08);
+            color.rgb = pow(color.rgb, vec3(0.96));
 
             // 轻量抖动：把可见色带打散为细微颗粒
             vec2 px = gl_FragCoord.xy;
@@ -468,10 +468,10 @@ export const PlayerBackground = React.memo(({
                 )}
             </div>
 
-            {/* 轻冷色染色，优先压掉偏白高亮，不用纯黑硬盖 */}
-            <div className="absolute inset-0 bg-[#0b1220]/14 z-10 pointer-events-none" />
+            {/* 轻灰雾统一背景，保留初版压白逻辑但略微提亮 */}
+            <div className="absolute inset-0 bg-[#585854]/10 z-10 pointer-events-none" />
             {/* 用暗角收边，避免整屏均匀压暗产生脏块感 */}
-            <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(4,6,12,0.06)_62%,rgba(4,6,12,0.16)_100%)]" />
+            <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0%,rgba(4,6,12,0.04)_62%,rgba(4,6,12,0.12)_100%)]" />
         </div>
     );
 });
