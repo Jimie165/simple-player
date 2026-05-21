@@ -6,6 +6,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 type PlayerStoreUpdate = Partial<{
     pathMap: Map<string, number>;
     favoriteSet: Set<number>;
+    favoritesLoaded: boolean;
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
 }>;
@@ -93,7 +94,7 @@ export async function toggleFavoriteFn(
         } else {
             newFavoriteSet.delete(songId);
         }
-        return { favoriteSet: newFavoriteSet };
+        return { favoriteSet: newFavoriteSet, favoritesLoaded: true };
     });
 
     get().triggerLibraryUpdate();

@@ -3,7 +3,6 @@ import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
 import clsx from 'clsx';
-import { Virtuoso, type Components } from 'react-virtuoso';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
@@ -55,7 +54,7 @@ interface SortableListContextValue {
     sortKey: SortKey;
 }
 
-const VirtuosoList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { context?: SortableListContextValue }>(
+const SortableList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { context?: SortableListContextValue }>(
     ({ children, context, ...props }, ref) => (
         <SortableContext
             items={context?.sortableItems ?? []}
@@ -68,7 +67,7 @@ const VirtuosoList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> &
         </SortableContext>
     )
 );
-VirtuosoList.displayName = 'VirtuosoList';
+SortableList.displayName = 'SortableList';
 
 const renderHeaderCell = (label: ReactNode, className?: string, alignRight = false) => (
     <div
@@ -172,6 +171,7 @@ export default function SortableSongList({
     // Use LibraryStore for Favorites
     const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
     const favoriteSet = useLibraryStore(state => state.favoriteSet);
+    const favoritesLoaded = useLibraryStore(state => state.favoritesLoaded);
     const isFavoriteStoreFn = useLibraryStore(state => state.isFavorite);
 
     // Destructure all needed SelectionStore values
@@ -297,21 +297,10 @@ export default function SortableSongList({
     // Derived state for dragging to show proper visuals
     const isDraggingSelection = !!(activeId && selectedIds.has(activeId));
 
-    // Custom Virtuoso Context
-    // Find custom scroll parent
-    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-        const el = document.querySelector('[data-scroll-viewport]');
-        if (!(el instanceof HTMLElement)) return;
-
-        const frame = requestAnimationFrame(() => setScrollParent(el));
-        return () => cancelAnimationFrame(frame);
-    }, []);
-
-    const itemContent = (index: number, song: SongMetadata) => {
+    const renderItem = (song: SongMetadata, index: number) => {
         const uniqueId = getSongId(song, index);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
-            ? favoriteSet.has(song.id)
+            ? (favoritesLoaded ? favoriteSet.has(song.id) : song.is_favorite)
             : isFavoriteStoreFn(song);
 
         return (
@@ -374,20 +363,12 @@ export default function SortableSongList({
                     },
                 }}
             >
-                {scrollParent ? (
-                    <Virtuoso
-                        useWindowScroll={false}
-                        customScrollParent={scrollParent}
-                        data={displaySongs}
-                        context={{ sortableItems, disableReorder, sortKey }}
-                        components={{ List: VirtuosoList as Components['List'] }}
-                        itemContent={itemContent}
-                        overscan={{ main: 2000, reverse: 2000 }} // High overscan for both directions
-                        className="w-full"
-                    />
-                ) : (
-                    <div className="flex flex-col opacity-0"></div>
-                )}
+                <SortableList
+                    context={{ sortableItems, disableReorder, sortKey }}
+                    className="w-full"
+                >
+                    {displaySongs.map((song, index) => renderItem(song, index))}
+                </SortableList>
 
                 {typeof document !== 'undefined' && createPortal(
                     <DragOverlay adjustScale={true}>

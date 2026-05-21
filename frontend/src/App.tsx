@@ -39,6 +39,10 @@ function App() {
 
   useEffect(() => initTheme(), [initTheme]);
 
+  useEffect(() => {
+    useLibraryStore.getState().refreshFavorites();
+  }, []);
+
   // Sync persisted audio output preference to backend on launch and listen for backend-driven changes.
   useEffect(() => {
     useAudioOutputStore.getState().syncToBackend();
@@ -197,9 +201,6 @@ function App() {
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
       <GlobalDetailStack />
-
-      {/* 选择操作栏 - 现在放在这里，使用 absolute 定位 */}
-      <SelectionMenuBar />
     </div>
   );
 
@@ -208,6 +209,7 @@ function App() {
 
       {/* 1. 标题栏 (始终在最顶层 z-[100]) */}
       <TitleBar />
+      <SelectionMenuBar />
 
       <div className="flex flex-1 overflow-hidden relative">
 

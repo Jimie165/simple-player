@@ -31,6 +31,7 @@ interface LibraryState {
     originalPlaylist: SongMetadata[];
     currentSongIndex: number;
     favoriteSet: Set<number>;
+    favoritesLoaded: boolean;
     pathMap: Map<string, number>; // Cache for path -> id
     optimisticallyDeletedSongIds: Set<number>;
     markSongsAsOptimisticallyDeleted: (ids: number[]) => void;
@@ -148,6 +149,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
+    favoritesLoaded: false,
     pathMap: new Map<string, number>(),
     optimisticallyDeletedSongIds: new Set<number>(),
 
@@ -176,7 +178,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     refreshFavorites: async () => {
         try {
             const { favoriteSet, pathMap } = await refreshFavoritesFn(get().pathMap);
-            set({ favoriteSet, pathMap });
+            set({ favoriteSet, pathMap, favoritesLoaded: true });
         } catch (e) { console.error('Failed to refresh favorites', e); }
     },
 

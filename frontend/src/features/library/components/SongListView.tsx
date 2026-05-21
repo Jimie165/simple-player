@@ -97,7 +97,7 @@ export default function SongListView({
 
     // Selection Store
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, clearSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
-    const { toggleFavorite, isFavorite, favoriteSet, optimisticallyDeletedSongIds } = useLibraryStore();
+    const { toggleFavorite, isFavorite, favoriteSet, favoritesLoaded, optimisticallyDeletedSongIds } = useLibraryStore();
 
     // Context Menu State
     type ContextMenuState = {
@@ -268,7 +268,7 @@ export default function SongListView({
         const id = getMusicItemId(song);
         const selected = isSelected(id);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
-            ? favoriteSet.has(song.id)
+            ? (favoritesLoaded ? favoriteSet.has(song.id) : song.is_favorite)
             : isFavorite(song);
 
         return (

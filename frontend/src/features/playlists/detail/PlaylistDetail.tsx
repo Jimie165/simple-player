@@ -71,7 +71,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Store Actions
     // Store Actions
-    const { triggerLibraryUpdate, triggerPlaylistUpdate, favoriteSet, updateRecentItemCover } = useLibraryStore();
+    const { triggerLibraryUpdate, triggerPlaylistUpdate, favoriteSet, favoritesLoaded, updateRecentItemCover } = useLibraryStore();
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
@@ -227,8 +227,12 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         let listToProcess = songs;
 
         if (isFavorites) {
-            // 实时过滤掉已取消喜爱的歌曲，避免在“喜爱歌曲”页面中残留
-            listToProcess = listToProcess.filter(s => s.id && favoriteSet.has(s.id));
+            // 收藏缓存未就绪时，先信任后端返回的 is_favorite，避免页面被空集合误过滤
+            if (favoritesLoaded) {
+                listToProcess = listToProcess.filter(s => s.id && favoriteSet.has(s.id));
+            } else {
+                listToProcess = listToProcess.filter(s => s.is_favorite !== false);
+            }
 
             // 对于喜爱歌曲的"播放列表顺序"，后端已经返回了正确的顺序，不需要前端再排序
             if (sortKey === 'manual') {
@@ -236,7 +240,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             }
         }
         return sortSongs(listToProcess, sortKey, sortOrder);
-    }, [songs, sortKey, sortOrder, isFavorites, favoriteSet]);
+    }, [songs, sortKey, sortOrder, isFavorites, favoriteSet, favoritesLoaded]);
 
 
     const filteredSongs = useMemo(() => {
