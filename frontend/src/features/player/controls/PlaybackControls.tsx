@@ -189,14 +189,16 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         let unlistenEnded: (() => void) | undefined;
         let isMounted = true;
 
-        const handleSeekEvent = (e: any) => {
-            if (e.detail && typeof e.detail.time === 'number') {
-                setCurrentTime(e.detail.time);
+        const handleSeekEvent = (event: Event) => {
+            const detail = (event as CustomEvent<{ time?: unknown }>).detail;
+            if (detail && typeof detail.time === 'number') {
+                setCurrentTime(detail.time);
             }
         };
-        const handleRemoteDraggingEvent = (e: any) => {
-            if (e.detail && typeof e.detail.dragging === 'boolean') {
-                setIsRemoteDragging(e.detail.dragging);
+        const handleRemoteDraggingEvent = (event: Event) => {
+            const detail = (event as CustomEvent<{ dragging?: unknown }>).detail;
+            if (detail && typeof detail.dragging === 'boolean') {
+                setIsRemoteDragging(detail.dragging);
             }
         };
         window.addEventListener('playback:seeked', handleSeekEvent);
@@ -297,10 +299,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
             const safeUnlisten = (fn: (() => void) | undefined) => {
                 if (fn) {
                     try {
-                        const result = fn() as any;
-                        if (result instanceof Promise) {
-                            result.catch((e: any) => console.warn("Failed to unlisten (async)", e));
-                        }
+                        Promise.resolve(fn()).catch((e: unknown) => console.warn("Failed to unlisten (async)", e));
                     } catch (e) {
                         console.warn("Failed to unlisten (sync)", e);
                     }
@@ -315,7 +314,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
             window.removeEventListener('playback:seeked', handleSeekEvent);
             window.removeEventListener('playback:dragging', handleRemoteDraggingEvent);
         };
-    }, []); // 依赖项始终为空，只在挂载/卸载时执行
+    }, [setIsPlaying]); // 依赖项始终为空，只在挂载/卸载时执行
 
     // --- 自动播放监听 ---
     // --- 进度条更新与兜底检测 ---
@@ -328,7 +327,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 setCurrentTime((prev) => {
                     // 兜底检测 (防止后端事件丢失)
                     if (metadata && metadata.duration > 0 && prev >= metadata.duration - 0.5) {
-                        handleSongEnded();
+                        handleSongEndedRef.current();
                         return 0;
                     }
                     return prev + 0.5;
@@ -336,7 +335,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
             }, 500);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, isDragging, isRemoteDragging, metadata, repeatMode, playlist, currentSongIndex]);
+    }, [isPlaying, isDragging, isRemoteDragging, metadata]);
 
     // Metadata 变化时的兜底重置 (比如从 Library 切歌)
     const prevSongKeyRef = useRef<string>('');

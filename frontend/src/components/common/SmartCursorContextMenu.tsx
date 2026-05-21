@@ -6,6 +6,9 @@ import { getMusicItemId, getMusicItemType } from '@/utils/musicItemUtils';
 import type { MusicItem } from '@/utils/musicItemUtils';
 import { useSelectionStore } from '@/store/useSelectionStore';
 
+type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'playlist' | 'video';
+const selectionTypes: SelectionType[] = ['song', 'album', 'artist', 'folder', 'file', 'recent', 'playlist', 'video'];
+
 interface SmartCursorContextMenuProps {
     x: number;
     y: number;
@@ -63,8 +66,8 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
     }, [isSelected, selectedIds, item]);
 
     const resolvedType = item ? getMusicItemType(item) : 'song';
-    const selectionType = (['song', 'album', 'artist', 'folder', 'file', 'recent', 'playlist', 'video'] as string[]).includes(resolvedType)
-        ? (resolvedType as any)
+    const selectionType = selectionTypes.includes(resolvedType as SelectionType)
+        ? (resolvedType as SelectionType)
         : 'song';
 
     // Hook to get menu items
@@ -153,7 +156,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         });
 
         return () => cancelAnimationFrame(raf);
-    }, [x, y, menuItems, menuGroups]);
+    }, [x, y, menuItems, menuGroups, placement]);
 
     const baseGroups = menuGroups ?? menuItems;
     const resolvedGroups = extraGroups && extraGroups.length > 0

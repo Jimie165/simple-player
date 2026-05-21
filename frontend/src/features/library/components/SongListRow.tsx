@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import type { SongMetadata } from '@/types';
 import SongCoverOverlay from '@/components/common/SongCoverOverlay';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
+import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -44,7 +45,7 @@ export function SongListRow({
     hideCover: boolean;
     hideArtist: boolean;
     effectiveHideAlbum: boolean;
-    context: any;
+    context: MusicMenuContext;
     enableDelete: boolean;
     onDelete?: (song: SongMetadata) => void;
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;

@@ -82,7 +82,11 @@ export function useRecentPlayback() {
     const playSingleFile = async (path: string, isLibraryItem = false, existingRecent?: RecentItem) => {
         try {
             let meta: SongMetadata | null = null;
-            try { meta = await fileService.getMetadata(path); } catch { }
+            try {
+                meta = await fileService.getMetadata(path);
+            } catch (error) {
+                console.warn(`Failed to read metadata for ${path}`, error);
+            }
 
             const safeMeta = meta || {
                 title: path.split(/[\\/]/).pop() || 'Unknown',

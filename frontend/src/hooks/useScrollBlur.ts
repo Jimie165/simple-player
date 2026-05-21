@@ -27,8 +27,8 @@ export function useScrollBlur(options: UseScrollBlurOptions = {}) {
 
     useEffect(() => {
         if (!enabled) {
-            setIsScrolled(false);
-            return;
+            const frame = requestAnimationFrame(() => setIsScrolled(false));
+            return () => cancelAnimationFrame(frame);
         }
 
         const target = topSentinelRef.current;

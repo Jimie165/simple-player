@@ -59,7 +59,10 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             // Constrain top to 0 (don't go off-screen top)
             if (newTop < 0) newTop = 0;
 
-            setPosition({ top: newTop, left: newLeft });
+            const frame = requestAnimationFrame(() => {
+                setPosition({ top: newTop, left: newLeft });
+            });
+            return () => cancelAnimationFrame(frame);
         }
     }, [x, y, menuGroups]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { getMusicItemId } from '@/utils/musicItemUtils';
@@ -18,6 +18,8 @@ import PlaylistSortMenu, { type PlaylistSortKey } from '@/features/playlists/lis
 import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
 
 type SortKey = PlaylistSortKey;
+type FavoritesPlaylist = Omit<Playlist, 'id'> & { id: 'favorites'; hidden?: boolean };
+type PlaylistListItem = Playlist | FavoritesPlaylist;
 
 export default function PlaylistList() {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
@@ -30,7 +32,9 @@ export default function PlaylistList() {
             if (saved === 'name' || saved === 'recently_added' || saved === 'recently_played') {
                 return saved;
             }
-        } catch { }
+        } catch (error) {
+            console.warn('Failed to read playlist sort key', error);
+        }
         return 'recently_added';
     });
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -44,34 +48,38 @@ export default function PlaylistList() {
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
 
-    const loadPlaylists = async () => {
+    const loadPlaylists = useCallback(async () => {
         try {
             const list = await libraryService.getPlaylists();
             setPlaylists(list);
         } catch (error) {
             console.error(error);
         }
-    };
+    }, []);
 
     useEffect(() => {
-        // Force refresh when library changes
-        setPlaylistSongs({});
-        loadPlaylists();
-        libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
-    }, [libraryVersion]);
+        const frame = requestAnimationFrame(() => {
+            setPlaylistSongs({});
+            loadPlaylists();
+            libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [libraryVersion, loadPlaylists]);
 
     useEffect(() => {
         try {
             localStorage.setItem('playlist_sort_key', sortKey);
-        } catch { }
+        } catch (error) {
+            console.warn('Failed to persist playlist sort key', error);
+        }
     }, [sortKey]);
 
     // Filter & Sort
     const filteredPlaylists = useMemo(() => {
-        let list = [...playlists];
+        let list: PlaylistListItem[] = [...playlists];
 
         // Construct Favorites Pseudo-Playlist
-        const favoritesItem: any = {
+        const favoritesItem: FavoritesPlaylist = {
             id: 'favorites',
             name: '喜爱歌曲',
             description: null,
@@ -108,7 +116,7 @@ export default function PlaylistList() {
         });
 
         // Always prepend Favorites if not hidden
-        if (!(favoritesItem as any).hidden) {
+        if (!favoritesItem.hidden) {
             list.unshift(favoritesItem);
         }
 
@@ -147,21 +155,22 @@ export default function PlaylistList() {
     };
 
     // 加载播放列表歌曲（用于封面展示）
-    const loadPlaylistSongs = async (playlistId: number) => {
+    const loadPlaylistSongs = useCallback(async (playlistId: number) => {
         if (playlistSongs[playlistId]) return playlistSongs[playlistId];
         try {
             const songs = await libraryService.getPlaylistSongs(playlistId);
             setPlaylistSongs(prev => ({ ...prev, [playlistId]: songs }));
             return songs;
-        } catch {
+        } catch (error) {
+            console.warn(`Failed to load playlist songs for ${playlistId}`, error);
             return [];
         }
-    };
+    }, [playlistSongs]);
 
     // 加载所有播放列表的歌曲
     useEffect(() => {
         playlists.forEach(pl => loadPlaylistSongs(pl.id));
-    }, [playlists]);
+    }, [playlists, loadPlaylistSongs]);
 
     // 播放播放列表
     const handlePlayPlaylist = async (pl: Playlist, shuffle = false) => {
@@ -316,8 +325,8 @@ export default function PlaylistList() {
                 favoritesCount={favoritesCount}
                 isSelectionMode={isSelectionMode}
                 selectedIds={selectedIds}
-                toggleSelection={toggleSelection as any}
-                toggleSelectionMode={toggleSelectionMode as any}
+                toggleSelection={toggleSelection}
+                toggleSelectionMode={toggleSelectionMode}
                 push={push}
                 handlePlayFavorites={handlePlayFavorites}
                 handleAddFavoritesToQueue={handleAddFavoritesToQueue}
@@ -353,7 +362,7 @@ export default function PlaylistList() {
                         type: 'playlist',
                         name: '喜爱歌曲',
                         title: '喜爱歌曲'
-                    } as any}
+                    } as unknown as Playlist}
                     context="playlist_list"
                     onClose={() => setFavoritesContextMenu(null)}
                     onShuffle={() => handlePlayFavorites(true)}

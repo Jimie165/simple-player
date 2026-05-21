@@ -68,8 +68,10 @@ export function useVideoPlayback({
         supportsAv1,
         supportedAudioCodecs,
         onPrepareError: (prepareError) => {
-            setError(String(prepareError));
-            setShowError(true);
+            requestAnimationFrame(() => {
+                setError(String(prepareError));
+                setShowError(true);
+            });
         },
     });
 
@@ -85,19 +87,19 @@ export function useVideoPlayback({
         let active = true;
         const loadPoster = async () => {
             if (!metadata) {
-                if (active) setPosterUrl(undefined);
+                if (active) requestAnimationFrame(() => setPosterUrl(undefined));
                 return;
             }
             const path = metadata.thumbnail_path || metadata.cover_path;
             if (path) {
                 try {
                     const url = await resolveMediaPath(path);
-                    if (active && url) setPosterUrl(url);
+                    if (active && url) requestAnimationFrame(() => setPosterUrl(url));
                 } catch (e) {
                     console.error('Failed to resolve poster:', e);
                 }
             } else {
-                if (active) setPosterUrl(undefined);
+                if (active) requestAnimationFrame(() => setPosterUrl(undefined));
             }
         };
         loadPoster();
@@ -109,10 +111,11 @@ export function useVideoPlayback({
     useEffect(() => {
         const srcReady = !isMkv || !!preparedPath;
         if (isOpen && metadata?.path && videoRef.current && srcReady) {
-            setIsPlaying(true);
+            const frame = requestAnimationFrame(() => setIsPlaying(true));
             videoRef.current.currentTime = 0;
             videoRef.current.load();
             videoRef.current.play().catch(() => setIsPlaying(false));
+            return () => cancelAnimationFrame(frame);
         }
     }, [isOpen, metadata?.path, preparedPath, isMkv, videoRef]);
 

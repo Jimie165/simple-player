@@ -109,7 +109,12 @@ export default function ArtistDetailView({
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     useEffect(() => {
         const el = document.querySelector('[data-scroll-viewport]');
-        if (el instanceof HTMLElement) setScrollParent(el);
+        if (!(el instanceof HTMLElement)) return;
+
+        const frame = requestAnimationFrame(() => {
+            setScrollParent(el);
+        });
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     const animatedAlbumIdsRef = useRef(new Set<string>());

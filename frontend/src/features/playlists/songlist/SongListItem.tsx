@@ -28,7 +28,18 @@ const SongListItemMenu = memo(({
     selected,
     playlistId,
     context = 'playlist'
-}: any) => {
+}: {
+    song: SongMetadata;
+    index: number;
+    onPlay?: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
+    onMenuOpen?: () => void;
+    isSelectionMode?: boolean;
+    toggleSelection?: (id: string, type: 'song', data: SongMetadata) => void;
+    onSelect?: (song: SongMetadata) => void;
+    selected?: boolean;
+    playlistId?: number;
+    context?: MusicMenuContext;
+}) => {
     const { menuItems } = useSongOperations({
         items: [song],
         context,
@@ -145,7 +156,7 @@ export const SongListItem = memo(({
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
-                            toggleFavorite && toggleFavorite(song);
+                            toggleFavorite?.(song);
                         }}
                         onDoubleClick={(e) => {
                             e.stopPropagation();

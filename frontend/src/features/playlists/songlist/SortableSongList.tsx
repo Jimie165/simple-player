@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useMemo, forwardRef } from 'react';
+import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
 import clsx from 'clsx';
@@ -48,6 +49,39 @@ export type SortOrder = 'asc' | 'desc';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 
+interface SortableListContextValue {
+    sortableItems: string[];
+    disableReorder: boolean;
+    sortKey: SortKey;
+}
+
+const VirtuosoList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { context?: SortableListContextValue }>(
+    ({ children, context, ...props }, ref) => (
+        <SortableContext
+            items={context?.sortableItems ?? []}
+            strategy={verticalListSortingStrategy}
+            disabled={context?.disableReorder || context?.sortKey !== 'manual'}
+        >
+            <div ref={ref} {...props}>
+                {children}
+            </div>
+        </SortableContext>
+    )
+);
+VirtuosoList.displayName = 'VirtuosoList';
+
+const renderHeaderCell = (label: ReactNode, className?: string, alignRight = false) => (
+    <div
+        className={clsx(
+            "flex items-center gap-1 select-none transition-colors",
+            alignRight ? "justify-end" : "",
+            className
+        )}
+    >
+        {label}
+    </div>
+);
+
 interface SortableSongListProps {
     songs: SongMetadata[];
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
@@ -56,8 +90,31 @@ interface SortableSongListProps {
     sortKey?: SortKey;
     sortOrder?: SortOrder;
 }
-const SortableItem = memo((props: any) => {
-    const { song, index, isDraggingGroup } = props;
+type SortableItemProps = {
+    song: SongMetadata;
+    index: number;
+    style: CSSProperties;
+    isDraggingGroup?: boolean;
+    isSelectionMode: boolean;
+    selected: boolean;
+    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
+    handleItemClick: (e: React.MouseEvent, song: SongMetadata) => void;
+    handleCheckboxClick: (e: React.MouseEvent | null, song: SongMetadata) => void;
+    handleContextMenu: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
+    hideAlbum: boolean;
+    formatDuration: (sec: number) => string;
+    onSelect: (song: SongMetadata) => void;
+    onAddToPlaylist: (song: SongMetadata) => void;
+    toggleFavorite: (song: SongMetadata) => void;
+    isFav: boolean;
+    toggleSelection: (id: string, type: 'song', data: SongMetadata) => void;
+    onMenuOpen: () => void;
+    playlistId?: number;
+    context: MusicMenuContext;
+};
+
+const SortableItem = memo((props: SortableItemProps) => {
+    const { song, index, isDraggingGroup = false } = props;
     const uniqueId = getSongId(song, index);
 
     const {
@@ -98,7 +155,6 @@ export default function SortableSongList({
     onReorder,
     disableReorder = false,
     sortKey = 'manual',
-    sortOrder: _3 = 'asc',
     playlistId,
     context = 'playlist' // Default to playlist
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
@@ -112,18 +168,6 @@ export default function SortableSongList({
         if (optimisticallyDeletedSongIds.size === 0) return songs;
         return songs.filter((song) => !(typeof song.id === 'number' && optimisticallyDeletedSongIds.has(song.id)));
     }, [songs, optimisticallyDeletedSongIds]);
-
-    const HeaderCell = ({ label, className, alignRight = false }: { label: React.ReactNode, className?: string, alignRight?: boolean }) => (
-        <div
-            className={clsx(
-                "flex items-center gap-1 select-none transition-colors",
-                alignRight ? "justify-end" : "",
-                className
-            )}
-        >
-            {label}
-        </div>
-    );
 
     // Use LibraryStore for Favorites
     const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
@@ -254,33 +298,21 @@ export default function SortableSongList({
     const isDraggingSelection = !!(activeId && selectedIds.has(activeId));
 
     // Custom Virtuoso Context
-    const VirtuosoList = useMemo(() => forwardRef<HTMLDivElement, any>(({ children, ...props }, ref) => {
-        return (
-            <SortableContext
-                items={sortableItems}
-                strategy={verticalListSortingStrategy}
-                disabled={disableReorder || sortKey !== 'manual'}
-            >
-                <div ref={ref} {...props}>
-                    {children}
-                </div>
-            </SortableContext>
-        );
-    }), [sortableItems, disableReorder, sortKey]);
-
-
     // Find custom scroll parent
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     useEffect(() => {
         const el = document.querySelector('[data-scroll-viewport]');
-        if (el instanceof HTMLElement) setScrollParent(el);
+        if (!(el instanceof HTMLElement)) return;
+
+        const frame = requestAnimationFrame(() => setScrollParent(el));
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     const itemContent = (index: number, song: SongMetadata) => {
         const uniqueId = getSongId(song, index);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
             ? favoriteSet.has(song.id)
-            : isFavoriteStoreFn(song as any);
+            : isFavoriteStoreFn(song);
 
         return (
             <SortableItem
@@ -319,10 +351,10 @@ export default function SortableSongList({
             <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-white/10 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl">
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
-                <HeaderCell label="标题" />
-                <HeaderCell label="艺人" />
-                {!shouldHideAlbum && <HeaderCell label="专辑" />}
-                <HeaderCell label={<MdAccessTime className="text-base inline" />} alignRight className="pr-2" />
+                {renderHeaderCell('标题')}
+                {renderHeaderCell('艺人')}
+                {!shouldHideAlbum && renderHeaderCell('专辑')}
+                {renderHeaderCell(<MdAccessTime className="text-base inline" />, 'pr-2', true)}
                 <div></div>
             </div>
 
@@ -347,6 +379,7 @@ export default function SortableSongList({
                         useWindowScroll={false}
                         customScrollParent={scrollParent}
                         data={displaySongs}
+                        context={{ sortableItems, disableReorder, sortKey }}
                         components={{ List: VirtuosoList as Components['List'] }}
                         itemContent={itemContent}
                         overscan={{ main: 2000, reverse: 2000 }} // High overscan for both directions
@@ -363,7 +396,7 @@ export default function SortableSongList({
                             if (!activeSong) return null;
                             const showStack = isDraggingSelection && selectedIds.size > 1;
                             return (
-                                <div className="relative" style={gridStyle as any}>
+                                <div className="relative" style={gridStyle}>
                                     {showStack && (
                                         <>
                                             <div className="absolute inset-0 translate-y-2 scale-[0.99] rounded-lg bg-surface-container-high opacity-60 shadow-md pointer-events-none" />

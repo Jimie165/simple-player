@@ -71,7 +71,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Store Actions
     // Store Actions
-    const { triggerLibraryUpdate, playlistVersion, triggerPlaylistUpdate, favoriteSet, updateRecentItemCover } = useLibraryStore();
+    const { triggerLibraryUpdate, triggerPlaylistUpdate, favoriteSet, updateRecentItemCover } = useLibraryStore();
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
@@ -106,7 +106,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             setLoading(false);
             initialLoadRef.current = false;
         }
-    }, [id, sortKey, sortOrder, playlistVersion]);
+    }, [id, sortKey, sortOrder]);
 
     useEffect(() => { loadData(); }, [loadData]);
 

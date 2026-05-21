@@ -1,6 +1,8 @@
 import { MdCheck, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
 import type { Playlist, SongMetadata } from '@/types';
+import type { ViewState } from '@/store/useNavigationStore';
+import type { SortKey, SortOrder } from '@/utils/songSort';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
@@ -10,14 +12,16 @@ import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/P
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
 
+type PlaylistGridItem = Playlist | (Omit<Playlist, 'id'> & { id: 'favorites' | 'playlist:favorites' });
+
 interface PlaylistCardsGridProps {
-    filteredPlaylists: Playlist[];
+    filteredPlaylists: PlaylistGridItem[];
     favoritesCount: number;
     isSelectionMode: boolean;
     selectedIds: Set<string>;
-    toggleSelection: (id: string, type: 'playlist', data: any) => void;
-    toggleSelectionMode: (item: { id: string; type: 'playlist'; data: any }) => void;
-    push: (entry: any) => void;
+    toggleSelection: (id: string, type: 'playlist', data: unknown) => void;
+    toggleSelectionMode: (item: { id: string; type: 'playlist'; data: unknown }) => void;
+    push: (entry: ViewState) => void;
     handlePlayFavorites: (shuffle?: boolean) => void;
     handleAddFavoritesToQueue: () => void;
     handlePlayPlaylist: (pl: Playlist, shuffle?: boolean) => Promise<void>;
@@ -25,7 +29,7 @@ interface PlaylistCardsGridProps {
     setEditPlaylist: (pl: Playlist) => void;
     setContextMenu: (value: { x: number; y: number; playlist: Playlist } | null) => void;
     setFavoritesContextMenu: (value: { x: number; y: number } | null) => void;
-    getPlaylistSettings: (playlistId: string) => { sortKey: any; sortOrder: any };
+    getPlaylistSettings: (playlistId: string) => { sortKey: SortKey; sortOrder: SortOrder };
     playlistSongs: Record<number, SongMetadata[]>;
 }
 
@@ -55,7 +59,7 @@ export default function PlaylistCardsGrid({
             style={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
         >
             {filteredPlaylists.map(pl => {
-                if (pl.id === 'favorites' as any) {
+                if (pl.id === 'favorites' || pl.id === 'playlist:favorites') {
                     const favoritesSelectionId = getMusicItemId(pl);
                     const isSelected = selectedIds.has(favoritesSelectionId);
                     return (
@@ -138,33 +142,34 @@ export default function PlaylistCardsGrid({
                     );
                 }
 
-                const id = getMusicItemId(pl);
+                const playlist = pl as Playlist;
+                const id = getMusicItemId(playlist);
                 const isSelected = selectedIds.has(id);
                 return (
                     <div
-                        key={pl.id}
+                        key={playlist.id}
                         onClick={() => {
                             if (isSelectionMode) {
-                                toggleSelection(id, 'playlist', pl);
+                                toggleSelection(id, 'playlist', playlist);
                             } else {
-                                push({ type: 'playlist_detail', data: pl });
+                                push({ type: 'playlist_detail', data: playlist });
                             }
                         }}
                         onContextMenu={(e) => {
                             e.preventDefault();
                             setFavoritesContextMenu(null);
-                            setContextMenu({ x: e.clientX, y: e.clientY, playlist: pl });
+                            setContextMenu({ x: e.clientX, y: e.clientY, playlist });
                         }}
                         className="group flex flex-col gap-3 cursor-pointer"
                     >
                         <div className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-all">
-                            {pl.cover_path ? (
-                                <CoverImage src={pl.cover_path} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                            {playlist.cover_path ? (
+                                <CoverImage src={playlist.cover_path} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                             ) : (
                                 <PlaylistCoverCollage
                                     songs={(() => {
-                                        const rawSongs = playlistSongs[pl.id] || [];
-                                        const settings = getPlaylistSettings(pl.id.toString());
+                                        const rawSongs = playlistSongs[playlist.id] || [];
+                                        const settings = getPlaylistSettings(playlist.id.toString());
                                         return sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
                                     })()}
                                     className="transition-transform duration-500 group-hover:scale-105"
@@ -175,7 +180,7 @@ export default function PlaylistCardsGrid({
                                 <div
                                     onClick={(e) => {
                                         e.stopPropagation();
-                                        toggleSelection(id, 'playlist', pl);
+                                        toggleSelection(id, 'playlist', playlist);
                                     }}
                                     className={clsx(
                                         'absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer',
@@ -193,11 +198,11 @@ export default function PlaylistCardsGrid({
                                     <CardPlayButton
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePlayPlaylist(pl);
+                                            handlePlayPlaylist(playlist);
                                         }}
                                     />
                                     <PlaylistCardMenu
-                                        pl={pl}
+                                        pl={playlist}
                                         handlePlayPlaylist={handlePlayPlaylist}
                                         handleAddToQueue={handleAddToQueue}
                                         setEditPlaylist={setEditPlaylist}
@@ -218,10 +223,10 @@ export default function PlaylistCardsGrid({
 
                         <div>
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 truncate text-[15px] group-hover:text-primary transition-colors">
-                                {pl.name}
+                                {playlist.name}
                             </h3>
                             <div className="flex items-center gap-2 text-xs text-neutral-500 font-medium">
-                                <span>{pl.song_count || 0} 首歌曲</span>
+                                <span>{playlist.song_count || 0} 首歌曲</span>
                             </div>
                         </div>
                     </div>

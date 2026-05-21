@@ -14,6 +14,7 @@ import {
     IoPlayForward,
 } from 'react-icons/io5';
 import type { SongMetadata } from '@/types';
+import type { ViewState } from '@/store/useNavigationStore';
 import { formatTime } from '@/utils/time';
 import MusicSlider from '@/components/common/MusicSlider';
 import { PlayerMenuWrapper } from '@/features/player/apple/PlayerMenuButton';
@@ -24,7 +25,7 @@ interface ApplePlayerControlsSectionProps {
     metadata: SongMetadata | null;
     marqueeResetToken: number;
     onClose: () => void;
-    push: (entry: any) => void;
+    push: (entry: ViewState) => void;
     toggleFavorite: (song: SongMetadata) => Promise<void>;
     currentTime: number;
     handleSeekChange: (value: number) => void;
@@ -145,14 +146,14 @@ export default function ApplePlayerControlsSection({
                 <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                         onClick={() => {
-                            if (metadata && typeof (metadata as any).id === 'number') {
+                            if (metadata && typeof metadata.id === 'number') {
                                 toggleFavorite(metadata);
                             }
                         }}
-                        disabled={!metadata || typeof (metadata as any).id !== 'number'}
+                        disabled={!metadata || typeof metadata.id !== 'number'}
                         className={clsx(
                             'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] flex-shrink-0 rounded-full flex items-center justify-center transition-all backdrop-blur-md',
-                            metadata && typeof (metadata as any).id === 'number'
+                            metadata && typeof metadata.id === 'number'
                                 ? 'bg-white/10 ring-1 ring-white/10 hover:bg-white/20 text-white/50 hover:text-red-500 cursor-pointer'
                                 : 'bg-white/5 ring-1 ring-white/5 text-white/20 cursor-default'
                         )}

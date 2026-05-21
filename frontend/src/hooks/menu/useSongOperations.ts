@@ -29,6 +29,11 @@ export interface MenuItemData {
     suffix?: ReactNode;
 }
 
+function hasLibraryIdentity(item: MusicItem) {
+    const record = item as unknown as Record<string, unknown>;
+    return typeof record.id === 'number' || record.isLibraryItem === true;
+}
+
 interface UseSongOperationsOptions {
     items: MusicItem[];
     context: MusicMenuContext;
@@ -58,7 +63,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     } = options;
 
     // Stores
-    const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite, libraryVersion, favoriteSet } = useLibraryStore();
+    const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const {
         setShuffleState, isShuffling, isPlaying, setIsPlaying,
@@ -81,14 +86,14 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const singleIsFavorite = useMemo(() => {
         if (!isSingle || !firstItem) return false;
         // 专门针对 SongMetadata 或带有完整 ID/Path 的项目进行检查
-        return isFavorite(firstItem as any);
-    }, [isSingle, firstItem, isFavorite, libraryVersion, favoriteSet]); // 监听 favoriteSet 确保状态同步
+        return isFavorite(firstItem as SongMetadata);
+    }, [isSingle, firstItem, isFavorite]); // 监听 favoriteSet 确保状态同步
 
     const isAllFavorited = useMemo(() => {
         if (!items.length) return false;
         if (isSingle) return singleIsFavorite;
-        return items.every(i => isFavorite(i as any));
-    }, [items, isSingle, singleIsFavorite, isFavorite, libraryVersion, favoriteSet]);
+        return items.every(i => isFavorite(i as SongMetadata));
+    }, [items, isSingle, singleIsFavorite, isFavorite]);
 
     // --- Actions ---
 
@@ -169,7 +174,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
         // Check if ALL are currently favorites
         // We check realtime status via store helper if possible
-        const allAreFav = songs.every(s => isFavorite(s as any));
+        const allAreFav = songs.every(s => isFavorite(s));
 
         // If all are favorite, we want to UN-favorite them.
         // If not all are favorite (mixed or none), we want to FAVORITE them.
@@ -182,7 +187,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             }
         }
         triggerLibraryUpdate();
-    }, [items, isFavorite, triggerLibraryUpdate]);
+    }, [items, isFavorite, toggleFavorite, triggerLibraryUpdate]);
 
     // 5. 删除或从音乐库删除
     const handleDeleteFromLibrary = useCallback(async () => {
@@ -252,8 +257,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         const canAddToPlaylist = items.every(i => {
             const t = getMusicItemType(i);
             return (
-                typeof (i as any).id === 'number' ||
-                (i as any).isLibraryItem === true ||
+                hasLibraryIdentity(i) ||
                 t === 'album' ||
                 t === 'artist' ||
                 t === 'playlist'

@@ -1,4 +1,4 @@
-import { Fragment, useState, useEffect } from 'react';
+import { Fragment, useState, useEffect, useCallback } from 'react';
 import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
 import { MdPlaylistAdd } from 'react-icons/md';
 import { MdAdd } from 'react-icons/md';
@@ -41,12 +41,43 @@ export default function AddToPlaylistSheet() {
 
     const [libraryMap, setLibraryMap] = useState<Map<number, SongMetadata>>(new Map());
 
+    const loadPlaylists = useCallback(async () => {
+        setLoading(true);
+        try {
+            const [list, libSongs] = await Promise.all([
+                libraryService.getPlaylists(),
+                libraryService.getLibrarySongs()
+            ]);
+
+            const map = new Map<number, SongMetadata>();
+            libSongs.forEach(s => {
+                if (s.id !== undefined) map.set(s.id, s);
+            });
+            setLibraryMap(map);
+
+            // Sort playlists:
+            // 1. By locally tracked lastAddedToPlaylists (most recent first)
+            // 2. Fallback to updated_at from backend
+            const sorted = [...list].sort((a, b) => {
+                const timeA = lastAddedToPlaylists[a.id] || (a.updated_at ? new Date(a.updated_at).getTime() : 0);
+                const timeB = lastAddedToPlaylists[b.id] || (b.updated_at ? new Date(b.updated_at).getTime() : 0);
+                return timeB - timeA;
+            });
+
+            setPlaylists(sorted);
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    }, [lastAddedToPlaylists]);
+
     useEffect(() => {
         if (isOpen) {
             setPlaylistSongs({});
             loadPlaylists();
         }
-    }, [isOpen, libraryVersion]);
+    }, [isOpen, libraryVersion, loadPlaylists]);
 
     useEffect(() => {
         if (isOpen && playlists.length > 0 && libraryMap.size > 0) {
@@ -73,8 +104,8 @@ export default function AddToPlaylistSheet() {
                         const sorted = sortSongs(hydrated, settings.sortKey, settings.sortOrder);
 
                         newMap[pl.id] = sorted;
-                    } catch (e) {
-                        // ignore
+                    } catch (error) {
+                        console.warn(`Failed to load songs for playlist ${pl.id}`, error);
                     }
                 }));
                 setPlaylistSongs(newMap);
@@ -82,37 +113,6 @@ export default function AddToPlaylistSheet() {
             fetchAll();
         }
     }, [isOpen, playlists, libraryMap]);
-
-    const loadPlaylists = async () => {
-        setLoading(true);
-        try {
-            const [list, libSongs] = await Promise.all([
-                libraryService.getPlaylists(),
-                libraryService.getLibrarySongs()
-            ]);
-
-            const map = new Map<number, SongMetadata>();
-            libSongs.forEach(s => {
-                if (s.id !== undefined) map.set(s.id, s);
-            });
-            setLibraryMap(map);
-
-            // Sort playlists: 
-            // 1. By locally tracked lastAddedToPlaylists (most recent first)
-            // 2. Fallback to updated_at from backend
-            const sorted = [...list].sort((a, b) => {
-                const timeA = lastAddedToPlaylists[a.id] || (a.updated_at ? new Date(a.updated_at).getTime() : 0);
-                const timeB = lastAddedToPlaylists[b.id] || (b.updated_at ? new Date(b.updated_at).getTime() : 0);
-                return timeB - timeA;
-            });
-
-            setPlaylists(sorted);
-        } catch (error) {
-            console.error(error);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleCreateNew = () => {
         setCreateDialogOpen(true);

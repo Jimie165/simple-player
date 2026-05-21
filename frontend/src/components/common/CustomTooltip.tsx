@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
 
@@ -25,7 +25,7 @@ export default function CustomTooltip({
     const triggerRef = useRef<HTMLDivElement>(null);
 
     // 计算弹窗位置
-    const updatePosition = () => {
+    const updatePosition = useCallback(() => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
 
@@ -47,7 +47,7 @@ export default function CustomTooltip({
         }
 
         setCoords({ top, left });
-    };
+    }, [placement]);
     const hoverTimeoutRef = useRef<number | null>(null);
     const leaveTimeoutRef = useRef<number | null>(null);
 
@@ -105,15 +105,25 @@ export default function CustomTooltip({
     }, []);
     // 如果父组件强制 show，也需要更新位置和渲染状态
     useEffect(() => {
+        let frame: number | null = null;
+
         if (show === true) {
-            updatePosition();
-            setIsRendered(true);
-            requestAnimationFrame(() => setIsVisible(true));
+            frame = requestAnimationFrame(() => {
+                updatePosition();
+                setIsRendered(true);
+                requestAnimationFrame(() => setIsVisible(true));
+            });
         } else if (show === false) {
-            setIsVisible(false);
-            leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
+            frame = requestAnimationFrame(() => {
+                setIsVisible(false);
+                leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
+            });
         }
-    }, [show]);
+
+        return () => {
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
+    }, [show, updatePosition]);
 
     useEffect(() => {
         if (isVisible || show) {
@@ -124,7 +134,7 @@ export default function CustomTooltip({
             window.removeEventListener('resize', updatePosition);
             window.removeEventListener('scroll', updatePosition, true);
         };
-    }, [isVisible, show]);
+    }, [isVisible, show, updatePosition]);
 
     const shouldRender = isRendered || show === true;
 

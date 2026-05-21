@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -32,15 +32,13 @@ export default function Library() {
             : 'songs';
 
     // Initial load: restore logic handled by useNavigationStore
-    useEffect(() => {
-        // Optional: Sync selection clearing ?
-    }, []);
-
     const handleTabChange = (tab: 'songs' | 'albums' | 'artists') => {
         // Switching tabs should exit selection mode immediately
         useSelectionStore.getState().clearSelection();
         setTab(tab);
-        try { localStorage.setItem('library_active_tab', tab); } catch { }
+        try { localStorage.setItem('library_active_tab', tab); } catch {
+            console.warn('Failed to persist library tab');
+        }
     };
 
     // Sort logic
@@ -57,18 +55,21 @@ export default function Library() {
     // Filtered & Sorted Logic
     // ...
 
-    useEffect(() => {
-        refreshLibrary();
-    }, [libraryVersion]);
-
-    const refreshLibrary = async () => {
+    const refreshLibrary = useCallback(async () => {
         try {
             const songs = await libraryService.getLibrarySongs();
             setLibrarySongs(songs);
         } catch (error) {
             console.error('Failed to load library:', error);
         }
-    };
+    }, []);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => {
+            refreshLibrary();
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [libraryVersion, refreshLibrary]);
 
     useEffect(() => {
         let unlisten: (() => void) | undefined;
@@ -97,21 +98,13 @@ export default function Library() {
             isMounted = false;
             if (unlisten) {
                 try {
-                    const result = unlisten() as any;
-                    if (result instanceof Promise) {
-                        result.catch((e: any) => console.warn('Failed to unlisten (async)', e));
-                    }
+                    Promise.resolve(unlisten()).catch((e: unknown) => console.warn('Failed to unlisten (async)', e));
                 } catch (e) {
                     console.warn('Failed to unlisten (sync)', e);
                 }
             }
         };
-    }, []);
-
-
-
-
-    useEffect(() => { refreshLibrary(); }, []);
+    }, [refreshLibrary]);
 
     const handleAddFolder = async () => {
         try {

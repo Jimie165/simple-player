@@ -23,9 +23,6 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
     // 当弹窗打开且有路径时，获取详细信息（大小、码率等）
     useEffect(() => {
         if (isOpen && initialMetadata?.path) {
-            // 先重置，避免显示上一次的数据
-            setFullMetadata(null);
-
             fileService.getMetadata(initialMetadata.path)
                 .then(meta => {
                     // 合并信息：数据库里的 id/added_at 等可能在 get_metadata 里没有，
@@ -46,7 +43,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
     }, [isOpen, initialMetadata]);
 
     // 显示的数据源：如果有 fullMetadata（加载完成），用它；否则用 initialMetadata
-    const displayMeta = fullMetadata || initialMetadata;
+    const displayMeta = fullMetadata?.path === initialMetadata?.path ? fullMetadata : initialMetadata;
     const isVideo = !!(displayMeta?.width && displayMeta?.height);
 
     const formatSize = (bytes?: number) => {

@@ -61,10 +61,7 @@ export const VideoLibrary: React.FC = () => {
             isMounted = false;
             if (unlisten) {
                 try {
-                    const result = unlisten() as any;
-                    if (result instanceof Promise) {
-                        result.catch((e: any) => console.warn('Failed to unlisten (async)', e));
-                    }
+                    Promise.resolve(unlisten()).catch((e: unknown) => console.warn('Failed to unlisten (async)', e));
                 } catch (e) {
                     console.warn('Failed to unlisten (sync)', e);
                 }
@@ -74,7 +71,10 @@ export const VideoLibrary: React.FC = () => {
 
     useEffect(() => {
         const el = document.querySelector('[data-scroll-viewport]');
-        if (el instanceof HTMLElement) setScrollParent(el);
+        if (!(el instanceof HTMLElement)) return;
+
+        const frame = requestAnimationFrame(() => setScrollParent(el));
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     const handleSelectFolder = (folderVideos: VideoMetadata[], isSelected: boolean) => {
@@ -92,8 +92,8 @@ export const VideoLibrary: React.FC = () => {
             if (sortBy === 'name') {
                 const valA = a.title;
                 const valB = b.title;
-                const isAsciiA = /^[\x00-\x7F]/.test(valA);
-                const isAsciiB = /^[\x00-\x7F]/.test(valB);
+                const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
+                const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
 
                 if (isAsciiA && !isAsciiB) {
                     res = -1;
@@ -171,8 +171,8 @@ export const VideoLibrary: React.FC = () => {
             if (sortBy === 'name') {
                 const nameA = a.path.split(/[/\\]/).pop() || '';
                 const nameB = b.path.split(/[/\\]/).pop() || '';
-                const isAsciiA = /^[\x00-\x7F]/.test(nameA);
-                const isAsciiB = /^[\x00-\x7F]/.test(nameB);
+                const isAsciiA = nameA.length > 0 && nameA.charCodeAt(0) <= 0x7F;
+                const isAsciiB = nameB.length > 0 && nameB.charCodeAt(0) <= 0x7F;
 
                 if (isAsciiA && !isAsciiB) {
                     res = -1;

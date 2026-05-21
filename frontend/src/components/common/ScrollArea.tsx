@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import clsx from 'clsx';
 
@@ -6,7 +6,7 @@ interface ScrollAreaProps {
     children: ReactNode;
     className?: string;
     topOffset?: number;
-    resetOnKeyChange?: any;
+    resetOnKeyChange?: unknown;
 }
 
 export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange }: ScrollAreaProps) {
@@ -27,7 +27,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
     const [isDragging, setIsDragging] = useState(false);
     const requestRef = useRef<number | undefined>(undefined);
 
-    const updateThumb = () => {
+    const updateThumb = useCallback(() => {
         if (!viewportRef.current || !thumbRef.current) return;
         const { scrollTop, scrollHeight, clientHeight } = viewportRef.current;
         const trackHeight = clientHeight - topOffset;
@@ -61,23 +61,23 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             scrollHeight,
             scrollRatio: maxThumb > 0 ? maxScroll / maxThumb : 0
         };
-    };
+    }, [topOffset]);
 
     // Throttled scroll handler using requestAnimationFrame
-    const onScroll = () => {
+    const onScroll = useCallback(() => {
         if (requestRef.current) return;
         requestRef.current = requestAnimationFrame(() => {
             updateThumb();
             requestRef.current = undefined;
         });
-    };
+    }, [updateThumb]);
 
     useEffect(() => {
         if (viewportRef.current) {
             viewportRef.current.scrollTop = 0;
             updateThumb();
         }
-    }, [resetOnKeyChange]);
+    }, [resetOnKeyChange, updateThumb]);
 
     useEffect(() => {
         const viewport = viewportRef.current;
@@ -106,7 +106,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             window.removeEventListener('resize', updateThumb);
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [topOffset]);
+    }, [onScroll, updateThumb]);
 
     // Drag Logic
     const dragInfo = useRef({
@@ -116,13 +116,13 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
     });
     const activePointerId = useRef<number | null>(null);
 
-    const scheduleThumbUpdate = () => {
+    const scheduleThumbUpdate = useCallback(() => {
         if (requestRef.current) return;
         requestRef.current = requestAnimationFrame(() => {
             updateThumb();
             requestRef.current = undefined;
         });
-    };
+    }, [updateThumb]);
 
     const handleThumbPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -134,6 +134,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         try {
             thumbRef.current.setPointerCapture(e.pointerId);
         } catch {
+            // Some browsers may reject capture if the pointer is already released.
         }
 
         dragInfo.current = {
@@ -176,7 +177,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             window.removeEventListener('pointerup', stopDragging);
             window.removeEventListener('pointercancel', stopDragging);
         };
-    }, [isDragging]);
+    }, [isDragging, scheduleThumbUpdate]);
 
     const handleTrackClick = (e: React.MouseEvent) => {
         if (!viewportRef.current || e.target === thumbRef.current) return;

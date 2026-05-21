@@ -27,7 +27,12 @@ export default function VirtualizedGrid<TItem>({
 
     useEffect(() => {
         const el = document.querySelector('[data-scroll-viewport]');
-        if (el instanceof HTMLElement) setScrollParent(el);
+        if (!(el instanceof HTMLElement)) return;
+
+        const frame = requestAnimationFrame(() => {
+            setScrollParent(el);
+        });
+        return () => cancelAnimationFrame(frame);
     }, []);
 
     useLayoutEffect(() => {

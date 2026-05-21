@@ -54,7 +54,8 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         }
         // Auto-close context menu when popup closes
         if (!show) {
-            setContextMenu(null);
+            const frame = requestAnimationFrame(() => setContextMenu(null));
+            return () => cancelAnimationFrame(frame);
         }
     }, [show, currentSongIndex]);
 

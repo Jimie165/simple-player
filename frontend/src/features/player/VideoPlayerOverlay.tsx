@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { formatTime } from '@/utils/time';
@@ -43,7 +43,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
     } = useVideoControls();
 
     const autoHideEnabled = true;
-    const showControls = () => {
+    const showControls = useCallback(() => {
         setIsControlsVisible(true);
         if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
 
@@ -54,7 +54,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 }
             }, 3000);
         }
-    };
+    }, [autoHideEnabled, isOpen]);
 
     const clearHideTimer = () => {
         if (controlsTimeoutRef.current) {
@@ -133,7 +133,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
             window.removeEventListener('pointerdown', onGlobalActivity, options);
             window.removeEventListener('focus', onGlobalActivity, options);
         };
-    }, [isOpen, isCompact]);
+    }, [isOpen, isCompact, showControls]);
 
     const handleClose = async () => {
         if (videoRef.current) {

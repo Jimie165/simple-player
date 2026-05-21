@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "tauri dev --config backend/tauri/tauri.conf.json",
     "build": "tauri build --config backend/tauri/tauri.conf.json",
-    "preview": "pnpm --filter frontend preview",
-    "lint": "pnpm --filter frontend lint",
+    "preview": "pnpm --filter simple-player-ui preview",
+    "lint": "pnpm --filter simple-player-ui lint",
     "test": "echo \"Error: no test specified\" && exit 1",
     "bump": "node scripts/bump-version.js"
   },

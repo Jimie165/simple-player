@@ -51,11 +51,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const [localVolume, setLocalVolume] = useState(volume);
     const [isVolumeDragging, setIsVolumeDragging] = useState(false);
 
-    useEffect(() => {
-        if (!isVolumeDragging) {
-            setLocalVolume(volume);
-        }
-    }, [volume, isVolumeDragging]);
+    const displayVolume = isVolumeDragging ? localVolume : volume;
 
     const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -170,9 +166,10 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         syncTime();
 
         // Listen for seek event from other components
-        const handleSeekEvent = (e: any) => {
-            if (e.detail && typeof e.detail.time === 'number') {
-                setCurrentTime(e.detail.time);
+        const handleSeekEvent = (event: Event) => {
+            const detail = (event as CustomEvent<{ time?: unknown }>).detail;
+            if (detail && typeof detail.time === 'number') {
+                setCurrentTime(detail.time);
             }
         };
         window.addEventListener('playback:seeked', handleSeekEvent);
@@ -231,7 +228,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                             if (t < prev - 1 || Math.abs(t - prev) > 0.5) return t;
                             return prev + 0.5;
                         });
-                    }).catch(() => { });
+                    }).catch((error) => console.warn('Failed to sync playback time', error));
                 } else {
                     setCurrentTime(prev => {
                         // If we are past estimated duration, wait for PlaybackControls to handle song end and dispatch seeked event
@@ -322,7 +319,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
 
     const toggleFullscreen = async () => {
         const appWindow = getCurrentWindow();
-        const anyWindow = appWindow as any;
+        const fullscreenWindow = appWindow as typeof appWindow & { unmaximize?: () => Promise<void> };
         try {
             const currentFullscreen = await appWindow.isFullscreen();
             const newState = !currentFullscreen;
@@ -331,8 +328,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                 const wasMaximized = await appWindow.isMaximized();
                 wasMaximizedBeforeFullscreenRef.current = wasMaximized;
                 if (wasMaximized) {
-                    if (typeof anyWindow.unmaximize === 'function') {
-                        await anyWindow.unmaximize();
+                    if (typeof fullscreenWindow.unmaximize === 'function') {
+                        await fullscreenWindow.unmaximize();
                     } else {
                         await appWindow.toggleMaximize();
                     }
@@ -450,7 +447,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                             playNext={playNext}
                             toggleRepeat={toggleRepeat}
                             repeatMode={repeatMode}
-                            localVolume={localVolume}
+                            localVolume={displayVolume}
                             handleVolumeChange={handleVolumeChange}
                             handleVolumeSeekStart={handleVolumeSeekStart}
                             handleVolumeSeekEnd={handleVolumeSeekEnd}

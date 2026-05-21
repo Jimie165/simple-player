@@ -4,6 +4,10 @@ import type { MusicItem } from '@/utils/musicItemUtils';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useVideoStore } from '@/store/useVideoStore';
 
+function getRecord(item: MusicItem): Record<string, unknown> {
+    return item as unknown as Record<string, unknown>;
+}
+
 interface DeleteFromLibraryParams {
     items: MusicItem[];
     count: number;
@@ -41,9 +45,10 @@ export function handleDeleteFromLibraryAction({
             if (context === 'video') {
                 const videos = useVideoStore.getState().videos;
                 const pathToId = new Map(videos.map(video => [video.path, video.id] as const));
-                const ids = items.map((item: any) => {
-                    if (typeof item?.id === 'number') return item.id;
-                    const path = item?.path;
+                const ids = items.map((item) => {
+                    const record = getRecord(item);
+                    if (typeof record.id === 'number') return record.id;
+                    const path = typeof record.path === 'string' ? record.path : '';
                     if (path && pathToId.has(path)) return pathToId.get(path);
                     return undefined;
                 }).filter((id): id is number => typeof id === 'number');
@@ -128,7 +133,10 @@ export function handleDeleteOrRemoveAction({
 }: DeleteOrRemoveParams) {
     if (items.length === 0) return;
 
-    const hasFavorites = items.some(item => (item as any).id === 'favorites' || (item as any).id === 'playlist:favorites');
+    const hasFavorites = items.some(item => {
+        const id = getRecord(item).id;
+        return id === 'favorites' || id === 'playlist:favorites';
+    });
     if (hasFavorites && context === 'playlist_list') return;
 
     if (onDelete) {
@@ -142,7 +150,7 @@ export function handleDeleteOrRemoveAction({
             async () => {
                 clearSelection();
                 for (const item of items) {
-                    const id = (item as any).id;
+                    const id = getRecord(item).id;
                     if (typeof id === 'number') {
                         await libraryService.deletePlaylist(id);
                     }
@@ -159,7 +167,7 @@ export function handleDeleteOrRemoveAction({
             items,
             async () => {
                 clearSelection();
-                const uniqueIds = items.map(item => (item as any).unique_id).filter(id => typeof id === 'number') as number[];
+                const uniqueIds = items.map(item => getRecord(item).unique_id).filter((id): id is number => typeof id === 'number');
 
                 if (uniqueIds.length > 0) {
                     try {
@@ -170,7 +178,7 @@ export function handleDeleteOrRemoveAction({
                         console.error('Failed to remove playlist items', e);
                     }
                 } else {
-                    const songIds = items.map(item => (item as any).id).filter(id => typeof id === 'number') as number[];
+                    const songIds = items.map(item => getRecord(item).id).filter((id): id is number => typeof id === 'number');
                     if (songIds.length > 0) {
                         try {
                             await libraryService.batchRemoveFromPlaylist(playlistId, songIds);

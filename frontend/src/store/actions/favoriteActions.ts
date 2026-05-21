@@ -3,6 +3,13 @@ import type { SongMetadata } from '@/types';
 import { libraryService } from '@/services/libraryService';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
+type PlayerStoreUpdate = Partial<{
+    pathMap: Map<string, number>;
+    favoriteSet: Set<number>;
+    playlist: SongMetadata[];
+    originalPlaylist: SongMetadata[];
+}>;
+
 export function isFavoriteFn(
     favoriteSet: Set<number>,
     pathMap: Map<string, number>,
@@ -42,7 +49,7 @@ export async function toggleFavoriteFn(
         triggerLibraryUpdate: () => void;
         refreshFavorites: () => Promise<void>;
     },
-    set: (updater: any) => void
+    set: (updater: PlayerStoreUpdate | ((state: { pathMap: Map<string, number>; favoriteSet: Set<number> }) => PlayerStoreUpdate)) => void
 ): Promise<void> {
     let songId: number | undefined;
     const songPath = song.path;

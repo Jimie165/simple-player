@@ -78,8 +78,9 @@ export function useMkvPrepare({
                 if (cancelled) return;
                 onPrepareErrorRef.current?.(error);
             } finally {
-                if (cancelled) return;
-                setIsPreparing(false);
+                if (!cancelled) {
+                    setIsPreparing(false);
+                }
             }
         };
 

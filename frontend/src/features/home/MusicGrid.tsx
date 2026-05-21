@@ -21,10 +21,6 @@ import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
 
-interface MusicGridProps {
-    onNavigateToLibrary?: () => void;
-}
-
 /**
  * 专门为最近播放列表定义的封面组件，负责内部加载歌曲数据以生成拼接封面
  */
@@ -54,7 +50,7 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
     return <PlaylistCoverCollage songs={songs} className="w-full h-full" />;
 }
 
-export default function MusicGrid({ onNavigateToLibrary: _onNavigateToLibrary }: MusicGridProps) {
+export default function MusicGrid() {
     const mainContentWidth = useMainContentWidth();
     // Store Actions
     const { recentHistory } = useLibraryStore();

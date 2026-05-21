@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
@@ -14,12 +14,7 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
     const [localVolume, setLocalVolume] = useState(volume);
     const [isDragging, setIsDragging] = useState(false);
 
-    // 当不处于拖拽状态时，同步外部（Store）的音量变化
-    useEffect(() => {
-        if (!isDragging) {
-            setLocalVolume(volume);
-        }
-    }, [volume, isDragging]);
+    const displayVolume = isDragging ? localVolume : volume;
 
     const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setIsDragging(true);
@@ -51,7 +46,7 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                     {/* 进度填充 */}
                     <div
                         className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-[height] group-hover:h-1.5"
-                        style={{ width: `${localVolume}%` }}
+                        style={{ width: `${displayVolume}%` }}
                     />
                     {/* 圆点 (Thumb) */}
                     <div
@@ -59,13 +54,13 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                             "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
                             isDragging && "opacity-100 scale-125"
                         )}
-                        style={{ left: `${localVolume}%`, marginLeft: '-6px' }}
+                        style={{ left: `${displayVolume}%`, marginLeft: '-6px' }}
                     />
                     {/* 透明的可交互滑块 */}
                     <input
                         type="range"
                         min="0" max="100"
-                        value={localVolume}
+                        value={displayVolume}
                         onMouseDown={() => setIsDragging(true)}
                         onTouchStart={() => setIsDragging(true)}
                         onChange={handleVolumeChange}
@@ -75,7 +70,7 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                     />
                 </div>
                 <span className="text-xs font-medium w-6 text-right tabular-nums text-neutral-900 dark:text-neutral-100">
-                    {localVolume}
+                    {displayVolume}
                 </span>
             </div>
             {/* 底部的小三角箭头 */}

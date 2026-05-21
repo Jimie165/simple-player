@@ -15,13 +15,14 @@ import {
     MdPlaylistAdd,
     MdRemoveCircleOutline,
 } from 'react-icons/md';
+import type { IconType } from 'react-icons';
 import { getMusicItemType } from '@/utils/musicItemUtils';
 import type { MusicItem } from '@/utils/musicItemUtils';
 
 interface MenuItemDataLike {
     id: string;
     label: string;
-    icon: any;
+    icon: IconType;
     onClick: () => void;
     variant?: 'default' | 'danger';
 }
@@ -111,7 +112,7 @@ export function buildSongMenuGroups({
     const group2: MenuItemDataLike[] = [];
     if (isSingle) {
         const type = firstType;
-        const item: any = firstItem;
+        const item = firstItem as Record<string, unknown> | undefined;
 
         let showProperties = true;
         if (context === 'folder' && type === 'folder') showProperties = false;

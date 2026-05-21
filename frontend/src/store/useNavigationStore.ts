@@ -6,7 +6,7 @@ export type ViewType = 'artist_detail' | 'album_detail' | 'playlist_detail';
 
 export interface ViewState {
     type: ViewType;
-    data?: any; // artist, album, or playlist data
+    data?: unknown; // artist, album, or playlist data
 }
 
 interface MainState {
@@ -50,7 +50,9 @@ interface NavigationState {
 const OVERLAY_PUSH_DEBOUNCE_MS = 260;
 
 function getOverlayKey(view: ViewState): string {
-    const data = view.data as Record<string, any> | undefined;
+    const data = view.data && typeof view.data === 'object'
+        ? view.data as Record<string, unknown>
+        : undefined;
     const idPart = data?.id ?? data?.name ?? '';
     const artistPart = data?.artist ?? '';
     return `${view.type}:${String(idPart)}:${String(artistPart)}`;

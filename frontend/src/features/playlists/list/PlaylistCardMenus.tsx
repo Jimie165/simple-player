@@ -2,6 +2,22 @@ import MusicContextMenu from '@/components/common/MusicContextMenu';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import type { Playlist } from '@/types';
+import type { MusicItem } from '@/utils/musicItemUtils';
+
+type FavoritesPlaylist = Omit<Playlist, 'id'> & { id: 'favorites' | 'playlist:favorites'; type: 'playlist'; title: string };
+type PlaylistContextMenu = { x: number; y: number; playlist: Playlist } | null;
+type FavoritesContextMenu = { x: number; y: number } | null;
+
+interface FavoritesCardMenuProps {
+    handlePlayFavorites: (shuffle?: boolean) => void;
+    handleAddFavoritesToQueue: () => void;
+    setFavoritesContextMenu: (value: FavoritesContextMenu) => void;
+    setContextMenu: (value: PlaylistContextMenu) => void;
+    toggleSelectionMode: (item: { id: string; type: 'playlist'; data: unknown }) => void;
+    toggleSelection: (id: string, type: 'playlist', data: unknown) => void;
+    isSelectionMode: boolean;
+    isSelected: boolean;
+}
 
 export function FavoritesCardMenu({
     handlePlayFavorites,
@@ -12,24 +28,29 @@ export function FavoritesCardMenu({
     toggleSelection,
     isSelectionMode,
     isSelected
-}: any) {
+}: FavoritesCardMenuProps) {
+    const favoritesItem: FavoritesPlaylist = {
+        id: 'playlist:favorites',
+        type: 'playlist',
+        name: '喜爱歌曲',
+        title: '喜爱歌曲',
+        description: null,
+        cover_path: null,
+        created_at: '',
+        updated_at: '',
+    };
     const { menuItems } = useSongOperations({
-        items: [{
-            id: 'playlist:favorites',
-            type: 'playlist',
-            name: '喜爱歌曲',
-            title: '喜爱歌曲'
-        } as any],
+        items: [favoritesItem as unknown as MusicItem],
         context: 'playlist_list',
         onPlay: () => handlePlayFavorites(),
         onShuffle: () => handlePlayFavorites(true),
         onAddToQueue: () => handleAddFavoritesToQueue(),
-        onDelete: () => { },
+        onDelete: () => undefined,
         onSelect: () => {
             if (!isSelectionMode) {
-                toggleSelectionMode({ id: 'playlist:favorites', type: 'playlist', data: { id: 'playlist:favorites', type: 'playlist', name: '喜爱歌曲', title: '喜爱歌曲' } });
+                toggleSelectionMode({ id: 'playlist:favorites', type: 'playlist', data: favoritesItem });
             } else {
-                toggleSelection('playlist:favorites', 'playlist', { id: 'playlist:favorites', type: 'playlist', name: '喜爱歌曲', title: '喜爱歌曲' });
+                toggleSelection('playlist:favorites', 'playlist', favoritesItem);
             }
         },
         isSelected
@@ -64,9 +85,9 @@ export function PlaylistCardMenu({
     handlePlayPlaylist: (pl: Playlist, shuffle?: boolean) => Promise<void>;
     handleAddToQueue: (pl: Playlist) => Promise<void>;
     setEditPlaylist: (pl: Playlist) => void;
-    setContextMenu: (v: any) => void;
-    setFavoritesContextMenu: (v: any) => void;
-    toggleSelectionMode: (item: any) => void;
+    setContextMenu: (v: PlaylistContextMenu) => void;
+    setFavoritesContextMenu: (v: FavoritesContextMenu) => void;
+    toggleSelectionMode: (item: { id: string; type: 'playlist'; data: unknown }) => void;
     toggleSelection: (id: string, type: 'playlist', data: Playlist) => void;
     isSelectionMode: boolean;
     isSelected: boolean;

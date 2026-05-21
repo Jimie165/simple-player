@@ -62,8 +62,8 @@ interface SongRowProps {
     onPlay: () => void;
     style?: React.CSSProperties;
     itemRef?: (node: HTMLElement | null) => void;
-    dragAttributes?: any;
-    dragListeners?: any;
+    dragAttributes?: object;
+    dragListeners?: object;
     isDraggable?: boolean;
     onRemove?: () => void;
     onNavigate?: () => void;

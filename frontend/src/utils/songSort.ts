@@ -9,7 +9,7 @@ export function sortSongs(songs: SongMetadata[], sortKey: SortKey, sortOrder: So
     }
 
     return [...songs].sort((a, b) => {
-        let key = sortKey as keyof SongMetadata;
+        const key = sortKey as keyof SongMetadata;
         let valA = a[key];
         let valB = b[key];
 
@@ -24,8 +24,8 @@ export function sortSongs(songs: SongMetadata[], sortKey: SortKey, sortOrder: So
         if (valB === undefined || valB === null) valB = '';
 
         if (typeof valA === 'string' && typeof valB === 'string') {
-            const isAsciiA = /^[\x00-\x7F]/.test(valA);
-            const isAsciiB = /^[\x00-\x7F]/.test(valB);
+            const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
+            const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
 
             if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
             if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;

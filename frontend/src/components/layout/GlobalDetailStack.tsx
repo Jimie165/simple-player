@@ -8,7 +8,7 @@ import PlaylistDetail from '@/features/playlists/detail/PlaylistDetail';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { SongMetadata } from '@/types';
-import type { RecentItem } from '@/types';
+import type { Playlist, RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -84,7 +84,7 @@ export default function GlobalDetailStack() {
                 let key = `${activeView.type}-${index}`;
                 if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
-                if (activeView.type === 'playlist_detail') key += `-${(activeView.data as any).id}`;
+                if (activeView.type === 'playlist_detail') key += `-${(activeView.data as Playlist).id}`;
 
                 return (
                     <motion.div
@@ -122,13 +122,14 @@ export default function GlobalDetailStack() {
                                                     onOpenArtistByName={handleOpenArtistByName}
                                                 />
                                             );
-                                        case 'playlist_detail':
+                                        case 'playlist_detail': {
                                             const plData = activeView.data as { id: number | 'favorites', name: string };
                                             return (
                                                 <div className="h-full">
                                                     <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
                                                 </div>
                                             );
+                                        }
                                         default:
                                             return null;
                                     }
@@ -145,33 +146,34 @@ export default function GlobalDetailStack() {
 // --- Internal Sub-Components to Isolate Hooks ---
 
 interface OverlayProps {
-    data: any;
+    data: AlbumData | ArtistData;
     onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
     onShuffle: (params: { songs: SongMetadata[], context?: { type: string, name: string, id?: string } }) => void;
-    addToRecent: (item: any) => void;
-    push?: (view: any) => void;
+    addToRecent: (item: RecentItem) => void;
+    push?: (view: { type: 'album_detail'; data: AlbumData }) => void;
     onOpenArtistByName: (name: string) => void;
 }
 
 function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
-    const [albumData, setAlbumData] = useState<AlbumData>(initialData);
+    const albumInitialData = initialData as AlbumData;
+    const [albumData, setAlbumData] = useState<AlbumData>(albumInitialData);
 
     useEffect(() => {
         // If we have an album name but no songs (or very few, implying incomplete data from a single item context)
         // we should fetch the full album.
         const fetchAlbumSongs = async () => {
-            const songs = initialData.songs || [];
+            const songs = albumInitialData.songs || [];
             if (songs.length === 0 || (songs.length === 1 && !songs[0].id)) {
                 try {
                     const allSongs = await libraryService.getLibrarySongs();
-                    const albumSongs = allSongs.filter(s => s.album === initialData.name && (!initialData.artist || s.artist === initialData.artist));
+                    const albumSongs = allSongs.filter(s => s.album === albumInitialData.name && (!albumInitialData.artist || s.artist === albumInitialData.artist));
                     if (albumSongs.length > 0) {
                         setAlbumData({
-                            ...initialData,
+                            ...albumInitialData,
                             songs: albumSongs,
-                            cover: albumSongs[0].cover_path || initialData.cover_path || null,
-                            cover_path: albumSongs[0].cover_path || initialData.cover_path || null,
-                            artist: albumSongs[0].artist || initialData.artist // refine artist if diverse
+                            cover: albumSongs[0].cover_path || albumInitialData.cover_path || null,
+                            cover_path: albumSongs[0].cover_path || albumInitialData.cover_path || null,
+                            artist: albumSongs[0].artist || albumInitialData.artist // refine artist if diverse
                         });
                     }
                 } catch (e) {
@@ -180,7 +182,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
             }
         };
         fetchAlbumSongs();
-    }, [initialData]);
+    }, [albumInitialData]);
 
     return (
         <AlbumDetailView
@@ -215,24 +217,25 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
 }
 
 function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
-    const [artistData, setArtistData] = useState<ArtistData>(initialData);
+    const artistInitialData = initialData as ArtistData;
+    const [artistData, setArtistData] = useState<ArtistData>(artistInitialData);
 
     useEffect(() => {
         const fetchArtistSongs = async () => {
             // If songs are empty, fetch from library
-            if (!initialData.songs || initialData.songs.length === 0) {
+            if (!artistInitialData.songs || artistInitialData.songs.length === 0) {
                 try {
                     const allSongs = await libraryService.getLibrarySongs();
-                    const artistSongs = allSongs.filter(s => s.artist === initialData.name);
+                    const artistSongs = allSongs.filter(s => s.artist === artistInitialData.name);
 
                     if (artistSongs.length > 0) {
                         const albums = new Set(artistSongs.map(s => s.album));
                         setArtistData({
-                            ...initialData,
+                            ...artistInitialData,
                             songs: artistSongs,
                             count: artistSongs.length,
                             albumCount: albums.size,
-                            cover: artistSongs[0]?.cover_path || initialData.cover
+                            cover: artistSongs[0]?.cover_path || artistInitialData.cover
                         });
                     }
                 } catch (e) {
@@ -241,7 +244,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
             }
         };
         fetchArtistSongs();
-    }, [initialData]);
+    }, [artistInitialData]);
 
     // Correct usage of useMemo: It is now at the top level of this component
     const artistAlbums = useMemo(() => {

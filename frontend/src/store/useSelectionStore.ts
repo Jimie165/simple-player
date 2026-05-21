@@ -3,22 +3,23 @@ import { create } from 'zustand';
 
 // "recent" is a special type that allows mixing file, folder, album in Recently Used
 type SelectionType = 'song' | 'album' | 'artist' | 'folder' | 'file' | 'recent' | 'playlist' | 'video' | null;
+type SelectionData = unknown;
 
 interface SelectionState {
     isSelectionMode: boolean;
     selectedIds: Set<string>; // Use IDs or unique identifiers (like path for files)
-    selectedItemsMap: Map<string, any>; // Store actual objects
+    selectedItemsMap: Map<string, SelectionData>; // Store actual objects
     selectionType: SelectionType;
     selectableIds: Set<string>;
 
     // Actions
-    toggleSelectionMode: (initialItem?: { id: string, type: SelectionType, data: any }) => void;
+    toggleSelectionMode: (initialItem?: { id: string, type: SelectionType, data: SelectionData }) => void;
     setSelectionMode: (active: boolean) => void;
-    selectItem: (id: string, type: SelectionType, data: any) => void;
+    selectItem: (id: string, type: SelectionType, data: SelectionData) => void;
     deselectItem: (id: string) => void;
-    toggleSelection: (id: string, type: SelectionType, data: any) => void;
+    toggleSelection: (id: string, type: SelectionType, data: SelectionData) => void;
     clearSelection: () => void;
-    selectAll: (items: { id: string, data: any }[], type: SelectionType) => void;
+    selectAll: (items: { id: string, data: SelectionData }[], type: SelectionType) => void;
     setSelectableIds: (ids: string[]) => void;
 
     // Global Select All Request signal
@@ -71,7 +72,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             if (state.selectionType && state.selectedIds.size > 0) {
                 if (!areTypesCompatible(state.selectionType, type)) {
                     // Types not compatible, reset selection
-                    const newMap = new Map();
+                    const newMap = new Map<string, SelectionData>();
                     newMap.set(id, data);
                     return {
                         selectionType: type,
@@ -142,7 +143,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
 
     selectAll: (items, type) => {
         const ids = new Set(items.map(i => i.id));
-        const map = new Map();
+        const map = new Map<string, SelectionData>();
         items.forEach(i => map.set(i.id, i.data));
         set({
             selectedIds: ids,

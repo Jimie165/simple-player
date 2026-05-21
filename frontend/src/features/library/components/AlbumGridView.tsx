@@ -51,7 +51,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             selectAll(items, 'album');
             setSelectAllRequested(false);
         }
-    }, [selectAllRequested, isSelectionMode, albums, selectAll, setSelectAllRequested]);
+    }, [selectAllRequested, isSelectionMode, selectionType, albums, selectAll, setSelectAllRequested]);
 
     useEffect(() => {
         if (!isSelectionMode) return;

@@ -68,16 +68,24 @@ export default function OverflowMarquee({
     }, [children, gapPx]);
 
     useLayoutEffect(() => {
+        let frame: number | null = null;
+
         if (behavior === 'auto-then-hover') {
-            setPhase('initial-delay');
-            setAutoRequestKey(v => v + 1);
+            frame = requestAnimationFrame(() => {
+                setPhase('initial-delay');
+                setAutoRequestKey(v => v + 1);
+            });
         } else {
-            setPhase('idle');
+            frame = requestAnimationFrame(() => setPhase('idle'));
         }
         if (hoverTimerRef.current !== null) {
             window.clearTimeout(hoverTimerRef.current);
             hoverTimerRef.current = null;
         }
+
+        return () => {
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
     }, [resetToken, behavior]);
 
     useLayoutEffect(() => {
@@ -93,8 +101,11 @@ export default function OverflowMarquee({
 
         lastAutoMetricsRef.current = metricsKey;
         if (phase !== 'animating') {
-            setPhase('initial-delay');
-            setAutoRequestKey(v => v + 1);
+            const frame = requestAnimationFrame(() => {
+                setPhase('initial-delay');
+                setAutoRequestKey(v => v + 1);
+            });
+            return () => cancelAnimationFrame(frame);
         }
     }, [behavior, metrics.containerWidth, metrics.distance, metrics.duration, metrics.overflow, phase]);
 

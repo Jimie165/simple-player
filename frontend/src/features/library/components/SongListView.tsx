@@ -14,6 +14,14 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 
+interface SongListVirtuosoContext {
+    footerSpacerClassName: string;
+}
+
+function SongListFooter({ context }: { context?: SongListVirtuosoContext }) {
+    return <div className={clsx(context?.footerSpacerClassName ?? 'h-12', 'w-full')} />;
+}
+
 interface SongListViewProps {
     songs: SongMetadata[];
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
@@ -69,7 +77,9 @@ export default function SongListView({
             if (saved === 'title' || saved === 'artist' || saved === 'album' || saved === 'duration') {
                 return saved;
             }
-        } catch { }
+        } catch (error) {
+            console.warn('Failed to read song list sort key', error);
+        }
         return null;
     });
 
@@ -79,7 +89,9 @@ export default function SongListView({
             if (saved === 'asc' || saved === 'desc') {
                 return saved;
             }
-        } catch { }
+        } catch (error) {
+            console.warn('Failed to read song list sort order', error);
+        }
         return 'asc';
     });
 
@@ -121,8 +133,8 @@ export default function SongListView({
             if (valB === undefined || valB === null) valB = '';
 
             if (typeof valA === 'string' && typeof valB === 'string') {
-                const isAsciiA = /^[\x00-\x7F]/.test(valA);
-                const isAsciiB = /^[\x00-\x7F]/.test(valB);
+                const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
+                const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
 
                 if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
                 if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;
@@ -159,14 +171,18 @@ export default function SongListView({
         if (sortKey === key) {
             if (sortOrder === 'asc') {
                 setSortOrder('desc');
-                try { localStorage.setItem('songlist_sort_order', 'desc'); } catch { }
+                try { localStorage.setItem('songlist_sort_order', 'desc'); } catch (error) {
+                    console.warn('Failed to persist song list sort order', error);
+                }
             } else {
                 setSortKey(null);
                 setSortOrder('asc');
                 try {
                     localStorage.removeItem('songlist_sort_key');
                     localStorage.setItem('songlist_sort_order', 'asc');
-                } catch { }
+                } catch (error) {
+                    console.warn('Failed to clear song list sort key', error);
+                }
             }
         } else {
             setSortKey(key);
@@ -174,16 +190,18 @@ export default function SongListView({
             try {
                 if (key) localStorage.setItem('songlist_sort_key', key);
                 localStorage.setItem('songlist_sort_order', 'asc');
-            } catch { }
+            } catch (error) {
+                console.warn('Failed to persist song list sort settings', error);
+            }
         }
     };
 
-    const SortIcon = ({ colKey }: { colKey: SortKey }) => {
+    const renderSortIcon = (colKey: SortKey) => {
         if (sortKey !== colKey) return null;
         return sortOrder === 'asc' ? <MdArrowDropUp className="inline text-lg -ml-1" /> : <MdArrowDropDown className="inline text-lg -ml-1" />;
     };
 
-    const HeaderCell = ({ label, colKey, className, allowSort = true }: { label: React.ReactNode, colKey: SortKey, className?: string, allowSort?: boolean }) => (
+    const renderHeaderCell = (label: React.ReactNode, colKey: SortKey, className?: string, allowSort = true) => (
         <div
             onClick={() => allowSort && !disableSort && handleSort(colKey)}
             className={clsx(
@@ -193,7 +211,7 @@ export default function SongListView({
             )}
         >
             {label}
-            {(allowSort && !disableSort) && <SortIcon colKey={colKey} />}
+            {(allowSort && !disableSort) && renderSortIcon(colKey)}
         </div>
     );
 
@@ -239,7 +257,10 @@ export default function SongListView({
     useEffect(() => {
         if (!virtualize) return;
         const el = document.querySelector('[data-scroll-viewport]');
-        if (el instanceof HTMLElement) setScrollParent(el);
+        if (!(el instanceof HTMLElement)) return;
+
+        const frame = requestAnimationFrame(() => setScrollParent(el));
+        return () => cancelAnimationFrame(frame);
     }, [virtualize]);
 
     // Render Row Function
@@ -248,7 +269,7 @@ export default function SongListView({
         const selected = isSelected(id);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
             ? favoriteSet.has(song.id)
-            : isFavorite(song as any);
+            : isFavorite(song);
 
         return (
             <SongListRow
@@ -291,15 +312,10 @@ export default function SongListView({
                     "text-[13px] text-on-surface-variant font-medium"
                 )}>
                 <div></div>
-                <HeaderCell label="标题" colKey="title" className="pl-0" allowSort={!disableSort} />
-                {!hideArtist && <HeaderCell label="艺人" colKey="artist" allowSort={!disableSort} />}
-                {!effectiveHideAlbum && <HeaderCell label="专辑" colKey="album" allowSort={!disableSort} />}
-                <HeaderCell
-                    label={<MdAccessTime className="text-base" />}
-                    colKey="duration"
-                    className="justify-end pr-2"
-                    allowSort={!disableSort}
-                />
+                {renderHeaderCell('标题', 'title', 'pl-0', !disableSort)}
+                {!hideArtist && renderHeaderCell('艺人', 'artist', undefined, !disableSort)}
+                {!effectiveHideAlbum && renderHeaderCell('专辑', 'album', undefined, !disableSort)}
+                {renderHeaderCell(<MdAccessTime className="text-base" />, 'duration', 'justify-end pr-2', !disableSort)}
                 <div></div>
             </div>
 
@@ -313,8 +329,9 @@ export default function SongListView({
                         itemContent={itemContent}
                         overscan={{ main: 2000, reverse: 2000 }}
                         className="w-full"
+                        context={{ footerSpacerClassName }}
                         components={{
-                            Footer: () => <div className={clsx(footerSpacerClassName, "w-full")} />
+                            Footer: SongListFooter
                         }}
                     />
                 ) : (

@@ -4,6 +4,10 @@ import type { MenuItemData, MusicMenuContext } from '@/hooks/menu/useSongOperati
 
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 
+function getRecord(item: MusicItem): Record<string, unknown> {
+    return item as unknown as Record<string, unknown>;
+}
+
 export function filterMenuGroupsByContext(
     groups: MenuItemData[][],
     context: MusicMenuContext,
@@ -18,8 +22,9 @@ export function filterMenuGroupsByContext(
         const isVideoItem = (item: MusicItem) => {
             const type = getMusicItemType(item);
             if (type === 'video') return true;
-            if (type === 'file' && (item as any).path) {
-                const ext = (item as any).path.split('.').pop()?.toLowerCase() || '';
+            const path = getRecord(item).path;
+            if (type === 'file' && typeof path === 'string') {
+                const ext = path.split('.').pop()?.toLowerCase() || '';
                 return VIDEO_EXTENSIONS.includes(ext);
             }
             return false;
@@ -34,7 +39,10 @@ export function filterMenuGroupsByContext(
         }
     }
 
-    if (context === 'playlist_list' && items.some(item => (item as any).id === 'favorites' || (item as any).id === 'playlist:favorites')) {
+    if (context === 'playlist_list' && items.some(item => {
+        const id = getRecord(item).id;
+        return id === 'favorites' || id === 'playlist:favorites';
+    })) {
         return groups.filter(group => !group.some(menuItem => menuItem.id === 'delete'));
     }
 

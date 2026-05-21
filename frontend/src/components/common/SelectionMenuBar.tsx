@@ -3,6 +3,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
+import type { MusicItem } from '@/utils/musicItemUtils';
 import { MdClose, MdCheckBoxOutlineBlank, MdCheckBox, MdMoreHoriz } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
@@ -14,18 +15,6 @@ export default function SelectionMenuBar() {
 
     const [visibleCount, setVisibleCount] = useState(4);
     const containerRef = useRef<HTMLDivElement>(null);
-
-    // Auto-clean
-    useEffect(() => {
-        if (!isSelectionMode) return;
-        // Logic to cleanup if navigating? 
-        // Existing SelectionActionBar did this.
-        // We will keep it to avoid stuck selection.
-        // clearSelection(); // Wait, this clears it immediately if we mount? 
-        // No, typically we might want to persist selection across some navigations?
-        // But for safety let's follow existing pattern: depends on where this component is mounted.
-        // If it is Global, we should listen to page changes.
-    }, [activeOverlay, currentPage]); // Need careful dependency here.
 
     const allSelected = useMemo(() => {
         if (!isSelectionMode) return false;
@@ -60,23 +49,25 @@ export default function SelectionMenuBar() {
         return 'other'; // generic
     }, [activeOverlay, currentPage, selectionType, selectedIds]);
 
-    const playlistId = activeOverlay?.type === 'playlist_detail' && activeOverlay.data?.id
-        ? activeOverlay.data.id
+    const activePlaylistData = activeOverlay?.data as { id?: unknown } | undefined;
+    const playlistId = activeOverlay?.type === 'playlist_detail' && activePlaylistData?.id
+        ? activePlaylistData.id
         : undefined;
 
     // Get Items
-    const selectedItems = useMemo(() => {
+    const selectedItems = useMemo<MusicItem[]>(() => {
         if (!selectedItemsMap) return [];
         return Array.from(selectedIds).map(id => {
             const item = selectedItemsMap.get(id);
-            if (item && selectionType) {
+            if (item && typeof item === 'object' && selectionType) {
                 // Ensure item carries its type for useSongOperations metadata logic
                 // ONLY override if item doesn't have a type (e.g. SongMetadata from SongList)
                 // RecentItems already have a type ('file', 'album') which we should preserve.
-                return { ...item, type: item.type || selectionType };
+                const record = item as Record<string, unknown>;
+                return { ...record, type: record.type || selectionType };
             }
             return item;
-        }).filter(Boolean);
+        }).filter((item): item is MusicItem => Boolean(item));
     }, [selectedIds, selectedItemsMap, selectionType]);
 
     // Use Hook
