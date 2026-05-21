@@ -18,6 +18,23 @@ type DisplayItem =
     | { type: 'line'; line: LyricsLine; lineIndex: number }
     | { type: 'interlude'; afterLineIndex: number; startMs: number; endMs: number };
 
+const getInterludeFocusOffsetPx = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return 18;
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+    return Math.round(Math.min(Math.max(0.9 * rootFontSize, 2.4 * vmin), 1.5 * rootFontSize));
+};
+
+const getInterludeRowHeightPx = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return 48;
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+    return Math.min(Math.max(2.5 * rootFontSize, 6 * vmin), 4 * rootFontSize);
+};
+
+const interludeGapOpenDurationMs = 420;
+const interludeExitDurationMs = 800;
+
 import { usePlayerStore } from '@/store/usePlayerStore';
 
 /**
@@ -127,21 +144,21 @@ function KaraokeText({
 
 function InterludeItem({
     isActive: isCurrentlyActive,
+    forceExiting,
+    forceExitKey,
+    suppressDots,
     currentTime,
     startMs,
     endMs
 }: {
     isActive: boolean;
+    forceExiting: boolean;
+    forceExitKey: number;
+    suppressDots: boolean;
     currentTime: number;
     startMs: number;
     endMs: number;
 }) {
-    const isFirstMount = useRef(true);
-
-    useEffect(() => {
-        isFirstMount.current = false;
-    }, []);
-
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const [preciseMs, setPreciseMs] = useState(currentTime * 1000);
     const lastTick = useRef(0);
@@ -174,6 +191,25 @@ function InterludeItem({
     const remainingMs = endMs - preciseMs;
     // 强制在剩余 1000ms 时触发离场动画（放大阶段），而外部聚焦会在 600ms 时切换（缩小阶段）
     const isActuallyActive = isCurrentlyActive && remainingMs > 1000;
+    const isWithinInterludeWindow = preciseMs >= startMs && preciseMs < endMs;
+    const areDotsVisible =
+        !suppressDots &&
+        isActuallyActive &&
+        preciseMs >= startMs + interludeGapOpenDurationMs;
+    const hasShownDotsRef = useRef(false);
+
+    useEffect(() => {
+        if (areDotsVisible) {
+            hasShownDotsRef.current = true;
+            return;
+        }
+
+        if (suppressDots || (!isWithinInterludeWindow && !forceExiting)) {
+            hasShownDotsRef.current = false;
+        }
+    }, [areDotsVisible, forceExiting, isWithinInterludeWindow, suppressDots]);
+
+    const canPlayDotsExit = !suppressDots && (forceExiting || hasShownDotsRef.current);
 
     const progress = Math.max(
         0,
@@ -194,37 +230,34 @@ function InterludeItem({
     // 离场动画参数
     const EXIT_DURATION = 0.8;
     const EXIT_PEAK_RATIO = 0.4; // 在 40% 的时间点达到最大缩放
+    const exitScaleFrames = forceExiting ? [1, 1.15, 0] : [null, 1.15, 0];
+    const exitOpacityFrames = forceExiting ? [0.85, 1, 0] : [null, 1, 0];
 
     return (
-        <motion.div
+        <div
             className="px-[clamp(1.2rem,2.2vw,2rem)] flex items-center overflow-hidden"
             aria-hidden={!isActuallyActive}
-            initial={{ height: 0 }}
-            animate={{
-                height: isActuallyActive ? 'clamp(2.5rem,6vmin,4rem)' : 0
-            }}
-            transition={isActuallyActive ? {
-                duration: 0.6,
-                ease: [0.25, 1, 0.5, 1]
-            } : {
-                // 只有在缩小时（达到峰值后）才开始收缩高度
-                delay: EXIT_DURATION * EXIT_PEAK_RATIO,
-                duration: EXIT_DURATION * (1 - EXIT_PEAK_RATIO),
-                ease: "easeIn"
+            style={{
+                height: 'clamp(2.5rem,6vmin,4rem)'
             }}
         >
             <motion.span
+                key={forceExiting ? `force-exit-${forceExitKey}` : 'normal'}
                 className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left"
                 aria-hidden
-                initial={{ scale: 0 }}
-                animate={isActuallyActive ? {
+                initial={forceExiting ? { scale: 1 } : { scale: 0 }}
+                animate={areDotsVisible ? {
                     scale: currentScale
+                } : suppressDots ? {
+                    scale: 0
+                } : canPlayDotsExit ? {
+                    scale: exitScaleFrames
                 } : {
-                    scale: isFirstMount.current ? 0 : [null, 1.15, 0]
+                    scale: 0
                 }}
-                transition={isActuallyActive ? {
-                    duration: 0.05,
-                    ease: "linear"
+                transition={areDotsVisible ? {
+                    duration: 0.24,
+                    ease: "easeOut"
                 } : {
                     duration: EXIT_DURATION,
                     ease: "easeInOut",
@@ -239,14 +272,18 @@ function InterludeItem({
                             width: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
                             height: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
                         }}
-                        initial={{ opacity: 0 }}
-                        animate={isActuallyActive ? {
+                        initial={{ opacity: forceExiting ? 1 : 0 }}
+                        animate={areDotsVisible ? {
                             opacity: dotOpacities[dotIndex]
+                        } : suppressDots ? {
+                            opacity: 0
+                        } : canPlayDotsExit ? {
+                            opacity: exitOpacityFrames
                         } : {
-                            opacity: isFirstMount.current ? 0 : [null, 1, 0]
+                            opacity: 0
                         }}
-                        transition={isActuallyActive ? {
-                            duration: 0.05, ease: "linear"
+                        transition={areDotsVisible ? {
+                            duration: 0.24, ease: "easeOut"
                         } : {
                             duration: EXIT_DURATION,
                             ease: "easeInOut",
@@ -255,7 +292,7 @@ function InterludeItem({
                     />
                 ))}
             </motion.span>
-        </motion.div>
+        </div>
     );
 }
 
@@ -276,6 +313,15 @@ export default function LyricsPanel({
     // short to bother animating dots — the previous line just stays
     // highlighted until the next one arrives.
     const interludeThresholdMs = 5000;
+    // Interludes hand focus to the next lyric shortly before singing
+    // resumes, so the dots can finish their exit animation cleanly.
+    const interludeNextLineFocusLeadMs = 600;
+    // For non-interlude silent gaps, only preview the upcoming line when
+    // the gap is noticeably long. Longer gaps hand focus to the next line
+    // shortly before it starts; shorter gaps switch as soon as the
+    // previous line ends.
+    const nonInterludeNextLineFocusThresholdMs = 600;
+    const nonInterludeNextLineFocusLeadMs = 600;
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
     const currentLyricIndex = useLyricsSync({
         lyrics: lines,
@@ -299,6 +345,10 @@ export default function LyricsPanel({
     const lastAutoScrollIndexRef = useRef<number | null>(null);
     const preferSmoothAutoScrollRef = useRef(false);
     const pausedScrollRef = useRef(false);
+    const interludeExitTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const previousPlaybackMsRef = useRef(currentTime * 1000);
+    const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
+    const [interludeExitKey, setInterludeExitKey] = useState(0);
 
     useEffect(() => {
         const el = scrollAreaRef.current;
@@ -367,6 +417,9 @@ export default function LyricsPanel({
         return () => {
             if (userScrollTimeoutRef.current) {
                 clearTimeout(userScrollTimeoutRef.current);
+            }
+            if (interludeExitTimeoutRef.current) {
+                clearTimeout(interludeExitTimeoutRef.current);
             }
         };
     }, []);
@@ -514,7 +567,7 @@ export default function LyricsPanel({
 
         if (leadingInterludeIndex >= 0) {
             const item = displayItems[leadingInterludeIndex] as { type: 'interlude'; endMs: number };
-            if (currentMs >= item.endMs - 600) {
+            if (currentMs >= item.endMs - interludeNextLineFocusLeadMs) {
                 return Math.min(displayItems.length - 1, leadingInterludeIndex + 1);
             }
             return leadingInterludeIndex;
@@ -535,8 +588,8 @@ export default function LyricsPanel({
 
             if (interludeIndex >= 0) {
                 const item = displayItems[interludeIndex] as { type: 'interlude'; endMs: number };
-                // 如果间奏即将结束（剩余 600ms），即点点开始从峰值缩小时，提前聚焦到下一行
-                if (currentMs >= item.endMs - 600) {
+                // 如果间奏即将结束，即点点开始从峰值缩小时，提前聚焦到下一行
+                if (currentMs >= item.endMs - interludeNextLineFocusLeadMs) {
                     return Math.min(displayItems.length - 1, interludeIndex + 1);
                 }
                 return interludeIndex;
@@ -548,7 +601,20 @@ export default function LyricsPanel({
                 );
                 const nextDisplayItem =
                     currentDisplayIndex >= 0 ? displayItems[currentDisplayIndex + 1] : null;
-                if (nextDisplayItem?.type === 'line') return currentDisplayIndex + 1;
+                if (nextDisplayItem?.type === 'line') {
+                    const nextLine = lines[nextDisplayItem.lineIndex];
+                    const nextLineStartMs = nextLine?.time_ms;
+                    if (typeof nextLineStartMs === 'number') {
+                        const gapMs = Math.max(0, nextLineStartMs - currentLine.end_ms);
+                        const focusNextLineAtMs =
+                            gapMs > nonInterludeNextLineFocusThresholdMs
+                                ? nextLineStartMs - nonInterludeNextLineFocusLeadMs
+                                : currentLine.end_ms;
+                        if (currentMs >= focusNextLineAtMs) {
+                            return currentDisplayIndex + 1;
+                        }
+                    }
+                }
             }
         }
 
@@ -557,7 +623,92 @@ export default function LyricsPanel({
         );
 
         return lineDisplayIndex >= 0 ? lineDisplayIndex : 0;
-    }, [currentLyricIndex, currentTime, displayItems, lines]);
+    }, [
+        currentLyricIndex,
+        currentTime,
+        displayItems,
+        interludeNextLineFocusLeadMs,
+        lines,
+        nonInterludeNextLineFocusThresholdMs,
+        nonInterludeNextLineFocusLeadMs,
+    ]);
+
+    const getVisualInterludeShift = useCallback(
+        (displayIndex: number) => {
+            const currentMs = currentTime * 1000;
+            const rowHeight = getInterludeRowHeightPx();
+
+            return displayItems.slice(0, displayIndex).reduce((shift, item) => {
+                if (item.type !== 'interlude') return shift;
+                const itemIndex = displayItems.indexOf(item);
+                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
+                const isOpen =
+                    itemIndex === exitingInterludeIndex ||
+                    (currentMs >= item.startMs && currentMs < closeAtMs);
+                return isOpen ? shift : shift - rowHeight;
+            }, 0);
+        },
+        [currentTime, displayItems, exitingInterludeIndex, interludeNextLineFocusLeadMs]
+    );
+
+    const startInterludeExit = useCallback((displayIndex: number) => {
+        if (displayItems[displayIndex]?.type !== 'interlude') return;
+
+        if (interludeExitTimeoutRef.current) {
+            clearTimeout(interludeExitTimeoutRef.current);
+        }
+
+        setExitingInterludeIndex(displayIndex);
+        setInterludeExitKey(key => key + 1);
+        interludeExitTimeoutRef.current = window.setTimeout(() => {
+            setExitingInterludeIndex(null);
+            interludeExitTimeoutRef.current = null;
+        }, interludeExitDurationMs);
+    }, [displayItems]);
+
+    const keepCurrentInterludeForExit = useCallback(() => {
+        const activeItem = displayItems[activeDisplayIndex];
+        if (activeItem?.type !== 'interlude') return;
+        if (currentTime * 1000 < activeItem.startMs + interludeGapOpenDurationMs) return;
+
+        startInterludeExit(activeDisplayIndex);
+    }, [activeDisplayIndex, currentTime, displayItems, startInterludeExit]);
+
+    useEffect(() => {
+        const previousMs = previousPlaybackMsRef.current;
+        const currentMs = currentTime * 1000;
+        previousPlaybackMsRef.current = currentMs;
+
+        if (Math.abs(currentMs - previousMs) < 900) return;
+
+        const previousInterludeIndex = displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            previousMs >= item.startMs + interludeGapOpenDurationMs &&
+            previousMs < item.endMs - interludeNextLineFocusLeadMs
+        );
+
+        if (previousInterludeIndex < 0) return;
+
+        const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
+        const stillInSameInterlude =
+            currentMs >= previousInterlude.startMs &&
+            currentMs < previousInterlude.endMs;
+
+        if (!stillInSameInterlude) {
+            startInterludeExit(previousInterludeIndex);
+        }
+    }, [currentTime, displayItems, interludeNextLineFocusLeadMs, startInterludeExit]);
+
+    const getAutoScrollOffset = useCallback(
+        (displayIndex: number) => {
+            const item = displayItems[displayIndex];
+            const visualShift = getVisualInterludeShift(displayIndex);
+            const interludeFocusOffset = item?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
+
+            return Math.round(visualShift + interludeFocusOffset);
+        },
+        [displayItems, getVisualInterludeShift]
+    );
 
     useEffect(() => {
         if (!isOpen || !hasTimestamps || lines.length === 0) return;
@@ -565,10 +716,27 @@ export default function LyricsPanel({
         if (isUserScrolling) return;
         if (lastAutoScrollIndexRef.current === activeDisplayIndex) return;
 
+        const previousAutoScrollIndex = lastAutoScrollIndexRef.current;
+        const previousAutoScrollItem =
+            previousAutoScrollIndex === null ? null : displayItems[previousAutoScrollIndex];
+        const activeDisplayItem = displayItems[activeDisplayIndex];
+        const isPostInterludeLineTransition =
+            previousAutoScrollItem?.type === 'interlude' &&
+            activeDisplayItem?.type === 'line' &&
+            previousAutoScrollIndex !== null &&
+            activeDisplayIndex === previousAutoScrollIndex + 1;
+
+        if (isPostInterludeLineTransition) {
+            lastAutoScrollIndexRef.current = activeDisplayIndex;
+            preferSmoothAutoScrollRef.current = false;
+            return;
+        }
+
         const scroll = () => {
             virtuosoRef.current?.scrollToIndex({
                 index: activeDisplayIndex,
                 align: 'center',
+                offset: getAutoScrollOffset(activeDisplayIndex),
                 behavior:
                     firstScrollDoneRef.current || preferSmoothAutoScrollRef.current
                         ? 'smooth'
@@ -578,9 +746,10 @@ export default function LyricsPanel({
             lastAutoScrollIndexRef.current = activeDisplayIndex;
             preferSmoothAutoScrollRef.current = false;
         };
+
         const raf = requestAnimationFrame(scroll);
         return () => cancelAnimationFrame(raf);
-    }, [activeDisplayIndex, isOpen, hasTimestamps, lines.length, isUserScrolling, isPlaying, layoutVersion, recenterVersion]);
+    }, [activeDisplayIndex, displayItems, getAutoScrollOffset, isOpen, hasTimestamps, lines.length, isUserScrolling, isPlaying, layoutVersion, recenterVersion]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
@@ -608,23 +777,40 @@ export default function LyricsPanel({
                         className="h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                         data={displayItems}
                         components={{ Header, Footer }}
-                        initialTopMostItemIndex={{ index: activeDisplayIndex, align: 'center' }}
+                        initialTopMostItemIndex={{
+                            index: activeDisplayIndex,
+                            align: 'center',
+                            offset: getAutoScrollOffset(activeDisplayIndex),
+                        }}
                         defaultItemHeight={90}
-                        itemContent={(_, item) => {
+                        increaseViewportBy={{ top: 520, bottom: 520 }}
+                        itemContent={(displayIndex, item) => {
+                            const interludeShift = getVisualInterludeShift(displayIndex);
+
                             if (item.type === 'interlude') {
                                 const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
                                 return (
-                                    <InterludeItem
-                                        isActive={isActive}
-                                        currentTime={currentTime}
-                                        startMs={item.startMs}
-                                        endMs={item.endMs}
-                                    />
+                                    <div
+                                        style={{
+                                            transform: `translateY(${interludeShift}px)`,
+                                            transition: `transform ${interludeGapOpenDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
+                                            willChange: 'transform',
+                                        }}
+                                    >
+                                        <InterludeItem
+                                            isActive={isActive}
+                                            forceExiting={displayIndex === exitingInterludeIndex}
+                                            forceExitKey={interludeExitKey}
+                                            suppressDots={isUserScrolling}
+                                            currentTime={currentTime}
+                                            startMs={item.startMs}
+                                            endMs={item.endMs}
+                                        />
+                                    </div>
                                 );
                             }
 
                             const { line } = item;
-                            const displayIndex = displayItems.indexOf(item);
                             const distanceFromActive =
                                 activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0;
                             const blurPx = Math.min(2.8, 0.35 + distanceFromActive * 0.55);
@@ -643,19 +829,22 @@ export default function LyricsPanel({
                                     type="button"
                                     onClick={() => {
                                         if (!canSeek) return;
+                                        keepCurrentInterludeForExit();
                                         onSeek(line.time_ms! / 1000);
                                     }}
                                     disabled={!canSeek}
                                     style={{
                                         filter: rowFilter,
                                         opacity: appliedOpacity,
+                                        transform: `translateY(${interludeShift}px) scale(${isActive ? 1 : 0.9})`,
+                                        transition: `filter 300ms, opacity 300ms, transform ${interludeGapOpenDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
                                     }}
                                     className={clsx(
-                                        'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] transition-all duration-300 origin-left will-change-[filter,opacity,transform]',
+                                        'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] origin-left will-change-[filter,opacity,transform]',
                                         canSeek ? 'cursor-pointer' : 'cursor-default',
                                         isActive
-                                            ? 'text-white scale-100 drop-shadow-xl'
-                                            : 'text-white scale-[0.9] hover:scale-[0.92]'
+                                            ? 'text-white drop-shadow-xl'
+                                            : 'text-white'
                                     )}
                                 >
                                     <span
