@@ -77,45 +77,37 @@ export function getActiveDisplayIndex(
     if (!displayItems.length) return 0;
 
     const currentMs = currentTime * 1000;
-    const leadingInterludeIndex = displayItems.findIndex((item) =>
-        item.type === 'interlude' &&
-        item.afterLineIndex === -1 &&
-        currentMs >= item.startMs &&
-        currentMs < item.endMs
-    );
-
-    if (leadingInterludeIndex >= 0) {
-        const item = displayItems[leadingInterludeIndex];
-        if (item.type === 'interlude' && currentMs >= item.endMs - interludeNextLineFocusLeadMs) {
-            return Math.min(displayItems.length - 1, leadingInterludeIndex + 1);
-        }
-        return leadingInterludeIndex;
-    }
-
-    const currentLine = lines[currentLyricIndex];
-
-    if (currentLine && typeof currentLine.time_ms === 'number') {
-        const interludeIndex = displayItems.findIndex((item) =>
+    const interludeIndex = displayItems.findIndex((item) =>
             item.type === 'interlude' &&
-            item.afterLineIndex === currentLyricIndex &&
             currentMs >= item.startMs &&
             currentMs < item.endMs
-        );
+    );
 
-        if (interludeIndex >= 0) {
-            const item = displayItems[interludeIndex];
-            if (item.type === 'interlude' && currentMs >= item.endMs - interludeNextLineFocusLeadMs) {
-                return Math.min(displayItems.length - 1, interludeIndex + 1);
-            }
-            return interludeIndex;
+    if (interludeIndex >= 0) {
+        const item = displayItems[interludeIndex];
+        if (item.type === 'interlude' && currentMs >= item.endMs - interludeNextLineFocusLeadMs) {
+            return Math.min(displayItems.length - 1, interludeIndex + 1);
         }
+        return interludeIndex;
+    }
+
+    let activeLineDisplayIndex = -1;
+    for (let index = 0; index < displayItems.length; index++) {
+        const item = displayItems[index];
+        if (item.type !== 'line') continue;
+        if (typeof item.line.time_ms !== 'number') continue;
+        if (item.line.time_ms <= currentMs) activeLineDisplayIndex = index;
+        else break;
+    }
+
+    if (activeLineDisplayIndex >= 0) {
+        const currentLineItem = displayItems[activeLineDisplayIndex];
+        if (currentLineItem.type !== 'line') return activeLineDisplayIndex;
+        const currentLine = currentLineItem.line;
 
         if (typeof currentLine.end_ms === 'number' && currentMs >= currentLine.end_ms) {
-            const currentDisplayIndex = displayItems.findIndex((item) =>
-                item.type === 'line' && item.lineIndex === currentLyricIndex
-            );
             const nextDisplayItem =
-                currentDisplayIndex >= 0 ? displayItems[currentDisplayIndex + 1] : null;
+                activeLineDisplayIndex >= 0 ? displayItems[activeLineDisplayIndex + 1] : null;
 
             if (nextDisplayItem?.type === 'line') {
                 const nextLineStartMs = lines[nextDisplayItem.lineIndex]?.time_ms;
@@ -126,11 +118,13 @@ export function getActiveDisplayIndex(
                             ? nextLineStartMs - nonInterludeNextLineFocusLeadMs
                             : currentLine.end_ms;
                     if (currentMs >= focusNextLineAtMs) {
-                        return currentDisplayIndex + 1;
+                        return activeLineDisplayIndex + 1;
                     }
                 }
             }
         }
+
+        return activeLineDisplayIndex;
     }
 
     const lineDisplayIndex = displayItems.findIndex((item) =>

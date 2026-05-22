@@ -205,6 +205,22 @@ export default function LyricsPanel({
         previousPlaybackMsRef.current = currentMs;
 
         if (Math.abs(currentMs - previousMs) < 900) return;
+
+        const findInterludeAt = (ms: number) => displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            ms >= item.startMs &&
+            ms < item.endMs
+        );
+        const previousActiveInterludeIndex = findInterludeAt(previousMs);
+        const currentActiveInterludeIndex = findInterludeAt(currentMs);
+
+        if (
+            previousActiveInterludeIndex >= 0 &&
+            previousActiveInterludeIndex === currentActiveInterludeIndex
+        ) {
+            return;
+        }
+
         setPlaybackSyncKey(key => key + 1);
 
         const previousInterludeIndex = displayItems.findIndex((item) =>
