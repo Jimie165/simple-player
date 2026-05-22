@@ -40,8 +40,8 @@ export default function AppearanceSection() {
         setSourceColor,
         presetColors,
         isCustomColor,
-        fullScreenMode,
-        setFullScreenMode,
+        playerEffectMode,
+        setPlayerEffectMode,
     } = useTheme();
 
     return (
@@ -61,36 +61,36 @@ export default function AppearanceSection() {
                 </div>
             </div>
 
-            {/* Full Screen Style Selection */}
+            {/* Player Effect Selection */}
             <div className="space-y-3">
                 <div className="flex items-center gap-2 px-1">
                     <MdWeb className="text-primary text-lg" />
-                    <h4 className="text-sm font-medium text-on-surface">播放页样式</h4>
+                    <h4 className="text-sm font-medium text-on-surface">播放页效果</h4>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <button
-                        onClick={() => setFullScreenMode('classic')}
+                        onClick={() => setPlayerEffectMode('performance')}
                         className={clsx(
-                            "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
-                            fullScreenMode === 'classic'
+                            "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
+                            playerEffectMode === 'performance'
                                 ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
                                 : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
                         )}
                     >
-                        <span>封面背景</span>
-                        {fullScreenMode === 'classic' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                        <span>性能优先</span>
+                        {playerEffectMode === 'performance' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                     <button
-                        onClick={() => setFullScreenMode('immersive')}
+                        onClick={() => setPlayerEffectMode('animation')}
                         className={clsx(
-                            "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
-                            fullScreenMode === 'immersive'
+                            "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
+                            playerEffectMode === 'animation'
                                 ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
                                 : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
                         )}
                     >
-                        <span>流体背景</span>
-                        {fullScreenMode === 'immersive' && <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
+                        <span>动画优先</span>
+                        {playerEffectMode === 'animation' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                 </div>
             </div>

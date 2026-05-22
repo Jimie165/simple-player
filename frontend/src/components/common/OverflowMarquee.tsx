@@ -40,7 +40,8 @@ export default function OverflowMarquee({
         const update = () => {
             const contentWidth = measure.scrollWidth;
             const containerWidth = container.clientWidth;
-            const overflow = contentWidth - containerWidth > 14;
+            // 降低阈值为 2px，因为哪怕只超出一两个字符，也会发生视觉截断
+            const overflow = contentWidth - containerWidth > 2;
             const distance = overflow ? contentWidth + gapPx : 0;
             const duration = overflow ? Math.max(10, distance / 28) : 0;
             setMetrics((prev) => {

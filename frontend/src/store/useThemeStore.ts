@@ -3,16 +3,19 @@ import { persist } from 'zustand/middleware';
 import { generateThemeVariables, PRESET_COLORS } from '@/utils/themeColors';
 
 type ThemeMode = 'light' | 'dark' | 'system';
+export type PlayerEffectMode = 'performance' | 'animation';
 
 interface ThemeState {
     themeMode: ThemeMode;
     sourceColor: string; // Hex Code
     isCustomColor: boolean;
     isDark: boolean; // Computed actual state
-    fullScreenMode: 'classic' | 'immersive';
+    playerEffectMode: PlayerEffectMode;
+    fullScreenMode: PlayerEffectMode;
 
     setThemeMode: (mode: ThemeMode) => void;
-    setFullScreenMode: (mode: 'classic' | 'immersive') => void;
+    setPlayerEffectMode: (mode: PlayerEffectMode) => void;
+    setFullScreenMode: (mode: PlayerEffectMode) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -27,15 +30,20 @@ export const useThemeStore = create<ThemeState>()(
             sourceColor: PRESET_COLORS[0].value, // Default Blue
             isCustomColor: false,
             isDark: false,
-            fullScreenMode: 'classic',
+            playerEffectMode: 'performance',
+            fullScreenMode: 'performance',
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
                 get().applyTheme();
             },
 
+            setPlayerEffectMode: (mode) => {
+                set({ playerEffectMode: mode, fullScreenMode: mode });
+            },
+
             setFullScreenMode: (mode) => {
-                set({ fullScreenMode: mode });
+                set({ playerEffectMode: mode, fullScreenMode: mode });
             },
 
             setSourceColor: (hex, isCustom = false) => {
@@ -99,8 +107,25 @@ export const useThemeStore = create<ThemeState>()(
                 themeMode: state.themeMode,
                 sourceColor: state.sourceColor,
                 isCustomColor: state.isCustomColor,
+                playerEffectMode: state.playerEffectMode,
                 fullScreenMode: state.fullScreenMode
             }),
+            merge: (persisted, current) => {
+                const persistedState = persisted as Partial<ThemeState> | undefined;
+                const legacyMode = persistedState?.fullScreenMode as unknown;
+                const persistedMode = persistedState?.playerEffectMode as unknown;
+                const playerEffectMode =
+                    persistedMode === 'animation' || legacyMode === 'immersive'
+                        ? 'animation'
+                        : 'performance';
+
+                return {
+                    ...current,
+                    ...persistedState,
+                    playerEffectMode,
+                    fullScreenMode: playerEffectMode,
+                };
+            },
         }
     )
 );

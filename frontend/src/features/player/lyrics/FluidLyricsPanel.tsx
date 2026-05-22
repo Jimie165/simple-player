@@ -1,0 +1,427 @@
+import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { motion, type PanInfo } from 'framer-motion';
+import { useLyricsSync } from '@/hooks/useLyricsSync';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import {
+    interludeExitCollapseDelayMs,
+    interludeGapOpenDurationMs,
+    interludeNextLineFocusLeadMs,
+    manualResumeFollowDelayMs,
+    topInsetPx,
+} from '@/features/player/lyrics/constants';
+import InterludeItem from '@/features/player/lyrics/InterludeItem';
+import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
+import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
+import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
+import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
+import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
+
+const scrollMaskStyle = {
+    maskImage:
+        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+    WebkitMaskImage:
+        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+};
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+export default function FluidLyricsPanel({
+    isOpen,
+    lyrics,
+    status,
+    hasTimestamps,
+    currentTime,
+    onSeek,
+}: LyricsPanelProps) {
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const lines = useMemo(() => lyrics ?? [], [lyrics]);
+    const preciseCurrentMs = usePrecisePlaybackTime(currentTime);
+    const currentLyricIndex = useLyricsSync({
+        lyrics: lines,
+        currentTime,
+        enabled: isOpen,
+        hasTimestamps,
+    });
+
+    const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+    const contentRef = useRef<HTMLDivElement | null>(null);
+    const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
+    const viewportSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
+    const contentHeightRef = useRef(0);
+    const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const interludeExitTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const previousPlaybackMsRef = useRef(currentTime * 1000);
+    const previousTargetYRef = useRef(0);
+    const pausedScrollRef = useRef(false);
+    const firstPositionDoneRef = useRef(false);
+
+    const [spacerHeight, setSpacerHeight] = useState(0);
+    const [layoutVersion, setLayoutVersion] = useState(0);
+    const [targetScrollY, setTargetScrollY] = useState(0);
+    const [motionDirection, setMotionDirection] = useState(1);
+    const [isUserScrolling, setIsUserScrolling] = useState(false);
+    const [pausedScroll, setPausedScroll] = useState(false);
+    const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
+    const [interludeExitKey, setInterludeExitKey] = useState(0);
+    const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
+
+    const displayState = useMemo(() => {
+        if (status === 'loading') return '正在加载歌词...';
+        if (status === 'error') return '歌词读取失败';
+        if (status === 'empty') return '此歌曲无歌词';
+        if (!lines.length) return '暂无歌词';
+        return null;
+    }, [status, lines.length]);
+
+    const displayItems = useMemo(
+        () => buildDisplayItems(lines, hasTimestamps),
+        [hasTimestamps, lines]
+    );
+    const activeDisplayIndex = useMemo(
+        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, preciseCurrentMs / 1000),
+        [currentLyricIndex, displayItems, lines, preciseCurrentMs]
+    );
+
+    const maxScrollY = useCallback(() => {
+        const viewportHeight = viewportSizeRef.current.height;
+        return Math.max(0, contentHeightRef.current - viewportHeight);
+    }, []);
+
+    const getVisualInterludeShift = useCallback(
+        (displayIndex: number) => {
+            const rowHeight = getInterludeRowHeightPx();
+
+            return displayItems.slice(0, displayIndex).reduce((shift, item, sliceIndex) => {
+                if (item.type !== 'interlude') return shift;
+                const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
+                const isOpenInterlude =
+                    sliceIndex === exitingInterludeIndex ||
+                    (preciseCurrentMs >= item.startMs && preciseCurrentMs < closeAtMs);
+                return isOpenInterlude ? shift : shift - rowHeight;
+            }, 0);
+        },
+        [displayItems, exitingInterludeIndex, preciseCurrentMs]
+    );
+
+    const calculateAutoTargetY = useCallback(() => {
+        const viewportHeight = viewportSizeRef.current.height;
+        const activeEl = itemRefs.current[activeDisplayIndex];
+        if (!activeEl || viewportHeight <= 0) return 0;
+
+        const activeItem = displayItems[activeDisplayIndex];
+        const visualShift = getVisualInterludeShift(activeDisplayIndex);
+        const interludeFocusOffset = activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
+        const itemCenter = activeEl.offsetTop + activeEl.offsetHeight / 2 + visualShift + interludeFocusOffset;
+
+        return clamp(Math.round(itemCenter - viewportHeight / 2), 0, maxScrollY());
+    }, [activeDisplayIndex, displayItems, getVisualInterludeShift, maxScrollY]);
+
+    const setTargetWithDirection = useCallback((nextTarget: number) => {
+        const clamped = clamp(nextTarget, 0, maxScrollY());
+        const previous = previousTargetYRef.current;
+        if (Math.abs(clamped - previous) > 0.5) {
+            setMotionDirection(clamped > previous ? 1 : -1);
+        }
+        previousTargetYRef.current = clamped;
+        setTargetScrollY(clamped);
+    }, [maxScrollY]);
+
+    useEffect(() => {
+        const el = scrollAreaRef.current;
+        if (!el) return;
+
+        const update = () => {
+            const width = el.clientWidth;
+            const height = el.clientHeight;
+            const nextContentHeight = contentRef.current?.scrollHeight ?? 0;
+            const previous = viewportSizeRef.current;
+
+            viewportSizeRef.current = { width, height };
+            contentHeightRef.current = nextContentHeight;
+            setSpacerHeight(height / 2);
+
+            if (previous.width !== width || previous.height !== height) {
+                setLayoutVersion(version => version + 1);
+            }
+        };
+
+        update();
+        const resizeObserver = new ResizeObserver(update);
+        resizeObserver.observe(el);
+        if (contentRef.current) resizeObserver.observe(contentRef.current);
+
+        return () => resizeObserver.disconnect();
+    }, [displayItems]);
+
+    useEffect(() => {
+        firstPositionDoneRef.current = false;
+        pausedScrollRef.current = false;
+        previousTargetYRef.current = 0;
+
+        const frame = requestAnimationFrame(() => {
+            setPausedScroll(false);
+            setIsUserScrolling(false);
+            setTargetScrollY(0);
+        });
+
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, lines]);
+
+    useEffect(() => {
+        if (isPlaying) {
+            pausedScrollRef.current = false;
+            const frame = requestAnimationFrame(() => setPausedScroll(false));
+            return () => cancelAnimationFrame(frame);
+        }
+    }, [isPlaying]);
+
+    useEffect(() => {
+        if (!isOpen || displayState) return;
+        if (isUserScrolling) return;
+        if (!isPlaying && firstPositionDoneRef.current) return;
+
+        const raf = requestAnimationFrame(() => {
+            setTargetWithDirection(calculateAutoTargetY());
+            firstPositionDoneRef.current = true;
+        });
+
+        return () => cancelAnimationFrame(raf);
+    }, [
+        activeDisplayIndex,
+        calculateAutoTargetY,
+        displayState,
+        isOpen,
+        isPlaying,
+        isUserScrolling,
+        layoutVersion,
+        preciseCurrentMs,
+        setTargetWithDirection,
+    ]);
+
+    const scheduleResumeFollow = useCallback(() => {
+        if (resumeTimeoutRef.current) {
+            clearTimeout(resumeTimeoutRef.current);
+        }
+        resumeTimeoutRef.current = setTimeout(() => {
+            setIsUserScrolling(false);
+            if (!isPlaying) {
+                pausedScrollRef.current = true;
+                setPausedScroll(true);
+                return;
+            }
+            setTargetWithDirection(calculateAutoTargetY());
+        }, manualResumeFollowDelayMs);
+    }, [calculateAutoTargetY, isPlaying, setTargetWithDirection]);
+
+    const handleManualDelta = useCallback((deltaY: number) => {
+        setIsUserScrolling(true);
+        if (!isPlaying) {
+            pausedScrollRef.current = true;
+            setPausedScroll(true);
+        }
+        setTargetWithDirection(previousTargetYRef.current + deltaY);
+        scheduleResumeFollow();
+    }, [isPlaying, scheduleResumeFollow, setTargetWithDirection]);
+
+    const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
+        event.preventDefault();
+        handleManualDelta(event.deltaY);
+    }, [handleManualDelta]);
+
+    const handlePan = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+        handleManualDelta(-info.delta.y);
+    }, [handleManualDelta]);
+
+    useEffect(() => {
+        return () => {
+            if (resumeTimeoutRef.current) {
+                clearTimeout(resumeTimeoutRef.current);
+            }
+            if (interludeExitTimeoutRef.current) {
+                clearTimeout(interludeExitTimeoutRef.current);
+            }
+        };
+    }, []);
+
+    const startInterludeExit = useCallback((displayIndex: number) => {
+        if (displayItems[displayIndex]?.type !== 'interlude') return;
+
+        if (interludeExitTimeoutRef.current) {
+            clearTimeout(interludeExitTimeoutRef.current);
+        }
+
+        setExitingInterludeIndex(displayIndex);
+        setInterludeExitKey(key => key + 1);
+        interludeExitTimeoutRef.current = window.setTimeout(() => {
+            setExitingInterludeIndex(null);
+            interludeExitTimeoutRef.current = null;
+        }, interludeExitCollapseDelayMs);
+    }, [displayItems]);
+
+    const keepCurrentInterludeForExit = useCallback(() => {
+        const activeItem = displayItems[activeDisplayIndex];
+        if (activeItem?.type !== 'interlude') return;
+        if (preciseCurrentMs < activeItem.startMs + interludeGapOpenDurationMs) return;
+
+        startInterludeExit(activeDisplayIndex);
+    }, [activeDisplayIndex, displayItems, preciseCurrentMs, startInterludeExit]);
+
+    useEffect(() => {
+        const previousMs = previousPlaybackMsRef.current;
+        const currentMs = currentTime * 1000;
+        previousPlaybackMsRef.current = currentMs;
+
+        if (Math.abs(currentMs - previousMs) < 900) return;
+
+        const findInterludeAt = (ms: number) => displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            ms >= item.startMs &&
+            ms < item.endMs
+        );
+        const previousActiveInterludeIndex = findInterludeAt(previousMs);
+        const currentActiveInterludeIndex = findInterludeAt(currentMs);
+
+        if (
+            previousActiveInterludeIndex >= 0 &&
+            previousActiveInterludeIndex === currentActiveInterludeIndex
+        ) {
+            return;
+        }
+
+        const syncFrame = requestAnimationFrame(() => {
+            setPlaybackSyncKey(key => key + 1);
+        });
+
+        const previousInterludeIndex = displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            previousMs >= item.startMs + interludeGapOpenDurationMs &&
+            previousMs < item.endMs - interludeNextLineFocusLeadMs
+        );
+
+        if (previousInterludeIndex < 0) return () => cancelAnimationFrame(syncFrame);
+
+        const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
+        const stillInSameInterlude =
+            currentMs >= previousInterlude.startMs &&
+            currentMs < previousInterlude.endMs;
+
+        if (!stillInSameInterlude) {
+            startInterludeExit(previousInterludeIndex);
+        }
+
+        return () => cancelAnimationFrame(syncFrame);
+    }, [currentTime, displayItems, startInterludeExit]);
+
+    const getMotionDelay = useCallback(
+        (displayIndex: number) => {
+            if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return 0;
+
+            const distance = Math.abs(displayIndex - activeDisplayIndex);
+
+            if (motionDirection >= 0) {
+                // 向下播放（歌词上移）：此时上方的歌词先行（延迟更短），形成从上往下拉动的牵引感
+                if (displayIndex <= activeDisplayIndex) {
+                    return Math.min(0.08, distance * 0.008);
+                } else {
+                    return Math.min(0.25, distance * 0.025);
+                }
+            } else {
+                // 向上跳段（歌词下移）：此时下方的歌词先行，往下拉动上方
+                if (displayIndex >= activeDisplayIndex) {
+                    return Math.min(0.08, distance * 0.008);
+                } else {
+                    return Math.min(0.25, distance * 0.025);
+                }
+            }
+        },
+        [activeDisplayIndex, isUserScrolling, isPlaying, motionDirection]
+    );
+
+    return (
+        <div className="relative h-full w-full rounded-[22px] overflow-hidden">
+            <motion.div
+                ref={scrollAreaRef}
+                className="relative z-10 h-[calc(100%-5rem)] mt-[1.5rem] mb-[1.5rem] overflow-hidden touch-none"
+                style={scrollMaskStyle}
+                onPan={handlePan}
+                onWheel={handleWheel}
+            >
+                {displayState ? (
+                    <div className="h-full flex items-center justify-center text-white/40 text-sm">
+                        {displayState}
+                    </div>
+                ) : (
+                    <div ref={contentRef} className="relative">
+                        <div style={{ height: spacerHeight + topInsetPx }} aria-hidden />
+                        {displayItems.map((item, displayIndex) => {
+                            const interludeShift = getVisualInterludeShift(displayIndex);
+                            const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
+
+                            return (
+                                <div
+                                    key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
+                                    ref={(node) => {
+                                        itemRefs.current[displayIndex] = node;
+                                    }}
+                                >
+                                    {item.type === 'interlude' ? (
+                                        <motion.div
+                                            animate={{ y: interludeShift - targetScrollY }}
+                                            transition={{
+                                                y: {
+                                                    type: 'spring',
+                                                    stiffness: 85,
+                                                    damping: 14,
+                                                    mass: 0.8,
+                                                    delay: getMotionDelay(displayIndex),
+                                                },
+                                            }}
+                                        >
+                                            <InterludeItem
+                                                isActive={isActive}
+                                                forceExiting={displayIndex === exitingInterludeIndex}
+                                                forceExitKey={interludeExitKey}
+                                                playbackSyncKey={playbackSyncKey}
+                                                suppressDots={false}
+                                                currentMs={preciseCurrentMs}
+                                                startMs={item.startMs}
+                                                endMs={item.endMs}
+                                            />
+                                        </motion.div>
+                                    ) : (
+                                        <LyricsLineItem
+                                            line={item.line}
+                                            isActive={isActive}
+                                            isUserScrolling={isUserScrolling}
+                                            pausedScroll={pausedScroll}
+                                            distanceFromActive={
+                                                activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0
+                                            }
+                                            interludeShift={interludeShift}
+                                            interludeShiftDurationMs={interludeGapOpenDurationMs}
+                                            lineEndMs={
+                                                typeof item.line.end_ms === 'number'
+                                                    ? item.line.end_ms
+                                                    : getLineEndMsByIndex(lines, item.lineIndex)
+                                            }
+                                            currentTime={preciseCurrentMs / 1000}
+                                            onSeek={(time) => {
+                                                keepCurrentInterludeForExit();
+                                                setIsUserScrolling(false);
+                                                onSeek(time);
+                                            }}
+                                            fluidMotion
+                                            targetScrollY={targetScrollY}
+                                            motionDelay={getMotionDelay(displayIndex)}
+                                        />
+                                    )}
+                                </div>
+                            );
+                        })}
+                        <div style={{ height: spacerHeight }} aria-hidden />
+                    </div>
+                )}
+            </motion.div>
+        </div>
+    );
+}

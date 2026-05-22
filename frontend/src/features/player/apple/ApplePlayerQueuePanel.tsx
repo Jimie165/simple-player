@@ -20,11 +20,9 @@ export default function ApplePlayerQueuePanel({
     onClose,
     queueScrollToTopSignal,
 }: ApplePlayerQueuePanelProps) {
-    const isFlipPreparing = panelFlipTarget === 'queue' && !isPanelFlipping && !isQueueOpen;
     const isFlippingIn = panelFlipTarget === 'queue' && isPanelFlipping && isQueueOpen;
     const isFlippingOut = panelFlipTarget === 'lyrics' && isPanelFlipping;
     const isVisible = isQueueOpen && !isFlippingOut;
-    const panelEase = [0.32, 0.72, 0, 1] as const;
 
     // 动画配置
     const variants: Variants = {
@@ -32,21 +30,20 @@ export default function ApplePlayerQueuePanel({
             opacity: 1,
             scale: 1,
             y: 0,
-            rotateY: 0,
             transition: {
-                duration: isFlippingIn ? 0.36 : 0.5,
-                ease: panelEase,
+                y: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
+                scale: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
+                opacity: { duration: 0.35, ease: 'easeOut' },
                 delay: (panelFlipTarget === null && isQueueOpen) ? 0.22 : (isFlippingIn ? 0.08 : 0)
             }
         },
         hidden: {
             opacity: 0,
             scale: isPanelFlipping ? 0.96 : 0.94,
-            y: isPanelFlipping ? 0 : 40,
-            rotateY: isFlipPreparing ? 90 : (isFlippingOut ? -90 : 0),
+            y: isPanelFlipping ? 16 : 40,
             transition: {
                 duration: isFlippingOut ? 0.25 : 0.35,
-                ease: panelEase
+                ease: 'easeOut'
             }
         }
     };
@@ -58,7 +55,6 @@ export default function ApplePlayerQueuePanel({
                 'pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]',
                 isQueueOpen ? 'pointer-events-auto' : 'pointer-events-none'
             )}
-            style={{ perspective: '1200px' }}
         >
             <div className="relative flex-1 overflow-hidden">
                 <motion.div

@@ -1,6 +1,15 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { usePlayerStore } from '@/store/usePlayerStore';
+
+function isEditableTarget(target: EventTarget | null): boolean {
+    if (!(target instanceof HTMLElement)) return false;
+    const tagName = target.tagName;
+    if (tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return true;
+    if (target.isContentEditable) return true;
+    return false;
+}
 
 export function useGlobalEvents() {
     const { refreshFavorites, refreshRecentHistory, triggerLibraryUpdate } = useLibraryStore();
@@ -36,4 +45,22 @@ export function useGlobalEvents() {
             if (unlistenVideo) unlistenVideo();
         };
     }, [refreshFavorites, refreshRecentHistory, triggerLibraryUpdate]);
+
+    useEffect(() => {
+        const handleGlobalSpace = (event: KeyboardEvent) => {
+            if (event.code !== 'Space') return;
+            if (event.repeat) return;
+            if (isEditableTarget(event.target)) return;
+
+            const { metadata, isVideoMode, togglePlay } = usePlayerStore.getState();
+            if (isVideoMode || !metadata) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            void togglePlay();
+        };
+
+        window.addEventListener('keydown', handleGlobalSpace, { capture: true });
+        return () => window.removeEventListener('keydown', handleGlobalSpace, { capture: true });
+    }, []);
 }

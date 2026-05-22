@@ -15,6 +15,8 @@ export function useTheme() {
     const isCustomColor = useThemeStore((state) => state.isCustomColor);
     const isDark = useThemeStore((state) => state.isDark);
 
+    const playerEffectMode = useThemeStore((state) => state.playerEffectMode);
+    const setPlayerEffectMode = useThemeStore((state) => state.setPlayerEffectMode);
     const fullScreenMode = useThemeStore((state) => state.fullScreenMode);
     const setFullScreenMode = useThemeStore((state) => state.setFullScreenMode);
 
@@ -31,6 +33,8 @@ export function useTheme() {
         isCustomColor,
         isDark,
 
+        playerEffectMode,
+        setPlayerEffectMode,
         fullScreenMode,
         setFullScreenMode,
 

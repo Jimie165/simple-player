@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { motion } from 'framer-motion';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 
@@ -13,6 +14,9 @@ interface LyricsLineItemProps {
     lineEndMs: number | null;
     currentTime: number;
     onSeek: (time: number) => void;
+    fluidMotion?: boolean;
+    targetScrollY?: number;
+    motionDelay?: number;
 }
 
 export default function LyricsLineItem({
@@ -26,36 +30,29 @@ export default function LyricsLineItem({
     lineEndMs,
     currentTime,
     onSeek,
+    fluidMotion = false,
+    targetScrollY = 0,
+    motionDelay = 0,
 }: LyricsLineItemProps) {
-    const blurPx = Math.min(2.8, 0.35 + distanceFromActive * 0.55);
+    const blurPx = isActive ? 0 : Math.min(5.4, 0.8 + distanceFromActive * 1.05);
     const rowOpacity = Math.max(
         0.22,
-        distanceFromActive === 0 ? 1 : 0.82 - distanceFromActive * 0.12
+        isActive ? 1 : 0.82 - distanceFromActive * 0.12
     );
-    const rowFilter = isUserScrolling || pausedScroll ? 'none' : `blur(${blurPx}px)`;
+    const rowFilter = isUserScrolling || pausedScroll ? 'blur(0px)' : `blur(${blurPx}px)`;
     const appliedOpacity = isUserScrolling || pausedScroll ? 1 : rowOpacity;
     const canSeek = line.time_ms !== null;
-
-    return (
-        <button
-            type="button"
-            onClick={() => {
-                if (line.time_ms === null) return;
-                onSeek(line.time_ms / 1000);
-            }}
-            disabled={!canSeek}
-            style={{
-                filter: rowFilter,
-                opacity: appliedOpacity,
-                transform: `translateY(${interludeShift}px) scale(${isActive ? 1 : 0.9})`,
-                transition: `filter 300ms, opacity 300ms, transform ${interludeShiftDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
-            }}
-            className={clsx(
-                'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] origin-left will-change-[filter,opacity,transform]',
-                canSeek ? 'cursor-pointer' : 'cursor-default',
-                isActive ? 'text-white drop-shadow-xl' : 'text-white'
-            )}
-        >
+    const handleClick = () => {
+        if (line.time_ms === null) return;
+        onSeek(line.time_ms / 1000);
+    };
+    const className = clsx(
+        'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] origin-left will-change-[filter,opacity,transform]',
+        canSeek ? 'cursor-pointer' : 'cursor-default',
+        isActive ? 'text-white drop-shadow-xl' : 'text-white'
+    );
+    const content = (
+        <>
             <span
                 className={clsx(
                     'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative',
@@ -84,6 +81,54 @@ export default function LyricsLineItem({
                     {line.translation}
                 </span>
             )}
+        </>
+    );
+
+    if (fluidMotion) {
+        return (
+            <motion.button
+                type="button"
+                onClick={handleClick}
+                disabled={!canSeek}
+                animate={{
+                    y: interludeShift - targetScrollY,
+                    scale: isActive ? 1 : 0.9,
+                    filter: rowFilter,
+                    opacity: appliedOpacity,
+                }}
+                transition={{
+                    y: {
+                        type: 'spring',
+                        stiffness: 85,
+                        damping: 14,
+                        mass: 0.8,
+                        delay: motionDelay,
+                    },
+                    scale: { type: 'spring', stiffness: 100, damping: 18, delay: motionDelay * 0.3 },
+                    filter: { duration: 0.38, ease: 'easeOut', delay: motionDelay * 0.2 },
+                    opacity: { duration: 0.35, ease: 'easeOut', delay: motionDelay * 0.2 },
+                }}
+                className={className}
+            >
+                {content}
+            </motion.button>
+        );
+    }
+
+    return (
+        <button
+            type="button"
+            onClick={handleClick}
+            disabled={!canSeek}
+            style={{
+                filter: rowFilter,
+                opacity: appliedOpacity,
+                transform: `translateY(${interludeShift}px) scale(${isActive ? 1 : 0.9})`,
+                transition: `filter 300ms, opacity 300ms, transform ${interludeShiftDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
+            }}
+            className={className}
+        >
+            {content}
         </button>
     );
 }

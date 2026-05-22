@@ -92,6 +92,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         onError,
     } = useVideoPlayback({
         isOpen,
+        isFullscreen,
         metadata,
         videoRef,
         volume,

@@ -47,7 +47,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         lyricsPath,
         requestLyricsForPath,
     } = usePlayerStore();
-    const { fullScreenMode } = useTheme();
+    const { playerEffectMode } = useTheme();
     const [localVolume, setLocalVolume] = useState(volume);
     const [isVolumeDragging, setIsVolumeDragging] = useState(false);
 
@@ -363,6 +363,22 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         }
     }, [isOpen, isFullscreen]);
 
+    useEffect(() => {
+        if (!isOpen) return;
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key !== 'Escape') return;
+            if (!isFullscreen) return;
+
+            event.preventDefault();
+            event.stopPropagation();
+            void toggleFullscreen();
+        };
+
+        window.addEventListener('keydown', handleEscape, { capture: true });
+        return () => window.removeEventListener('keydown', handleEscape, { capture: true });
+    }, [isOpen, isFullscreen]);
+
     // const lastCloseRef = React.useRef(0); // Removed
 
     // Background Image Source - already handled by state
@@ -378,7 +394,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             className="absolute inset-0 z-[200] flex flex-col overflow-hidden bg-neutral-900"
         >
             {/* Background Layer - Memoized to prevent re-renders during drag */}
-            <PlayerBackground src={bgImageSrc} variant={fullScreenMode === 'immersive' ? 'fluid' : 'blurred'} />
+            <PlayerBackground src={bgImageSrc} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
 
             <ApplePlayerTopBar
                 isFullscreen={isFullscreen}

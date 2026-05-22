@@ -59,7 +59,8 @@ export default function InterludeItem({
         currentMs >= startMs + interludeGapOpenDurationMs;
 
     useEffect(() => {
-        setHasShownDots(false);
+        const frame = requestAnimationFrame(() => setHasShownDots(false));
+        return () => cancelAnimationFrame(frame);
     }, [playbackSyncKey, startMs, endMs]);
 
     useEffect(() => {

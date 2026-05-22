@@ -11,13 +11,13 @@ interface NowPlayingViewProps {
 }
 
 export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
-    const { fullScreenMode } = useTheme();
+    const { playerEffectMode } = useTheme();
 
     // Classic Mode Logic
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (fullScreenMode !== 'classic') return;
+        if (playerEffectMode !== 'performance') return;
 
         let isMounted = true;
         const loadCover = async () => {
@@ -33,7 +33,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
 
         loadCover();
         return () => { isMounted = false; };
-    }, [metadata, fullScreenMode]);
+    }, [metadata, playerEffectMode]);
 
     // If Immersive (Apple) Mode, render that component
     // Note: onClose logic is handled by parent visibility usually, but here we pass a dummy or actual closer if needed.
@@ -51,7 +51,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
     // We need to pass a close handler. But NowPlayingView doesn't receive one.
     // I will modify NowPlayingView to take `onClose` prop, and update App.tsx to pass it.
 
-    if (fullScreenMode === 'immersive') {
+    if (playerEffectMode === 'animation') {
         return null;
     }
 

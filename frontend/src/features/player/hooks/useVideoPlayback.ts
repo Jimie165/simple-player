@@ -14,6 +14,7 @@ type VideoMetadataLike = {
 
 interface UseVideoPlaybackOptions {
     isOpen: boolean;
+    isFullscreen: boolean;
     metadata: VideoMetadataLike;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     volume: number;
@@ -28,6 +29,7 @@ interface UseVideoPlaybackOptions {
 
 export function useVideoPlayback({
     isOpen,
+    isFullscreen,
     metadata,
     videoRef,
     volume,
@@ -126,6 +128,11 @@ export function useVideoPlayback({
             if (!videoRef.current) return;
 
             switch (e.code) {
+                case 'Escape':
+                    if (!isFullscreen) break;
+                    e.preventDefault();
+                    void toggleAppFullscreen();
+                    break;
                 case 'Space':
                     e.preventDefault();
                     if (videoRef.current.paused) {
@@ -160,7 +167,7 @@ export function useVideoPlayback({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, duration, showControls, setIsControlsVisible, videoRef]);
+    }, [isOpen, isFullscreen, duration, showControls, setIsControlsVisible, videoRef, toggleAppFullscreen]);
 
     useEffect(() => {
         if (videoRef.current) {

@@ -221,7 +221,9 @@ export default function LyricsPanel({
             return;
         }
 
-        setPlaybackSyncKey(key => key + 1);
+        const syncFrame = requestAnimationFrame(() => {
+            setPlaybackSyncKey(key => key + 1);
+        });
 
         const previousInterludeIndex = displayItems.findIndex((item) =>
             item.type === 'interlude' &&
@@ -229,7 +231,7 @@ export default function LyricsPanel({
             previousMs < item.endMs - interludeNextLineFocusLeadMs
         );
 
-        if (previousInterludeIndex < 0) return;
+        if (previousInterludeIndex < 0) return () => cancelAnimationFrame(syncFrame);
 
         const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
         const stillInSameInterlude =
@@ -239,6 +241,8 @@ export default function LyricsPanel({
         if (!stillInSameInterlude) {
             startInterludeExit(previousInterludeIndex);
         }
+
+        return () => cancelAnimationFrame(syncFrame);
     }, [currentTime, displayItems, startInterludeExit]);
 
     const getAutoScrollOffset = useCallback(
@@ -338,7 +342,7 @@ export default function LyricsPanel({
                                             forceExiting={displayIndex === exitingInterludeIndex}
                                             forceExitKey={interludeExitKey}
                                             playbackSyncKey={playbackSyncKey}
-                                            suppressDots={isUserScrolling}
+                                            suppressDots={false}
                                             currentMs={preciseCurrentMs}
                                             startMs={item.startMs}
                                             endMs={item.endMs}
