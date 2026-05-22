@@ -3,7 +3,7 @@ import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
-    interludeExitDurationMs,
+    interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
@@ -14,6 +14,7 @@ import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/p
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
 import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
+import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
 const scrollMaskStyle = {
     maskImage:
@@ -32,6 +33,7 @@ export default function LyricsPanel({
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
+    const preciseCurrentMs = usePrecisePlaybackTime(currentTime);
     const currentLyricIndex = useLyricsSync({
         lyrics: lines,
         currentTime,
@@ -52,6 +54,7 @@ export default function LyricsPanel({
     const previousPlaybackMsRef = useRef(currentTime * 1000);
     const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
     const [interludeExitKey, setInterludeExitKey] = useState(0);
+    const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const userScrollTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
@@ -152,26 +155,25 @@ export default function LyricsPanel({
         [hasTimestamps, lines]
     );
     const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, currentTime),
-        [currentLyricIndex, currentTime, displayItems, lines]
+        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, preciseCurrentMs / 1000),
+        [currentLyricIndex, displayItems, lines, preciseCurrentMs]
     );
 
     const getVisualInterludeShift = useCallback(
         (displayIndex: number) => {
-            const currentMs = currentTime * 1000;
             const rowHeight = getInterludeRowHeightPx();
 
             return displayItems.slice(0, displayIndex).reduce((shift, item) => {
                 if (item.type !== 'interlude') return shift;
                 const itemIndex = displayItems.indexOf(item);
-                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
+                const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
                 const isOpen =
                     itemIndex === exitingInterludeIndex ||
-                    (currentMs >= item.startMs && currentMs < closeAtMs);
+                    (preciseCurrentMs >= item.startMs && preciseCurrentMs < closeAtMs);
                 return isOpen ? shift : shift - rowHeight;
             }, 0);
         },
-        [currentTime, displayItems, exitingInterludeIndex]
+        [displayItems, exitingInterludeIndex, preciseCurrentMs]
     );
 
     const startInterludeExit = useCallback((displayIndex: number) => {
@@ -186,16 +188,16 @@ export default function LyricsPanel({
         interludeExitTimeoutRef.current = window.setTimeout(() => {
             setExitingInterludeIndex(null);
             interludeExitTimeoutRef.current = null;
-        }, interludeExitDurationMs);
+        }, interludeExitCollapseDelayMs);
     }, [displayItems]);
 
     const keepCurrentInterludeForExit = useCallback(() => {
         const activeItem = displayItems[activeDisplayIndex];
         if (activeItem?.type !== 'interlude') return;
-        if (currentTime * 1000 < activeItem.startMs + interludeGapOpenDurationMs) return;
+        if (preciseCurrentMs < activeItem.startMs + interludeGapOpenDurationMs) return;
 
         startInterludeExit(activeDisplayIndex);
-    }, [activeDisplayIndex, currentTime, displayItems, startInterludeExit]);
+    }, [activeDisplayIndex, displayItems, preciseCurrentMs, startInterludeExit]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
@@ -203,6 +205,7 @@ export default function LyricsPanel({
         previousPlaybackMsRef.current = currentMs;
 
         if (Math.abs(currentMs - previousMs) < 900) return;
+        setPlaybackSyncKey(key => key + 1);
 
         const previousInterludeIndex = displayItems.findIndex((item) =>
             item.type === 'interlude' &&
@@ -318,8 +321,9 @@ export default function LyricsPanel({
                                             isActive={isActive}
                                             forceExiting={displayIndex === exitingInterludeIndex}
                                             forceExitKey={interludeExitKey}
+                                            playbackSyncKey={playbackSyncKey}
                                             suppressDots={isUserScrolling}
-                                            currentTime={currentTime}
+                                            currentMs={preciseCurrentMs}
                                             startMs={item.startMs}
                                             endMs={item.endMs}
                                         />
@@ -343,7 +347,7 @@ export default function LyricsPanel({
                                             ? item.line.end_ms
                                             : getLineEndMsByIndex(lines, item.lineIndex)
                                     }
-                                    currentTime={currentTime}
+                                    currentTime={preciseCurrentMs / 1000}
                                     onSeek={(time) => {
                                         keepCurrentInterludeForExit();
                                         onSeek(time);
