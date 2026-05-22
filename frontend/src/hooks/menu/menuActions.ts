@@ -70,6 +70,7 @@ export function handleDeleteFromLibraryAction({
                         songsToDelete.forEach((song) => {
                             if (song.path) {
                                 store.removeSongFromPlaylist(song.path);
+                                removeFromRecent(song.path);
                             }
                         });
                         window.setTimeout(() => {
@@ -153,6 +154,7 @@ export function handleDeleteOrRemoveAction({
                     const id = getRecord(item).id;
                     if (typeof id === 'number') {
                         await libraryService.deletePlaylist(id);
+                        removeFromRecent(`playlist:${id}`);
                     }
                 }
                 triggerLibraryUpdate();

@@ -187,10 +187,13 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             const { recentHistory } = get();
             if (recentHistory.length === 0) return;
 
+            const hasPlaylistItems = recentHistory.some((item) => item.type === 'playlist');
+
             // Fetch latest data safely
-            const [allSongs, allVideos] = await Promise.all([
+            const [allSongs, allVideos, playlists] = await Promise.all([
                 libraryService.getLibrarySongs().catch(() => [] as SongMetadata[]),
-                libraryService.getAllVideos().catch(() => [] as VideoMetadata[])
+                libraryService.getAllVideos().catch(() => [] as VideoMetadata[]),
+                hasPlaylistItems ? libraryService.getPlaylists().catch(() => []) : Promise.resolve([])
             ]);
 
             // Create lookup maps for faster access
@@ -204,6 +207,9 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                 if (v.path) videoMap.set(v.path.replace(/[\\/]/g, '/').toLowerCase(), v);
             });
 
+            const playlistIds = new Set(
+                (playlists as Array<{ id: number }>).map((playlist) => playlist.id)
+            );
 
             const newRecent = recentHistory.map(item => {
                 if (item.type === 'file' || item.type === 'video') {
@@ -239,6 +245,25 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                     }
                 }
                 return item;
+            }).filter((item) => {
+                if (item.type === 'playlist') {
+                    if (item.id === 'playlist:favorites') return true;
+                    const rawId = item.id.replace('playlist:', '');
+                    const playlistId = Number.parseInt(rawId, 10);
+                    return Number.isInteger(playlistId) && playlistIds.has(playlistId);
+                }
+
+                if (item.type === 'video') {
+                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    return videoMap.has(normPath);
+                }
+
+                if (item.type === 'file' && item.isLibraryItem) {
+                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    return songMap.has(normPath) || videoMap.has(normPath);
+                }
+
+                return true;
             });
 
             set({ recentHistory: newRecent });

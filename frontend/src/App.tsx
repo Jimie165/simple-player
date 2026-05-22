@@ -41,6 +41,7 @@ function App() {
 
   useEffect(() => {
     useLibraryStore.getState().refreshFavorites();
+    useLibraryStore.getState().refreshRecentHistory();
   }, []);
 
   // Sync persisted audio output preference to backend on launch and listen for backend-driven changes.
