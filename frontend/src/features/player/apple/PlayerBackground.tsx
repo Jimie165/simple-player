@@ -412,6 +412,15 @@ function BlurredCoverBackground({ src }: { src: string | null }) {
                     transition={{ duration: 0.9, ease: "easeInOut" }}
                     className="absolute inset-0 w-full h-full opacity-85 dark:opacity-70"
                 >
+                    {/* 最底层弥补空白边缘的大号模糊背景 */}
+                    <div className="absolute inset-[-10%]">
+                        <img
+                            src={src}
+                            alt=""
+                            className="w-full h-full object-cover scale-[1.15] blur-[100px] saturate-[1.25] opacity-80"
+                        />
+                    </div>
+                    {/* 原始底层景深 */}
                     <div className="absolute inset-[-10%]">
                         <img
                             src={src}
