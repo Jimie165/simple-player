@@ -300,7 +300,7 @@ export default function SortableSongList({
     const renderItem = (song: SongMetadata, index: number) => {
         const uniqueId = getSongId(song, index);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
-            ? (favoritesLoaded ? favoriteSet.has(song.id) : song.is_favorite)
+            ? (favoritesLoaded ? favoriteSet.has(song.id) : (song.is_favorite ?? false))
             : isFavoriteStoreFn(song);
 
         return (

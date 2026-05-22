@@ -268,7 +268,7 @@ export default function SongListView({
         const id = getMusicItemId(song);
         const selected = isSelected(id);
         const isFav = (song.id !== undefined && typeof song.id === 'number')
-            ? (favoritesLoaded ? favoriteSet.has(song.id) : song.is_favorite)
+            ? (favoritesLoaded ? favoriteSet.has(song.id) : (song.is_favorite ?? false))
             : isFavorite(song);
 
         return (

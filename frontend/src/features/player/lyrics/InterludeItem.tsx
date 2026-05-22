@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { interludeGapOpenDurationMs } from '@/features/player/lyrics/constants';
+import { interludeGapOpenDurationMs, interludeExitDurationMs } from '@/features/player/lyrics/constants';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
 const dotIndexes = [0, 1, 2];
 const breathDurationMs = 4500;
-const exitDurationSeconds = 0.8;
+const exitDurationSeconds = interludeExitDurationMs / 1000;
 const exitPeakRatio = 0.4;
 
 interface InterludeItemProps {
@@ -41,15 +41,26 @@ export default function InterludeItem({
     useEffect(() => {
         const external = currentTime * 1000;
         const diff = Math.abs(external - lastExternalMs.current);
+        let frame: number | null = null;
+
         if (diff > 1000) {
-            setPreciseMs(external);
+            frame = requestAnimationFrame(() => setPreciseMs(external));
         }
         lastExternalMs.current = external;
+
+        return () => {
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
     }, [currentTime]);
 
     useEffect(() => {
-        setPreciseMs(currentTimeRef.current * 1000);
-        if (!isPlaying) return;
+        const syncFrame = requestAnimationFrame(() => {
+            setPreciseMs(currentTimeRef.current * 1000);
+        });
+        if (!isPlaying) {
+            return () => cancelAnimationFrame(syncFrame);
+        }
+
         let frame: number;
         const tick = (now: number) => {
             const delta = now - lastTick.current;
@@ -59,7 +70,10 @@ export default function InterludeItem({
         };
         lastTick.current = performance.now();
         frame = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frame);
+        return () => {
+            cancelAnimationFrame(syncFrame);
+            cancelAnimationFrame(frame);
+        };
     }, [isPlaying]);
 
     const remainingMs = endMs - preciseMs;

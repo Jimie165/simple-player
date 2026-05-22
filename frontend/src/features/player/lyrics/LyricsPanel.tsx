@@ -337,6 +337,7 @@ export default function LyricsPanel({
                                         activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0
                                     }
                                     interludeShift={interludeShift}
+                                    interludeShiftDurationMs={interludeGapOpenDurationMs}
                                     lineEndMs={
                                         typeof item.line.end_ms === 'number'
                                             ? item.line.end_ms

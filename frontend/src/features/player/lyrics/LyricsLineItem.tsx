@@ -1,6 +1,5 @@
 import clsx from 'clsx';
 import type { LyricsLine } from '@/types';
-import { interludeGapOpenDurationMs } from '@/features/player/lyrics/constants';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 
 interface LyricsLineItemProps {
@@ -10,6 +9,7 @@ interface LyricsLineItemProps {
     pausedScroll: boolean;
     distanceFromActive: number;
     interludeShift: number;
+    interludeShiftDurationMs: number;
     lineEndMs: number | null;
     currentTime: number;
     onSeek: (time: number) => void;
@@ -22,6 +22,7 @@ export default function LyricsLineItem({
     pausedScroll,
     distanceFromActive,
     interludeShift,
+    interludeShiftDurationMs,
     lineEndMs,
     currentTime,
     onSeek,
@@ -47,7 +48,7 @@ export default function LyricsLineItem({
                 filter: rowFilter,
                 opacity: appliedOpacity,
                 transform: `translateY(${interludeShift}px) scale(${isActive ? 1 : 0.9})`,
-                transition: `filter 300ms, opacity 300ms, transform ${interludeGapOpenDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
+                transition: `filter 300ms, opacity 300ms, transform ${interludeShiftDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
             }}
             className={clsx(
                 'w-full text-left px-[clamp(1.2rem,2.2vw,2rem)] py-[clamp(0.6rem,1vw,1rem)] origin-left will-change-[filter,opacity,transform]',
@@ -57,7 +58,7 @@ export default function LyricsLineItem({
         >
             <span
                 className={clsx(
-                    'block font-bold text-[clamp(1.42rem,3.9vmin,2.7rem)] leading-[1.38] tracking-wide relative',
+                    'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative',
                     isActive ? 'opacity-100' : 'opacity-40 hover:opacity-75'
                 )}
             >

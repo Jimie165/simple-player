@@ -401,7 +401,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-500"></div>
                 </div>
             ) : (
-                <div className="px-2 pb-16 relative z-10">
+                <div className="px-2 pb-32 relative z-10">
                     <SortableSongList
                         songs={filteredSongs}
                         onPlay={handlePlaySong}
