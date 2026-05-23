@@ -265,6 +265,7 @@ function App() {
       <AppleMusicPlayer
         isOpen={isFullScreen}
         onClose={() => setIsFullScreen(false)}
+        mainContentWidth={mainContentWidth}
       />
       <Toaster
         position="top-center"

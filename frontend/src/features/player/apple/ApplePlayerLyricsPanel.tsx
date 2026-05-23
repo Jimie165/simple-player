@@ -7,6 +7,7 @@ import LyricsPanel from '@/features/player/lyrics/LyricsPanel';
 import type { LyricsLine } from '@/types';
 
 interface ApplePlayerLyricsPanelProps {
+    variant?: 'side' | 'narrow';
     isLyricsOpen: boolean;
     lyricsMounted: boolean;
     panelFlipTarget: 'queue' | 'lyrics' | null;
@@ -16,9 +17,12 @@ interface ApplePlayerLyricsPanelProps {
     hasTimestamps: boolean;
     currentTime: number;
     onSeek: (time: number) => void;
+    onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
+    narrowControlsVisible?: boolean;
 }
 
 export default function ApplePlayerLyricsPanel({
+    variant = 'side',
     isLyricsOpen,
     lyricsMounted,
     panelFlipTarget,
@@ -28,6 +32,8 @@ export default function ApplePlayerLyricsPanel({
     hasTimestamps,
     currentTime,
     onSeek,
+    onUserScrollDirection,
+    narrowControlsVisible = true,
 }: ApplePlayerLyricsPanelProps) {
     const { playerEffectMode } = useTheme();
     const isFlippingIn = panelFlipTarget === 'lyrics' && isPanelFlipping && isLyricsOpen;
@@ -62,8 +68,9 @@ export default function ApplePlayerLyricsPanel({
     return (
         <div
             className={clsx(
-                'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col z-10 overflow-hidden justify-center',
-                'pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]',
+                variant === 'side'
+                    ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col z-10 overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
+                    : 'absolute inset-0 w-full h-full flex flex-col z-10 overflow-hidden',
                 isLyricsOpen ? 'pointer-events-auto' : 'pointer-events-none'
             )}
         >
@@ -76,6 +83,15 @@ export default function ApplePlayerLyricsPanel({
                     initial="hidden"
                     animate={isVisible ? "visible" : "hidden"}
                     variants={variants}
+                    style={variant === 'narrow' ? {
+                        maskImage: narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
+                        WebkitMaskImage: narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
+                        transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out'
+                    } : undefined}
                 >
                     {lyricsMounted && (
                         playerEffectMode === 'animation' ? (
@@ -86,6 +102,8 @@ export default function ApplePlayerLyricsPanel({
                                 hasTimestamps={hasTimestamps}
                                 currentTime={currentTime}
                                 onSeek={onSeek}
+                                onUserScrollDirection={onUserScrollDirection}
+                                variant={variant}
                             />
                         ) : (
                             <LyricsPanel
@@ -95,6 +113,8 @@ export default function ApplePlayerLyricsPanel({
                                 hasTimestamps={hasTimestamps}
                                 currentTime={currentTime}
                                 onSeek={onSeek}
+                                onUserScrollDirection={onUserScrollDirection}
+                                variant={variant}
                             />
                         )
                     )}

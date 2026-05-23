@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
 import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -18,12 +19,14 @@ import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlayb
 
 const scrollMaskStyle = {
     maskImage:
-        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
     WebkitMaskImage:
-        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
+const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function FluidLyricsPanel({
     isOpen,
@@ -32,6 +35,8 @@ export default function FluidLyricsPanel({
     hasTimestamps,
     currentTime,
     onSeek,
+    onUserScrollDirection,
+    variant,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
@@ -55,7 +60,8 @@ export default function FluidLyricsPanel({
     const pausedScrollRef = useRef(false);
     const firstPositionDoneRef = useRef(false);
 
-    const [spacerHeight, setSpacerHeight] = useState(0);
+    const [topSpacerHeight, setTopSpacerHeight] = useState(0);
+    const [bottomSpacerHeight, setBottomSpacerHeight] = useState(0);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [targetScrollY, setTargetScrollY] = useState(0);
     const [motionDirection, setMotionDirection] = useState(1);
@@ -113,8 +119,9 @@ export default function FluidLyricsPanel({
         const interludeFocusOffset = activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
         const itemCenter = activeEl.offsetTop + activeEl.offsetHeight / 2 + visualShift + interludeFocusOffset;
 
-        return clamp(Math.round(itemCenter - viewportHeight / 2), 0, maxScrollY());
-    }, [activeDisplayIndex, displayItems, getVisualInterludeShift, maxScrollY]);
+        const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : 0.5;
+        return clamp(Math.round(itemCenter - viewportHeight * alpha), 0, maxScrollY());
+    }, [activeDisplayIndex, displayItems, getVisualInterludeShift, maxScrollY, variant]);
 
     const setTargetWithDirection = useCallback((nextTarget: number) => {
         const clamped = clamp(nextTarget, 0, maxScrollY());
@@ -138,7 +145,14 @@ export default function FluidLyricsPanel({
 
             viewportSizeRef.current = { width, height };
             contentHeightRef.current = nextContentHeight;
-            setSpacerHeight(height / 2);
+
+            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : 0.5;
+            setTopSpacerHeight(height * alpha);
+            setBottomSpacerHeight(
+                variant === 'narrow'
+                    ? Math.max(0, height * (1 - alpha) - NARROW_LYRICS_END_STOP_OFFSET)
+                    : height * (1 - alpha)
+            );
 
             if (previous.width !== width || previous.height !== height) {
                 setLayoutVersion(version => version + 1);
@@ -214,6 +228,7 @@ export default function FluidLyricsPanel({
     }, [calculateAutoTargetY, isPlaying, setTargetWithDirection]);
 
     const handleManualDelta = useCallback((deltaY: number) => {
+        if (deltaY !== 0) onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
         setIsUserScrolling(true);
         if (!isPlaying) {
             pausedScrollRef.current = true;
@@ -221,7 +236,7 @@ export default function FluidLyricsPanel({
         }
         setTargetWithDirection(previousTargetYRef.current + deltaY);
         scheduleResumeFollow();
-    }, [isPlaying, scheduleResumeFollow, setTargetWithDirection]);
+    }, [isPlaying, onUserScrollDirection, scheduleResumeFollow, setTargetWithDirection]);
 
     const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
         event.preventDefault();
@@ -341,7 +356,12 @@ export default function FluidLyricsPanel({
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
             <motion.div
                 ref={scrollAreaRef}
-                className="relative z-10 h-[calc(100%-5rem)] mt-[1.5rem] mb-[1.5rem] overflow-hidden touch-none"
+                className={clsx(
+                    'relative z-10 mt-0 overflow-hidden touch-none',
+                    variant === 'narrow'
+                        ? 'h-full mb-0'
+                        : 'h-[calc(100%-3.5rem)] mb-[1.5rem]'
+                )}
                 style={scrollMaskStyle}
                 onPan={handlePan}
                 onWheel={handleWheel}
@@ -352,7 +372,7 @@ export default function FluidLyricsPanel({
                     </div>
                 ) : (
                     <div ref={contentRef} className="relative">
-                        <div style={{ height: spacerHeight + topInsetPx }} aria-hidden />
+                        <div style={{ height: topSpacerHeight + topInsetPx }} aria-hidden />
                         {displayItems.map((item, displayIndex) => {
                             const interludeShift = getVisualInterludeShift(displayIndex);
                             const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
@@ -413,12 +433,13 @@ export default function FluidLyricsPanel({
                                             fluidMotion
                                             targetScrollY={targetScrollY}
                                             motionDelay={getMotionDelay(displayIndex)}
+                                            variant={variant}
                                         />
                                     )}
                                 </div>
                             );
                         })}
-                        <div style={{ height: spacerHeight }} aria-hidden />
+                        <div style={{ height: bottomSpacerHeight }} aria-hidden />
                     </div>
                 )}
             </motion.div>

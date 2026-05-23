@@ -7,6 +7,9 @@ export interface LyricsPanelProps {
     hasTimestamps: boolean;
     currentTime: number;
     onSeek: (time: number) => void;
+    onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
+    variant?: 'side' | 'narrow';
+    narrowControlsVisible?: boolean;
 }
 
 export type DisplayItem =

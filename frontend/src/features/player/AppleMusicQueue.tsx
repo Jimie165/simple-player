@@ -38,6 +38,9 @@ interface AppleMusicQueueProps {
     onNavigate?: () => void;
     scrollToTopSignal?: number;
     isOpen?: boolean;
+    onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
+    variant?: 'side' | 'narrow';
+    narrowControlsVisible?: boolean;
 }
 
 function createSortableList(items: string[]) {
@@ -59,8 +62,16 @@ function createSortableList(items: string[]) {
 /**
  * Apple 风格播放队列面板，负责队列分区、拖拽与虚拟渲染编排。
  */
-export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen }: AppleMusicQueueProps) {
+export default function AppleMusicQueue({
+    onNavigate,
+    scrollToTopSignal,
+    isOpen,
+    onUserScrollDirection,
+    variant = 'side',
+    narrowControlsVisible = true,
+}: AppleMusicQueueProps) {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const lastScrollTopRef = useRef(0);
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
     const [draggedItemWidth, setDraggedItemWidth] = useState<number | undefined>(undefined);
@@ -77,6 +88,7 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
     useEffect(() => {
         if (scrollContainerRef.current) {
             setScrollParent(scrollContainerRef.current);
+            lastScrollTopRef.current = scrollContainerRef.current.scrollTop;
         }
     }, []);
 
@@ -225,11 +237,33 @@ export default function AppleMusicQueue({ onNavigate, scrollToTopSignal, isOpen 
             <div
                 ref={scrollContainerRef}
                 data-queue-viewport
-                className="flex-1 overflow-y-auto overflow-x-hidden immersive-scrollbar relative z-10 block pb-24"
+                className={clsx(
+                    'flex-1 overflow-y-auto overflow-x-hidden immersive-scrollbar relative z-10 block',
+                    variant === 'narrow'
+                        ? (narrowControlsVisible ? 'pb-24' : 'pb-8')
+                        : 'pb-24'
+                )}
+                onWheel={(event) => onUserScrollDirection?.(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
+                onScroll={(event) => {
+                    const nextScrollTop = event.currentTarget.scrollTop;
+                    const delta = nextScrollTop - lastScrollTopRef.current;
+                    if (Math.abs(delta) > 2) {
+                        onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
+                    }
+                    lastScrollTopRef.current = nextScrollTop;
+                }}
                 style={{
                     overflowAnchor: 'none',
-                    maskImage: 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
-                    WebkitMaskImage: 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
+                    maskImage: variant === 'narrow'
+                        ? (narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
+                            : 'linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)')
+                        : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
+                    WebkitMaskImage: variant === 'narrow'
+                        ? (narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
+                            : 'linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)')
+                        : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
                 }}
             >
                 <DndContext

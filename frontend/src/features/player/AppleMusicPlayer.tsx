@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, type PointerEvent } from 'react';
 import clsx from 'clsx';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -13,7 +13,10 @@ import { audioService } from '@/services/audioService';
 import { resolveCover } from '@/utils/mediaPath';
 import CoverImage from '@/components/common/CoverImage';
 import { PlayerBackground } from '@/features/player/apple/PlayerBackground';
-import ApplePlayerControlsSection from '@/features/player/apple/ApplePlayerControlsSection';
+import ApplePlayerControlsSection, {
+    ApplePlayerNarrowBottomControls,
+    ApplePlayerNarrowHeader,
+} from '@/features/player/apple/ApplePlayerControlsSection';
 import ApplePlayerTopBar from '@/features/player/apple/ApplePlayerTopBar';
 import ApplePlayerQueuePanel from '@/features/player/apple/ApplePlayerQueuePanel';
 import ApplePlayerQueueToggle from '@/features/player/apple/ApplePlayerQueueToggle';
@@ -22,7 +25,15 @@ import ApplePlayerLyricsPanel from '@/features/player/apple/ApplePlayerLyricsPan
 
 type SidePanel = 'queue' | 'lyrics';
 
-export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => void; isOpen: boolean }) {
+export default function AppleMusicPlayer({
+    onClose,
+    isOpen,
+    mainContentWidth,
+}: {
+    onClose: () => void;
+    isOpen: boolean;
+    mainContentWidth: number;
+}) {
     const {
         metadata, isPlaying, isShuffling, repeatMode,
         togglePlay, toggleRepeat
@@ -70,6 +81,14 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     const [isPanelFlipping, setIsPanelFlipping] = useState(false);
     const panelFlipRafRef = useRef<number | null>(null);
     const panelFlipTimeoutRef = useRef<number | null>(null);
+    const [narrowControlsVisible, setNarrowControlsVisible] = useState(true);
+    const narrowControlsHideTimeoutRef = useRef<number | null>(null);
+    const narrowControlsRef = useRef<HTMLDivElement | null>(null);
+    const isPointerInsideNarrowControlsRef = useRef(false);
+    const upwardScrollRevealDistanceRef = useRef(0);
+    const isNarrowPanelLayout = mainContentWidth < 520 && (isQueueOpen || isLyricsOpen);
+    const NARROW_UPWARD_REVEAL_THRESHOLD = 96;
+    const coverScale = isPlaying ? 1 : 0.85;
 
     useEffect(() => {
         if (isQueueOpen) setQueueMounted(true);
@@ -101,8 +120,115 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
         return () => {
             if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
             if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
+            if (narrowControlsHideTimeoutRef.current !== null) window.clearTimeout(narrowControlsHideTimeoutRef.current);
         };
     }, []);
+
+    const clearNarrowControlsHideTimer = () => {
+        if (narrowControlsHideTimeoutRef.current !== null) {
+            window.clearTimeout(narrowControlsHideTimeoutRef.current);
+            narrowControlsHideTimeoutRef.current = null;
+        }
+    };
+
+    const hideNarrowControlsLater = () => {
+        clearNarrowControlsHideTimer();
+        narrowControlsHideTimeoutRef.current = window.setTimeout(() => {
+            if (isPointerInsideNarrowControlsRef.current) {
+                narrowControlsHideTimeoutRef.current = null;
+                return;
+            }
+            setNarrowControlsVisible(false);
+            narrowControlsHideTimeoutRef.current = null;
+        }, 2500);
+    };
+
+    const revealNarrowControls = (autoHide = true) => {
+        upwardScrollRevealDistanceRef.current = 0;
+        setNarrowControlsVisible(true);
+        if (!isNarrowPanelLayout) return;
+        if (autoHide) {
+            hideNarrowControlsLater();
+            return;
+        }
+        clearNarrowControlsHideTimer();
+    };
+
+    const hideNarrowControlsNow = () => {
+        clearNarrowControlsHideTimer();
+        isPointerInsideNarrowControlsRef.current = false;
+        upwardScrollRevealDistanceRef.current = 0;
+        setNarrowControlsVisible(false);
+    };
+
+    const handleNarrowPanelScroll = (direction: 'up' | 'down', delta = 16) => {
+        if (!isNarrowPanelLayout) return;
+        if (direction === 'down') {
+            hideNarrowControlsNow();
+            return;
+        }
+        if (narrowControlsVisible) {
+            hideNarrowControlsLater();
+            return;
+        }
+        upwardScrollRevealDistanceRef.current += Math.min(delta, 48);
+        if (upwardScrollRevealDistanceRef.current >= NARROW_UPWARD_REVEAL_THRESHOLD) {
+            revealNarrowControls();
+        }
+    };
+
+    const handleNarrowActivity = () => {
+        if (isNarrowPanelLayout) revealNarrowControls();
+    };
+
+    const handleNarrowPointerMove = (event: PointerEvent<HTMLDivElement>) => {
+        if (!isNarrowPanelLayout || narrowControlsVisible) return;
+        const controlsRect = narrowControlsRef.current?.getBoundingClientRect();
+        const fallbackBoundary = window.innerHeight - 120;
+        const revealBoundary = controlsRect
+            ? controlsRect.top + controlsRect.height / 2
+            : fallbackBoundary;
+        if (event.clientY >= revealBoundary) {
+            isPointerInsideNarrowControlsRef.current = controlsRect
+                ? event.clientX >= controlsRect.left &&
+                event.clientX <= controlsRect.right &&
+                event.clientY >= controlsRect.top &&
+                event.clientY <= controlsRect.bottom
+                : true;
+            revealNarrowControls(!isPointerInsideNarrowControlsRef.current);
+        }
+    };
+
+    const handleNarrowControlsPointerEnter = () => {
+        if (!isNarrowPanelLayout) return;
+        isPointerInsideNarrowControlsRef.current = true;
+        clearNarrowControlsHideTimer();
+    };
+
+    const handleNarrowControlsPointerMove = () => {
+        if (!isNarrowPanelLayout) return;
+        isPointerInsideNarrowControlsRef.current = true;
+        clearNarrowControlsHideTimer();
+    };
+
+    const handleNarrowControlsPointerLeave = () => {
+        if (!isNarrowPanelLayout) return;
+        isPointerInsideNarrowControlsRef.current = false;
+        if (narrowControlsVisible) hideNarrowControlsLater();
+    };
+
+    useEffect(() => {
+        if (isOpen && isNarrowPanelLayout) {
+            revealNarrowControls();
+            return;
+        }
+        if (narrowControlsHideTimeoutRef.current !== null) {
+            window.clearTimeout(narrowControlsHideTimeoutRef.current);
+            narrowControlsHideTimeoutRef.current = null;
+        }
+        isPointerInsideNarrowControlsRef.current = false;
+        setNarrowControlsVisible(true);
+    }, [isOpen, isNarrowPanelLayout, isQueueOpen, isLyricsOpen]);
 
     useEffect(() => {
         if (metadata?.path && metadata.path !== lyricsPath) {
@@ -120,8 +246,9 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
 
     // Use pure DOM manipulation for performance (avoids React render cycle lag during animation)
     useEffect(() => {
-        if (!coverShellRef.current || !controlsRef.current) return;
+        if (isNarrowPanelLayout) return;
 
+        let observer: ResizeObserver | null = null;
         const updateWidth = () => {
             if (coverShellRef.current && controlsRef.current) {
                 const width = coverShellRef.current.getBoundingClientRect().width;
@@ -129,24 +256,22 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             }
         };
 
-        // Initial set
-        updateWidth();
-
-        const observer = new ResizeObserver(() => {
-            // Directly set style to avoid React render lag
-            requestAnimationFrame(updateWidth);
-        });
-
-        observer.observe(coverShellRef.current);
-
-        // Also listen to transitionend on the parent or window resize for good measure
-        window.addEventListener('resize', updateWidth);
+        const timer = setTimeout(() => {
+            if (!coverShellRef.current || !controlsRef.current) return;
+            updateWidth();
+            observer = new ResizeObserver(() => {
+                requestAnimationFrame(updateWidth);
+            });
+            observer.observe(coverShellRef.current);
+            window.addEventListener('resize', updateWidth);
+        }, 0);
 
         return () => {
-            observer.disconnect();
+            clearTimeout(timer);
+            if (observer) observer.disconnect();
             window.removeEventListener('resize', updateWidth);
         };
-    }, []);
+    }, [isNarrowPanelLayout]);
 
     // Sync volume with audio service
     useEffect(() => {
@@ -186,6 +311,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     };
 
     const handleVolumeSeekStart = () => {
+        handleNarrowActivity();
         setIsVolumeDragging(true);
     };
 
@@ -250,6 +376,7 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
     // The previous useEffect handles syncing the correct time on mount/change.
 
     const handleSeekStart = () => {
+        handleNarrowActivity();
         setIsDragging(true);
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: true } }));
     };
@@ -392,6 +519,8 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
             }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-0 z-[200] flex flex-col overflow-hidden bg-neutral-900"
+            onPointerDown={handleNarrowPointerMove}
+            onPointerMove={handleNarrowPointerMove}
         >
             {/* Background Layer - Memoized to prevent re-renders during drag */}
             <PlayerBackground src={bgImageSrc} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
@@ -402,109 +531,262 @@ export default function AppleMusicPlayer({ onClose, isOpen }: { onClose: () => v
                 toggleFullscreen={toggleFullscreen}
             />
 
-            {/* Content Layer - Responsive Flex Layout */}
-            <div className="relative z-20 flex-1 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]">
-
-                <div className={clsx(
-                    "relative z-20 flex flex-col items-center justify-center mr-auto transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                    (isQueueOpen || isLyricsOpen) ? "w-[41%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
-                )}>
-                    {/* Content Wrapper: Controls vertical spacing */}
-                    <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
-
-                        {/* Artwork Container - Auto scaling with aspect ratio preservation */}
-                        {/* flex-1 min-h-0 allows shrinking. flex justify-center aligns it. */}
-                        <div className="flex-1 min-h-0 flex items-center justify-center w-full">
-                            <div
-                                ref={coverShellRef}
-                                className="relative aspect-square h-auto w-auto max-h-full max-w-full flex-shrink-0"
-                            >
-                                {/* Invisible 1000x1000 placeholder to force intrinsic size expansion to the limits, keeping perfect 1:1 ratio. */}
-                                <img
-                                    src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAwIiBoZWlnaHQ9IjEwMDAiPjwvc3ZnPg=="
-                                    alt=""
-                                    className="invisible block h-auto w-auto max-w-full max-h-full pointer-events-none"
-                                />
+            <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+                <AnimatePresence initial={false}>
+                    {isNarrowPanelLayout ? (
+                        <motion.div
+                            key="narrow-panel-layout"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+                            className="absolute inset-0 z-20 flex flex-col px-5 pb-5"
+                        >
+                            <div className="flex items-center gap-3 flex-shrink-0 pt-1 pb-2">
                                 <motion.div
-                                    ref={coverRef}
-                                    className="absolute inset-0 rounded-[12px] md:rounded-[18px] shadow-2xl overflow-hidden bg-white/5"
-                                    animate={{
-                                        scale: isPlaying ? 1 : 0.85,
-                                        boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
-                                    }}
+                                    layoutId="player-cover"
+                                    className="w-[clamp(3rem,14vw,4rem)] aspect-square flex-shrink-0"
                                     transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
                                 >
-                                    <CoverImage
-                                        song={metadata}
-                                        className="w-full h-full object-cover"
-                                        iconClassName="text-white/20 text-9xl"
-                                    />
+                                    <motion.div
+                                        className="w-full h-full rounded-[8px] overflow-hidden bg-white/5"
+                                        animate={{
+                                            scale: coverScale,
+                                            boxShadow: isPlaying ? "0 10px 20px -5px rgba(0, 0, 0, 0.4)" : "0 4px 10px -3px rgba(0, 0, 0, 0.2)"
+                                        }}
+                                        transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                                    >
+                                        {bgImageSrc ? (
+                                            <img
+                                                src={bgImageSrc}
+                                                className="w-full h-full object-cover"
+                                                alt={metadata?.title || "Cover"}
+                                            />
+                                        ) : (
+                                            <CoverImage
+                                                song={metadata}
+                                                className="w-full h-full object-cover"
+                                                iconClassName="text-white/20 text-4xl"
+                                            />
+                                        )}
+                                    </motion.div>
                                 </motion.div>
+                                <div className="min-w-0 flex-1">
+                                    <ApplePlayerNarrowHeader
+                                        metadata={metadata}
+                                        marqueeResetToken={marqueeResetToken}
+                                        onClose={onClose}
+                                        push={push}
+                                        toggleFavorite={toggleFavorite}
+                                    />
+                                </div>
                             </div>
-                        </div>
 
-                        {/* Controls Container - Fixed Height */}
-                        <ApplePlayerControlsSection
-                            controlsRef={controlsRef}
-                            metadata={metadata}
-                            marqueeResetToken={marqueeResetToken}
-                            onClose={onClose}
-                            push={push}
-                            toggleFavorite={toggleFavorite}
-                            currentTime={currentTime}
-                            handleSeekChange={handleSeekChange}
-                            handleSeekStart={handleSeekStart}
-                            handleSeekEnd={handleSeekEnd}
-                            isShuffling={isShuffling}
-                            toggleShuffle={toggleShuffle}
-                            playPrev={() => playPrev(currentTime)}
-                            togglePlay={togglePlay}
-                            isPlaying={isPlaying}
-                            playNext={playNext}
-                            toggleRepeat={toggleRepeat}
-                            repeatMode={repeatMode}
-                            localVolume={displayVolume}
-                            handleVolumeChange={handleVolumeChange}
-                            handleVolumeSeekStart={handleVolumeSeekStart}
-                            handleVolumeSeekEnd={handleVolumeSeekEnd}
-                        />
-                    </div>
-                </div>
+                            <div className="relative flex-1 min-h-0">
+                                <ApplePlayerQueuePanel
+                                    variant="narrow"
+                                    isQueueOpen={isQueueOpen}
+                                    queueMounted={queueMounted}
+                                    panelFlipTarget={panelFlipTarget}
+                                    isPanelFlipping={isPanelFlipping}
+                                    onClose={onClose}
+                                    queueScrollToTopSignal={queueScrollToTopSignal}
+                                    onUserScrollDirection={handleNarrowPanelScroll}
+                                    narrowControlsVisible={narrowControlsVisible}
+                                />
 
-                <ApplePlayerQueuePanel
-                    isQueueOpen={isQueueOpen}
-                    queueMounted={queueMounted}
-                    panelFlipTarget={panelFlipTarget}
-                    isPanelFlipping={isPanelFlipping}
-                    onClose={onClose}
-                    queueScrollToTopSignal={queueScrollToTopSignal}
-                />
+                                <ApplePlayerLyricsPanel
+                                    variant="narrow"
+                                    isLyricsOpen={isLyricsOpen}
+                                    lyricsMounted={lyricsMounted}
+                                    panelFlipTarget={panelFlipTarget}
+                                    isPanelFlipping={isPanelFlipping}
+                                    lyrics={lyrics}
+                                    lyricsStatus={lyricsStatus}
+                                    hasTimestamps={lyricsHasTimestamps}
+                                    currentTime={currentTime}
+                                    onSeek={seek}
+                                    onUserScrollDirection={handleNarrowPanelScroll}
+                                    narrowControlsVisible={narrowControlsVisible}
+                                />
+                            </div>
 
-                <ApplePlayerLyricsPanel
-                    isLyricsOpen={isLyricsOpen}
-                    lyricsMounted={lyricsMounted}
-                    panelFlipTarget={panelFlipTarget}
-                    isPanelFlipping={isPanelFlipping}
-                    lyrics={lyrics}
-                    lyricsStatus={lyricsStatus}
-                    hasTimestamps={lyricsHasTimestamps}
-                    currentTime={currentTime}
-                    onSeek={seek}
-                />
-            </div>
+                            <motion.div
+                                ref={narrowControlsRef}
+                                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] bottom-[clamp(1rem,5vw,2rem)] z-30 flex flex-col gap-4"
+                                onPointerEnter={handleNarrowControlsPointerEnter}
+                                onPointerMove={handleNarrowControlsPointerMove}
+                                onPointerLeave={handleNarrowControlsPointerLeave}
+                                initial={false}
+                                animate={{
+                                    opacity: narrowControlsVisible ? 1 : 0,
+                                    y: narrowControlsVisible ? 0 : 28,
+                                    pointerEvents: narrowControlsVisible ? 'auto' : 'none',
+                                }}
+                                transition={{ duration: 0.22, ease: 'easeOut' }}
+                            >
+                                <ApplePlayerNarrowBottomControls
+                                    metadata={metadata}
+                                    currentTime={currentTime}
+                                    handleSeekChange={handleSeekChange}
+                                    handleSeekStart={handleSeekStart}
+                                    handleSeekEnd={handleSeekEnd}
+                                    isShuffling={isShuffling}
+                                    toggleShuffle={toggleShuffle}
+                                    playPrev={() => playPrev(currentTime)}
+                                    togglePlay={togglePlay}
+                                    isPlaying={isPlaying}
+                                    playNext={playNext}
+                                    toggleRepeat={toggleRepeat}
+                                    repeatMode={repeatMode}
+                                    localVolume={displayVolume}
+                                    handleVolumeChange={handleVolumeChange}
+                                    handleVolumeSeekStart={handleVolumeSeekStart}
+                                    handleVolumeSeekEnd={handleVolumeSeekEnd}
+                                />
+                                <div className="flex items-center justify-end mt-2">
+                                    <div className="flex items-center gap-2">
+                                        <ApplePlayerLyricsToggle
+                                            isLyricsOpen={isLyricsOpen}
+                                            hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                                            onToggle={handleToggleLyrics}
+                                        />
+                                        <ApplePlayerQueueToggle
+                                            isQueueOpen={isQueueOpen}
+                                            onToggle={handleToggleQueue}
+                                        />
+                                    </div>
+                                </div>
+                            </motion.div>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="standard-layout"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+                            className="absolute inset-0 z-20 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]"
+                        >
+                            <div className={clsx(
+                                "relative z-20 flex flex-col items-center justify-center mr-auto",
+                                mainContentWidth < 520
+                                    ? "w-full px-[clamp(1rem,4vw,3rem)]"
+                                    : [
+                                        "transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
+                                        (isQueueOpen || isLyricsOpen) ? "w-[41%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
+                                      ]
+                            )}>
+                                {/* Content Wrapper: Controls vertical spacing */}
+                                <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
 
-            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
-                <ApplePlayerLyricsToggle
-                    isLyricsOpen={isLyricsOpen}
-                    // 允许在面板已展开但当前歌曲无歌词时仍可点击按钮关闭面板；
-                    // 只有在面板关闭后才禁用，防止再次打开。
-                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
-                    onToggle={handleToggleLyrics}
-                />
-                <ApplePlayerQueueToggle
-                    isQueueOpen={isQueueOpen}
-                    onToggle={handleToggleQueue}
-                />
+                                    {/* Artwork Container - Auto scaling with aspect ratio preservation */}
+                                    <div className="flex-1 min-h-0 flex items-center justify-center w-full">
+                                        <div
+                                            ref={coverShellRef}
+                                            className="relative aspect-square h-auto w-auto max-h-full max-w-full flex-shrink-0"
+                                        >
+                                            {/* Invisible 1000x1000 placeholder to force intrinsic size expansion to the limits, keeping perfect 1:1 ratio. */}
+                                            <img
+                                                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAwIiBoZWlnaHQ9IjEwMDAiPjwvc3ZnPg=="
+                                                alt=""
+                                                className="invisible block h-auto w-auto max-w-full max-h-full pointer-events-none"
+                                            />
+                                            <motion.div
+                                                ref={coverRef}
+                                                layoutId="player-cover"
+                                                className="absolute inset-0"
+                                                transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                                            >
+                                                <motion.div
+                                                    className="w-full h-full rounded-[12px] md:rounded-[18px] overflow-hidden bg-white/5"
+                                                    animate={{
+                                                        scale: coverScale,
+                                                        boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
+                                                    }}
+                                                    transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
+                                                >
+                                                    {bgImageSrc ? (
+                                                        <img
+                                                            src={bgImageSrc}
+                                                            className="w-full h-full object-cover"
+                                                            alt={metadata?.title || "Cover"}
+                                                        />
+                                                    ) : (
+                                                        <CoverImage
+                                                            song={metadata}
+                                                            className="w-full h-full object-cover"
+                                                            iconClassName="text-white/20 text-9xl"
+                                                        />
+                                                    )}
+                                                </motion.div>
+                                            </motion.div>
+                                        </div>
+                                    </div>
+
+                                    {/* Controls Container - Fixed Height */}
+                                    <ApplePlayerControlsSection
+                                        controlsRef={controlsRef}
+                                        metadata={metadata}
+                                        marqueeResetToken={marqueeResetToken}
+                                        onClose={onClose}
+                                        push={push}
+                                        toggleFavorite={toggleFavorite}
+                                        currentTime={currentTime}
+                                        handleSeekChange={handleSeekChange}
+                                        handleSeekStart={handleSeekStart}
+                                        handleSeekEnd={handleSeekEnd}
+                                        isShuffling={isShuffling}
+                                        toggleShuffle={toggleShuffle}
+                                        playPrev={() => playPrev(currentTime)}
+                                        togglePlay={togglePlay}
+                                        isPlaying={isPlaying}
+                                        playNext={playNext}
+                                        toggleRepeat={toggleRepeat}
+                                        repeatMode={repeatMode}
+                                        localVolume={displayVolume}
+                                        handleVolumeChange={handleVolumeChange}
+                                        handleVolumeSeekStart={handleVolumeSeekStart}
+                                        handleVolumeSeekEnd={handleVolumeSeekEnd}
+                                    />
+                                </div>
+                            </div>
+
+                            <ApplePlayerQueuePanel
+                                isQueueOpen={isQueueOpen}
+                                queueMounted={queueMounted}
+                                panelFlipTarget={panelFlipTarget}
+                                isPanelFlipping={isPanelFlipping}
+                                onClose={onClose}
+                                queueScrollToTopSignal={queueScrollToTopSignal}
+                            />
+
+                            <ApplePlayerLyricsPanel
+                                isLyricsOpen={isLyricsOpen}
+                                lyricsMounted={lyricsMounted}
+                                panelFlipTarget={panelFlipTarget}
+                                isPanelFlipping={isPanelFlipping}
+                                lyrics={lyrics}
+                                lyricsStatus={lyricsStatus}
+                                hasTimestamps={lyricsHasTimestamps}
+                                currentTime={currentTime}
+                                onSeek={seek}
+                            />
+
+                            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
+                                <ApplePlayerLyricsToggle
+                                    isLyricsOpen={isLyricsOpen}
+                                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                                    onToggle={handleToggleLyrics}
+                                />
+                                <ApplePlayerQueueToggle
+                                    isQueueOpen={isQueueOpen}
+                                    onToggle={handleToggleQueue}
+                                />
+                            </div>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
 

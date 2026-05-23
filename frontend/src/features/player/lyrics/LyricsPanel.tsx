@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -18,10 +19,13 @@ import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlayb
 
 const scrollMaskStyle = {
     maskImage:
-        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
     WebkitMaskImage:
-        'linear-gradient(to bottom, transparent 0%, black 12%, black 88%, transparent 100%)',
+        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
 };
+
+const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
+const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function LyricsPanel({
     isOpen,
@@ -30,6 +34,8 @@ export default function LyricsPanel({
     hasTimestamps,
     currentTime,
     onSeek,
+    onUserScrollDirection,
+    variant,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
@@ -42,7 +48,8 @@ export default function LyricsPanel({
     });
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-    const [spacerHeight, setSpacerHeight] = useState(0);
+    const [topSpacerHeight, setTopSpacerHeight] = useState(0);
+    const [bottomSpacerHeight, setBottomSpacerHeight] = useState(0);
     const viewportSizeRef = useRef<{ width: number; height: number } | null>(null);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [recenterVersion, setRecenterVersion] = useState(0);
@@ -57,6 +64,7 @@ export default function LyricsPanel({
     const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const userScrollTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const lastTouchYRef = useRef<number | null>(null);
 
     useEffect(() => {
         const el = scrollAreaRef.current;
@@ -66,7 +74,13 @@ export default function LyricsPanel({
             const height = el.clientHeight;
             const prevSize = viewportSizeRef.current;
 
-            setSpacerHeight(height / 2);
+            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : 0.5;
+            setTopSpacerHeight(height * alpha);
+            setBottomSpacerHeight(
+                variant === 'narrow'
+                    ? Math.max(0, height * (1 - alpha) - NARROW_LYRICS_END_STOP_OFFSET)
+                    : height * (1 - alpha)
+            );
 
             if (prevSize && (prevSize.width !== width || prevSize.height !== height)) {
                 setLayoutVersion(version => version + 1);
@@ -78,18 +92,19 @@ export default function LyricsPanel({
         const ro = new ResizeObserver(update);
         ro.observe(el);
         return () => ro.disconnect();
-    }, []);
+    }, [variant]);
 
     const Header = useCallback(
-        () => <div style={{ height: spacerHeight + topInsetPx }} aria-hidden />,
-        [spacerHeight]
+        () => <div style={{ height: topSpacerHeight + topInsetPx }} aria-hidden />,
+        [topSpacerHeight]
     );
     const Footer = useCallback(
-        () => <div style={{ height: spacerHeight }} aria-hidden />,
-        [spacerHeight]
+        () => <div style={{ height: bottomSpacerHeight }} aria-hidden />,
+        [bottomSpacerHeight]
     );
 
-    const handleUserInteraction = () => {
+    const handleUserInteraction = (direction?: 'up' | 'down', delta?: number) => {
+        if (direction) onUserScrollDirection?.(direction, delta);
         setIsUserScrolling(true);
         lastAutoScrollIndexRef.current = null;
         preferSmoothAutoScrollRef.current = true;
@@ -251,9 +266,15 @@ export default function LyricsPanel({
             const visualShift = getVisualInterludeShift(displayIndex);
             const interludeFocusOffset = item?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
 
-            return Math.round(visualShift + interludeFocusOffset);
+            const baseOffset = Math.round(visualShift + interludeFocusOffset);
+            if (variant === 'narrow' && viewportSizeRef.current) {
+                const alpha = NARROW_LYRICS_FOCUS_ALPHA;
+                const shiftUp = Math.round(viewportSizeRef.current.height * (0.5 - alpha));
+                return baseOffset + shiftUp;
+            }
+            return baseOffset;
         },
-        [displayItems, getVisualInterludeShift]
+        [displayItems, getVisualInterludeShift, variant]
     );
 
     useEffect(() => {
@@ -301,11 +322,27 @@ export default function LyricsPanel({
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
             <div
                 ref={scrollAreaRef}
-                className="relative z-10 h-[calc(100%-5rem)] mt-[1.5rem] mb-[1.5rem]"
+                className={clsx(
+                    'relative z-10 mt-0',
+                    variant === 'narrow'
+                        ? 'h-full mb-0'
+                        : 'h-[calc(100%-3.5rem)] mb-[1.5rem]'
+                )}
                 style={scrollMaskStyle}
-                onWheel={handleUserInteraction}
-                onTouchMove={handleUserInteraction}
-                onPointerDown={handleUserInteraction}
+                onWheel={(event) => handleUserInteraction(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
+                onTouchStart={(event) => {
+                    lastTouchYRef.current = event.touches[0]?.clientY ?? null;
+                }}
+                onTouchMove={(event) => {
+                    const nextY = event.touches[0]?.clientY;
+                    const previousY = lastTouchYRef.current;
+                    const direction = previousY === null || nextY === undefined
+                        ? undefined
+                        : nextY < previousY ? 'down' : 'up';
+                    lastTouchYRef.current = nextY ?? null;
+                    handleUserInteraction(direction, previousY === null || nextY === undefined ? undefined : Math.abs(nextY - previousY));
+                }}
+                onPointerDown={() => handleUserInteraction()}
             >
                 {displayState ? (
                     <div className="h-full flex items-center justify-center text-white/40 text-sm">
@@ -372,6 +409,7 @@ export default function LyricsPanel({
                                         keepCurrentInterludeForExit();
                                         onSeek(time);
                                     }}
+                                    variant={variant}
                                 />
                             );
                         }}

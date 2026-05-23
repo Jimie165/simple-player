@@ -4,21 +4,27 @@ import type { Variants } from 'framer-motion';
 import AppleMusicQueue from '@/features/player/AppleMusicQueue';
 
 interface ApplePlayerQueuePanelProps {
+    variant?: 'side' | 'narrow';
     isQueueOpen: boolean;
     queueMounted: boolean;
     panelFlipTarget: 'queue' | 'lyrics' | null;
     isPanelFlipping: boolean;
     onClose: () => void;
     queueScrollToTopSignal: number;
+    onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
+    narrowControlsVisible?: boolean;
 }
 
 export default function ApplePlayerQueuePanel({
+    variant = 'side',
     isQueueOpen,
     queueMounted,
     panelFlipTarget,
     isPanelFlipping,
     onClose,
     queueScrollToTopSignal,
+    onUserScrollDirection,
+    narrowControlsVisible = true,
 }: ApplePlayerQueuePanelProps) {
     const isFlippingIn = panelFlipTarget === 'queue' && isPanelFlipping && isQueueOpen;
     const isFlippingOut = panelFlipTarget === 'lyrics' && isPanelFlipping;
@@ -51,8 +57,9 @@ export default function ApplePlayerQueuePanel({
     return (
         <div
             className={clsx(
-                'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col z-10 overflow-hidden justify-center',
-                'pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]',
+                variant === 'side'
+                    ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col z-10 overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
+                    : 'absolute inset-0 w-full h-full flex flex-col z-10 overflow-hidden',
                 isQueueOpen ? 'pointer-events-auto' : 'pointer-events-none'
             )}
         >
@@ -65,12 +72,24 @@ export default function ApplePlayerQueuePanel({
                     initial="hidden"
                     animate={isVisible ? "visible" : "hidden"}
                     variants={variants}
+                    style={variant === 'narrow' ? {
+                        maskImage: narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
+                        WebkitMaskImage: narrowControlsVisible
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
+                        transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out'
+                    } : undefined}
                 >
                     {queueMounted && (
                         <AppleMusicQueue
                             onNavigate={onClose}
                             scrollToTopSignal={queueScrollToTopSignal}
                             isOpen={isQueueOpen}
+                            onUserScrollDirection={onUserScrollDirection}
+                            variant={variant}
+                            narrowControlsVisible={narrowControlsVisible}
                         />
                     )}
                 </motion.div>

@@ -17,6 +17,7 @@ interface LyricsLineItemProps {
     fluidMotion?: boolean;
     targetScrollY?: number;
     motionDelay?: number;
+    variant?: 'side' | 'narrow';
 }
 
 export default function LyricsLineItem({
@@ -33,12 +34,21 @@ export default function LyricsLineItem({
     fluidMotion = false,
     targetScrollY = 0,
     motionDelay = 0,
+    variant,
 }: LyricsLineItemProps) {
-    const blurPx = isActive ? 0 : Math.min(5.4, 0.8 + distanceFromActive * 1.05);
-    const rowOpacity = Math.max(
-        0.22,
-        isActive ? 1 : 0.82 - distanceFromActive * 0.12
-    );
+    const isNarrow = variant === 'narrow';
+    const blurPx = isActive
+        ? 0
+        : isNarrow
+            ? Math.min(2.8, 0.3 + distanceFromActive * 0.45)
+            : Math.min(5.4, 0.8 + distanceFromActive * 1.05);
+
+    const rowOpacity = isActive
+        ? 1
+        : isNarrow
+            ? Math.max(0.35, 0.85 - distanceFromActive * 0.07)
+            : Math.max(0.22, 0.82 - distanceFromActive * 0.12);
+
     const rowFilter = isUserScrolling || pausedScroll ? 'blur(0px)' : `blur(${blurPx}px)`;
     const appliedOpacity = isUserScrolling || pausedScroll ? 1 : rowOpacity;
     const canSeek = line.time_ms !== null;
