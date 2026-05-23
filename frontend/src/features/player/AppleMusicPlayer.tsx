@@ -410,12 +410,26 @@ export default function AppleMusicPlayer({
         });
     };
 
+    const resetPanelFlipState = () => {
+        if (panelFlipRafRef.current !== null) {
+            window.cancelAnimationFrame(panelFlipRafRef.current);
+            panelFlipRafRef.current = null;
+        }
+        if (panelFlipTimeoutRef.current !== null) {
+            window.clearTimeout(panelFlipTimeoutRef.current);
+            panelFlipTimeoutRef.current = null;
+        }
+        setIsPanelFlipping(false);
+        setPanelFlipTarget(null);
+    };
+
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
         if (isLyricsOpen && !isQueueOpen) {
             startPanelFlip('queue', toggleQueue);
             return;
         }
+        resetPanelFlipState();
         toggleQueue();
     };
 
@@ -425,6 +439,7 @@ export default function AppleMusicPlayer({
             startPanelFlip('lyrics', toggleLyrics);
             return;
         }
+        resetPanelFlipState();
         toggleLyrics();
     };
 
