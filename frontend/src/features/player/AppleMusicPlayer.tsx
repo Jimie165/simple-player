@@ -49,9 +49,7 @@ export default function AppleMusicPlayer({
         volume,
         setVolume,
         isQueueOpen,
-        toggleQueue,
         isLyricsOpen,
-        toggleLyrics,
         lyrics,
         lyricsStatus,
         lyricsHasTimestamps,
@@ -81,6 +79,7 @@ export default function AppleMusicPlayer({
     const [isPanelFlipping, setIsPanelFlipping] = useState(false);
     const panelFlipRafRef = useRef<number | null>(null);
     const panelFlipTimeoutRef = useRef<number | null>(null);
+    const panelFlipSequenceRef = useRef(0);
     const [narrowControlsVisible, setNarrowControlsVisible] = useState(true);
     const narrowControlsHideTimeoutRef = useRef<number | null>(null);
     const narrowControlsRef = useRef<HTMLDivElement | null>(null);
@@ -395,22 +394,28 @@ export default function AppleMusicPlayer({
     };
 
     const startPanelFlip = (target: SidePanel, toggle: () => void) => {
+        const sequence = ++panelFlipSequenceRef.current;
         if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
         if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
 
         setPanelFlipTarget(target);
         setIsPanelFlipping(false);
         panelFlipRafRef.current = window.requestAnimationFrame(() => {
+            if (panelFlipSequenceRef.current !== sequence) return;
+            panelFlipRafRef.current = null;
             setIsPanelFlipping(true);
             toggle();
             panelFlipTimeoutRef.current = window.setTimeout(() => {
+                if (panelFlipSequenceRef.current !== sequence) return;
                 setIsPanelFlipping(false);
                 setPanelFlipTarget(null);
+                panelFlipTimeoutRef.current = null;
             }, 420);
         });
     };
 
     const resetPanelFlipState = () => {
+        panelFlipSequenceRef.current += 1;
         if (panelFlipRafRef.current !== null) {
             window.cancelAnimationFrame(panelFlipRafRef.current);
             panelFlipRafRef.current = null;
@@ -423,25 +428,45 @@ export default function AppleMusicPlayer({
         setPanelFlipTarget(null);
     };
 
+    const setQueuePanelOpen = (open: boolean) => {
+        usePlayerStore.setState((state) => ({
+            isQueueOpen: open,
+            isLyricsOpen: open ? false : state.isLyricsOpen,
+        }));
+    };
+
+    const setLyricsPanelOpen = (open: boolean) => {
+        usePlayerStore.setState((state) => ({
+            isLyricsOpen: open,
+            isQueueOpen: open ? false : state.isQueueOpen,
+        }));
+    };
+
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
         if (isLyricsOpen && !isQueueOpen) {
-            startPanelFlip('queue', toggleQueue);
+            startPanelFlip('queue', () => setQueuePanelOpen(true));
             return;
         }
         resetPanelFlipState();
-        toggleQueue();
+        setQueuePanelOpen(!isQueueOpen);
     };
 
     const handleToggleLyrics = () => {
         if (!lyricsMounted) setLyricsMounted(true);
         if (isQueueOpen && !isLyricsOpen) {
-            startPanelFlip('lyrics', toggleLyrics);
+            startPanelFlip('lyrics', () => setLyricsPanelOpen(true));
             return;
         }
         resetPanelFlipState();
-        toggleLyrics();
+        setLyricsPanelOpen(!isLyricsOpen);
     };
+
+    useEffect(() => {
+        if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
+        resetPanelFlipState();
+        setLyricsPanelOpen(false);
+    }, [lyricsStatus, isLyricsOpen]);
 
     // Fullscreen Logic
     const [isFullscreen, setIsFullscreen] = useState(false);
