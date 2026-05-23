@@ -214,7 +214,7 @@ export default function OverflowMarquee({
                 {shouldShowDuplicate && (
                     <div
                         aria-hidden="true"
-                        className={clsx("inline-flex shrink-0 pointer-events-none", contentClassName)}
+                        className={clsx("inline-flex shrink-0", contentClassName)}
                         style={{ paddingLeft: gapPx }}
                     >
                         {repeatedContent}
