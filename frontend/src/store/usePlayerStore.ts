@@ -215,7 +215,8 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
             lyricsStatus: path ? 'loading' : 'empty',
             lyrics: null,
             lyricsHasTimestamps: false,
-            currentLyricsIndex: 0
+            currentLyricsIndex: 0,
+            isLyricsOpen: path ? get().isLyricsOpen : false,
         });
 
         if (!path) return;
@@ -226,7 +227,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
 
             const lines = sanitizeLyricsLines(data);
             if (!lines) {
-                set({ lyricsStatus: 'empty', lyrics: null, lyricsHasTimestamps: false });
+                set({ lyricsStatus: 'empty', lyrics: null, lyricsHasTimestamps: false, isLyricsOpen: false });
                 return;
             }
 
