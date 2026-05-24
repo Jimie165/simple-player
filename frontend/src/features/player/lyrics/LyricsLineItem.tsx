@@ -102,7 +102,7 @@ export default function LyricsLineItem({
                 disabled={!canSeek}
                 animate={{
                     y: interludeShift - targetScrollY,
-                    scale: isActive ? 1 : 0.9,
+                    scale: isActive ? 1.05 : 1,
                     filter: rowFilter,
                     opacity: appliedOpacity,
                 }}
@@ -133,7 +133,7 @@ export default function LyricsLineItem({
             style={{
                 filter: rowFilter,
                 opacity: appliedOpacity,
-                transform: `translateY(${interludeShift}px) scale(${isActive ? 1 : 0.9})`,
+                transform: `translateY(${interludeShift}px) scale(${isActive ? 1.05 : 1})`,
                 transition: `filter 300ms, opacity 300ms, transform ${interludeShiftDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
             }}
             className={className}
