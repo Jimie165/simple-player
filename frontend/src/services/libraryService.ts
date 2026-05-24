@@ -2,6 +2,22 @@ import { invoke } from '@tauri-apps/api/core';
 import type { SongMetadata, LibraryFolder, Playlist } from '@/types';
 import type { VideoMetadata } from '@/types/video';
 
+export interface UpdateSongDetailsRequest {
+    id: number;
+    title: string;
+    artist: string;
+    album: string;
+    album_artist?: string | null;
+    year?: number | null;
+    genre?: string | null;
+    track_number?: number | null;
+    track_total?: number | null;
+    disc_number?: number | null;
+    disc_total?: number | null;
+    lyrics_text?: string | null;
+    lyrics_source_path?: string | null;
+}
+
 export const libraryService = {
     // ========== 文件夹管理 ==========
     getFolders: async (): Promise<LibraryFolder[]> => {
@@ -80,6 +96,10 @@ export const libraryService = {
 
     restoreSong: async (id: number): Promise<void> => {
         return invoke('restore_song', { id });
+    },
+
+    updateSongDetails: async (request: UpdateSongDetailsRequest): Promise<SongMetadata> => {
+        return invoke('update_song_details', { request });
     },
 
     // ========== 批量操作 ==========

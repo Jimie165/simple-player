@@ -70,7 +70,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         setVideoMode, setVideoMetadata, setVideoQueue
     } = usePlayerStore();
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
-    const { openDeleteConfirm, openProperties } = useDialogStore();
+    const { openDeleteConfirm, openProperties, openEditSong } = useDialogStore();
     const { push } = useNavigationStore();
     const { clearSelection } = useSelectionStore();
 
@@ -251,9 +251,26 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         });
     }, [isSingle, firstItem, openProperties, onShowProperties]);
 
+    const handleEdit = useCallback(async () => {
+        if (onEdit) {
+            onEdit();
+            return;
+        }
+        if (!isSingle || !firstItem) return;
+
+        const type = getMusicItemType(firstItem);
+        if (type !== 'song' && type !== 'file') return;
+
+        const songs = await resolveSongsFromItems([firstItem]);
+        const song = songs.find(s => typeof s.id === 'number');
+        if (song) openEditSong(song);
+    }, [firstItem, isSingle, onEdit, openEditSong]);
+
 
     // --- Menu Generation ---
     const menuItems = useMemo(() => {
+        const editType = firstItem ? getMusicItemType(firstItem) : '';
+        const canDefaultEdit = isSingle && (editType === 'song' || editType === 'file') && context !== 'video';
         const canAddToPlaylist = items.every(i => {
             const t = getMusicItemType(i);
             return (
@@ -274,7 +291,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             selectText,
             isSelected,
             onSelect,
-            onEdit,
+            onEdit: onEdit ?? (canDefaultEdit ? handleEdit : undefined),
             onShowProperties,
             canAddToPlaylist,
             isAllFavorited,
@@ -293,7 +310,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         return filterMenuGroupsByContext(groups as MenuItemData[][], context, items);
     }, [
         handlePlay, handleShufflePlay, handleAddToQueue, handleAddToPlaylist, handleFavorite,
-        handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, onSelect, onEdit,
+        handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, handleEdit, onSelect, onEdit,
         isSingle, isAllFavorited, firstItem, context, hideSelect, selectText, isSelected, items,
         onShowProperties, count, handleDeleteFromLibrary
     ]);

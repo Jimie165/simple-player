@@ -1,5 +1,6 @@
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import InfoDialog from '@/components/common/InfoDialog';
+import EditSongDialog from '@/features/library/dialogs/song-edit/EditSongDialog';
 import { useDialogStore } from '@/store/useDialogStore';
 
 /**
@@ -8,7 +9,7 @@ import { useDialogStore } from '@/store/useDialogStore';
  * 将此组件放置在 App 的顶层，确保弹窗不会因为触发菜单的组件卸载而关闭。
  */
 export default function GlobalDialogLayer() {
-    const { deleteConfirm, closeDeleteConfirm, properties, closeProperties } = useDialogStore();
+    const { deleteConfirm, closeDeleteConfirm, properties, closeProperties, editSong, closeEditSong } = useDialogStore();
 
     return (
         <>
@@ -28,6 +29,12 @@ export default function GlobalDialogLayer() {
                 isOpen={properties.isOpen}
                 onClose={closeProperties}
                 song={properties.song}
+            />
+
+            <EditSongDialog
+                isOpen={editSong.isOpen}
+                onClose={closeEditSong}
+                song={editSong.song}
             />
         </>
     );

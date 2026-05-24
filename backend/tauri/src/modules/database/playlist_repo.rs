@@ -197,7 +197,8 @@ impl PlaylistRepo {
         let sql = format!(
             "SELECT s.id, s.path, s.title, s.artist, s.album, s.duration, s.cover, s.cover_path, s.folder_id,
                     s.album_artist, s.year, s.genre, s.track_number, s.track_total, s.disc_number, s.disc_total,
-                    s.play_count, s.last_played_at, s.is_favorite, s.rating, s.status, s.created_at, s.updated_at,
+                    s.play_count, s.last_played_at, s.is_favorite, s.rating, s.lyrics_text, s.lyrics_source_path,
+                    s.status, s.created_at, s.updated_at,
                     ps.id as playlist_entry_id
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
@@ -208,8 +209,8 @@ impl PlaylistRepo {
         let songs = stmt
             .query_map(params![playlist_id], |row| {
                 let mut song = SongRepo::map_row(row)?;
-                // map_row 读取 0-22. 我们追加了 ps.id 在 23.
-                song.unique_id = Some(row.get(23)?);
+                // map_row 读取 0-24. 我们追加了 ps.id 在 25.
+                song.unique_id = Some(row.get(25)?);
                 Ok(song)
             })?
             .collect::<Result<Vec<_>>>()?;

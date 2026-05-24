@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 11;
+const SCHEMA_VERSION: i32 = 12;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -93,6 +93,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 11 {
         migrate_v11(conn)?;
+        set_db_version(conn, 11)?;
+    }
+
+    if current_version < 12 {
+        migrate_v12(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -492,5 +497,23 @@ fn migrate_v10(conn: &Connection) -> Result<()> {
 /// 版本 11: 清理旧的 base64 封面字段
 fn migrate_v11(conn: &Connection) -> Result<()> {
     conn.execute("UPDATE songs SET cover = NULL WHERE cover IS NOT NULL", [])?;
+    Ok(())
+}
+
+/// 版本 12: 用户自定义歌词
+fn migrate_v12(conn: &Connection) -> Result<()> {
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(songs)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"lyrics_text".to_string()) {
+        conn.execute("ALTER TABLE songs ADD COLUMN lyrics_text TEXT", [])?;
+    }
+
+    if !columns.contains(&"lyrics_source_path".to_string()) {
+        conn.execute("ALTER TABLE songs ADD COLUMN lyrics_source_path TEXT", [])?;
+    }
+
     Ok(())
 }

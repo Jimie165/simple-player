@@ -24,6 +24,8 @@ export interface SongMetadata {
     last_played_at?: string;
     is_favorite?: boolean;
     rating?: number;
+    lyrics_text?: string | null;
+    lyrics_source_path?: string | null;
     // 队列控制
     is_queue_item?: boolean;
     // 播放列表唯一ID (用于处理重复歌曲)

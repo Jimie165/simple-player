@@ -46,6 +46,7 @@ interface PlayerState {
     lyricsRequestId: number;
     lyricsPath: string | null;
     requestLyricsForPath: (path?: string) => Promise<void>;
+    reloadLyricsForPath: (path: string) => Promise<void>;
 
     // Video Mode
     isVideoMode: boolean;
@@ -242,6 +243,16 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
             if (get().lyricsRequestId !== requestId) return;
             set({ lyricsStatus: 'error', lyrics: null, lyricsHasTimestamps: false });
         }
+    },
+
+    reloadLyricsForPath: async (path: string) => {
+        set({
+            lyricsPath: null,
+            lyricsStatus: 'idle',
+            lyrics: null,
+            lyricsHasTimestamps: false,
+        });
+        await get().requestLyricsForPath(path);
     },
 }), {
     name: 'player-store',

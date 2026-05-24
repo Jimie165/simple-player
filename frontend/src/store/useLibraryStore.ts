@@ -44,6 +44,7 @@ interface LibraryState {
     removeFromRecent: (id: string) => void;
     updateRecentItemCover: (id: string, newCoverPath: string | null) => void;
     setPlaylist: (songs: SongMetadata[]) => void;
+    updateSongInQueues: (song: SongMetadata) => void;
     setCurrentSongIndex: (index: number) => void;
     pushHistory: (index: number) => void;
     popHistory: () => number | undefined;
@@ -294,6 +295,21 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         playlist: songs,
         originalPlaylist: songs,
         playHistory: []
+    }),
+
+    updateSongInQueues: (song) => set((state) => {
+        const matches = (candidate: SongMetadata) => (
+            (song.id !== undefined && candidate.id === song.id) ||
+            (!!song.path && candidate.path === song.path)
+        );
+        const mergeSong = (candidate: SongMetadata) => matches(candidate)
+            ? { ...candidate, ...song, unique_id: candidate.unique_id, is_queue_item: candidate.is_queue_item }
+            : candidate;
+
+        return {
+            playlist: state.playlist.map(mergeSong),
+            originalPlaylist: state.originalPlaylist.map(mergeSong),
+        };
     }),
 
     setCurrentSongIndex: (currentSongIndex) => set({ currentSongIndex }),

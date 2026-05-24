@@ -21,12 +21,20 @@ interface DialogState {
         song: SongMetadata | null;
     };
 
+    editSong: {
+        isOpen: boolean;
+        song: SongMetadata | null;
+    };
+
     // Actions
     openDeleteConfirm: (items: MusicItem[], onConfirm: () => void, text: string, title?: string, confirmText?: string) => void;
     closeDeleteConfirm: () => void;
 
     openProperties: (song: SongMetadata) => void;
     closeProperties: () => void;
+
+    openEditSong: (song: SongMetadata) => void;
+    closeEditSong: () => void;
 }
 
 export const useDialogStore = create<DialogState>((set) => ({
@@ -39,6 +47,10 @@ export const useDialogStore = create<DialogState>((set) => ({
         confirmText: '删除',
     },
     properties: {
+        isOpen: false,
+        song: null,
+    },
+    editSong: {
         isOpen: false,
         song: null,
     },
@@ -71,5 +83,18 @@ export const useDialogStore = create<DialogState>((set) => ({
     closeProperties: () =>
         set((state) => ({
             properties: { ...state.properties, isOpen: false },
+        })),
+
+    openEditSong: (song) =>
+        set({
+            editSong: {
+                isOpen: true,
+                song,
+            },
+        }),
+
+    closeEditSong: () =>
+        set((state) => ({
+            editSong: { ...state.editSong, isOpen: false },
         })),
 }));

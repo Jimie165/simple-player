@@ -1,9 +1,9 @@
-use crate::DbState;
 use crate::modules::database::SongRepo;
 use crate::modules::library::video_scanner;
 use crate::modules::library::video_thumbnails;
 use crate::modules::library::{self, SongMetadata};
 use crate::utils::path::normalize_db_path;
+use crate::DbState;
 use std::path::Path;
 use tauri::{Manager, State};
 
@@ -47,6 +47,8 @@ pub fn get_metadata(
             last_played_at: None,
             is_favorite: None,
             rating: None,
+            lyrics_text: None,
+            lyrics_source_path: None,
             unique_id: None,
             width: video_meta.width,
             height: video_meta.height,
@@ -65,13 +67,27 @@ pub fn get_metadata(
     // 如果数据库中有此文件，应该优先使用数据库ID，这样才能进行播放列表操作
     if let Ok(conn) = state.0.lock() {
         let normalized_path = normalize_db_path(std::path::Path::new(&path));
-        // Try exact match first, then normalized
-        let db_result = SongRepo::get_by_path(&conn, &path)
-            .or_else(|_| SongRepo::get_by_path(&conn, &normalized_path));
+        let db_result = match SongRepo::get_by_path(&conn, &path) {
+            Ok(Some(song)) => Ok(Some(song)),
+            Ok(None) => SongRepo::get_by_path(&conn, &normalized_path),
+            Err(error) => Err(error),
+        };
 
         if let Ok(Some(db_song)) = db_result {
             // Merge DB info
             meta.id = Some(db_song.id);
+            meta.title = db_song.title;
+            meta.artist = db_song.artist;
+            meta.album = db_song.album;
+            meta.album_artist = db_song.album_artist;
+            meta.year = db_song.year;
+            meta.genre = db_song.genre;
+            meta.track_number = db_song.track_number;
+            meta.track_total = db_song.track_total;
+            meta.disc_number = db_song.disc_number;
+            meta.disc_total = db_song.disc_total;
+            meta.lyrics_text = db_song.lyrics_text;
+            meta.lyrics_source_path = db_song.lyrics_source_path;
             meta.is_favorite = Some(db_song.is_favorite);
             meta.play_count = Some(db_song.play_count);
             meta.last_played_at = db_song.last_played_at;
@@ -133,6 +149,8 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 last_played_at: None,
                 is_favorite: None,
                 rating: None,
+                lyrics_text: None,
+                lyrics_source_path: None,
                 unique_id: None,
                 width: video_meta.width,
                 height: video_meta.height,
@@ -174,6 +192,8 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 last_played_at: None,
                 is_favorite: None,
                 rating: None,
+                lyrics_text: None,
+                lyrics_source_path: None,
                 unique_id: None,
                 width: None,
                 height: None,

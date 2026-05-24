@@ -123,6 +123,10 @@ export function buildSongMenuGroups({
             group2.push({ id: 'properties', label: '属性', icon: MdInfo, onClick: handleProperties });
         }
 
+        if (onEdit) {
+            group2.push({ id: 'edit', label: '编辑信息', icon: MdEdit, onClick: onEdit });
+        }
+
         const showAlbum = context !== 'album_detail';
         const showArtist = context !== 'artist_detail';
 
@@ -143,7 +147,7 @@ export function buildSongMenuGroups({
         }
     }
 
-    if (onEdit) {
+    if (!isSingle && onEdit) {
         group2.push({ id: 'edit', label: '编辑信息', icon: MdEdit, onClick: onEdit });
     }
 

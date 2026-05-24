@@ -1,6 +1,10 @@
+use crate::modules::database::SongRepo;
 use crate::modules::library::LyricsData;
 use crate::modules::library::SongMetadata;
 use crate::modules::player::{AudioOutputInfo, AudioOutputState, AudioState};
+use crate::utils::path::normalize_db_path;
+use crate::DbState;
+use std::path::Path;
 use tauri::State;
 
 #[tauri::command]
@@ -47,8 +51,45 @@ pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
 }
 
 #[tauri::command]
-pub fn get_lyrics(path: String) -> Result<LyricsData, String> {
+pub fn get_lyrics(db: State<'_, DbState>, path: String) -> Result<LyricsData, String> {
+    if let Ok(conn) = db.0.lock() {
+        let normalized_path = normalize_db_path(Path::new(&path));
+        let db_song = match SongRepo::get_by_path(&conn, &path) {
+            Ok(Some(song)) => Ok(Some(song)),
+            Ok(None) => SongRepo::get_by_path(&conn, &normalized_path),
+            Err(error) => Err(error),
+        };
+        if let Ok(Some(song)) = db_song {
+            if let Some(lyrics_text) = song.lyrics_text.as_deref() {
+                if !lyrics_text.trim().is_empty() {
+                    return Ok(crate::modules::library::lyrics_from_text(lyrics_text));
+                }
+            }
+        }
+    }
+
     crate::modules::library::get_lyrics(&path)
+}
+
+#[tauri::command]
+pub fn get_raw_lyrics(db: State<'_, DbState>, path: String) -> Result<Option<String>, String> {
+    if let Ok(conn) = db.0.lock() {
+        let normalized_path = normalize_db_path(Path::new(&path));
+        let db_song = match SongRepo::get_by_path(&conn, &path) {
+            Ok(Some(song)) => Ok(Some(song)),
+            Ok(None) => SongRepo::get_by_path(&conn, &normalized_path),
+            Err(error) => Err(error),
+        };
+        if let Ok(Some(song)) = db_song {
+            if let Some(lyrics_text) = song.lyrics_text.as_deref() {
+                if !lyrics_text.trim().is_empty() {
+                    return Ok(Some(lyrics_text.to_string()));
+                }
+            }
+        }
+    }
+
+    crate::modules::library::get_raw_lyrics(&path)
 }
 
 #[tauri::command]

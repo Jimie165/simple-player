@@ -37,6 +37,29 @@ struct SongWorkResult {
     meta: Option<SongMetadata>,
 }
 
+#[derive(Deserialize)]
+pub struct UpdateSongDetailsRequest {
+    pub id: i64,
+    pub title: String,
+    pub artist: String,
+    pub album: String,
+    pub album_artist: Option<String>,
+    pub year: Option<i32>,
+    pub genre: Option<String>,
+    pub track_number: Option<i32>,
+    pub track_total: Option<i32>,
+    pub disc_number: Option<i32>,
+    pub disc_total: Option<i32>,
+    pub lyrics_text: Option<String>,
+    pub lyrics_source_path: Option<String>,
+}
+
+fn clean_optional_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+}
+
 /// 判断 `child` 是否是 `parent` 的子路径（要求两端都已经过 `normalize_folder_path` 处理）。
 /// 不依赖文件系统，仅按字符串前缀比较，对 Windows 盘符做大小写不敏感处理。
 fn is_subpath_of(child: &str, parent: &str) -> bool {
@@ -538,6 +561,53 @@ pub fn batch_delete_songs(db: State<'_, DbState>, ids: Vec<i64>) -> Result<(), S
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     SongRepo::batch_delete(&conn, &ids).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// 更新歌曲信息和播放器内自定义歌词
+#[tauri::command]
+pub fn update_song_details(
+    db: State<'_, DbState>,
+    request: UpdateSongDetailsRequest,
+) -> Result<SongMetadata, String> {
+    let title = request.title.trim();
+    if title.is_empty() {
+        return Err("标题不能为空".to_string());
+    }
+
+    let artist = request.artist.trim();
+    let album = request.album.trim();
+    let album_artist = clean_optional_string(request.album_artist);
+    let genre = clean_optional_string(request.genre);
+    let lyrics_text = clean_optional_string(request.lyrics_text);
+    let lyrics_source_path = if lyrics_text.is_some() {
+        clean_optional_string(request.lyrics_source_path)
+    } else {
+        None
+    };
+
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    SongRepo::update_details(
+        &conn,
+        request.id,
+        title,
+        artist,
+        album,
+        album_artist.as_deref(),
+        request.year,
+        genre.as_deref(),
+        request.track_number,
+        request.track_total,
+        request.disc_number,
+        request.disc_total,
+        lyrics_text.as_deref(),
+        lyrics_source_path.as_deref(),
+    )
+    .map_err(|e| e.to_string())?;
+
+    let updated = SongRepo::get_by_id(&conn, request.id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到歌曲".to_string())?;
+    Ok(SongMetadata::from_db_song(&updated))
 }
 
 /// 搜索歌曲

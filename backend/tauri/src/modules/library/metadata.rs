@@ -48,6 +48,8 @@ pub struct SongMetadata {
     pub last_played_at: Option<String>,
     pub is_favorite: Option<bool>,
     pub rating: Option<i32>,
+    pub lyrics_text: Option<String>,
+    pub lyrics_source_path: Option<String>,
     pub unique_id: Option<i64>, // Playlist Entry ID
     // 媒体详细信息
     pub width: Option<u32>,
@@ -74,6 +76,13 @@ fn build_unsynced_lyrics(content: &str) -> Option<LyricsData> {
 
     Some(LyricsData {
         lines,
+        has_timestamps: false,
+    })
+}
+
+pub fn lyrics_from_text(content: &str) -> LyricsData {
+    build_unsynced_lyrics(content).unwrap_or(LyricsData {
+        lines: Vec::new(),
         has_timestamps: false,
     })
 }
@@ -178,6 +187,54 @@ pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
     })
 }
 
+pub fn get_raw_lyrics(path: &str) -> Result<Option<String>, String> {
+    let path_obj = Path::new(path);
+    let tagged_file =
+        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
+
+    if let Some(tag) = tagged_file.tag(TagType::Id3v2) {
+        let id3v2_tag: Id3v2Tag = tag.clone().into();
+
+        if let Some(frame) = id3v2_tag.unsync_text().next() {
+            let content = frame.content.trim();
+            if !content.is_empty() {
+                return Ok(Some(content.to_string()));
+            }
+        }
+
+        if let Some(lyrics) = extract_id3v2_lyrics(&id3v2_tag) {
+            let content = lyrics
+                .lines
+                .iter()
+                .map(|line| match line.time_ms {
+                    Some(ms) => {
+                        let minutes = ms / 60000;
+                        let seconds = (ms % 60000) / 1000;
+                        let hundredths = (ms % 1000) / 10;
+                        format!("[{:02}:{:02}.{:02}]{}", minutes, seconds, hundredths, line.text)
+                    }
+                    None => line.text.clone(),
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+            if !content.trim().is_empty() {
+                return Ok(Some(content));
+            }
+        }
+    }
+
+    if let Some(tag) = tagged_file.primary_tag() {
+        if let Some(content) = tag.get_string(&ItemKey::Lyrics) {
+            let trimmed = content.trim();
+            if !trimmed.is_empty() {
+                return Ok(Some(trimmed.to_string()));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
 impl SongMetadata {
     /// 从数据库 Song 模型转换为 SongMetadata
     pub fn from_db_song(song: &crate::modules::database::Song) -> Self {
@@ -204,6 +261,8 @@ impl SongMetadata {
             last_played_at: song.last_played_at.clone(),
             is_favorite: Some(song.is_favorite),
             rating: song.rating,
+            lyrics_text: song.lyrics_text.clone(),
+            lyrics_source_path: song.lyrics_source_path.clone(),
             unique_id: song.unique_id,
             width: None,
             height: None,
@@ -327,6 +386,8 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         last_played_at: None,
         is_favorite: None,
         rating: None,
+        lyrics_text: None,
+        lyrics_source_path: None,
         unique_id: None,
         width: None,
         height: None,

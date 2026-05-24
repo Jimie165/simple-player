@@ -37,6 +37,8 @@ pub struct Song {
     pub last_played_at: Option<String>,
     pub is_favorite: bool,
     pub rating: Option<i32>,
+    pub lyrics_text: Option<String>,
+    pub lyrics_source_path: Option<String>,
     pub status: String, // 'active' | 'archived'
     pub created_at: String,
     pub updated_at: String,

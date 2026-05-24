@@ -101,6 +101,10 @@ export const audioService = {
         return tryParseLrc(data);
     },
 
+    getRawLyrics: async (path: string): Promise<string | null> => {
+        return invoke<string | null>('get_raw_lyrics', { path });
+    },
+
     listAudioOutputs: async (): Promise<AudioOutputInfo[]> =>
         invoke('list_audio_outputs'),
 

@@ -2,7 +2,7 @@
 // ============================================================================
 
 use super::models::Song;
-use rusqlite::{Connection, Result, params};
+use rusqlite::{params, Connection, Result};
 
 pub struct SongRepo;
 
@@ -30,11 +30,13 @@ impl SongRepo {
             last_played_at: row.get(17)?,
             is_favorite: row.get::<_, Option<i32>>(18)?.unwrap_or(0) != 0,
             rating: row.get(19)?,
+            lyrics_text: row.get(20)?,
+            lyrics_source_path: row.get(21)?,
             status: row
-                .get::<_, Option<String>>(20)?
+                .get::<_, Option<String>>(22)?
                 .unwrap_or("active".to_string()),
-            created_at: row.get(21)?,
-            updated_at: row.get(22)?,
+            created_at: row.get(23)?,
+            updated_at: row.get(24)?,
             unique_id: None,
         })
     }
@@ -42,7 +44,8 @@ impl SongRepo {
     pub(crate) const SELECT_COLUMNS: &'static str =
         "id, path, title, artist, album, duration, cover, cover_path, folder_id, 
          album_artist, year, genre, track_number, track_total, disc_number, disc_total,
-         play_count, last_played_at, is_favorite, rating, status, created_at, updated_at";
+         play_count, last_played_at, is_favorite, rating, lyrics_text, lyrics_source_path,
+         status, created_at, updated_at";
 
     /// 获取所有活跃歌曲
     pub fn get_all(conn: &Connection) -> Result<Vec<Song>> {
@@ -290,6 +293,50 @@ impl SongRepo {
                 track_total,
                 disc_number,
                 disc_total,
+                id
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// 更新用户可编辑的歌曲信息和自定义歌词
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_details(
+        conn: &Connection,
+        id: i64,
+        title: &str,
+        artist: &str,
+        album: &str,
+        album_artist: Option<&str>,
+        year: Option<i32>,
+        genre: Option<&str>,
+        track_number: Option<i32>,
+        track_total: Option<i32>,
+        disc_number: Option<i32>,
+        disc_total: Option<i32>,
+        lyrics_text: Option<&str>,
+        lyrics_source_path: Option<&str>,
+    ) -> Result<()> {
+        conn.execute(
+            "UPDATE songs SET
+                title = ?1, artist = ?2, album = ?3, album_artist = ?4,
+                year = ?5, genre = ?6, track_number = ?7, track_total = ?8,
+                disc_number = ?9, disc_total = ?10, lyrics_text = ?11,
+                lyrics_source_path = ?12, updated_at = datetime('now')
+            WHERE id = ?13",
+            params![
+                title,
+                artist,
+                album,
+                album_artist,
+                year,
+                genre,
+                track_number,
+                track_total,
+                disc_number,
+                disc_total,
+                lyrics_text,
+                lyrics_source_path,
                 id
             ],
         )?;
