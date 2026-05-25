@@ -52,6 +52,9 @@ export default function LyricsLineItem({
     const rowFilter = isUserScrolling || pausedScroll ? 'blur(0px)' : `blur(${blurPx}px)`;
     const appliedOpacity = isUserScrolling || pausedScroll ? 1 : rowOpacity;
     const canSeek = line.time_ms !== null;
+    const currentMs = currentTime * 1000;
+    const karaokeWords = line.words ?? [];
+    const shouldRenderKaraoke = isActive && karaokeWords.length > 0;
     const handleClick = () => {
         if (line.time_ms === null) return;
         onSeek(line.time_ms / 1000);
@@ -69,11 +72,11 @@ export default function LyricsLineItem({
                     isActive ? 'opacity-100' : 'opacity-40 hover:opacity-75'
                 )}
             >
-                {isActive && line.words && line.words.length > 0 ? (
+                {shouldRenderKaraoke ? (
                     <KaraokeText
-                        words={line.words}
+                        words={karaokeWords}
                         lineEndMs={lineEndMs}
-                        currentMs={currentTime * 1000}
+                        currentMs={currentMs}
                     />
                 ) : (
                     line.text

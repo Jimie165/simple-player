@@ -14,6 +14,8 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
     const currentMsRef = useRef(baseCurrentMs);
     const lastTick = useRef(0);
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const metrics = useMemo(() => words.map((word, index) => {
         const nextStart = index + 1 < words.length ? words[index + 1].time_ms : lineEndMs ?? word.time_ms + 600;
         return {
@@ -33,7 +35,9 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
         const updateWordStyles = (timeMs: number) => {
             words.forEach((word, index) => {
                 const el = wordRefs.current[index];
-                if (!el) return;
+                const fillEl = fillRefs.current[index];
+                const glowEl = glowRefs.current[index];
+                if (!el || !fillEl || !glowEl) return;
 
                 const { nextStart, durationMs } = metrics[index];
                 const rawProgress = (timeMs - word.time_ms) / durationMs;
@@ -55,21 +59,33 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
                 const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
                 const lift = hasStarted ? liftAttack : 0;
                 const translateY = lift * -0.048;
-                const releaseProgress = Math.min(1, Math.max(0, (nextStart - timeMs) / 220));
+                const toneReleaseMs = Math.min(240, Math.max(120, durationMs * 0.22));
+                const releaseProgress = Math.min(1, Math.max(0, (nextStart - timeMs) / toneReleaseMs));
                 const release = releaseProgress * releaseProgress * (3 - 2 * releaseProgress);
-                const toneAttackProgress = Math.min(1, Math.max(0, elapsedMs / 160));
+                const toneAttackMs = Math.min(260, Math.max(140, durationMs * 0.24));
+                const toneAttackProgress = Math.min(1, Math.max(0, elapsedMs / toneAttackMs));
                 const toneAttack = toneAttackProgress * toneAttackProgress * (3 - 2 * toneAttackProgress);
                 const longToneEnvelope = hasStarted ? Math.min(toneAttack, release) : 0;
                 const longToneEffect = longToneAmount * longToneEnvelope;
-
-                el.style.transform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.018})`;
-                el.style.filter = longToneEffect > 0.01
-                    ? `drop-shadow(0 0 ${longToneEffect * 2.4}px rgba(255, 255, 255, ${longToneEffect * 0.28}))`
+                const glowOpacity = longToneEffect * (0.42 + progress * 0.38);
+                const glowRadius = 2.8 + longToneEffect * 5.8;
+                const glowShadow = longToneEffect > 0.01
+                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
                     : 'none';
-                el.style.willChange = longToneAmount > 0.01 ? 'transform, filter' : 'transform';
-                el.style.backgroundImage = hasProgress
+                const glowMask = hasProgress
+                    ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
+                    : 'linear-gradient(to right, transparent, transparent)';
+
+                el.style.transform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
+                el.style.willChange = longToneAmount > 0.01 ? 'transform' : 'transform';
+                fillEl.style.backgroundImage = hasProgress
                     ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
                     : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
+                glowEl.style.clipPath = 'none';
+                glowEl.style.maskImage = glowMask;
+                glowEl.style.webkitMaskImage = glowMask;
+                glowEl.style.opacity = longToneEffect > 0.01 && hasProgress ? `${glowOpacity}` : '0';
+                glowEl.style.textShadow = glowShadow;
             });
         };
 
@@ -117,21 +133,27 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
                 const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
                 const lift = hasStarted ? liftAttack : 0;
                 const translateY = lift * -0.048;
-                const releaseProgress = Math.min(1, Math.max(0, (nextStart - renderCurrentMs) / 220));
-                const toneAttackProgress = Math.min(1, Math.max(0, elapsedMs / 160));
+                const toneReleaseMs = Math.min(240, Math.max(120, durationMs * 0.22));
+                const releaseProgress = Math.min(1, Math.max(0, (nextStart - renderCurrentMs) / toneReleaseMs));
+                const toneAttackMs = Math.min(260, Math.max(140, durationMs * 0.24));
+                const toneAttackProgress = Math.min(1, Math.max(0, elapsedMs / toneAttackMs));
                 const toneAttack = toneAttackProgress * toneAttackProgress * (3 - 2 * toneAttackProgress);
                 const longToneEnvelope = hasStarted
                     ? Math.min(toneAttack, releaseProgress * releaseProgress * (3 - 2 * releaseProgress))
                     : 0;
                 const longToneEffect = longToneAmount * longToneEnvelope;
-
-                const currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.018})`;
-
-                const currentFilter = longToneEffect > 0.01
-                    ? `drop-shadow(0 0 ${longToneEffect * 2.4}px rgba(255, 255, 255, ${longToneEffect * 0.28}))`
+                const glowOpacity = longToneEffect * (0.42 + progress * 0.38);
+                const glowRadius = 2.8 + longToneEffect * 5.8;
+                const glowShadow = longToneEffect > 0.01
+                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
                     : 'none';
+                const glowMask = hasProgress
+                    ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
+                    : 'linear-gradient(to right, transparent, transparent)';
 
-                const currentWillChange = longToneAmount > 0.01 ? 'transform, filter' : 'transform';
+                const currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
+
+                const currentWillChange = 'transform';
 
                 return (
                     <span
@@ -147,17 +169,49 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
                             willChange: currentWillChange,
                             transition: 'none',
                             backfaceVisibility: 'hidden',
-                            filter: currentFilter,
-                            backgroundImage: hasProgress
-                                ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
-                                : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`,
-                            WebkitBackgroundClip: 'text',
-                            backgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            color: 'transparent',
                         }}
                     >
-                        {word.text}
+                        <span
+                            aria-hidden="true"
+                            ref={(el) => {
+                                glowRefs.current[index] = el;
+                            }}
+                            style={{
+                                position: 'absolute',
+                                inset: 0,
+                                pointerEvents: 'none',
+                                whiteSpace: 'pre-wrap',
+                                color: 'rgba(255,255,255,0.95)',
+                                WebkitTextFillColor: 'rgba(255,255,255,0.95)',
+                                clipPath: 'none',
+                                maskImage: glowMask,
+                                WebkitMaskImage: glowMask,
+                                opacity: longToneEffect > 0.01 && hasProgress ? glowOpacity : 0,
+                                textShadow: glowShadow,
+                                willChange: 'opacity, text-shadow, mask-image',
+                                transform: 'translateZ(0)',
+                            }}
+                        >
+                            {word.text}
+                        </span>
+                        <span
+                            ref={(el) => {
+                                fillRefs.current[index] = el;
+                            }}
+                            style={{
+                                position: 'relative',
+                                zIndex: 1,
+                                backgroundImage: hasProgress
+                                    ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
+                                    : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`,
+                                WebkitBackgroundClip: 'text',
+                                backgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                color: 'transparent',
+                            }}
+                        >
+                            {word.text}
+                        </span>
                     </span>
                 );
             })}
