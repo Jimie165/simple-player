@@ -26,7 +26,7 @@ import { getSparseGridStyle } from '@/utils/gridLayout';
  */
 function PlaylistGridCover({ item }: { item: RecentItem }) {
     const [songs, setSongs] = useState<SongMetadata[]>([]);
-    const { getPlaylistSettings, libraryVersion } = useLibraryStore();
+    const { getPlaylistSettings, libraryVersion, playlistVersion } = useLibraryStore();
 
     useEffect(() => {
         const load = async () => {
@@ -45,7 +45,7 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
             setSongs(plSongs);
         };
         load();
-    }, [item.id, getPlaylistSettings, libraryVersion]);
+    }, [item.id, getPlaylistSettings, libraryVersion, playlistVersion]);
 
     return <PlaylistCoverCollage songs={songs} className="w-full h-full" />;
 }

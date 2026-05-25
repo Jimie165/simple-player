@@ -43,7 +43,7 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, getPlaylistSettings, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
+    const { addMultipleToNext, libraryVersion, playlistVersion, getPlaylistSettings, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
@@ -64,7 +64,7 @@ export default function PlaylistList() {
             libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
         });
         return () => cancelAnimationFrame(frame);
-    }, [libraryVersion, loadPlaylists]);
+    }, [libraryVersion, playlistVersion, loadPlaylists]);
 
     useEffect(() => {
         try {

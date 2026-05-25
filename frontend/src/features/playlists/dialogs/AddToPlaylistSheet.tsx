@@ -20,6 +20,7 @@ export default function AddToPlaylistSheet() {
     const { clearSelection } = useSelectionStore();
     const { lastAddedToPlaylists, recordPlaylistAddition } = useLibraryStore();
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
+    const playlistVersion = useLibraryStore(s => s.playlistVersion);
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
     const [loading, setLoading] = useState(false);
@@ -77,7 +78,7 @@ export default function AddToPlaylistSheet() {
             setPlaylistSongs({});
             loadPlaylists();
         }
-    }, [isOpen, libraryVersion, loadPlaylists]);
+    }, [isOpen, libraryVersion, playlistVersion, loadPlaylists]);
 
     useEffect(() => {
         if (isOpen && playlists.length > 0 && libraryMap.size > 0) {

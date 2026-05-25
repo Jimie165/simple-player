@@ -87,7 +87,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
                     value={displayText}
                     readOnly={!customEnabled}
                     onChange={(event) => onChange({ lyricsText: event.target.value, lyricsSourcePath: values.lyricsSourcePath })}
-                    className={`h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 font-mono text-sm leading-6 text-neutral-900 outline-none dark:text-white ${showEmptyState ? 'text-transparent caret-transparent' : ''}`}
+                    className={`lyrics-editor-scrollbar h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 font-mono text-sm leading-6 text-neutral-900 outline-none dark:text-white ${showEmptyState ? 'text-transparent caret-transparent' : ''}`}
                 />
                 {showEmptyState && (
                     <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-900 dark:text-neutral-100">

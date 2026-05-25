@@ -23,7 +23,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
     // 只有当是 Playlist 且没有预设封面时，才需要动态加载歌曲里的封面
     const [playlistSongs, setPlaylistSongs] = useState<SongMetadata[]>([]);
     const [coverUrl, setCoverUrl] = useState<string | null>(null);
-    const { getPlaylistSettings } = useLibraryStore();
+    const { getPlaylistSettings, playlistVersion } = useLibraryStore();
 
     useEffect(() => {
         if (isPlaylist && !item.cover_path) {
@@ -44,7 +44,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
             };
             loadSongs();
         }
-    }, [item, isPlaylist, getPlaylistSettings]);
+    }, [item, isPlaylist, getPlaylistSettings, playlistVersion]);
 
     useEffect(() => {
         let isMounted = true;
