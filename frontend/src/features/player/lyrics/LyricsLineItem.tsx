@@ -54,7 +54,7 @@ export default function LyricsLineItem({
     const canSeek = line.time_ms !== null;
     const currentMs = currentTime * 1000;
     const karaokeWords = line.words ?? [];
-    const shouldRenderKaraoke = isActive && karaokeWords.length > 0;
+    const shouldRenderKaraoke = karaokeWords.length > 0;
     const handleClick = () => {
         if (line.time_ms === null) return;
         onSeek(line.time_ms / 1000);
@@ -76,7 +76,8 @@ export default function LyricsLineItem({
                     <KaraokeText
                         words={karaokeWords}
                         lineEndMs={lineEndMs}
-                        currentMs={currentMs}
+                        currentMs={isActive ? currentMs : 0}
+                        isActive={isActive}
                     />
                 ) : (
                     line.text

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, memo } from 'react';
 import type { LyricsWord } from '@/types';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
@@ -8,9 +8,15 @@ interface KaraokeTextProps {
     words: LyricsWord[];
     lineEndMs: number | null;
     currentMs: number;
+    isActive: boolean;
 }
 
-export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs }: KaraokeTextProps) {
+type IndexedCharItem = {
+    item: FlatCharItem;
+    flatIndex: number;
+};
+
+function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, isActive }: KaraokeTextProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const targetMsRef = useRef(baseCurrentMs);
     const currentMsRef = useRef(baseCurrentMs);
@@ -24,12 +30,12 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
 
     // 2. 按单词分组的字符序列（英文单词换行保护）
     const wordGroups = useMemo(() => {
-        const groups: FlatCharItem[][] = [];
-        flatChars.forEach((charItem) => {
+        const groups: IndexedCharItem[][] = [];
+        flatChars.forEach((charItem, flatIndex) => {
             if (!groups[charItem.wordIndex]) {
                 groups[charItem.wordIndex] = [];
             }
-            groups[charItem.wordIndex].push(charItem);
+            groups[charItem.wordIndex].push({ item: charItem, flatIndex });
         });
         return groups;
     }, [flatChars]);
@@ -43,6 +49,8 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
 
     // 3. 升级 tick 渲染逻辑至字符级，逐字应用所有原先公式
     useEffect(() => {
+        if (!isActive) return;
+
         const updateWordStyles = (timeMs: number) => {
             flatChars.forEach((charItem, index) => {
                 const el = wordRefs.current[index];
@@ -128,7 +136,7 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
         lastTick.current = performance.now();
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [isPlaying, flatChars]);
+    }, [isPlaying, flatChars, isActive]);
 
     return (
         <>
@@ -142,54 +150,95 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
                             whiteSpace: 'nowrap',
                         }}
                     >
-                        {group.map((charItem) => {
-                            const flatIndex = flatChars.indexOf(charItem);
-                            const renderCurrentMs = currentMsRef.current;
-                            const { time_ms, durationMs, wordDurationMs, wordStart, wordNextStart } = charItem;
-
-                            const rawProgress = (renderCurrentMs - time_ms) / durationMs;
-                            const progress = rawProgress <= 0 ? 0 : rawProgress >= 1 ? 1 : rawProgress;
-                            const stopVal = progress * 100;
-
-                            const longToneRaw = Math.min(1, Math.max(0, (wordDurationMs - 650) / 600));
-                            const longToneAmount = longToneRaw * longToneRaw * (3 - 2 * longToneRaw);
+                        {group.map(({ item: charItem, flatIndex }) => {
+                            if (!isActive) {
+                                return (
+                                    <span
+                                        key={charItem.charIndexInWord}
+                                        style={{
+                                            position: 'relative',
+                                            display: 'inline-block',
+                                            whiteSpace: 'pre-wrap',
+                                            transform: 'none',
+                                            willChange: 'auto',
+                                            transition: 'none',
+                                            backfaceVisibility: 'hidden',
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                position: 'relative',
+                                                zIndex: 1,
+                                                color: 'currentColor',
+                                            }}
+                                        >
+                                            {charItem.char}
+                                        </span>
+                                    </span>
+                                );
+                            }
 
                             const baseAlpha = 0.36; // 统一为 0.36
-                            const edgeWidth = 24 + longToneAmount * 14;
-                            const edgeAlpha = 0.72 + longToneAmount * 0.18;
-                            const hasProgress = progress > 0;
-                            const softEdgeStart = hasProgress ? Math.max(0, stopVal - edgeWidth) : 0;
-                            const softEdgeEnd = hasProgress ? Math.min(120, stopVal + edgeWidth * 0.9) : 0;
 
-                            const elapsedMs = renderCurrentMs - time_ms;
-                            const hasStarted = elapsedMs > 0;
-                            const attackMs = 460;
-                            const attackProgress = Math.min(1, Math.max(0, elapsedMs / attackMs));
-                            const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
-                            const lift = hasStarted ? liftAttack : 0;
-                            const translateY = lift * -0.048;
+                            let currentTransform = 'none';
+                            let currentWillChange = 'auto';
+                            let glowOpacity = 0;
+                            let glowShadow = 'none';
+                            let glowMask = 'linear-gradient(to right, transparent, transparent)';
+                            let fillBackgroundImage = `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
+                            let longToneEffect = 0;
+                            let hasProgress = false;
 
-                            const toneReleaseMs = Math.min(240, Math.max(120, wordDurationMs * 0.22));
-                            const releaseProgress = Math.min(1, Math.max(0, (wordNextStart - renderCurrentMs) / toneReleaseMs));
-                            const release = releaseProgress * releaseProgress * (3 - 2 * releaseProgress);
-                            const toneAttackMs = Math.min(260, Math.max(140, wordDurationMs * 0.24));
-                            const elapsedWordMs = renderCurrentMs - wordStart;
-                            const toneAttackProgress = Math.min(1, Math.max(0, elapsedWordMs / toneAttackMs));
-                            const toneAttack = toneAttackProgress * toneAttackProgress * (3 - 2 * toneAttackProgress);
+                            if (isActive) {
+                                const renderCurrentMs = currentMsRef.current;
+                                const { time_ms, durationMs, wordDurationMs, wordStart, wordNextStart } = charItem;
 
-                            const longToneEnvelope = hasStarted ? Math.min(toneAttack, release) : 0;
-                            const longToneEffect = longToneAmount * longToneEnvelope;
-                            const glowOpacity = longToneEffect * (0.42 + progress * 0.38);
-                            const glowRadius = 2.8 + longToneEffect * 5.8;
-                            const glowShadow = longToneEffect > 0.01
-                                ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
-                                : 'none';
-                            const glowMask = hasProgress
-                                ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
-                                : 'linear-gradient(to right, transparent, transparent)';
+                                const rawProgress = (renderCurrentMs - time_ms) / durationMs;
+                                const progress = rawProgress <= 0 ? 0 : rawProgress >= 1 ? 1 : rawProgress;
+                                const stopVal = progress * 100;
 
-                            const currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
-                            const currentWillChange = 'transform';
+                                const longToneRaw = Math.min(1, Math.max(0, (wordDurationMs - 650) / 600));
+                                const longToneAmount = longToneRaw * longToneRaw * (3 - 2 * longToneRaw);
+
+                                const edgeWidth = 24 + longToneAmount * 14;
+                                const edgeAlpha = 0.72 + longToneAmount * 0.18;
+                                hasProgress = progress > 0;
+                                const softEdgeStart = hasProgress ? Math.max(0, stopVal - edgeWidth) : 0;
+                                const softEdgeEnd = hasProgress ? Math.min(120, stopVal + edgeWidth * 0.9) : 0;
+
+                                const elapsedMs = renderCurrentMs - time_ms;
+                                const hasStarted = elapsedMs > 0;
+                                const attackMs = 460;
+                                const attackProgress = Math.min(1, Math.max(0, elapsedMs / attackMs));
+                                const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
+                                const lift = hasStarted ? liftAttack : 0;
+                                const translateY = lift * -0.048;
+
+                                const toneReleaseMs = Math.min(240, Math.max(120, wordDurationMs * 0.22));
+                                const releaseProgress = Math.min(1, Math.max(0, (wordNextStart - renderCurrentMs) / toneReleaseMs));
+                                const release = releaseProgress * releaseProgress * (3 - 2 * releaseProgress);
+                                const toneAttackMs = Math.min(260, Math.max(140, wordDurationMs * 0.24));
+                                const elapsedWordMs = renderCurrentMs - wordStart;
+                                const toneAttackProgress = Math.min(1, Math.max(0, elapsedWordMs / toneAttackMs));
+                                const toneAttack = toneAttackProgress * toneAttackProgress * (3 - 2 * toneAttackProgress);
+
+                                const longToneEnvelope = hasStarted ? Math.min(toneAttack, release) : 0;
+                                longToneEffect = longToneAmount * longToneEnvelope;
+                                glowOpacity = longToneEffect * (0.42 + progress * 0.38);
+                                const glowRadius = 2.8 + longToneEffect * 5.8;
+                                glowShadow = longToneEffect > 0.01
+                                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
+                                    : 'none';
+                                glowMask = hasProgress
+                                    ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
+                                    : 'linear-gradient(to right, transparent, transparent)';
+
+                                currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
+                                currentWillChange = 'transform';
+                                fillBackgroundImage = hasProgress
+                                    ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
+                                    : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
+                            }
 
                             return (
                                 <span
@@ -237,9 +286,7 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
                                         style={{
                                             position: 'relative',
                                             zIndex: 1,
-                                            backgroundImage: hasProgress
-                                                ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
-                                                : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`,
+                                            backgroundImage: fillBackgroundImage,
                                             WebkitBackgroundClip: 'text',
                                             backgroundClip: 'text',
                                             WebkitTextFillColor: 'transparent',
@@ -257,3 +304,18 @@ export default function KaraokeText({ words, lineEndMs, currentMs: baseCurrentMs
         </>
     );
 }
+
+const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
+    if (!prev.isActive && !next.isActive) {
+        return prev.words === next.words && prev.lineEndMs === next.lineEndMs;
+    }
+
+    return (
+        prev.words === next.words &&
+        prev.lineEndMs === next.lineEndMs &&
+        prev.currentMs === next.currentMs &&
+        prev.isActive === next.isActive
+    );
+});
+
+export default KaraokeText;
