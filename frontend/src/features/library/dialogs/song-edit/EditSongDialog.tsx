@@ -101,14 +101,16 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
         }
     };
 
-    if (!song || !values) return null;
+    const resolvedValues = values ?? (song ? makeInitialSongEditForm(song) : null);
+
+    if (!song || !resolvedValues) return null;
 
     const renderPanel = () => {
         if (activeTab === 'details') {
-            return <SongInfoFields values={values} errors={errors} onChange={handleChange} />;
+            return <SongInfoFields values={resolvedValues} errors={errors} onChange={handleChange} />;
         }
         if (activeTab === 'lyrics') {
-            return <SongLyricsFields songPath={song.path} values={values} onChange={handleChange} onError={setMessage} />;
+            return <SongLyricsFields songPath={song.path} values={resolvedValues} onChange={handleChange} onError={setMessage} />;
         }
         if (activeTab === 'artwork') {
             return (
@@ -159,9 +161,9 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                                 <CoverImage song={song} className="h-full w-full" iconClassName="text-5xl" />
                                             </div>
                                             <div className="min-w-0 pt-1">
-                                                <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{values.title || song.title}</div>
-                                                <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{values.artist || '未知艺人'}</div>
-                                                <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{values.album || '未知专辑'}</div>
+                                                <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{resolvedValues.title || song.title}</div>
+                                                <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{resolvedValues.artist || '未知艺人'}</div>
+                                                <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{resolvedValues.album || '未知专辑'}</div>
                                             </div>
                                         </div>
 

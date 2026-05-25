@@ -270,7 +270,12 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     // --- Menu Generation ---
     const menuItems = useMemo(() => {
         const editType = firstItem ? getMusicItemType(firstItem) : '';
-        const canDefaultEdit = isSingle && (editType === 'song' || editType === 'file') && context !== 'video';
+        const canDefaultEdit =
+            isSingle &&
+            !!firstItem &&
+            (editType === 'song' || editType === 'file') &&
+            context !== 'video' &&
+            hasLibraryIdentity(firstItem);
         const canAddToPlaylist = items.every(i => {
             const t = getMusicItemType(i);
             return (
