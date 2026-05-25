@@ -266,7 +266,7 @@ export default function AddToPlaylistSheet() {
                         className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
                     />
 
-                    <div className="fixed inset-0 overflow-y-auto">
+                    <div className="fixed inset-0 overflow-y-auto p-3 sm:p-4">
                         <div className="flex min-h-full items-center justify-center p-4 text-center">
                             <TransitionChild
                                 as={Fragment}
@@ -277,7 +277,7 @@ export default function AddToPlaylistSheet() {
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <DialogPanel className="w-full max-w-md transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700">
+                                <DialogPanel className="w-[min(28rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-md sm:max-h-[calc(100vh-2rem)]">
                                     <DialogTitle
                                         as="h3"
                                         className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2"
@@ -286,7 +286,7 @@ export default function AddToPlaylistSheet() {
                                         添加到播放列表
                                     </DialogTitle>
 
-                                    <div className="mt-2 flex flex-col gap-2 max-h-[60vh] overflow-y-auto">
+                                    <div className="mt-2 flex flex-col gap-2 max-h-[min(60vh,24rem)] overflow-y-auto">
                                         <button
                                             onClick={handleCreateNew}
                                             className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left group"

@@ -81,7 +81,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
             <div className="fixed inset-0 flex w-screen items-center justify-center p-3 sm:p-4">
                 <DialogPanel
                     transition
-                    className="w-full max-w-2xl max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-4 sm:p-6 lg:p-8 text-left align-middle shadow-xl border border-neutral-200 dark:border-neutral-700 transition-all duration-300 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 flex flex-col"
+                    className="w-[min(42rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] p-4 sm:w-full sm:max-w-2xl sm:max-h-[calc(100vh-2rem)] sm:p-6 lg:p-8 text-left align-middle shadow-xl border border-neutral-200 dark:border-neutral-700 transition-all duration-300 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 flex flex-col"
                 >
                     <div className="flex justify-between items-start mb-4 sm:mb-6 gap-4 shrink-0">
                         <DialogTitle as="h3" className="text-xl font-bold leading-6 text-neutral-900 dark:text-white whitespace-nowrap">

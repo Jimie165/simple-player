@@ -80,8 +80,8 @@ export default function EditPlaylistDialog({
                     className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
                 />
 
-                <div className="fixed inset-0 overflow-y-auto">
-                    <div className="flex min-h-full items-center justify-center p-4 text-center">
+                <div className="fixed inset-0 overflow-y-auto p-3 sm:p-4">
+                    <div className="flex min-h-full items-center justify-center text-center">
                         <TransitionChild
                             as={Fragment}
                             enter="ease-out duration-300"
@@ -91,9 +91,9 @@ export default function EditPlaylistDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-full max-w-[360px] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col">
-                                <form onSubmit={handleSubmit} className="flex flex-col h-full">
-                                    <div className="p-6 pb-5 flex flex-col items-center">
+                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-[360px] sm:max-h-[calc(100vh-2rem)]">
+                                <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
+                                    <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-5 flex flex-col items-center">
                                         <DialogTitle
                                             as="h3"
                                             className="text-lg font-bold leading-6 text-neutral-900 dark:text-neutral-100 mb-6 text-center w-full"
@@ -176,7 +176,7 @@ export default function EditPlaylistDialog({
                                         </div>
                                     </div>
 
-                                    <div className="px-6 py-4 bg-neutral-50 dark:bg-[#252525] border-t border-neutral-200 dark:border-neutral-700 flex gap-3 mt-auto">
+                                    <div className="shrink-0 px-6 py-4 bg-neutral-50 dark:bg-[#252525] border-t border-neutral-200 dark:border-neutral-700 flex gap-3">
                                         <button
                                             type="submit"
                                             disabled={!name.trim() || loading}

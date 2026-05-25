@@ -132,7 +132,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                     className="fixed inset-0 bg-black/20 backdrop-blur-[2px] transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
                 />
 
-                <div className="fixed inset-0 overflow-y-auto p-0 sm:p-4">
+                <div className="fixed inset-0 overflow-y-auto p-2 sm:p-4">
                     <div className="flex min-h-full items-center justify-center text-center">
                         <TransitionChild
                             as={Fragment}
@@ -143,7 +143,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="h-screen w-full transform overflow-hidden bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:max-w-[640px] sm:rounded-[6px]">
+                            <DialogPanel className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-[6px]">
                                 <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">编辑歌曲信息</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
