@@ -8,12 +8,8 @@ export interface FlatCharItem {
     groupStartMs: number;  // 所属分组的整体开始时间（用于整体位移/长音）
     groupEndMs: number;    // 所属分组的整体结束时间
     groupDurationMs: number;// 所属分组的整体持续时间
-    wordStart: number;     // 所属单词的整体开始时间（用于长音发光波络）
-    wordDurationMs: number;// 所属单词的整体持续时间（用于判断长音类型）
-    wordNextStart: number; // 所属单词的整体结束时间（用于长音结束渐变）
     wordIndex: number;     // 单词索引，用以外层单词包裹和 Ref 寻址
     charIndexInWord: number;// 字符在单词内部的相对索引
-    isWhitespace: boolean;  // 是否是空白字符
 }
 
 /**
@@ -70,12 +66,8 @@ export function parseLyricsWordsToChars(words: LyricsWord[], lineEndMs: number |
                 groupStartMs: word.time_ms,
                 groupEndMs: nextStart,
                 groupDurationMs: durationMs,
-                wordStart: word.time_ms,
-                wordDurationMs: durationMs,
-                wordNextStart: nextStart,
                 wordIndex,
                 charIndexInWord: charIndex,
-                isWhitespace,
             });
         });
     });
