@@ -5,6 +5,9 @@ export interface FlatCharItem {
     time_ms: number;       // 字符高亮的开始时间
     durationMs: number;    // 字符高亮的持续时间
     nextStart: number;     // 字符高亮的结束时间
+    groupStartMs: number;  // 所属分组的整体开始时间（用于整体位移/长音）
+    groupEndMs: number;    // 所属分组的整体结束时间
+    groupDurationMs: number;// 所属分组的整体持续时间
     wordStart: number;     // 所属单词的整体开始时间（用于长音发光波络）
     wordDurationMs: number;// 所属单词的整体持续时间（用于判断长音类型）
     wordNextStart: number; // 所属单词的整体结束时间（用于长音结束渐变）
@@ -26,7 +29,13 @@ export function parseLyricsWordsToChars(words: LyricsWord[], lineEndMs: number |
         const nextStart = wordIndex + 1 < words.length
             ? words[wordIndex + 1].time_ms
             : lineEndMs ?? word.time_ms + 600;
-        const durationMs = Math.max(80, nextStart - word.time_ms);
+        
+        const calculatedDuration = word.duration_ms ?? Math.max(80, nextStart - word.time_ms);
+        // 如果是最后一个单词且没有精确时间戳，限制其最长动画时值为 800ms，防止长间奏拖沓
+        const isLastWord = wordIndex + 1 === words.length;
+        const durationMs = (isLastWord && word.duration_ms === undefined)
+            ? Math.min(800, calculatedDuration)
+            : calculatedDuration;
 
         const chars = Array.from(word.text);
         const nonSpaceChars = chars.filter((c) => !/\s/.test(c));
@@ -58,6 +67,9 @@ export function parseLyricsWordsToChars(words: LyricsWord[], lineEndMs: number |
                 time_ms: charStart,
                 durationMs: Math.max(20, charDuration), // 设定 20ms 的最小保护值以防止计算溢出
                 nextStart: charStart + charDuration,
+                groupStartMs: word.time_ms,
+                groupEndMs: nextStart,
+                groupDurationMs: durationMs,
                 wordStart: word.time_ms,
                 wordDurationMs: durationMs,
                 wordNextStart: nextStart,

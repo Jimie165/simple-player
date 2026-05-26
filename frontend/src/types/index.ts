@@ -40,6 +40,7 @@ export interface SongMetadata {
 export interface LyricsWord {
     time_ms: number;
     text: string;
+    duration_ms?: number;
 }
 
 export interface LyricsLine {

@@ -88,6 +88,13 @@ function extractWords(text: string): ExtractedWords | null {
             // A trailing/empty timestamp segment — treat the latest such
             // stamp as the line end (Apple-style closing marker).
             endMs = stamps[i].ms;
+            // 连续空时间戳表示前一个单词的精确结束时间
+            if (words.length > 0) {
+                const prevWord = words[words.length - 1];
+                if (prevWord.duration_ms === undefined) {
+                    prevWord.duration_ms = stamps[i].ms - prevWord.time_ms;
+                }
+            }
             continue;
         }
         words.push({ time_ms: stamps[i].ms, text: segText });
@@ -138,6 +145,13 @@ function tokenizeInlineSquare(stamps: InlineSquareStamp[], text: string): Inline
         const segText = text.slice(segStart, segEnd);
         if (segText.length === 0) {
             if (i === stamps.length - 1) endMs = stamps[i].ms;
+            // 连续空时间戳表示前一个单词的精确结束时间
+            if (words.length > 0) {
+                const prevWord = words[words.length - 1];
+                if (prevWord.duration_ms === undefined) {
+                    prevWord.duration_ms = stamps[i].ms - prevWord.time_ms;
+                }
+            }
             continue;
         }
         words.push({ time_ms: stamps[i].ms, text: segText });
