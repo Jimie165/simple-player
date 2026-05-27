@@ -13,6 +13,7 @@ interface ApplePlayerLyricsPanelProps {
     panelFlipTarget: 'queue' | 'lyrics' | null;
     isPanelFlipping: boolean;
     lyrics: LyricsLine[] | null;
+    lyricsPath: string | null;
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
     hasTimestamps: boolean;
     currentTime: number;
@@ -28,6 +29,7 @@ export default function ApplePlayerLyricsPanel({
     panelFlipTarget,
     isPanelFlipping,
     lyrics,
+    lyricsPath,
     lyricsStatus,
     hasTimestamps,
     currentTime,
@@ -96,6 +98,7 @@ export default function ApplePlayerLyricsPanel({
                     {lyricsMounted && (
                         playerEffectMode === 'animation' ? (
                             <FluidLyricsPanel
+                                key={`fluid-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
                                 lyrics={lyrics}
                                 status={lyricsStatus}
@@ -107,6 +110,7 @@ export default function ApplePlayerLyricsPanel({
                             />
                         ) : (
                             <LyricsPanel
+                                key={`virtual-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
                                 lyrics={lyrics}
                                 status={lyricsStatus}

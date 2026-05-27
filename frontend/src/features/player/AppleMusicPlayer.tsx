@@ -654,6 +654,7 @@ export default function AppleMusicPlayer({
                                     panelFlipTarget={panelFlipTarget}
                                     isPanelFlipping={isPanelFlipping}
                                     lyrics={lyrics}
+                                    lyricsPath={lyricsPath}
                                     lyricsStatus={lyricsStatus}
                                     hasTimestamps={lyricsHasTimestamps}
                                     currentTime={currentTime}
@@ -819,6 +820,7 @@ export default function AppleMusicPlayer({
                                 panelFlipTarget={panelFlipTarget}
                                 isPanelFlipping={isPanelFlipping}
                                 lyrics={lyrics}
+                                lyricsPath={lyricsPath}
                                 lyricsStatus={lyricsStatus}
                                 hasTimestamps={lyricsHasTimestamps}
                                 currentTime={currentTime}

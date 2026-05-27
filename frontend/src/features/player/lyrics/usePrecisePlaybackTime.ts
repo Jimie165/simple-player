@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 
+const HARD_SYNC_MS = 900;
+
 export function usePrecisePlaybackTime(currentTime: number) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const playbackRevision = usePlayerStore(state => state.playbackRevision);
@@ -8,6 +10,12 @@ export function usePrecisePlaybackTime(currentTime: number) {
     const lastTick = useRef(0);
     const lastExternalMs = useRef(currentTime * 1000);
     const currentTimeRef = useRef(currentTime);
+    const preciseMsRef = useRef(currentTime * 1000);
+
+    const setSyncedPreciseMs = (ms: number) => {
+        preciseMsRef.current = ms;
+        setPreciseMs(ms);
+    };
 
     useEffect(() => {
         currentTimeRef.current = currentTime;
@@ -15,11 +23,12 @@ export function usePrecisePlaybackTime(currentTime: number) {
 
     useEffect(() => {
         const externalMs = currentTime * 1000;
-        const diff = Math.abs(externalMs - lastExternalMs.current);
+        const externalStepMs = Math.abs(externalMs - lastExternalMs.current);
+        const driftMs = Math.abs(externalMs - preciseMsRef.current);
         let frame: number | null = null;
 
-        if (diff > 120 || !isPlaying) {
-            frame = requestAnimationFrame(() => setPreciseMs(externalMs));
+        if (!isPlaying || externalStepMs > HARD_SYNC_MS || driftMs > HARD_SYNC_MS) {
+            frame = requestAnimationFrame(() => setSyncedPreciseMs(externalMs));
         }
         lastExternalMs.current = externalMs;
 
@@ -30,7 +39,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
 
     useEffect(() => {
         const syncFrame = requestAnimationFrame(() => {
-            setPreciseMs(currentTimeRef.current * 1000);
+            setSyncedPreciseMs(currentTimeRef.current * 1000);
         });
         if (!isPlaying) {
             return () => cancelAnimationFrame(syncFrame);
@@ -40,13 +49,9 @@ export function usePrecisePlaybackTime(currentTime: number) {
         const tick = (now: number) => {
             const delta = now - lastTick.current;
             lastTick.current = now;
-            setPreciseMs(prev => {
-                const advancedMs = prev + delta;
-                const externalMs = currentTimeRef.current * 1000;
-                const driftMs = externalMs - advancedMs;
-                if (Math.abs(driftMs) > 500) return externalMs;
-                return advancedMs + driftMs * 0.08;
-            });
+            const advancedMs = preciseMsRef.current + delta;
+            preciseMsRef.current = advancedMs;
+            setPreciseMs(advancedMs);
             frame = requestAnimationFrame(tick);
         };
 
