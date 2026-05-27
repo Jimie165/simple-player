@@ -39,10 +39,10 @@ export default function LyricsPanel({
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
-    const preciseCurrentMs = usePrecisePlaybackTime(currentTime);
+    const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
     const currentLyricIndex = useLyricsSync({
         lyrics: lines,
-        currentTime,
+        currentTime: renderCurrentMs / 1000,
         enabled: isOpen,
         hasTimestamps,
     });
@@ -170,8 +170,8 @@ export default function LyricsPanel({
         [hasTimestamps, lines]
     );
     const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, preciseCurrentMs / 1000),
-        [currentLyricIndex, displayItems, lines, preciseCurrentMs]
+        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000),
+        [currentLyricIndex, displayItems, lines, renderCurrentMs]
     );
 
     const getVisualInterludeShift = useCallback(
@@ -184,11 +184,11 @@ export default function LyricsPanel({
                 const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
                 const isOpen =
                     itemIndex === exitingInterludeIndex ||
-                    (preciseCurrentMs >= item.startMs && preciseCurrentMs < closeAtMs);
+                    (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
                 return isOpen ? shift : shift - rowHeight;
             }, 0);
         },
-        [displayItems, exitingInterludeIndex, preciseCurrentMs]
+        [displayItems, exitingInterludeIndex, renderCurrentMs]
     );
 
     const startInterludeExit = useCallback((displayIndex: number) => {
@@ -209,14 +209,14 @@ export default function LyricsPanel({
     const keepCurrentInterludeForExit = useCallback(() => {
         const activeItem = displayItems[activeDisplayIndex];
         if (activeItem?.type !== 'interlude') return;
-        if (preciseCurrentMs < activeItem.startMs + interludeGapOpenDurationMs) return;
+        if (renderCurrentMs < activeItem.startMs + interludeGapOpenDurationMs) return;
 
         startInterludeExit(activeDisplayIndex);
-    }, [activeDisplayIndex, displayItems, preciseCurrentMs, startInterludeExit]);
+    }, [activeDisplayIndex, displayItems, renderCurrentMs, startInterludeExit]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
-        const currentMs = currentTime * 1000;
+        const currentMs = renderCurrentMs;
         previousPlaybackMsRef.current = currentMs;
 
         if (Math.abs(currentMs - previousMs) < 900) return;
@@ -258,7 +258,7 @@ export default function LyricsPanel({
         }
 
         return () => cancelAnimationFrame(syncFrame);
-    }, [currentTime, displayItems, startInterludeExit]);
+    }, [displayItems, renderCurrentMs, startInterludeExit]);
 
     const getAutoScrollOffset = useCallback(
         (displayIndex: number) => {
@@ -380,7 +380,8 @@ export default function LyricsPanel({
                                             forceExitKey={interludeExitKey}
                                             playbackSyncKey={playbackSyncKey}
                                             suppressDots={false}
-                                            currentMs={preciseCurrentMs}
+                                            currentMs={renderCurrentMs}
+                                            preciseMsRef={preciseMsRef}
                                             startMs={item.startMs}
                                             endMs={item.endMs}
                                         />
@@ -404,7 +405,8 @@ export default function LyricsPanel({
                                             ? item.line.end_ms
                                             : getLineEndMsByIndex(lines, item.lineIndex)
                                     }
-                                    currentTime={preciseCurrentMs / 1000}
+                                    currentTime={renderCurrentMs / 1000}
+                                    preciseMsRef={preciseMsRef}
                                     onSeek={(time) => {
                                         keepCurrentInterludeForExit();
                                         onSeek(time);

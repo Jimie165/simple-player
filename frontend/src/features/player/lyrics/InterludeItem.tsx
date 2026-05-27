@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { motion } from 'framer-motion';
 import {
     interludeExitCollapseDelayMs,
@@ -12,6 +12,8 @@ const dotIndexes = [0, 1, 2];
 const BREATH_BASE_MS = 4500;
 const BREATH_SCALE_CENTER = 0.95;
 const BREATH_SCALE_AMP = 0.1;
+const BREATH_PHASE_LEAD_MS = 420;
+const DOTS_ENTER_DURATION_MS = 340;
 
 // 离场动画参数
 const EXIT_SCALE_MIN = 0.8;
@@ -35,6 +37,7 @@ interface InterludeItemProps {
     playbackSyncKey: number;
     suppressDots: boolean;
     currentMs: number;
+    preciseMsRef: RefObject<number>;
     startMs: number;
     endMs: number;
 }
@@ -46,10 +49,14 @@ export default function InterludeItem({
     playbackSyncKey,
     suppressDots,
     currentMs,
+    preciseMsRef,
     startMs,
     endMs
 }: InterludeItemProps) {
     const [hasShownDots, setHasShownDots] = useState(false);
+    const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
+    const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const dotsVisibleSinceRef = useRef<number | null>(null);
     const remainingMs = endMs - currentMs;
     const isActuallyActive = isCurrentlyActive && remainingMs > interludeExitDurationMs;
     const isWithinInterludeWindow = currentMs >= startMs && currentMs < endMs;
@@ -83,18 +90,42 @@ export default function InterludeItem({
     }, [areDotsVisible, forceExiting, isWithinInterludeWindow, suppressDots]);
 
     const canPlayDotsExit = !suppressDots && (forceExiting || hasShownDots);
-    const progress = Math.max(0, Math.min(1, (currentMs - startMs) / (endMs - startMs)));
-    const dotOpacities = dotIndexes.map((dotIndex) => {
-        const phaseStart = dotIndex / 3;
-        const normalized = Math.max(0, Math.min(1, (progress - phaseStart) * 3));
-        return 0.24 + normalized * 0.76;
-    });
-    // 呼吸相位：从点出现时开始自然循环，不强制对齐离场时刻
-    // 不同间奏因时长差异，离场时自然处于不同呼吸阶段（峰值或谷值），产生视觉变化
-    const breathStartMs = startMs + interludeGapOpenDurationMs;
-    const elapsedInBreath = Math.max(0, currentMs - breathStartMs);
-    const cycleProgress = (elapsedInBreath % BREATH_BASE_MS) / BREATH_BASE_MS;
-    const currentScale = BREATH_SCALE_CENTER + BREATH_SCALE_AMP * Math.sin(cycleProgress * 2 * Math.PI - Math.PI / 2);
+    useEffect(() => {
+        const container = dotsContainerRef.current;
+        if (!areDotsVisible || !container) return;
+
+        dotsVisibleSinceRef.current = performance.now();
+        let frame: number;
+        const tick = (now: number) => {
+            const preciseMs = preciseMsRef.current;
+            const progress = Math.max(0, Math.min(1, (preciseMs - startMs) / (endMs - startMs)));
+            const breathStartMs = startMs + interludeGapOpenDurationMs;
+            const elapsedInBreath = Math.max(0, preciseMs - breathStartMs + BREATH_PHASE_LEAD_MS);
+            const cycleProgress = (elapsedInBreath % BREATH_BASE_MS) / BREATH_BASE_MS;
+            const breathScale = BREATH_SCALE_CENTER + BREATH_SCALE_AMP * Math.sin(cycleProgress * 2 * Math.PI - Math.PI / 2);
+            const visibleSince = dotsVisibleSinceRef.current ?? now;
+            const enterRaw = Math.max(0, Math.min(1, (now - visibleSince) / DOTS_ENTER_DURATION_MS));
+            const enterEase = 1 - Math.pow(1 - enterRaw, 3);
+            const currentScale = breathScale * enterEase;
+
+            container.style.transform = `scale(${currentScale})`;
+            dotIndexes.forEach((dotIndex) => {
+                const dot = dotRefs.current[dotIndex];
+                if (!dot) return;
+                const phaseStart = dotIndex / 3;
+                const normalized = Math.max(0, Math.min(1, (progress - phaseStart) * 3));
+                dot.style.opacity = `${0.24 + normalized * 0.76}`;
+            });
+
+            frame = requestAnimationFrame(tick);
+        };
+
+        frame = requestAnimationFrame(tick);
+        return () => {
+            dotsVisibleSinceRef.current = null;
+            cancelAnimationFrame(frame);
+        };
+    }, [areDotsVisible, endMs, preciseMsRef, startMs]);
 
     // 离场四阶段关键帧：变白+缩至最小 → 放大至最大 → 缩小消失
     const exitScaleFrames = forceExiting
@@ -114,11 +145,11 @@ export default function InterludeItem({
         >
             <motion.span
                 key={forceExiting ? `force-exit-${forceExitKey}` : 'normal'}
-                className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left"
+                className="origin-left"
                 aria-hidden
                 initial={forceExiting ? { scale: 1 } : { scale: 0 }}
                 animate={areDotsVisible ? {
-                    scale: currentScale
+                    scale: 1
                 } : suppressDots ? {
                     scale: 0
                 } : canPlayDotsExit ? {
@@ -127,41 +158,51 @@ export default function InterludeItem({
                     scale: 0
                 }}
                 transition={areDotsVisible ? {
-                    duration: 0.24,
-                    ease: 'easeOut'
+                    duration: 0,
                 } : {
                     duration: exitDurationSeconds,
                     ease: 'easeInOut',
                     times: exitTimes
                 }}
             >
-                {dotIndexes.map((dotIndex) => (
-                    <motion.span
-                        key={dotIndex}
-                        className="rounded-full bg-white"
-                        style={{
-                            width: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
-                            height: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
-                        }}
-                        initial={{ opacity: forceExiting ? 1 : 0 }}
-                        animate={areDotsVisible ? {
-                            opacity: dotOpacities[dotIndex]
-                        } : suppressDots ? {
-                            opacity: 0
-                        } : canPlayDotsExit ? {
-                            opacity: exitOpacityFrames
-                        } : {
-                            opacity: 0
-                        }}
-                        transition={areDotsVisible ? {
-                            duration: 0.24, ease: 'easeOut'
-                        } : {
-                            duration: exitDurationSeconds,
-                            ease: 'easeInOut',
-                            times: exitTimes
-                        }}
-                    />
-                ))}
+                <span
+                    ref={dotsContainerRef}
+                    className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left"
+                >
+                    {dotIndexes.map((dotIndex) => (
+                        <motion.span
+                            key={dotIndex}
+                            initial={{ opacity: forceExiting ? 1 : 0 }}
+                            animate={areDotsVisible ? {
+                                opacity: 1
+                            } : suppressDots ? {
+                                opacity: 0
+                            } : canPlayDotsExit ? {
+                                opacity: exitOpacityFrames
+                            } : {
+                                opacity: 0
+                            }}
+                            transition={areDotsVisible ? {
+                                duration: 0.24, ease: 'easeOut'
+                            } : {
+                                duration: exitDurationSeconds,
+                                ease: 'easeInOut',
+                                times: exitTimes
+                            }}
+                        >
+                            <span
+                                ref={(node) => {
+                                    dotRefs.current[dotIndex] = node;
+                                }}
+                                className="block rounded-full bg-white"
+                                style={{
+                                    width: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
+                                    height: 'clamp(0.48rem, 1.42vmin, 0.97rem)',
+                                }}
+                            />
+                        </motion.span>
+                    ))}
+                </span>
             </motion.span>
         </div>
     );

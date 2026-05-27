@@ -25,7 +25,10 @@ export default function SongCoverOverlay({
     isActive,
     restartOnPlay = false
 }: SongCoverOverlayProps) {
-    const { metadata, isPlaying, togglePlay, setIsPlaying } = usePlayerStore();
+    const metadata = usePlayerStore(state => state.metadata);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
 
     // Determine if this is the currently active song
     // Prioritize manual isActive prop, then ID match, fallback to path match

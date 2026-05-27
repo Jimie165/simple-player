@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
+import type { RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 
@@ -13,6 +14,7 @@ interface LyricsLineItemProps {
     interludeShiftDurationMs: number;
     lineEndMs: number | null;
     currentTime: number;
+    preciseMsRef: RefObject<number>;
     onSeek: (time: number) => void;
     fluidMotion?: boolean;
     targetScrollY?: number;
@@ -30,6 +32,7 @@ export default function LyricsLineItem({
     interludeShiftDurationMs,
     lineEndMs,
     currentTime,
+    preciseMsRef,
     onSeek,
     fluidMotion = false,
     targetScrollY = 0,
@@ -77,6 +80,7 @@ export default function LyricsLineItem({
                         words={karaokeWords}
                         lineEndMs={lineEndMs}
                         currentMs={isActive ? currentMs : 0}
+                        preciseMsRef={preciseMsRef}
                         isActive={isActive}
                     />
                 ) : (

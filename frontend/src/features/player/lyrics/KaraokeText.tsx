@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useRef, memo } from 'react';
+import { useEffect, useMemo, useRef, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
-import { usePlayerStore } from '@/store/usePlayerStore';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
 
@@ -8,6 +7,7 @@ interface KaraokeTextProps {
     words: LyricsWord[];
     lineEndMs: number | null;
     currentMs: number;
+    preciseMsRef: RefObject<number>;
     isActive: boolean;
 }
 
@@ -16,11 +16,7 @@ type IndexedCharItem = {
     flatIndex: number;
 };
 
-function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, isActive }: KaraokeTextProps) {
-    const isPlaying = usePlayerStore(state => state.isPlaying);
-    const targetMsRef = useRef(baseCurrentMs);
-    const currentMsRef = useRef(baseCurrentMs);
-    const lastTick = useRef(0);
+function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMsRef, isActive }: KaraokeTextProps) {
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -39,13 +35,6 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, isActive 
         });
         return groups;
     }, [flatChars]);
-
-    useEffect(() => {
-        targetMsRef.current = baseCurrentMs;
-        if (Math.abs(baseCurrentMs - currentMsRef.current) > 3000) {
-            currentMsRef.current = baseCurrentMs;
-        }
-    }, [baseCurrentMs]);
 
     // 3. 升级 tick 渲染逻辑至字符级，逐字应用所有原先公式
     useEffect(() => {
@@ -120,23 +109,14 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, isActive 
 
         let frame: number;
 
-        const tick = (now: number) => {
-            if (!lastTick.current) lastTick.current = now;
-            const delta = isPlaying ? now - lastTick.current : 0;
-            lastTick.current = now;
-
-            let nextMs = isPlaying ? currentMsRef.current + delta : targetMsRef.current;
-            const diff = targetMsRef.current - nextMs;
-            if (diff > 50) nextMs += diff * 0.15;
-            currentMsRef.current = nextMs;
-            updateWordStyles(nextMs);
+        const tick = () => {
+            updateWordStyles(preciseMsRef.current);
             frame = requestAnimationFrame(tick);
         };
 
-        lastTick.current = performance.now();
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [isPlaying, flatChars, wordGroups, isActive]);
+    }, [flatChars, isActive, preciseMsRef]);
 
     return (
         <>
@@ -319,6 +299,7 @@ const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
         prev.words === next.words &&
         prev.lineEndMs === next.lineEndMs &&
         prev.currentMs === next.currentMs &&
+        prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive
     );
 });

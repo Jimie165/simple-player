@@ -27,6 +27,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
 
     // Context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
+    const [listMounted, setListMounted] = useState(show);
 
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const headerHeight = 62;
@@ -38,16 +39,38 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         popupMaxHeight - headerHeight
     );
 
+    const scrollCurrentIntoView = useCallback(() => {
+        if (!show) return;
+        if (playlist.length === 0) return;
+        if (currentSongIndex < 0 || currentSongIndex >= playlist.length) return;
+
+        virtuosoRef.current?.scrollToIndex({
+            index: currentSongIndex,
+            align: 'center',
+            behavior: 'auto'
+        });
+    }, [show, playlist.length, currentSongIndex]);
+
+    useEffect(() => {
+        if (!show) return;
+        if (listMounted) return;
+        const rafId = window.requestAnimationFrame(() => setListMounted(true));
+        return () => window.cancelAnimationFrame(rafId);
+    }, [show, listMounted]);
+
     useEffect(() => {
         if (show && playlist.length > 0 && currentSongIndex >= 0 && currentSongIndex < playlist.length) {
             const rafId = window.requestAnimationFrame(() => {
-                virtuosoRef.current?.scrollToIndex({
-                    index: currentSongIndex,
-                    align: 'center',
-                    behavior: 'auto'
-                });
+                scrollCurrentIntoView();
             });
-            return () => window.cancelAnimationFrame(rafId);
+            const timeoutId = window.setTimeout(() => {
+                scrollCurrentIntoView();
+            }, 80);
+
+            return () => {
+                window.cancelAnimationFrame(rafId);
+                window.clearTimeout(timeoutId);
+            };
         }
 
         // Auto-close context menu when popup closes
@@ -55,7 +78,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
             const frame = requestAnimationFrame(() => setContextMenu(null));
             return () => cancelAnimationFrame(frame);
         }
-    }, [show, currentSongIndex, playlist.length]);
+    }, [show, currentSongIndex, playlist.length, scrollCurrentIntoView]);
 
     const handlePlay = useCallback(async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         // In the play queue, we strictly use index to define the "current" playing item.
@@ -172,10 +195,11 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
                         <span>队列为空</span>
                     </div>
                 ) : (
-                    show && (
+                    listMounted && (
                         <Virtuoso
                             ref={virtuosoRef}
                             data={playlist}
+                            initialTopMostItemIndex={currentSongIndex >= 0 ? currentSongIndex : 0}
                             itemContent={renderQueueItem}
                             className="h-full scrollbar-thin"
                             style={{ height: '100%' }}
