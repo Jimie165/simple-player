@@ -98,8 +98,12 @@ export default function InterludeItem({
         let frame: number;
         const tick = (now: number) => {
             const preciseMs = preciseMsRef.current;
-            const progress = Math.max(0, Math.min(1, (preciseMs - startMs) / (endMs - startMs)));
             const breathStartMs = startMs + interludeGapOpenDurationMs;
+            const visibleEndMs = Math.max(breathStartMs, endMs - interludeExitDurationMs);
+            const visibleDurationMs = visibleEndMs - breathStartMs;
+            const progress = visibleDurationMs <= 0
+                ? 1
+                : Math.max(0, Math.min(1, (preciseMs - breathStartMs) / visibleDurationMs));
             const elapsedInBreath = Math.max(0, preciseMs - breathStartMs + BREATH_PHASE_LEAD_MS);
             const cycleProgress = (elapsedInBreath % BREATH_BASE_MS) / BREATH_BASE_MS;
             const breathScale = BREATH_SCALE_CENTER + BREATH_SCALE_AMP * Math.sin(cycleProgress * 2 * Math.PI - Math.PI / 2);
