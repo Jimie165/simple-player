@@ -1,4 +1,12 @@
 import type { LyricsData, LyricsLine, LyricsWord } from '@/types';
+import {
+    LRC_TIMESTAMP_RE,
+    analyzeInlineSquareKaraoke,
+    classifyInlineSquareLine,
+    collectInlineSquareStamps,
+    timestampMs,
+    tokenizeInlineSquare,
+} from '@/utils/inlineSquareKaraoke';
 
 /* ============================================================
  * Script detection helpers — used to tell original lyrics from
@@ -40,29 +48,11 @@ const isHeaderLine = (text: string) => HEADER_PREFIX_RE.test(text);
  * ============================================================ */
 
 const WORD_TIMESTAMP_RE = /<(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?>/g;
-const LRC_TIMESTAMP_RE = /\[(\d{2,}):(\d{2})(?:[.:](\d{2,3}))?\]/g;
 
 interface ExtractedWords {
     words: LyricsWord[];
     cleanText: string;
     endMs: number | null;
-}
-
-interface InlineSquareStamp {
-    idx: number;
-    len: number;
-    ms: number;
-}
-
-interface InlineSquareWords extends ExtractedWords {
-    lineTimeMs: number;
-}
-
-function timestampMs(minutesRaw: string, secondsRaw: string, fractionRaw?: string): number {
-    const minutes = parseInt(minutesRaw, 10);
-    const seconds = parseInt(secondsRaw, 10);
-    const fraction = fractionRaw ? parseInt(fractionRaw.padEnd(3, '0'), 10) : 0;
-    return minutes * 60000 + seconds * 1000 + fraction;
 }
 
 function extractWords(text: string): ExtractedWords | null {
@@ -104,67 +94,6 @@ function extractWords(text: string): ExtractedWords | null {
 
     const cleanText = text.replace(WORD_TIMESTAMP_RE, '').trim();
     return { words, cleanText, endMs };
-}
-
-function inlineSquareStampFromMatch(m: RegExpExecArray): InlineSquareStamp {
-    return {
-        idx: m.index,
-        len: m[0].length,
-        ms: timestampMs(m[1], m[2], m[3]),
-    };
-}
-
-function collectInlineSquareStamps(text: string): InlineSquareStamp[] {
-    const stamps: InlineSquareStamp[] = [];
-    LRC_TIMESTAMP_RE.lastIndex = 0;
-    let m: RegExpExecArray | null;
-    while ((m = LRC_TIMESTAMP_RE.exec(text)) !== null) {
-        stamps.push(inlineSquareStampFromMatch(m));
-    }
-    return stamps;
-}
-
-function isInlineSquareKaraoke(stamps: InlineSquareStamp[], text: string): boolean {
-    if (stamps.length < 2) return false;
-    for (let i = 0; i + 1 < stamps.length; i++) {
-        const between = text.slice(stamps[i].idx + stamps[i].len, stamps[i + 1].idx);
-        if (between.trim().length > 0) return true;
-    }
-    return false;
-}
-
-function tokenizeInlineSquare(stamps: InlineSquareStamp[], text: string): InlineSquareWords | null {
-    if (stamps.length === 0) return null;
-
-    const words: LyricsWord[] = [];
-    let endMs: number | null = null;
-
-    for (let i = 0; i < stamps.length; i++) {
-        const segStart = stamps[i].idx + stamps[i].len;
-        const segEnd = i + 1 < stamps.length ? stamps[i + 1].idx : text.length;
-        const segText = text.slice(segStart, segEnd);
-        if (segText.length === 0) {
-            if (i === stamps.length - 1) endMs = stamps[i].ms;
-            // 连续空时间戳表示前一个单词的精确结束时间
-            if (words.length > 0) {
-                const prevWord = words[words.length - 1];
-                if (prevWord.duration_ms === undefined) {
-                    prevWord.duration_ms = stamps[i].ms - prevWord.time_ms;
-                }
-            }
-            continue;
-        }
-        words.push({ time_ms: stamps[i].ms, text: segText });
-    }
-
-    if (words.length === 0) return null;
-
-    return {
-        words,
-        cleanText: words.map((w) => w.text).join(''),
-        endMs,
-        lineTimeMs: stamps[0].ms,
-    };
 }
 
 /* ============================================================
@@ -275,6 +204,8 @@ function mergeAdjacent(entries: ParseEntry[]): ParseEntry[] {
 export function enrichLyricsLines(lines: LyricsLine[]): LyricsLine[] {
     const timed: ParseEntry[] = [];
     const untimed: LyricsLine[] = [];
+    const forceInlineSquareKaraoke = false;
+    const inlineSquareAnalysis = analyzeInlineSquareKaraoke(lines);
 
     for (const l of lines) {
         if (typeof l.time_ms === 'number') {
@@ -283,19 +214,26 @@ export function enrichLyricsLines(lines: LyricsLine[]): LyricsLine[] {
             // lyrics get the karaoke effect too.
             const extracted = extractWords(l.text);
             const inlineSquareStamps = extracted ? [] : collectInlineSquareStamps(l.text);
+            const inlineSquareDecision = extracted
+                ? { kind: 'none' as const }
+                : classifyInlineSquareLine(inlineSquareStamps, l.text, {
+                    ...inlineSquareAnalysis,
+                    forceInlineSquareKaraoke,
+                });
             const inlineSquare =
-                !extracted && isInlineSquareKaraoke(inlineSquareStamps, l.text)
+                inlineSquareDecision.kind === 'karaoke'
                     ? tokenizeInlineSquare(inlineSquareStamps, l.text)
                     : null;
+            const lineEndOnly = inlineSquareDecision.kind === 'lineEndOnly' ? inlineSquareDecision : null;
             timed.push({
-                time_ms: inlineSquare ? inlineSquare.lineTimeMs : l.time_ms,
-                text: extracted ? extracted.cleanText : (inlineSquare ? inlineSquare.cleanText : l.text),
+                time_ms: lineEndOnly ? lineEndOnly.lineTimeMs : (inlineSquare ? inlineSquare.lineTimeMs : l.time_ms),
+                text: extracted ? extracted.cleanText : (lineEndOnly ? lineEndOnly.cleanText : (inlineSquare ? inlineSquare.cleanText : l.text)),
                 translation: l.translation ?? null,
                 words: extracted ? extracted.words : (inlineSquare ? inlineSquare.words : (l.words ?? null)),
                 end_ms:
                     extracted && extracted.endMs !== null
                         ? extracted.endMs
-                        : (inlineSquare && inlineSquare.endMs !== null ? inlineSquare.endMs : (l.end_ms ?? null)),
+                        : (lineEndOnly ? lineEndOnly.endMs : (inlineSquare && inlineSquare.endMs !== null ? inlineSquare.endMs : (l.end_ms ?? null))),
                 _raw: l.text,
             });
         } else {
@@ -356,6 +294,8 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
     let hasTimestamps = false;
     const entries: ParseEntry[] = [];
     const metaEntries: ParseEntry[] = [];
+    const forceInlineSquareKaraoke = false;
+    const inlineSquareAnalysis = analyzeInlineSquareKaraoke(rawLines);
 
     const metaRegExp = /^\[([a-zA-Z]+):(.*?)\].*/;
 
@@ -372,9 +312,15 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
 
         if (matches.length > 0) {
             hasTimestamps = true;
-            const stamps = matches.map(inlineSquareStampFromMatch);
+            const stamps = collectInlineSquareStamps(text);
+            const inlineSquareDecision = classifyInlineSquareLine(stamps, text, {
+                ...inlineSquareAnalysis,
+                forceInlineSquareKaraoke,
+            });
             const inlineSquare =
-                isInlineSquareKaraoke(stamps, text) ? tokenizeInlineSquare(stamps, text) : null;
+                inlineSquareDecision.kind === 'karaoke'
+                    ? tokenizeInlineSquare(stamps, text)
+                    : null;
             if (inlineSquare) {
                 entries.push({
                     time_ms: inlineSquare.lineTimeMs,
@@ -382,6 +328,17 @@ export function parseLrcStrings(rawLines: LyricsLine[]): LyricsData {
                     translation: null,
                     words: inlineSquare.words,
                     end_ms: inlineSquare.endMs,
+                    _raw: text,
+                });
+                continue;
+            }
+            if (inlineSquareDecision.kind === 'lineEndOnly') {
+                entries.push({
+                    time_ms: inlineSquareDecision.lineTimeMs,
+                    text: inlineSquareDecision.cleanText,
+                    translation: null,
+                    words: null,
+                    end_ms: inlineSquareDecision.endMs,
                     _raw: text,
                 });
                 continue;
