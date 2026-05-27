@@ -20,12 +20,14 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
 
     useEffect(() => {
         if (!songPath || customEnabled) {
-            setEmbeddedLyrics('');
-            return;
+            const frame = requestAnimationFrame(() => setEmbeddedLyrics(''));
+            return () => cancelAnimationFrame(frame);
         }
 
         let cancelled = false;
-        setLoadingEmbedded(true);
+        const loadingFrame = requestAnimationFrame(() => {
+            if (!cancelled) setLoadingEmbedded(true);
+        });
         audioService.getRawLyrics(songPath)
             .then((text) => {
                 if (cancelled) return;
@@ -42,6 +44,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
 
         return () => {
             cancelled = true;
+            cancelAnimationFrame(loadingFrame);
         };
     }, [customEnabled, songPath]);
 

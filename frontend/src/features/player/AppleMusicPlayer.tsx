@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type PointerEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -91,11 +91,15 @@ export default function AppleMusicPlayer({
     const coverScale = isPlaying ? 1 : 0.85;
 
     useEffect(() => {
-        if (isQueueOpen) setQueueMounted(true);
+        if (!isQueueOpen) return;
+        const frame = requestAnimationFrame(() => setQueueMounted(true));
+        return () => cancelAnimationFrame(frame);
     }, [isQueueOpen]);
 
     useEffect(() => {
-        if (isLyricsOpen) setLyricsMounted(true);
+        if (!isLyricsOpen) return;
+        const frame = requestAnimationFrame(() => setLyricsMounted(true));
+        return () => cancelAnimationFrame(frame);
     }, [isLyricsOpen]);
 
     useEffect(() => {
@@ -103,17 +107,21 @@ export default function AppleMusicPlayer({
             queueScrollDidMountRef.current = true;
             return;
         }
-        if (isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
+        if (!isQueueOpen) return;
+        const frame = requestAnimationFrame(() => setQueueScrollToTopSignal((v) => v + 1));
+        return () => cancelAnimationFrame(frame);
     }, [isQueueOpen]);
 
     useEffect(() => {
-        if (isOpen && isQueueOpen) setQueueScrollToTopSignal((v) => v + 1);
+        if (!isOpen || !isQueueOpen) return;
+        const frame = requestAnimationFrame(() => setQueueScrollToTopSignal((v) => v + 1));
+        return () => cancelAnimationFrame(frame);
     }, [isOpen, isQueueOpen]);
 
     useEffect(() => {
-        if (isOpen) {
-            setMarqueeResetToken((v) => v + 1);
-        }
+        if (!isOpen) return;
+        const frame = requestAnimationFrame(() => setMarqueeResetToken((v) => v + 1));
+        return () => cancelAnimationFrame(frame);
     }, [isOpen]);
 
     useEffect(() => {
@@ -124,14 +132,14 @@ export default function AppleMusicPlayer({
         };
     }, []);
 
-    const clearNarrowControlsHideTimer = () => {
+    const clearNarrowControlsHideTimer = useCallback(() => {
         if (narrowControlsHideTimeoutRef.current !== null) {
             window.clearTimeout(narrowControlsHideTimeoutRef.current);
             narrowControlsHideTimeoutRef.current = null;
         }
-    };
+    }, []);
 
-    const hideNarrowControlsLater = () => {
+    const hideNarrowControlsLater = useCallback(() => {
         clearNarrowControlsHideTimer();
         narrowControlsHideTimeoutRef.current = window.setTimeout(() => {
             if (isPointerInsideNarrowControlsRef.current) {
@@ -141,9 +149,9 @@ export default function AppleMusicPlayer({
             setNarrowControlsVisible(false);
             narrowControlsHideTimeoutRef.current = null;
         }, 2500);
-    };
+    }, [clearNarrowControlsHideTimer]);
 
-    const revealNarrowControls = (autoHide = true) => {
+    const revealNarrowControls = useCallback((autoHide = true) => {
         upwardScrollRevealDistanceRef.current = 0;
         setNarrowControlsVisible(true);
         if (!isNarrowPanelLayout) return;
@@ -152,14 +160,14 @@ export default function AppleMusicPlayer({
             return;
         }
         clearNarrowControlsHideTimer();
-    };
+    }, [clearNarrowControlsHideTimer, hideNarrowControlsLater, isNarrowPanelLayout]);
 
-    const hideNarrowControlsNow = () => {
+    const hideNarrowControlsNow = useCallback(() => {
         clearNarrowControlsHideTimer();
         isPointerInsideNarrowControlsRef.current = false;
         upwardScrollRevealDistanceRef.current = 0;
         setNarrowControlsVisible(false);
-    };
+    }, [clearNarrowControlsHideTimer]);
 
     const handleNarrowPanelScroll = (direction: 'up' | 'down', delta = 16) => {
         if (!isNarrowPanelLayout) return;
@@ -219,16 +227,17 @@ export default function AppleMusicPlayer({
 
     useEffect(() => {
         if (isOpen && isNarrowPanelLayout) {
-            revealNarrowControls();
-            return;
+            const frame = requestAnimationFrame(() => revealNarrowControls());
+            return () => cancelAnimationFrame(frame);
         }
         if (narrowControlsHideTimeoutRef.current !== null) {
             window.clearTimeout(narrowControlsHideTimeoutRef.current);
             narrowControlsHideTimeoutRef.current = null;
         }
         isPointerInsideNarrowControlsRef.current = false;
-        setNarrowControlsVisible(true);
-    }, [isOpen, isNarrowPanelLayout, isQueueOpen, isLyricsOpen]);
+        const frame = requestAnimationFrame(() => setNarrowControlsVisible(true));
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, isNarrowPanelLayout, isQueueOpen, isLyricsOpen, revealNarrowControls]);
 
     useEffect(() => {
         if (metadata?.path && metadata.path !== lyricsPath) {
@@ -453,8 +462,11 @@ export default function AppleMusicPlayer({
 
     useEffect(() => {
         if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
-        resetPanelFlipState();
-        setLyricsPanelOpen(false);
+        const frame = requestAnimationFrame(() => {
+            resetPanelFlipState();
+            setLyricsPanelOpen(false);
+        });
+        return () => cancelAnimationFrame(frame);
     }, [lyricsStatus, isLyricsOpen]);
 
     // Fullscreen Logic
@@ -509,13 +521,24 @@ export default function AppleMusicPlayer({
     // Auto-exit fullscreen on close
     useEffect(() => {
         if (!isOpen && isFullscreen) {
-            const appWindow = getCurrentWindow();
-            appWindow.setFullscreen(false).catch(console.error);
-            if (wasMaximizedBeforeFullscreenRef.current) {
-                appWindow.maximize().catch(console.error);
-                wasMaximizedBeforeFullscreenRef.current = false;
-            }
-            setIsFullscreen(false);
+            let cancelled = false;
+            const closeFullscreen = async () => {
+                const appWindow = getCurrentWindow();
+                try {
+                    await appWindow.setFullscreen(false);
+                    if (wasMaximizedBeforeFullscreenRef.current) {
+                        await appWindow.maximize();
+                        wasMaximizedBeforeFullscreenRef.current = false;
+                    }
+                } catch (error) {
+                    console.error(error);
+                }
+                if (!cancelled) setIsFullscreen(false);
+            };
+            closeFullscreen();
+            return () => {
+                cancelled = true;
+            };
         }
     }, [isOpen, isFullscreen]);
 

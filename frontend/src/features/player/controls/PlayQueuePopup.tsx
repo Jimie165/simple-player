@@ -28,15 +28,6 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
     // Context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
 
-    const contextMenuOps = useSongOperations({
-        items: contextMenu ? [contextMenu.song] : [],
-        context: 'queue',
-        onPlay: contextMenu ? () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }) : undefined,
-        onDelete: contextMenu ? () => removeSongFromPlaylistByIndex(contextMenu.index) : undefined,
-        onNavigate: onNavigateClose,
-        hideSelect: true
-    });
-
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const headerHeight = 62;
     const rowHeight = 56; // 40px content + p-2 (16px) = 56px per row
@@ -66,7 +57,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         }
     }, [show, currentSongIndex, playlist.length]);
 
-    const handlePlay = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
+    const handlePlay = useCallback(async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         // In the play queue, we strictly use index to define the "current" playing item.
         // This allows multiple instances of the same song to coexist and be handled separately.
         if (index === currentSongIndex && !options?.restartIfCurrent) {
@@ -78,9 +69,18 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         restartSong();
 
         await playQueueItem({ song, index, restartIfCurrent: options?.restartIfCurrent });
-    };
+    }, [currentSongIndex, playQueueItem, restartSong, togglePlay]);
 
-    const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
+    const contextMenuOps = useSongOperations({
+        items: contextMenu ? [contextMenu.song] : [],
+        context: 'queue',
+        onPlay: contextMenu ? () => handlePlay(contextMenu.song, contextMenu.index, { restartIfCurrent: true }) : undefined,
+        onDelete: contextMenu ? () => removeSongFromPlaylistByIndex(contextMenu.index) : undefined,
+        onNavigate: onNavigateClose,
+        hideSelect: true
+    });
+
+    const handleContextMenu = useCallback((e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
         e.stopPropagation();
 
@@ -92,7 +92,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         }));
 
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
-    };
+    }, []);
 
     const renderQueueItem = useCallback((index: number, song: SongMetadata) => {
         const isCurrent = index === currentSongIndex;
@@ -144,7 +144,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
                 </div>
             </div>
         );
-    }, [currentSongIndex, onNavigateClose, removeSongFromPlaylistByIndex]);
+    }, [currentSongIndex, handleContextMenu, handlePlay, onNavigateClose, removeSongFromPlaylistByIndex]);
 
 
 

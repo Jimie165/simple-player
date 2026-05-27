@@ -357,7 +357,7 @@ export default function LyricsPanel({
                         initialTopMostItemIndex={{
                             index: activeDisplayIndex,
                             align: 'center',
-                            offset: getAutoScrollOffset(activeDisplayIndex),
+                            offset: 0,
                         }}
                         defaultItemHeight={90}
                         increaseViewportBy={{ top: 520, bottom: 520 }}

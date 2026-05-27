@@ -195,7 +195,7 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, isActive 
                             let hasProgress = false;
 
                             if (isActive) {
-                                const renderCurrentMs = currentMsRef.current;
+                                const renderCurrentMs = baseCurrentMs;
                                 const { time_ms, durationMs, groupStartMs, groupEndMs, groupDurationMs } = charItem;
 
                                 const rawProgress = (renderCurrentMs - time_ms) / durationMs;

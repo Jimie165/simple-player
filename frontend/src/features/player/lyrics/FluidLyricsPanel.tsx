@@ -165,7 +165,7 @@ export default function FluidLyricsPanel({
         if (contentRef.current) resizeObserver.observe(contentRef.current);
 
         return () => resizeObserver.disconnect();
-    }, [displayItems]);
+    }, [displayItems, variant]);
 
     useEffect(() => {
         firstPositionDoneRef.current = false;
