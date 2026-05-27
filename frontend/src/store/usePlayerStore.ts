@@ -10,6 +10,9 @@ interface PlayerState {
     volume: number;
     metadata: SongMetadata | null;
     isAudioLoaded: boolean;
+    currentTime: number;
+    playbackPath: string | null;
+    playbackRevision: number;
 
     isShuffling: boolean;      // 随机状态
     repeatMode: RepeatMode;    // 循环模式
@@ -19,6 +22,8 @@ interface PlayerState {
     setVolume: (volume: number) => void;
     setMetadata: (metadata: SongMetadata | null) => void;
     setAudioLoaded: (loaded: boolean) => void;
+    setPlaybackTime: (time: number) => void;
+    resetPlaybackClock: (path?: string | null) => void;
 
     // 辅助 Setter (给 Library 用)
     setShuffleState: (state: boolean) => void;
@@ -88,6 +93,9 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     volume: 70,
     metadata: null,
     isAudioLoaded: false,
+    currentTime: 0,
+    playbackPath: null,
+    playbackRevision: 0,
     isShuffling: false,
     repeatMode: 'off',
     isQueueOpen: false,
@@ -107,6 +115,14 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setMetadata: (metadata) => set({ metadata }),
     setAudioLoaded: (loaded) => set({ isAudioLoaded: loaded }),
+    setPlaybackTime: (time) => set({
+        currentTime: Number.isFinite(time) ? Math.max(0, time) : 0,
+    }),
+    resetPlaybackClock: (path) => set((state) => ({
+        currentTime: 0,
+        playbackPath: path ?? null,
+        playbackRevision: state.playbackRevision + 1,
+    })),
     setVolume: (volume) => {
         set({ volume });
         audioService.setVolume(volume / 100);
@@ -176,7 +192,13 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
                 const { isAudioLoaded, metadata } = get();
                 if (!isAudioLoaded && metadata && metadata.path) {
                     await audioService.play(metadata.path, metadata);
-                    set({ isPlaying: true, isAudioLoaded: true });
+                    set((state) => ({
+                        isPlaying: true,
+                        isAudioLoaded: true,
+                        currentTime: 0,
+                        playbackPath: metadata.path ?? null,
+                        playbackRevision: state.playbackRevision + 1,
+                    }));
                     get().requestLyricsForPath(metadata.path);
                 } else {
                     await audioService.resume();
@@ -224,7 +246,11 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
 
         try {
             const data = await audioService.getLyrics(path);
-            if (get().lyricsRequestId !== requestId) return;
+            const currentState = get();
+            if (
+                currentState.lyricsRequestId !== requestId ||
+                currentState.metadata?.path !== path
+            ) return;
 
             const lines = sanitizeLyricsLines(data);
             if (!lines) {

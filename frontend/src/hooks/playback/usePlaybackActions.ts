@@ -58,6 +58,8 @@ export function usePlaybackActions() {
         restartSong,
         toggleShuffle: togglePlayerShuffle,
         setAudioLoaded,
+        setPlaybackTime,
+        resetPlaybackClock,
         requestLyricsForPath,
     } = usePlayerStore();
 
@@ -86,10 +88,12 @@ export function usePlaybackActions() {
         try {
             if (isCurrent && options?.restartIfCurrent) {
                 const actualTime = await audioService.seek(0);
+                setPlaybackTime(actualTime);
                 window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
 
             await audioService.play(song.path, song);
+            resetPlaybackClock(song.path);
             setMetadata(song);
             setIsPlaying(true);
             setAudioLoaded(true);
@@ -205,9 +209,11 @@ export function usePlaybackActions() {
         try {
             if (index === currentSongIndex && restartIfCurrent) {
                 const actualTime = await audioService.seek(0);
+                setPlaybackTime(actualTime);
                 window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
             await audioService.play(song.path, song);
+            resetPlaybackClock(song.path);
             setCurrentSongIndex(index);
             setMetadata(song);
             setIsPlaying(true);
@@ -229,6 +235,7 @@ export function usePlaybackActions() {
         }
 
         const actualTime = await audioService.seek(time);
+        setPlaybackTime(actualTime);
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
         return actualTime;
     };

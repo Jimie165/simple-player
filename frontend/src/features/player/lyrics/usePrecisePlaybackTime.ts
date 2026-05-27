@@ -3,6 +3,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 
 export function usePrecisePlaybackTime(currentTime: number) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
+    const playbackRevision = usePlayerStore(state => state.playbackRevision);
     const [preciseMs, setPreciseMs] = useState(currentTime * 1000);
     const lastTick = useRef(0);
     const lastExternalMs = useRef(currentTime * 1000);
@@ -17,7 +18,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
         const diff = Math.abs(externalMs - lastExternalMs.current);
         let frame: number | null = null;
 
-        if (diff > 1000) {
+        if (diff > 120 || !isPlaying) {
             frame = requestAnimationFrame(() => setPreciseMs(externalMs));
         }
         lastExternalMs.current = externalMs;
@@ -25,7 +26,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
         return () => {
             if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [currentTime]);
+    }, [currentTime, isPlaying]);
 
     useEffect(() => {
         const syncFrame = requestAnimationFrame(() => {
@@ -39,7 +40,13 @@ export function usePrecisePlaybackTime(currentTime: number) {
         const tick = (now: number) => {
             const delta = now - lastTick.current;
             lastTick.current = now;
-            setPreciseMs(prev => prev + delta);
+            setPreciseMs(prev => {
+                const advancedMs = prev + delta;
+                const externalMs = currentTimeRef.current * 1000;
+                const driftMs = externalMs - advancedMs;
+                if (Math.abs(driftMs) > 500) return externalMs;
+                return advancedMs + driftMs * 0.08;
+            });
             frame = requestAnimationFrame(tick);
         };
 
@@ -49,7 +56,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
             cancelAnimationFrame(syncFrame);
             cancelAnimationFrame(frame);
         };
-    }, [isPlaying]);
+    }, [isPlaying, playbackRevision]);
 
     return preciseMs;
 }

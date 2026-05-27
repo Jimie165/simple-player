@@ -27,13 +27,16 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         toggleRepeat,
         setMetadata,
         setAudioLoaded,
-        restartTrigger // Destructure trigger
+        restartTrigger, // Destructure trigger
+        currentTime,
+        setPlaybackTime,
+        resetPlaybackClock,
+        requestLyricsForPath,
     } = usePlayerStore();
 
     const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory } = useLibraryStore();
     const { toggleShuffle, seek } = usePlaybackActions();
 
-    const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [isRemoteDragging, setIsRemoteDragging] = useState(false);
 
@@ -70,8 +73,9 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
             // 2. 成功后更新 UI (Update UI Later)
             setMetadata(song);
             setCurrentSongIndex(index);
-            setCurrentTime(0); // 放在成功后，避免视觉跳动
+            resetPlaybackClock(song.path);
             window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
+            requestLyricsForPath(song.path);
 
             if (autoPlay) {
                 setIsPlaying(true);
@@ -112,7 +116,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         // 3秒规则
         if (currentTime > 3) {
             const actualTime = await seek(0);
-            setCurrentTime(actualTime);
+            setPlaybackTime(actualTime);
             return;
         }
 
@@ -192,7 +196,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         const handleSeekEvent = (event: Event) => {
             const detail = (event as CustomEvent<{ time?: unknown }>).detail;
             if (detail && typeof detail.time === 'number') {
-                setCurrentTime(detail.time);
+                setPlaybackTime(detail.time);
             }
         };
         const handleRemoteDraggingEvent = (event: Event) => {
@@ -264,7 +268,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
                     try {
                         const actualTime = await audioService.seek(requestedTime);
-                        setCurrentTime(actualTime);
+                        setPlaybackTime(actualTime);
                         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
                     } catch (error) {
                         console.error("SMTC seek failed:", error);
@@ -314,7 +318,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
             window.removeEventListener('playback:seeked', handleSeekEvent);
             window.removeEventListener('playback:dragging', handleRemoteDraggingEvent);
         };
-    }, [setIsPlaying]); // 依赖项始终为空，只在挂载/卸载时执行
+    }, [setIsPlaying, setPlaybackTime]);
 
     // --- 自动播放监听 ---
     // --- 进度条更新与兜底检测 ---
@@ -324,13 +328,14 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         if (isPlaying && !isDragging && !isRemoteDragging) {
             // 改为 500ms 更新一次，响应更灵敏
             interval = window.setInterval(() => {
-                setCurrentTime((prev) => {
+                usePlayerStore.setState((state) => {
+                    const prev = state.currentTime;
                     // 兜底检测 (防止后端事件丢失)
                     if (metadata && metadata.duration > 0 && prev >= metadata.duration - 0.5) {
                         handleSongEndedRef.current();
-                        return 0;
+                        return { currentTime: 0 };
                     }
-                    return prev + 0.5;
+                    return { currentTime: prev + 0.5 };
                 });
             }, 500);
         }
@@ -349,7 +354,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         const songChanged = songKey !== prevSongKeyRef.current;
 
         if (restartChanged || songChanged) {
-            setCurrentTime(0);
+            resetPlaybackClock(metadata?.path ?? null);
             window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
             // 这里也加一道解锁保险
             isAutoChanging.current = false;
@@ -357,13 +362,13 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
         prevRestartRef.current = restartTrigger;
         prevSongKeyRef.current = songKey;
-    }, [metadata, restartTrigger]);
+    }, [metadata, restartTrigger, resetPlaybackClock]);
 
     // 拖拽处理
     const handleSeekStart = () => setIsDragging(true);
     const handleSeekChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const time = Number(e.target.value);
-        setCurrentTime(time);
+        setPlaybackTime(time);
         // Real-time sync for other components (like immersive player)
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time } }));
     };
@@ -371,7 +376,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         const newTime = Number((e.currentTarget as HTMLInputElement).value);
         setIsDragging(false);
         const actualTime = await seek(newTime); // Use hook action to ensure consistent behavior & event dispatch
-        setCurrentTime(actualTime);
+        setPlaybackTime(actualTime);
     };
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
     const displayCurrentTime = Math.max(0, Math.floor(currentTime));

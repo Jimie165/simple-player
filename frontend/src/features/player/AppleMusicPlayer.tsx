@@ -54,6 +54,8 @@ export default function AppleMusicPlayer({
         lyricsStatus,
         lyricsHasTimestamps,
         lyricsPath,
+        currentTime,
+        setPlaybackTime,
         requestLyricsForPath,
     } = usePlayerStore();
     const { playerEffectMode } = useTheme();
@@ -62,7 +64,6 @@ export default function AppleMusicPlayer({
 
     const displayVolume = isVolumeDragging ? localVolume : volume;
 
-    const [currentTime, setCurrentTime] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [bgImageSrc, setBgImageSrc] = useState<string | null>(null);
     // Removed: const [showQueue, setShowQueue] = useState(false);
@@ -285,7 +286,7 @@ export default function AppleMusicPlayer({
         // We can get the current time from the audio service directly to prevent reset
         const syncTime = async () => {
             const t = await audioService.getCurrentTime();
-            setCurrentTime(t);
+            setPlaybackTime(t);
         };
         syncTime();
 
@@ -293,7 +294,7 @@ export default function AppleMusicPlayer({
         const handleSeekEvent = (event: Event) => {
             const detail = (event as CustomEvent<{ time?: unknown }>).detail;
             if (detail && typeof detail.time === 'number') {
-                setCurrentTime(detail.time);
+                setPlaybackTime(detail.time);
             }
         };
         window.addEventListener('playback:seeked', handleSeekEvent);
@@ -301,7 +302,7 @@ export default function AppleMusicPlayer({
         return () => {
             window.removeEventListener('playback:seeked', handleSeekEvent);
         };
-    }, [metadata, isOpen]); // Run on mount, song change, or when player opens
+    }, [metadata, isOpen, setPlaybackTime]); // Run on mount, song change, or when player opens
 
     const handleVolumeChange = (val: number) => {
         setLocalVolume(val);
@@ -336,36 +337,24 @@ export default function AppleMusicPlayer({
 
 
 
-    // Progress Logic with Auto-Sync
+    // Progress Logic with Auto-Sync. The bottom playback controls own the
+    // frontend clock tick; this mounted overlay only corrects drift from backend.
     useEffect(() => {
         let interval: ReturnType<typeof setInterval>;
-        let tickCount = 0;
 
         if (isPlaying && !isDragging) {
             interval = setInterval(() => {
-                tickCount++;
-
-                // Every 4 ticks (2 seconds), sync with backend to correct drift or handle loop reset
-                if (tickCount % 4 === 0) {
-                    audioService.getCurrentTime().then(t => {
-                        // Only update if difference is significant (>0.5s) or if it looped (decreased)
-                        setCurrentTime(prev => {
-                            if (t < prev - 1 || Math.abs(t - prev) > 0.5) return t;
-                            return prev + 0.5;
-                        });
-                    }).catch((error) => console.warn('Failed to sync playback time', error));
-                } else {
-                    setCurrentTime(prev => {
-                        // If we are past estimated duration, wait for PlaybackControls to handle song end and dispatch seeked event
-                        if (metadata && metadata.duration > 0 && prev >= metadata.duration) return metadata.duration;
-                        // Just increment
-                        return prev + 0.5;
+                audioService.getCurrentTime().then(t => {
+                    usePlayerStore.setState((state) => {
+                        const prev = state.currentTime;
+                        if (t < prev - 0.75 || Math.abs(t - prev) > 0.75) return { currentTime: t };
+                        return {};
                     });
-                }
-            }, 500);
+                }).catch((error) => console.warn('Failed to sync playback time', error));
+            }, 1000);
         }
         return () => clearInterval(interval);
-    }, [isPlaying, isDragging, metadata]);
+    }, [isPlaying, isDragging]);
 
     // Reset time on song change
     // useEffect(() => {
@@ -381,7 +370,7 @@ export default function AppleMusicPlayer({
     };
 
     const handleSeekChange = (val: number) => {
-        setCurrentTime(val);
+        setPlaybackTime(val);
         // Dispatch event for real-time sync with external player
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: val } }));
     };
@@ -389,7 +378,7 @@ export default function AppleMusicPlayer({
     const handleSeekEnd = async () => {
         setIsDragging(false);
         const actualTime = await seek(currentTime);
-        setCurrentTime(actualTime);
+        setPlaybackTime(actualTime);
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };
 
