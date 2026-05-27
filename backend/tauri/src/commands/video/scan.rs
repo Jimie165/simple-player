@@ -36,6 +36,12 @@ struct VideoWorkItem {
     should_restore: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum VideoRefreshMode {
+    Incremental,
+    ForceReextract,
+}
+
 struct VideoWorkResult {
     item: VideoWorkItem,
     meta: Option<video_scanner::RawVideoMetadata>,
@@ -138,11 +144,12 @@ fn process_video_metadata_parallel(
 }
 
 /// 内部扫描函数
-pub(crate) fn scan_videos_internal(
+fn scan_videos_internal(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
     force_restore: bool,
     restore_folder_id: Option<i64>,
+    refresh_mode: VideoRefreshMode,
 ) -> Result<Vec<Video>, String> {
     let (folders, ignored_dirs): (Vec<_>, Vec<String>) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -192,7 +199,10 @@ pub(crate) fn scan_videos_internal(
                                 should_restore: true,
                             });
                         }
-                    } else if existing.duration == 0 {
+                    } else if refresh_mode == VideoRefreshMode::ForceReextract
+                        || existing.duration == 0
+                        || existing.thumbnail_path.is_none()
+                    {
                         // 如果时长为 0，说明可能是占位符或者之前的扫描不完整，强制重新扫描
                         work_items.push(VideoWorkItem {
                             path: file_path,
@@ -254,7 +264,15 @@ pub fn scan_videos(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<Video>, String> {
-    scan_videos_internal(db, app_handle, false, None)
+    let videos = scan_videos_internal(
+        db,
+        app_handle.clone(),
+        false,
+        None,
+        VideoRefreshMode::ForceReextract,
+    )?;
+    let _ = app_handle.emit("video_scan_complete", ScanCompletePayload { folder_id: 0 });
+    Ok(videos)
 }
 
 /// 添加文件夹到视频库
@@ -357,7 +375,13 @@ pub async fn add_video_folder(
         let db_state = app_handle.state::<DbState>();
         // Re-use logic: scan_videos_internal will pick up placeholder items (duration=0) and process them
         let result =
-            scan_videos_internal(db_state, app_handle.clone(), true, Some(added_folder_id));
+            scan_videos_internal(
+                db_state,
+                app_handle.clone(),
+                true,
+                Some(added_folder_id),
+                VideoRefreshMode::Incremental,
+            );
         if result.is_ok() {
             let _ = app_handle.emit(
                 "video_scan_complete",

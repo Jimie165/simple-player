@@ -32,6 +32,12 @@ struct SongWorkItem {
     is_new: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MetadataRefreshMode {
+    Incremental,
+    ForceReextract,
+}
+
 struct SongWorkResult {
     item: SongWorkItem,
     meta: Option<SongMetadata>,
@@ -199,6 +205,7 @@ async fn scan_library_internal(
     app_handle: tauri::AppHandle,
     force_restore: bool,
     restore_folder_id: Option<i64>,
+    refresh_mode: MetadataRefreshMode,
 ) -> Result<Vec<SongMetadata>, String> {
     let app_cache_dir = app_handle
         .path()
@@ -267,6 +274,17 @@ async fn scan_library_internal(
                                 is_new: false,
                             });
                         }
+                        continue;
+                    }
+
+                    if refresh_mode == MetadataRefreshMode::ForceReextract {
+                        work_items.push(SongWorkItem {
+                            path: file,
+                            folder_id: folder.id,
+                            existing_id: Some(existing.id),
+                            should_restore: false,
+                            is_new: false,
+                        });
                         continue;
                     }
 
@@ -471,8 +489,14 @@ pub async fn add_library_folder(
     let app_handle = app_handle.clone();
     tauri::async_runtime::spawn(async move {
         let db_state = app_handle.state::<DbState>();
-        let result =
-            scan_library_internal(db_state, app_handle.clone(), true, Some(added_folder_id)).await;
+        let result = scan_library_internal(
+            db_state,
+            app_handle.clone(),
+            true,
+            Some(added_folder_id),
+            MetadataRefreshMode::Incremental,
+        )
+        .await;
         if result.is_ok() {
             let _ = app_handle.emit(
                 "library_scan_complete",
@@ -508,7 +532,14 @@ pub async fn scan_library(
     app_handle: tauri::AppHandle,
     force_restore: bool,
 ) -> Result<Vec<SongMetadata>, String> {
-    scan_library_internal(db, app_handle, force_restore, None).await
+    scan_library_internal(
+        db,
+        app_handle,
+        force_restore,
+        None,
+        MetadataRefreshMode::Incremental,
+    )
+    .await
 }
 
 /// 获取库中所有缓存的歌曲（不重新扫描）
@@ -534,8 +565,21 @@ pub async fn refresh_library(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
 ) -> Result<Vec<SongMetadata>, String> {
-    // 直接扫描，force_restore = false (尊重归档)
-    scan_library(db, app_handle, false).await
+    let songs = scan_library_internal(
+        db,
+        app_handle.clone(),
+        false,
+        None,
+        MetadataRefreshMode::ForceReextract,
+    )
+    .await?;
+
+    let _ = app_handle.emit(
+        "library_scan_complete",
+        ScanCompletePayload { folder_id: 0 },
+    );
+
+    Ok(songs)
 }
 
 /// 从库中删除单首歌曲（同时清理收藏、播放列表关联等状态）
