@@ -184,7 +184,11 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         try {
             if (isPlaying) {
                 await audioService.pause();
-                set({ isPlaying: false });
+                const currentTime = await audioService.getCurrentTime().catch(() => get().currentTime);
+                set({
+                    isPlaying: false,
+                    currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : get().currentTime,
+                });
             } else {
                 // Check if audio is loaded. If not (and we have metadata), we must PLAY first to load it.
                 // This happens when app restarts: metadata is restored but backend audio is empty.

@@ -133,6 +133,12 @@ body {
   cursor: default;
 }
 
+:where(button, [role="button"]):focus,
+:where(button, [role="button"]):focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
 /* Apple Music style fluid background tuning */
 .am-fluid-canvas {
   filter: blur(4px) saturate(1.25) contrast(1.08);

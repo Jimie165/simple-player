@@ -254,7 +254,13 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
                 const pauseFn = await listen('smtc:pause', async () => {
                     await audioService.pause();
-                    setIsPlaying(false);
+                    const currentTime = await audioService.getCurrentTime().catch(() => usePlayerStore.getState().currentTime);
+                    usePlayerStore.setState({
+                        isPlaying: false,
+                        currentTime: Number.isFinite(currentTime)
+                            ? Math.max(0, currentTime)
+                            : usePlayerStore.getState().currentTime,
+                    });
                 });
                 if (isMounted) {
                     unlistenPause = pauseFn;
