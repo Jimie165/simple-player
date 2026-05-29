@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type PointerEvent } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, type PointerEvent } from 'react';
 import clsx from 'clsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getCurrentWindow } from '@tauri-apps/api/window';
@@ -81,6 +81,8 @@ export default function AppleMusicPlayer({
     const panelFlipRafRef = useRef<number | null>(null);
     const panelFlipTimeoutRef = useRef<number | null>(null);
     const panelFlipSequenceRef = useRef(0);
+    const panelCloseRafRef = useRef<number | null>(null);
+    const [closingPanel, setClosingPanel] = useState<SidePanel | null>(null);
     const [narrowControlsVisible, setNarrowControlsVisible] = useState(true);
     const narrowControlsHideTimeoutRef = useRef<number | null>(null);
     const narrowControlsRef = useRef<HTMLDivElement | null>(null);
@@ -101,6 +103,18 @@ export default function AppleMusicPlayer({
         const frame = requestAnimationFrame(() => setLyricsMounted(true));
         return () => cancelAnimationFrame(frame);
     }, [isLyricsOpen]);
+
+    useEffect(() => {
+        if (mainContentWidth >= 520) {
+            setClosingPanel(null);
+        }
+    }, [mainContentWidth]);
+
+    useEffect(() => {
+        if (!closingPanel || isNarrowPanelLayout) return;
+        const frame = requestAnimationFrame(() => setClosingPanel(null));
+        return () => cancelAnimationFrame(frame);
+    }, [closingPanel, isNarrowPanelLayout]);
 
     useEffect(() => {
         if (!queueScrollDidMountRef.current) {
@@ -128,6 +142,7 @@ export default function AppleMusicPlayer({
         return () => {
             if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
             if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
+            if (panelCloseRafRef.current !== null) window.cancelAnimationFrame(panelCloseRafRef.current);
             if (narrowControlsHideTimeoutRef.current !== null) window.clearTimeout(narrowControlsHideTimeoutRef.current);
         };
     }, []);
@@ -393,6 +408,10 @@ export default function AppleMusicPlayer({
 
     const startPanelFlip = (target: SidePanel, toggle: () => void) => {
         const sequence = ++panelFlipSequenceRef.current;
+        if (panelCloseRafRef.current !== null) {
+            window.cancelAnimationFrame(panelCloseRafRef.current);
+            panelCloseRafRef.current = null;
+        }
         if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
         if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
 
@@ -426,6 +445,13 @@ export default function AppleMusicPlayer({
         setPanelFlipTarget(null);
     };
 
+    const cancelPendingPanelClose = () => {
+        if (panelCloseRafRef.current !== null) {
+            window.cancelAnimationFrame(panelCloseRafRef.current);
+            panelCloseRafRef.current = null;
+        }
+    };
+
     const setQueuePanelOpen = (open: boolean) => {
         usePlayerStore.setState((state) => ({
             isQueueOpen: open,
@@ -440,33 +466,67 @@ export default function AppleMusicPlayer({
         }));
     };
 
+    const closePanel = (panel: SidePanel) => {
+        cancelPendingPanelClose();
+        resetPanelFlipState();
+        if (mainContentWidth < 520) {
+            setClosingPanel(panel);
+            panelCloseRafRef.current = window.requestAnimationFrame(() => {
+                panelCloseRafRef.current = null;
+                if (panel === 'queue') {
+                    setQueuePanelOpen(false);
+                    return;
+                }
+                setLyricsPanelOpen(false);
+            });
+            return;
+        }
+        if (panel === 'queue') {
+            setQueuePanelOpen(false);
+            return;
+        }
+        setLyricsPanelOpen(false);
+    };
+
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
         if (isLyricsOpen && !isQueueOpen) {
+            cancelPendingPanelClose();
+            setClosingPanel(null);
             startPanelFlip('queue', () => setQueuePanelOpen(true));
             return;
         }
+        if (isQueueOpen) {
+            closePanel('queue');
+            return;
+        }
         resetPanelFlipState();
-        setQueuePanelOpen(!isQueueOpen);
+        cancelPendingPanelClose();
+        setClosingPanel(null);
+        setQueuePanelOpen(true);
     };
 
     const handleToggleLyrics = () => {
         if (!lyricsMounted) setLyricsMounted(true);
         if (isQueueOpen && !isLyricsOpen) {
+            cancelPendingPanelClose();
+            setClosingPanel(null);
             startPanelFlip('lyrics', () => setLyricsPanelOpen(true));
             return;
         }
+        if (isLyricsOpen) {
+            closePanel('lyrics');
+            return;
+        }
         resetPanelFlipState();
-        setLyricsPanelOpen(!isLyricsOpen);
+        cancelPendingPanelClose();
+        setClosingPanel(null);
+        setLyricsPanelOpen(true);
     };
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
-        const frame = requestAnimationFrame(() => {
-            resetPanelFlipState();
-            setLyricsPanelOpen(false);
-        });
-        return () => cancelAnimationFrame(frame);
+        closePanel('lyrics');
     }, [lyricsStatus, isLyricsOpen]);
 
     // Fullscreen Logic
@@ -590,7 +650,10 @@ export default function AppleMusicPlayer({
                             key="narrow-panel-layout"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
+                            exit={{
+                                opacity: 0,
+                                transition: { duration: closingPanel ? 0.35 : 0.2, ease: 'easeOut' },
+                            }}
                             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
                             className="absolute inset-0 z-20 flex flex-col px-5 pb-5"
                         >
@@ -635,33 +698,37 @@ export default function AppleMusicPlayer({
                             </div>
 
                             <div className="relative flex-1 min-h-0">
-                                <ApplePlayerQueuePanel
-                                    variant="narrow"
-                                    isQueueOpen={isQueueOpen}
-                                    queueMounted={queueMounted}
-                                    panelFlipTarget={panelFlipTarget}
-                                    isPanelFlipping={isPanelFlipping}
-                                    onClose={onClose}
-                                    queueScrollToTopSignal={queueScrollToTopSignal}
-                                    onUserScrollDirection={handleNarrowPanelScroll}
-                                    narrowControlsVisible={narrowControlsVisible}
-                                />
+                                {!closingPanel && (
+                                    <>
+                                        <ApplePlayerQueuePanel
+                                            variant="narrow"
+                                            isQueueOpen={isQueueOpen}
+                                            queueMounted={queueMounted}
+                                            panelFlipTarget={panelFlipTarget}
+                                            isPanelFlipping={isPanelFlipping}
+                                            onClose={onClose}
+                                            queueScrollToTopSignal={queueScrollToTopSignal}
+                                            onUserScrollDirection={handleNarrowPanelScroll}
+                                            narrowControlsVisible={narrowControlsVisible}
+                                        />
 
-                                <ApplePlayerLyricsPanel
-                                    variant="narrow"
-                                    isLyricsOpen={isLyricsOpen}
-                                    lyricsMounted={lyricsMounted}
-                                    panelFlipTarget={panelFlipTarget}
-                                    isPanelFlipping={isPanelFlipping}
-                                    lyrics={lyrics}
-                                    lyricsPath={lyricsPath}
-                                    lyricsStatus={lyricsStatus}
-                                    hasTimestamps={lyricsHasTimestamps}
-                                    currentTime={currentTime}
-                                    onSeek={seek}
-                                    onUserScrollDirection={handleNarrowPanelScroll}
-                                    narrowControlsVisible={narrowControlsVisible}
-                                />
+                                        <ApplePlayerLyricsPanel
+                                            variant="narrow"
+                                            isLyricsOpen={isLyricsOpen}
+                                            lyricsMounted={lyricsMounted}
+                                            panelFlipTarget={panelFlipTarget}
+                                            isPanelFlipping={isPanelFlipping}
+                                            lyrics={lyrics}
+                                            lyricsPath={lyricsPath}
+                                            lyricsStatus={lyricsStatus}
+                                            hasTimestamps={lyricsHasTimestamps}
+                                            currentTime={currentTime}
+                                            onSeek={seek}
+                                            onUserScrollDirection={handleNarrowPanelScroll}
+                                            narrowControlsVisible={narrowControlsVisible}
+                                        />
+                                    </>
+                                )}
                             </div>
 
                             <motion.div
@@ -841,6 +908,7 @@ export default function AppleMusicPlayer({
                         </motion.div>
                     )}
                 </AnimatePresence>
+
             </div>
 
 

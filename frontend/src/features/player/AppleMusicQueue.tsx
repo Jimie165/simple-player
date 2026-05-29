@@ -34,7 +34,7 @@ import {
     VIRTUOSO_OVERSCAN,
 } from '@/features/player/queue/queueHelpers';
 
-interface AppleMusicQueueProps {
+export interface AppleMusicQueueProps {
     onNavigate?: () => void;
     scrollToTopSignal?: number;
     isOpen?: boolean;
