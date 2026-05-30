@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SidePanel } from '@/features/player/apple/shared/types';
 
@@ -142,12 +142,14 @@ export function useAppleMusicPanels({
         if (mainContentWidth < 520) {
             setClosingPanel(panel);
             panelCloseRafRef.current = window.requestAnimationFrame(() => {
-                panelCloseRafRef.current = null;
-                if (panel === 'queue') {
-                    setQueuePanelOpen(false);
-                    return;
-                }
-                setLyricsPanelOpen(false);
+                panelCloseRafRef.current = window.requestAnimationFrame(() => {
+                    panelCloseRafRef.current = null;
+                    if (panel === 'queue') {
+                        setQueuePanelOpen(false);
+                        return;
+                    }
+                    setLyricsPanelOpen(false);
+                });
             });
             return;
         }
@@ -194,7 +196,7 @@ export function useAppleMusicPanels({
         setLyricsPanelOpen(true);
     };
 
-    useLayoutEffect(() => {
+    useEffect(() => {
         if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
         closePanel('lyrics');
     }, [lyricsStatus, isLyricsOpen]);
