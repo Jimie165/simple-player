@@ -1,5 +1,6 @@
 {
     "productName": "Simple Player",
+    "mainBinaryName": "Simple Player",
     "version": "0.3.0",
     "identifier": "com.maho.simpleplayer",
     "build": {
