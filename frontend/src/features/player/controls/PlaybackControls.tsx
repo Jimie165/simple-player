@@ -1,18 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-    MdPlayCircle, MdPauseCircle, MdSkipPrevious, MdSkipNext, MdShuffle, MdRepeat
-} from 'react-icons/md';
 import { toast } from 'react-hot-toast';
-import clsx from 'clsx';
 import { listen } from '@tauri-apps/api/event';
 // Store & Services
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { audioService } from '@/services/audioService';
-import { formatTime } from '@/utils/time';
-// Components
-import CustomTooltip from '@/components/common/CustomTooltip';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
+import { PlaybackControlButtons } from '@/features/player/controls/PlaybackControlButtons';
+import { PlaybackProgressBar } from '@/features/player/controls/PlaybackProgressBar';
 
 interface PlaybackControlsProps {
     mode: 'full' | 'compact' | 'mini';
@@ -391,118 +386,32 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
     return (
         <>
-            <div className={clsx(
-                "relative z-10 row-start-1 flex min-w-0 items-center gap-1.5",
-                isMini ? "col-start-2 justify-end gap-2" : "col-start-1 justify-center"
-            )}>
+            <PlaybackControlButtons
+                isMini={isMini}
+                metadata={metadata}
+                isPlaying={isPlaying}
+                isShuffling={isShuffling}
+                repeatMode={repeatMode}
+                togglePlay={togglePlay}
+                handlePrev={handlePrev}
+                handleNext={handleNext}
+                handleBtnShuffle={handleBtnShuffle}
+                handleBtnRepeat={handleBtnRepeat}
+            />
 
-                {/* 随机按钮 */}
-                <div className={clsx(isMini && "hidden")}>
-                    <CustomTooltip text={"随机播放"}>
-                        <button
-                            onClick={handleBtnShuffle}
-                            className={clsx(
-                                "grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-black/5 dark:hover:bg-white/10",
-                                isShuffling
-                                    ? "text-primary"
-                                    : "text-neutral-700 dark:text-white/70"
-                            )}
-                        >
-                            <MdShuffle />
-                        </button>
-                    </CustomTooltip>
-                </div>
-
-                {/* 上一首 */}
-                <CustomTooltip text="上一首">
-                    <button onClick={handlePrev} className={clsx(
-                        "grid h-7 w-7 place-items-center rounded-full text-[23px] text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
-                        isMini && "hidden"
-                    )}>
-                        <MdSkipPrevious />
-                    </button>
-                </CustomTooltip>
-
-                {/* 播放/暂停 */}
-                <CustomTooltip text={!metadata ? "没有歌曲" : (isPlaying ? "暂停" : "播放")}>
-                    <button
-                        onClick={metadata ? togglePlay : undefined}
-                        disabled={!metadata}
-                        className={clsx(
-                            "grid place-items-center rounded-full transition-all active:scale-95",
-                            isMini ? "h-11 w-11 text-[44px]" : "h-8 w-8 text-[32px]",
-                            metadata
-                                ? "cursor-pointer text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:text-primary/90 hover:scale-[1.04]"
-                                : "cursor-not-allowed text-neutral-300 dark:text-neutral-600"
-                        )}
-                    >
-                        {isPlaying ? <MdPauseCircle /> : <MdPlayCircle />}
-                    </button>
-                </CustomTooltip>
-
-                {/* 下一首 */}
-                <CustomTooltip text="下一首">
-                    <button onClick={handleNext} className={clsx(
-                        "grid place-items-center rounded-full text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
-                        isMini ? "h-10 w-10 text-[34px]" : "h-7 w-7 text-[23px]"
-                    )}>
-                        <MdSkipNext />
-                    </button>
-                </CustomTooltip>
-
-                {/* 循环按钮 */}
-                <div className={clsx(isMini && "hidden")}>
-                    <CustomTooltip text={
-                        repeatMode === 'off' ? "重复播放已关闭" :
-                            repeatMode === 'all' ? "重复播放全部" : "单曲循环"
-                    }>
-                        <button
-                            onClick={handleBtnRepeat}
-                            className={clsx(
-                                "relative grid h-7 w-7 place-items-center rounded-full text-[17px] transition-colors hover:bg-black/5 dark:hover:bg-white/10",
-                                repeatMode !== 'off'
-                                    ? "text-primary"
-                                    : "text-neutral-700 dark:text-white/70"
-                            )}
-                        >
-                            <MdRepeat />
-                            {repeatMode === 'one' && (
-                                <span className="absolute top-[5px] right-[5px] grid h-2.5 w-2.5 place-items-center rounded-full bg-white text-[7px] font-bold leading-none text-primary dark:bg-neutral-950">1</span>
-                            )}
-                        </button>
-                    </CustomTooltip>
-                </div>
-            </div>
-
-            {/* 进度条 */}
-            <div className={clsx(
-                "z-20 col-start-2 col-end-4 row-start-1 mb-1 ml-[68px] flex self-end text-[10px] font-medium text-neutral-500 dark:text-white/50",
-                mode === 'full' && "mr-[104px]",
-                mode === 'compact' && "mr-8",
-                isMini && "hidden"
-            )}>
-                <div className="group relative flex h-5 flex-1 items-center">
-                    <span className="pointer-events-none absolute -top-1.5 left-0 text-[10px] font-medium tabular-nums leading-none text-neutral-700 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-white/84">
-                        {formatTime(displayCurrentTime)}
-                    </span>
-                    <span className="pointer-events-none absolute -top-1.5 right-0 text-[10px] font-medium tabular-nums leading-none text-neutral-700 opacity-0 transition-opacity duration-150 group-hover:opacity-100 dark:text-white/84">
-                        -{formatTime(remainingTime)}
-                    </span>
-                    <div className="pointer-events-none absolute left-0 right-0 h-[3px] overflow-hidden rounded-full bg-black/[0.075] transition-[height] group-hover:h-1 dark:bg-white/[0.12]"></div>
-                    <div className="pointer-events-none absolute left-0 top-1/2 h-[3px] -translate-y-1/2 rounded-full bg-primary/90 transition-[height] group-hover:h-1" style={{ width: `${progressPercent}%` }} />
-                    <div
-                        className={clsx(
-                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary/95 opacity-0 shadow-[0_1px_4px_rgba(0,0,0,0.18)] transition-opacity duration-200 group-hover:opacity-100",
-                            isDragging && "opacity-100 scale-125"
-                        )}
-                        style={{ left: `${progressPercent}%`, marginLeft: '-6px' }}
-                    />
-                    {/* 只有在有歌曲时才允许拖动进度条 */}
-                    {metadata && (
-                        <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />
-                    )}
-                </div>
-            </div>
+            <PlaybackProgressBar
+                mode={mode}
+                isMini={isMini}
+                metadata={metadata}
+                currentTime={currentTime}
+                displayCurrentTime={displayCurrentTime}
+                remainingTime={remainingTime}
+                progressPercent={progressPercent}
+                isDragging={isDragging}
+                handleSeekStart={handleSeekStart}
+                handleSeekChange={handleSeekChange}
+                handleSeekEnd={handleSeekEnd}
+            />
         </>
     );
 }

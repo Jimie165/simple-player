@@ -1,29 +1,23 @@
-import { useState, useEffect, useLayoutEffect, useRef, useCallback, type PointerEvent } from 'react';
-import clsx from 'clsx';
+import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useTheme } from '@/hooks/useTheme';
-
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
-import { audioService } from '@/services/audioService';
-import { resolveCover } from '@/utils/mediaPath';
-import CoverImage from '@/components/common/CoverImage';
-import { PlayerBackground } from '@/features/player/apple/PlayerBackground';
-import ApplePlayerControlsSection, {
-    ApplePlayerNarrowBottomControls,
-    ApplePlayerNarrowHeader,
-} from '@/features/player/apple/ApplePlayerControlsSection';
-import ApplePlayerTopBar from '@/features/player/apple/ApplePlayerTopBar';
-import ApplePlayerQueuePanel from '@/features/player/apple/ApplePlayerQueuePanel';
-import ApplePlayerQueueToggle from '@/features/player/apple/ApplePlayerQueueToggle';
-import ApplePlayerLyricsToggle from '@/features/player/apple/ApplePlayerLyricsToggle';
-import ApplePlayerLyricsPanel from '@/features/player/apple/ApplePlayerLyricsPanel';
 
-type SidePanel = 'queue' | 'lyrics';
+import { PlayerBackground } from '@/features/player/apple/background/PlayerBackground';
+import ApplePlayerTopBar from '@/features/player/apple/toolbar/ApplePlayerTopBar';
+import {
+    AppleMusicNarrowPanelLayout,
+    AppleMusicStandardLayout,
+} from '@/features/player/apple/layouts/AppleMusicPlayerLayouts';
+import { useAppleMusicPanels } from '@/features/player/apple/hooks/useAppleMusicPanels';
+import { useCoverBackground } from '@/features/player/apple/hooks/useCoverBackground';
+import { useImmersiveFullscreen } from '@/features/player/apple/hooks/useImmersiveFullscreen';
+import { useImmersivePlaybackControls } from '@/features/player/apple/hooks/useImmersivePlaybackControls';
+import { useNarrowPanelControls } from '@/features/player/apple/hooks/useNarrowPanelControls';
 
 export default function AppleMusicPlayer({
     onClose,
@@ -38,13 +32,6 @@ export default function AppleMusicPlayer({
         metadata, isPlaying, isShuffling, repeatMode,
         togglePlay, toggleRepeat
     } = usePlayerStore();
-
-    const { toggleFavorite } = useLibraryStore();
-
-    const { push } = useNavigationStore();
-    const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
-
-    // Local state for UI
     const {
         volume,
         setVolume,
@@ -58,201 +45,81 @@ export default function AppleMusicPlayer({
         setPlaybackTime,
         requestLyricsForPath,
     } = usePlayerStore();
+
+    const { toggleFavorite } = useLibraryStore();
+    const { push } = useNavigationStore();
+    const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
     const { playerEffectMode } = useTheme();
-    const [localVolume, setLocalVolume] = useState(volume);
-    const [isVolumeDragging, setIsVolumeDragging] = useState(false);
 
-    const displayVolume = isVolumeDragging ? localVolume : volume;
-
-    const [isDragging, setIsDragging] = useState(false);
-    const [bgImageSrc, setBgImageSrc] = useState<string | null>(null);
-    // Removed: const [showQueue, setShowQueue] = useState(false);
-
-
-    // Layout sizing state
-    // Lazy load queue: mount if open, keep mounted once opened
-    const [queueMounted, setQueueMounted] = useState(isQueueOpen);
-    const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
-    const queueScrollDidMountRef = useRef(false);
-    const [lyricsMounted, setLyricsMounted] = useState(isLyricsOpen);
     const [marqueeResetToken, setMarqueeResetToken] = useState(0);
-    const [panelFlipTarget, setPanelFlipTarget] = useState<SidePanel | null>(null);
-    const [isPanelFlipping, setIsPanelFlipping] = useState(false);
-    const panelFlipRafRef = useRef<number | null>(null);
-    const panelFlipTimeoutRef = useRef<number | null>(null);
-    const panelFlipSequenceRef = useRef(0);
-    const panelCloseRafRef = useRef<number | null>(null);
-    const [closingPanel, setClosingPanel] = useState<SidePanel | null>(null);
-    const [narrowControlsVisible, setNarrowControlsVisible] = useState(true);
-    const narrowControlsHideTimeoutRef = useRef<number | null>(null);
-    const narrowControlsRef = useRef<HTMLDivElement | null>(null);
-    const isPointerInsideNarrowControlsRef = useRef(false);
-    const upwardScrollRevealDistanceRef = useRef(0);
     const isNarrowPanelLayout = mainContentWidth < 520 && (isQueueOpen || isLyricsOpen);
-    const NARROW_UPWARD_REVEAL_THRESHOLD = 96;
     const coverScale = isPlaying ? 1 : 0.85;
+    const bgImageSrc = useCoverBackground(metadata);
+    const coverRef = useRef<HTMLDivElement>(null);
+    const coverShellRef = useRef<HTMLDivElement>(null);
+    const controlsRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!isQueueOpen) return;
-        const frame = requestAnimationFrame(() => setQueueMounted(true));
-        return () => cancelAnimationFrame(frame);
-    }, [isQueueOpen]);
+    const {
+        queueMounted,
+        queueScrollToTopSignal,
+        lyricsMounted,
+        panelFlipTarget,
+        isPanelFlipping,
+        closingPanel,
+        handleToggleQueue,
+        handleToggleLyrics,
+    } = useAppleMusicPanels({
+        isOpen,
+        isQueueOpen,
+        isLyricsOpen,
+        lyricsStatus,
+        mainContentWidth,
+        isNarrowPanelLayout,
+    });
 
-    useEffect(() => {
-        if (!isLyricsOpen) return;
-        const frame = requestAnimationFrame(() => setLyricsMounted(true));
-        return () => cancelAnimationFrame(frame);
-    }, [isLyricsOpen]);
+    const {
+        narrowControlsVisible,
+        narrowControlsRef,
+        handleNarrowPanelScroll,
+        handleNarrowActivity,
+        handleNarrowPointerMove,
+        handleNarrowControlsPointerEnter,
+        handleNarrowControlsPointerMove,
+        handleNarrowControlsPointerLeave,
+    } = useNarrowPanelControls({
+        isOpen,
+        isNarrowPanelLayout,
+        isQueueOpen,
+        isLyricsOpen,
+    });
 
-    useEffect(() => {
-        if (mainContentWidth >= 520) {
-            setClosingPanel(null);
-        }
-    }, [mainContentWidth]);
+    const {
+        displayVolume,
+        handleSeekChange,
+        handleSeekStart,
+        handleSeekEnd,
+        handleVolumeChange,
+        handleVolumeSeekStart,
+        handleVolumeSeekEnd,
+    } = useImmersivePlaybackControls({
+        volume,
+        setVolume,
+        metadata,
+        isOpen,
+        isPlaying,
+        currentTime,
+        setPlaybackTime,
+        seek,
+        onNarrowActivity: handleNarrowActivity,
+    });
 
-    useEffect(() => {
-        if (!closingPanel || isNarrowPanelLayout) return;
-        const frame = requestAnimationFrame(() => setClosingPanel(null));
-        return () => cancelAnimationFrame(frame);
-    }, [closingPanel, isNarrowPanelLayout]);
-
-    useEffect(() => {
-        if (!queueScrollDidMountRef.current) {
-            queueScrollDidMountRef.current = true;
-            return;
-        }
-        if (!isQueueOpen) return;
-        const frame = requestAnimationFrame(() => setQueueScrollToTopSignal((v) => v + 1));
-        return () => cancelAnimationFrame(frame);
-    }, [isQueueOpen]);
-
-    useEffect(() => {
-        if (!isOpen || !isQueueOpen) return;
-        const frame = requestAnimationFrame(() => setQueueScrollToTopSignal((v) => v + 1));
-        return () => cancelAnimationFrame(frame);
-    }, [isOpen, isQueueOpen]);
+    const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
 
     useEffect(() => {
         if (!isOpen) return;
         const frame = requestAnimationFrame(() => setMarqueeResetToken((v) => v + 1));
         return () => cancelAnimationFrame(frame);
     }, [isOpen]);
-
-    useEffect(() => {
-        return () => {
-            if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
-            if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
-            if (panelCloseRafRef.current !== null) window.cancelAnimationFrame(panelCloseRafRef.current);
-            if (narrowControlsHideTimeoutRef.current !== null) window.clearTimeout(narrowControlsHideTimeoutRef.current);
-        };
-    }, []);
-
-    const clearNarrowControlsHideTimer = useCallback(() => {
-        if (narrowControlsHideTimeoutRef.current !== null) {
-            window.clearTimeout(narrowControlsHideTimeoutRef.current);
-            narrowControlsHideTimeoutRef.current = null;
-        }
-    }, []);
-
-    const hideNarrowControlsLater = useCallback(() => {
-        clearNarrowControlsHideTimer();
-        narrowControlsHideTimeoutRef.current = window.setTimeout(() => {
-            if (isPointerInsideNarrowControlsRef.current) {
-                narrowControlsHideTimeoutRef.current = null;
-                return;
-            }
-            setNarrowControlsVisible(false);
-            narrowControlsHideTimeoutRef.current = null;
-        }, 2500);
-    }, [clearNarrowControlsHideTimer]);
-
-    const revealNarrowControls = useCallback((autoHide = true) => {
-        upwardScrollRevealDistanceRef.current = 0;
-        setNarrowControlsVisible(true);
-        if (!isNarrowPanelLayout) return;
-        if (autoHide) {
-            hideNarrowControlsLater();
-            return;
-        }
-        clearNarrowControlsHideTimer();
-    }, [clearNarrowControlsHideTimer, hideNarrowControlsLater, isNarrowPanelLayout]);
-
-    const hideNarrowControlsNow = useCallback(() => {
-        clearNarrowControlsHideTimer();
-        isPointerInsideNarrowControlsRef.current = false;
-        upwardScrollRevealDistanceRef.current = 0;
-        setNarrowControlsVisible(false);
-    }, [clearNarrowControlsHideTimer]);
-
-    const handleNarrowPanelScroll = (direction: 'up' | 'down', delta = 16) => {
-        if (!isNarrowPanelLayout) return;
-        if (direction === 'down') {
-            hideNarrowControlsNow();
-            return;
-        }
-        if (narrowControlsVisible) {
-            hideNarrowControlsLater();
-            return;
-        }
-        upwardScrollRevealDistanceRef.current += Math.min(delta, 48);
-        if (upwardScrollRevealDistanceRef.current >= NARROW_UPWARD_REVEAL_THRESHOLD) {
-            revealNarrowControls();
-        }
-    };
-
-    const handleNarrowActivity = () => {
-        if (isNarrowPanelLayout) revealNarrowControls();
-    };
-
-    const handleNarrowPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!isNarrowPanelLayout || narrowControlsVisible) return;
-        const controlsRect = narrowControlsRef.current?.getBoundingClientRect();
-        const fallbackBoundary = window.innerHeight - 120;
-        const revealBoundary = controlsRect
-            ? controlsRect.top + controlsRect.height / 2
-            : fallbackBoundary;
-        if (event.clientY >= revealBoundary) {
-            isPointerInsideNarrowControlsRef.current = controlsRect
-                ? event.clientX >= controlsRect.left &&
-                event.clientX <= controlsRect.right &&
-                event.clientY >= controlsRect.top &&
-                event.clientY <= controlsRect.bottom
-                : true;
-            revealNarrowControls(!isPointerInsideNarrowControlsRef.current);
-        }
-    };
-
-    const handleNarrowControlsPointerEnter = () => {
-        if (!isNarrowPanelLayout) return;
-        isPointerInsideNarrowControlsRef.current = true;
-        clearNarrowControlsHideTimer();
-    };
-
-    const handleNarrowControlsPointerMove = () => {
-        if (!isNarrowPanelLayout) return;
-        isPointerInsideNarrowControlsRef.current = true;
-        clearNarrowControlsHideTimer();
-    };
-
-    const handleNarrowControlsPointerLeave = () => {
-        if (!isNarrowPanelLayout) return;
-        isPointerInsideNarrowControlsRef.current = false;
-        if (narrowControlsVisible) hideNarrowControlsLater();
-    };
-
-    useEffect(() => {
-        if (isOpen && isNarrowPanelLayout) {
-            const frame = requestAnimationFrame(() => revealNarrowControls());
-            return () => cancelAnimationFrame(frame);
-        }
-        if (narrowControlsHideTimeoutRef.current !== null) {
-            window.clearTimeout(narrowControlsHideTimeoutRef.current);
-            narrowControlsHideTimeoutRef.current = null;
-        }
-        isPointerInsideNarrowControlsRef.current = false;
-        const frame = requestAnimationFrame(() => setNarrowControlsVisible(true));
-        return () => cancelAnimationFrame(frame);
-    }, [isOpen, isNarrowPanelLayout, isQueueOpen, isLyricsOpen, revealNarrowControls]);
 
     useEffect(() => {
         if (metadata?.path && metadata.path !== lyricsPath) {
@@ -263,12 +130,6 @@ export default function AppleMusicPlayer({
         }
     }, [metadata?.path, lyricsPath, requestLyricsForPath]);
 
-    // Layout sizing state
-    const coverRef = useRef<HTMLDivElement>(null);
-    const coverShellRef = useRef<HTMLDivElement>(null);
-    const controlsRef = useRef<HTMLDivElement>(null);
-
-    // Use pure DOM manipulation for performance (avoids React render cycle lag during animation)
     useEffect(() => {
         if (isNarrowPanelLayout) return;
 
@@ -297,330 +158,46 @@ export default function AppleMusicPlayer({
         };
     }, [isNarrowPanelLayout]);
 
-    // Sync volume with audio service
-    useEffect(() => {
-        // Initial volume read (mock, usually we'd need a getter or store)
-        // We could read from audioService if it exposed a getter, or assume store is source of truth if we sync it.
-        // For now, let's just default to 1 or whatever usePlayerStore says if we had it.
-    }, []);
-
-    // Sync local currentTime with store/audioService when component mounts or metadata changes
-    useEffect(() => {
-        if (!metadata) return;
-        // We can get the current time from the audio service directly to prevent reset
-        const syncTime = async () => {
-            const t = await audioService.getCurrentTime();
-            setPlaybackTime(t);
-        };
-        syncTime();
-
-        // Listen for seek event from other components
-        const handleSeekEvent = (event: Event) => {
-            const detail = (event as CustomEvent<{ time?: unknown }>).detail;
-            if (detail && typeof detail.time === 'number') {
-                setPlaybackTime(detail.time);
-            }
-        };
-        window.addEventListener('playback:seeked', handleSeekEvent);
-
-        return () => {
-            window.removeEventListener('playback:seeked', handleSeekEvent);
-        };
-    }, [metadata, isOpen, setPlaybackTime]); // Run on mount, song change, or when player opens
-
-    const handleVolumeChange = (val: number) => {
-        setLocalVolume(val);
-        // Direct audio service update for smooth real-time listening feedback
-        audioService.setVolume(val / 100);
+    const layoutProps = {
+        metadata,
+        bgImageSrc,
+        coverScale,
+        isPlaying,
+        isShuffling,
+        toggleShuffle,
+        playPrev: () => playPrev(currentTime),
+        togglePlay,
+        playNext,
+        toggleRepeat,
+        repeatMode,
+        currentTime,
+        handleSeekChange,
+        handleSeekStart,
+        handleSeekEnd,
+        localVolume: displayVolume,
+        handleVolumeChange,
+        handleVolumeSeekStart,
+        handleVolumeSeekEnd,
+        marqueeResetToken,
+        onClose,
+        push,
+        toggleFavorite,
+        isQueueOpen,
+        isLyricsOpen,
+        queueMounted,
+        lyricsMounted,
+        panelFlipTarget,
+        isPanelFlipping,
+        queueScrollToTopSignal,
+        lyrics,
+        lyricsPath,
+        lyricsStatus,
+        lyricsHasTimestamps,
+        seek,
+        handleToggleLyrics,
+        handleToggleQueue,
     };
 
-    const handleVolumeSeekStart = () => {
-        handleNarrowActivity();
-        setIsVolumeDragging(true);
-    };
-
-    const handleVolumeSeekEnd = () => {
-        setIsVolumeDragging(false);
-        setVolume(localVolume);
-    };
-
-    // Load Background Image
-    useEffect(() => {
-        let isMounted = true;
-        const loadBg = async () => {
-            if (metadata) {
-                const src = await resolveCover(metadata);
-                if (isMounted) setBgImageSrc(src);
-            } else {
-                if (isMounted) setBgImageSrc(null);
-            }
-        };
-        loadBg();
-        return () => { isMounted = false; };
-    }, [metadata]);
-
-
-
-    // Progress Logic with Auto-Sync. The bottom playback controls own the
-    // frontend clock tick; this mounted overlay only corrects drift from backend.
-    useEffect(() => {
-        let interval: ReturnType<typeof setInterval>;
-
-        if (isPlaying && !isDragging) {
-            interval = setInterval(() => {
-                audioService.getCurrentTime().then(t => {
-                    usePlayerStore.setState((state) => {
-                        const prev = state.currentTime;
-                        if (t < prev - 0.75 || Math.abs(t - prev) > 0.75) return { currentTime: t };
-                        return {};
-                    });
-                }).catch((error) => console.warn('Failed to sync playback time', error));
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [isPlaying, isDragging]);
-
-    // Reset time on song change
-    // useEffect(() => {
-    //    setCurrentTime(0);
-    // }, [metadata]); 
-    // Commented out: This was causing the progress bar to reset to 0 even when re-opening the player for the same song.
-    // The previous useEffect handles syncing the correct time on mount/change.
-
-    const handleSeekStart = () => {
-        handleNarrowActivity();
-        setIsDragging(true);
-        window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: true } }));
-    };
-
-    const handleSeekChange = (val: number) => {
-        setPlaybackTime(val);
-        // Dispatch event for real-time sync with external player
-        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: val } }));
-    };
-
-    const handleSeekEnd = async () => {
-        setIsDragging(false);
-        const actualTime = await seek(currentTime);
-        setPlaybackTime(actualTime);
-        window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
-    };
-
-    const startPanelFlip = (target: SidePanel, toggle: () => void) => {
-        const sequence = ++panelFlipSequenceRef.current;
-        if (panelCloseRafRef.current !== null) {
-            window.cancelAnimationFrame(panelCloseRafRef.current);
-            panelCloseRafRef.current = null;
-        }
-        if (panelFlipRafRef.current !== null) window.cancelAnimationFrame(panelFlipRafRef.current);
-        if (panelFlipTimeoutRef.current !== null) window.clearTimeout(panelFlipTimeoutRef.current);
-
-        setPanelFlipTarget(target);
-        setIsPanelFlipping(false);
-        panelFlipRafRef.current = window.requestAnimationFrame(() => {
-            if (panelFlipSequenceRef.current !== sequence) return;
-            panelFlipRafRef.current = null;
-            setIsPanelFlipping(true);
-            toggle();
-            panelFlipTimeoutRef.current = window.setTimeout(() => {
-                if (panelFlipSequenceRef.current !== sequence) return;
-                setIsPanelFlipping(false);
-                setPanelFlipTarget(null);
-                panelFlipTimeoutRef.current = null;
-            }, 420);
-        });
-    };
-
-    const resetPanelFlipState = () => {
-        panelFlipSequenceRef.current += 1;
-        if (panelFlipRafRef.current !== null) {
-            window.cancelAnimationFrame(panelFlipRafRef.current);
-            panelFlipRafRef.current = null;
-        }
-        if (panelFlipTimeoutRef.current !== null) {
-            window.clearTimeout(panelFlipTimeoutRef.current);
-            panelFlipTimeoutRef.current = null;
-        }
-        setIsPanelFlipping(false);
-        setPanelFlipTarget(null);
-    };
-
-    const cancelPendingPanelClose = () => {
-        if (panelCloseRafRef.current !== null) {
-            window.cancelAnimationFrame(panelCloseRafRef.current);
-            panelCloseRafRef.current = null;
-        }
-    };
-
-    const setQueuePanelOpen = (open: boolean) => {
-        usePlayerStore.setState((state) => ({
-            isQueueOpen: open,
-            isLyricsOpen: open ? false : state.isLyricsOpen,
-        }));
-    };
-
-    const setLyricsPanelOpen = (open: boolean) => {
-        usePlayerStore.setState((state) => ({
-            isLyricsOpen: open,
-            isQueueOpen: open ? false : state.isQueueOpen,
-        }));
-    };
-
-    const closePanel = (panel: SidePanel) => {
-        cancelPendingPanelClose();
-        resetPanelFlipState();
-        if (mainContentWidth < 520) {
-            setClosingPanel(panel);
-            panelCloseRafRef.current = window.requestAnimationFrame(() => {
-                panelCloseRafRef.current = null;
-                if (panel === 'queue') {
-                    setQueuePanelOpen(false);
-                    return;
-                }
-                setLyricsPanelOpen(false);
-            });
-            return;
-        }
-        if (panel === 'queue') {
-            setQueuePanelOpen(false);
-            return;
-        }
-        setLyricsPanelOpen(false);
-    };
-
-    const handleToggleQueue = () => {
-        if (!queueMounted) setQueueMounted(true);
-        if (isLyricsOpen && !isQueueOpen) {
-            cancelPendingPanelClose();
-            setClosingPanel(null);
-            startPanelFlip('queue', () => setQueuePanelOpen(true));
-            return;
-        }
-        if (isQueueOpen) {
-            closePanel('queue');
-            return;
-        }
-        resetPanelFlipState();
-        cancelPendingPanelClose();
-        setClosingPanel(null);
-        setQueuePanelOpen(true);
-    };
-
-    const handleToggleLyrics = () => {
-        if (!lyricsMounted) setLyricsMounted(true);
-        if (isQueueOpen && !isLyricsOpen) {
-            cancelPendingPanelClose();
-            setClosingPanel(null);
-            startPanelFlip('lyrics', () => setLyricsPanelOpen(true));
-            return;
-        }
-        if (isLyricsOpen) {
-            closePanel('lyrics');
-            return;
-        }
-        resetPanelFlipState();
-        cancelPendingPanelClose();
-        setClosingPanel(null);
-        setLyricsPanelOpen(true);
-    };
-
-    useLayoutEffect(() => {
-        if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
-        closePanel('lyrics');
-    }, [lyricsStatus, isLyricsOpen]);
-
-    // Fullscreen Logic
-    const [isFullscreen, setIsFullscreen] = useState(false);
-    const wasMaximizedBeforeFullscreenRef = useRef(false);
-
-    useEffect(() => {
-        const checkFullscreen = async () => {
-            try {
-                const isFull = await getCurrentWindow().isFullscreen();
-                setIsFullscreen(isFull);
-            } catch (e) {
-                console.error("Failed to check fullscreen status", e);
-            }
-        };
-        checkFullscreen();
-    }, [isOpen]);
-
-    const toggleFullscreen = async () => {
-        const appWindow = getCurrentWindow();
-        const fullscreenWindow = appWindow as typeof appWindow & { unmaximize?: () => Promise<void> };
-        try {
-            const currentFullscreen = await appWindow.isFullscreen();
-            const newState = !currentFullscreen;
-
-            if (newState) {
-                const wasMaximized = await appWindow.isMaximized();
-                wasMaximizedBeforeFullscreenRef.current = wasMaximized;
-                if (wasMaximized) {
-                    if (typeof fullscreenWindow.unmaximize === 'function') {
-                        await fullscreenWindow.unmaximize();
-                    } else {
-                        await appWindow.toggleMaximize();
-                    }
-                    await new Promise(requestAnimationFrame);
-                }
-                await appWindow.setFullscreen(true);
-                setIsFullscreen(true);
-            } else {
-                await appWindow.setFullscreen(false);
-                setIsFullscreen(false);
-                if (wasMaximizedBeforeFullscreenRef.current) {
-                    await appWindow.maximize();
-                    wasMaximizedBeforeFullscreenRef.current = false;
-                }
-            }
-        } catch (e) {
-            console.error("Failed to toggle fullscreen", e);
-        }
-    };
-
-    // Auto-exit fullscreen on close
-    useEffect(() => {
-        if (!isOpen && isFullscreen) {
-            let cancelled = false;
-            const closeFullscreen = async () => {
-                const appWindow = getCurrentWindow();
-                try {
-                    await appWindow.setFullscreen(false);
-                    if (wasMaximizedBeforeFullscreenRef.current) {
-                        await appWindow.maximize();
-                        wasMaximizedBeforeFullscreenRef.current = false;
-                    }
-                } catch (error) {
-                    console.error(error);
-                }
-                if (!cancelled) setIsFullscreen(false);
-            };
-            closeFullscreen();
-            return () => {
-                cancelled = true;
-            };
-        }
-    }, [isOpen, isFullscreen]);
-
-    useEffect(() => {
-        if (!isOpen) return;
-
-        const handleEscape = (event: KeyboardEvent) => {
-            if (event.key !== 'Escape') return;
-            if (!isFullscreen) return;
-
-            event.preventDefault();
-            event.stopPropagation();
-            void toggleFullscreen();
-        };
-
-        window.addEventListener('keydown', handleEscape, { capture: true });
-        return () => window.removeEventListener('keydown', handleEscape, { capture: true });
-    }, [isOpen, isFullscreen]);
-
-    // const lastCloseRef = React.useRef(0); // Removed
-
-    // Background Image Source - already handled by state
     return (
         <motion.div
             initial={{ opacity: 0, y: '100%' }}
@@ -634,7 +211,6 @@ export default function AppleMusicPlayer({
             onPointerDown={handleNarrowPointerMove}
             onPointerMove={handleNarrowPointerMove}
         >
-            {/* Background Layer - Memoized to prevent re-renders during drag */}
             <PlayerBackground src={bgImageSrc} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
 
             <ApplePlayerTopBar
@@ -646,272 +222,27 @@ export default function AppleMusicPlayer({
             <div className="relative flex-1 min-h-0 w-full overflow-hidden">
                 <AnimatePresence initial={false}>
                     {isNarrowPanelLayout ? (
-                        <motion.div
-                            key="narrow-panel-layout"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{
-                                opacity: 0,
-                                transition: { duration: closingPanel ? 0.35 : 0.2, ease: 'easeOut' },
-                            }}
-                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
-                            className="absolute inset-0 z-20 flex flex-col px-5 pb-5"
-                        >
-                            <div className="flex items-center gap-3 flex-shrink-0 pt-1 pb-2">
-                                <motion.div
-                                    layoutId="player-cover"
-                                    className="w-[clamp(3rem,14vw,4rem)] aspect-square flex-shrink-0"
-                                    transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
-                                >
-                                    <motion.div
-                                        className="w-full h-full rounded-[8px] overflow-hidden bg-white/5"
-                                        animate={{
-                                            scale: coverScale,
-                                            boxShadow: isPlaying ? "0 10px 20px -5px rgba(0, 0, 0, 0.4)" : "0 4px 10px -3px rgba(0, 0, 0, 0.2)"
-                                        }}
-                                        transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
-                                    >
-                                        {bgImageSrc ? (
-                                            <img
-                                                src={bgImageSrc}
-                                                className="w-full h-full object-cover"
-                                                alt={metadata?.title || "Cover"}
-                                            />
-                                        ) : (
-                                            <CoverImage
-                                                song={metadata}
-                                                className="w-full h-full object-cover"
-                                                iconClassName="text-white/20 text-4xl"
-                                            />
-                                        )}
-                                    </motion.div>
-                                </motion.div>
-                                <div className="min-w-0 flex-1">
-                                    <ApplePlayerNarrowHeader
-                                        metadata={metadata}
-                                        marqueeResetToken={marqueeResetToken}
-                                        onClose={onClose}
-                                        push={push}
-                                        toggleFavorite={toggleFavorite}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="relative flex-1 min-h-0">
-                                {!closingPanel && (
-                                    <>
-                                        <ApplePlayerQueuePanel
-                                            variant="narrow"
-                                            isQueueOpen={isQueueOpen}
-                                            queueMounted={queueMounted}
-                                            panelFlipTarget={panelFlipTarget}
-                                            isPanelFlipping={isPanelFlipping}
-                                            onClose={onClose}
-                                            queueScrollToTopSignal={queueScrollToTopSignal}
-                                            onUserScrollDirection={handleNarrowPanelScroll}
-                                            narrowControlsVisible={narrowControlsVisible}
-                                        />
-
-                                        <ApplePlayerLyricsPanel
-                                            variant="narrow"
-                                            isLyricsOpen={isLyricsOpen}
-                                            lyricsMounted={lyricsMounted}
-                                            panelFlipTarget={panelFlipTarget}
-                                            isPanelFlipping={isPanelFlipping}
-                                            lyrics={lyrics}
-                                            lyricsPath={lyricsPath}
-                                            lyricsStatus={lyricsStatus}
-                                            hasTimestamps={lyricsHasTimestamps}
-                                            currentTime={currentTime}
-                                            onSeek={seek}
-                                            onUserScrollDirection={handleNarrowPanelScroll}
-                                            narrowControlsVisible={narrowControlsVisible}
-                                        />
-                                    </>
-                                )}
-                            </div>
-
-                            <motion.div
-                                ref={narrowControlsRef}
-                                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] bottom-[clamp(1rem,5vw,2rem)] z-30 flex flex-col gap-4"
-                                onPointerEnter={handleNarrowControlsPointerEnter}
-                                onPointerMove={handleNarrowControlsPointerMove}
-                                onPointerLeave={handleNarrowControlsPointerLeave}
-                                initial={false}
-                                animate={{
-                                    opacity: narrowControlsVisible ? 1 : 0,
-                                    y: narrowControlsVisible ? 0 : 28,
-                                    pointerEvents: narrowControlsVisible ? 'auto' : 'none',
-                                }}
-                                transition={{ duration: 0.22, ease: 'easeOut' }}
-                            >
-                                <ApplePlayerNarrowBottomControls
-                                    metadata={metadata}
-                                    currentTime={currentTime}
-                                    handleSeekChange={handleSeekChange}
-                                    handleSeekStart={handleSeekStart}
-                                    handleSeekEnd={handleSeekEnd}
-                                    isShuffling={isShuffling}
-                                    toggleShuffle={toggleShuffle}
-                                    playPrev={() => playPrev(currentTime)}
-                                    togglePlay={togglePlay}
-                                    isPlaying={isPlaying}
-                                    playNext={playNext}
-                                    toggleRepeat={toggleRepeat}
-                                    repeatMode={repeatMode}
-                                    localVolume={displayVolume}
-                                    handleVolumeChange={handleVolumeChange}
-                                    handleVolumeSeekStart={handleVolumeSeekStart}
-                                    handleVolumeSeekEnd={handleVolumeSeekEnd}
-                                />
-                                <div className="flex items-center justify-end mt-2">
-                                    <div className="flex items-center gap-2">
-                                        <ApplePlayerLyricsToggle
-                                            isLyricsOpen={isLyricsOpen}
-                                            hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
-                                            onToggle={handleToggleLyrics}
-                                        />
-                                        <ApplePlayerQueueToggle
-                                            isQueueOpen={isQueueOpen}
-                                            onToggle={handleToggleQueue}
-                                        />
-                                    </div>
-                                </div>
-                            </motion.div>
-                        </motion.div>
+                        <AppleMusicNarrowPanelLayout
+                            {...layoutProps}
+                            closingPanel={closingPanel}
+                            narrowControlsVisible={narrowControlsVisible}
+                            narrowControlsRef={narrowControlsRef}
+                            handleNarrowPanelScroll={handleNarrowPanelScroll}
+                            handleNarrowControlsPointerEnter={handleNarrowControlsPointerEnter}
+                            handleNarrowControlsPointerMove={handleNarrowControlsPointerMove}
+                            handleNarrowControlsPointerLeave={handleNarrowControlsPointerLeave}
+                        />
                     ) : (
-                        <motion.div
-                            key="standard-layout"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
-                            className="absolute inset-0 z-20 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]"
-                        >
-                            <div className={clsx(
-                                "relative z-20 flex flex-col items-center justify-center mr-auto",
-                                mainContentWidth < 520
-                                    ? "w-full px-[clamp(1rem,4vw,3rem)]"
-                                    : [
-                                        "transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",
-                                        (isQueueOpen || isLyricsOpen) ? "w-[41%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
-                                      ]
-                            )}>
-                                {/* Content Wrapper: Controls vertical spacing */}
-                                <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
-
-                                    {/* Artwork Container - Auto scaling with aspect ratio preservation */}
-                                    <div className="flex-1 min-h-0 flex items-center justify-center w-full">
-                                        <div
-                                            ref={coverShellRef}
-                                            className="relative aspect-square h-auto w-auto max-h-full max-w-full flex-shrink-0"
-                                        >
-                                            {/* Invisible 1000x1000 placeholder to force intrinsic size expansion to the limits, keeping perfect 1:1 ratio. */}
-                                            <img
-                                                src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAwIiBoZWlnaHQ9IjEwMDAiPjwvc3ZnPg=="
-                                                alt=""
-                                                className="invisible block h-auto w-auto max-w-full max-h-full pointer-events-none"
-                                            />
-                                            <motion.div
-                                                ref={coverRef}
-                                                layoutId="player-cover"
-                                                className="absolute inset-0"
-                                                transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
-                                            >
-                                                <motion.div
-                                                    className="w-full h-full rounded-[12px] md:rounded-[18px] overflow-hidden bg-white/5"
-                                                    animate={{
-                                                        scale: coverScale,
-                                                        boxShadow: isPlaying ? "0 20px 40px -8px rgba(0, 0, 0, 0.5)" : "0 10px 20px -5px rgba(0, 0, 0, 0.3)"
-                                                    }}
-                                                    transition={{ type: "spring", stiffness: 200, damping: 24, mass: 1 }}
-                                                >
-                                                    {bgImageSrc ? (
-                                                        <img
-                                                            src={bgImageSrc}
-                                                            className="w-full h-full object-cover"
-                                                            alt={metadata?.title || "Cover"}
-                                                        />
-                                                    ) : (
-                                                        <CoverImage
-                                                            song={metadata}
-                                                            className="w-full h-full object-cover"
-                                                            iconClassName="text-white/20 text-9xl"
-                                                        />
-                                                    )}
-                                                </motion.div>
-                                            </motion.div>
-                                        </div>
-                                    </div>
-
-                                    {/* Controls Container - Fixed Height */}
-                                    <ApplePlayerControlsSection
-                                        controlsRef={controlsRef}
-                                        metadata={metadata}
-                                        marqueeResetToken={marqueeResetToken}
-                                        onClose={onClose}
-                                        push={push}
-                                        toggleFavorite={toggleFavorite}
-                                        currentTime={currentTime}
-                                        handleSeekChange={handleSeekChange}
-                                        handleSeekStart={handleSeekStart}
-                                        handleSeekEnd={handleSeekEnd}
-                                        isShuffling={isShuffling}
-                                        toggleShuffle={toggleShuffle}
-                                        playPrev={() => playPrev(currentTime)}
-                                        togglePlay={togglePlay}
-                                        isPlaying={isPlaying}
-                                        playNext={playNext}
-                                        toggleRepeat={toggleRepeat}
-                                        repeatMode={repeatMode}
-                                        localVolume={displayVolume}
-                                        handleVolumeChange={handleVolumeChange}
-                                        handleVolumeSeekStart={handleVolumeSeekStart}
-                                        handleVolumeSeekEnd={handleVolumeSeekEnd}
-                                    />
-                                </div>
-                            </div>
-
-                            <ApplePlayerQueuePanel
-                                isQueueOpen={isQueueOpen}
-                                queueMounted={queueMounted}
-                                panelFlipTarget={panelFlipTarget}
-                                isPanelFlipping={isPanelFlipping}
-                                onClose={onClose}
-                                queueScrollToTopSignal={queueScrollToTopSignal}
-                            />
-
-                            <ApplePlayerLyricsPanel
-                                isLyricsOpen={isLyricsOpen}
-                                lyricsMounted={lyricsMounted}
-                                panelFlipTarget={panelFlipTarget}
-                                isPanelFlipping={isPanelFlipping}
-                                lyrics={lyrics}
-                                lyricsPath={lyricsPath}
-                                lyricsStatus={lyricsStatus}
-                                hasTimestamps={lyricsHasTimestamps}
-                                currentTime={currentTime}
-                                onSeek={seek}
-                            />
-
-                            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
-                                <ApplePlayerLyricsToggle
-                                    isLyricsOpen={isLyricsOpen}
-                                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
-                                    onToggle={handleToggleLyrics}
-                                />
-                                <ApplePlayerQueueToggle
-                                    isQueueOpen={isQueueOpen}
-                                    onToggle={handleToggleQueue}
-                                />
-                            </div>
-                        </motion.div>
+                        <AppleMusicStandardLayout
+                            {...layoutProps}
+                            mainContentWidth={mainContentWidth}
+                            coverRef={coverRef}
+                            coverShellRef={coverShellRef}
+                            controlsRef={controlsRef}
+                        />
                     )}
                 </AnimatePresence>
-
             </div>
-
-
-        </motion.div >
+        </motion.div>
     );
 }
