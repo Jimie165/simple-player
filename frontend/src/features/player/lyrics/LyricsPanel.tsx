@@ -6,6 +6,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import {
     interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
+    interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
     topInsetPx,
 } from '@/features/player/lyrics/constants';
@@ -15,10 +16,9 @@ import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import {
     buildDisplayItems,
     getActiveDisplayIndex,
-    getInterludeExitIndexForPlaybackJump,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
-import type { LyricsPanelProps } from '@/features/player/lyrics/types';
+import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
 const scrollMaskStyle = {
@@ -67,7 +67,6 @@ export default function LyricsPanel({
     const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
     const [interludeExitKey, setInterludeExitKey] = useState(0);
     const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
-    const [layoutPreviousPlaybackMs, setLayoutPreviousPlaybackMs] = useState(currentTime * 1000);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const userScrollTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const lastTouchYRef = useRef<number | null>(null);
@@ -179,22 +178,6 @@ export default function LyricsPanel({
         () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000),
         [currentLyricIndex, displayItems, lines, renderCurrentMs]
     );
-    const pendingInterludeExitIndex = useMemo(
-        () => getInterludeExitIndexForPlaybackJump(
-            displayItems,
-            layoutPreviousPlaybackMs,
-            renderCurrentMs
-        ),
-        [displayItems, layoutPreviousPlaybackMs, renderCurrentMs]
-    );
-    const visualExitingInterludeIndex = exitingInterludeIndex ?? pendingInterludeExitIndex;
-
-    useEffect(() => {
-        const frame = requestAnimationFrame(() => {
-            setLayoutPreviousPlaybackMs(renderCurrentMs);
-        });
-        return () => cancelAnimationFrame(frame);
-    }, [renderCurrentMs]);
 
     useEffect(() => {
         exitingInterludeIndexRef.current = exitingInterludeIndex;
@@ -209,12 +192,12 @@ export default function LyricsPanel({
                 const itemIndex = displayItems.indexOf(item);
                 const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
                 const isOpen =
-                    itemIndex === visualExitingInterludeIndex ||
+                    itemIndex === exitingInterludeIndex ||
                     (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
                 return isOpen ? shift : shift - rowHeight;
             }, 0);
         },
-        [displayItems, renderCurrentMs, visualExitingInterludeIndex]
+        [displayItems, exitingInterludeIndex, renderCurrentMs]
     );
 
     const startInterludeExit = useCallback((displayIndex: number) => {
@@ -265,14 +248,25 @@ export default function LyricsPanel({
             return;
         }
 
-        const exitInterludeIndex = getInterludeExitIndexForPlaybackJump(displayItems, previousMs, currentMs);
-
         const syncFrame = requestAnimationFrame(() => {
             setPlaybackSyncKey(key => key + 1);
         });
 
-        if (exitInterludeIndex !== null) {
-            startInterludeExit(exitInterludeIndex);
+        const previousInterludeIndex = displayItems.findIndex((item) =>
+            item.type === 'interlude' &&
+            previousMs >= item.startMs + interludeGapOpenDurationMs &&
+            previousMs < item.endMs - interludeNextLineFocusLeadMs
+        );
+
+        if (previousInterludeIndex < 0) return () => cancelAnimationFrame(syncFrame);
+
+        const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
+        const stillInSameInterlude =
+            currentMs >= previousInterlude.startMs &&
+            currentMs < previousInterlude.endMs;
+
+        if (!stillInSameInterlude) {
+            startInterludeExit(previousInterludeIndex);
         }
 
         return () => cancelAnimationFrame(syncFrame);
