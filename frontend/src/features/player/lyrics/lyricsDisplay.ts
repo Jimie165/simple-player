@@ -1,5 +1,6 @@
 import type { LyricsLine } from '@/types';
 import {
+    interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     interludeThresholdMs,
     nonInterludeNextLineFocusLeadMs,
@@ -132,4 +133,44 @@ export function getActiveDisplayIndex(
     );
 
     return lineDisplayIndex >= 0 ? lineDisplayIndex : 0;
+}
+
+export function getInterludeExitIndexForPlaybackJump(
+    displayItems: DisplayItem[],
+    previousMs: number,
+    currentMs: number
+): number | null {
+    if (Math.abs(currentMs - previousMs) < 900) return null;
+
+    const findInterludeAt = (ms: number) => displayItems.findIndex((item) =>
+        item.type === 'interlude' &&
+        ms >= item.startMs &&
+        ms < item.endMs
+    );
+    const previousActiveInterludeIndex = findInterludeAt(previousMs);
+    const currentActiveInterludeIndex = findInterludeAt(currentMs);
+
+    if (
+        previousActiveInterludeIndex >= 0 &&
+        previousActiveInterludeIndex === currentActiveInterludeIndex
+    ) {
+        return null;
+    }
+
+    const previousInterludeIndex = displayItems.findIndex((item) =>
+        item.type === 'interlude' &&
+        previousMs >= item.startMs + interludeGapOpenDurationMs &&
+        previousMs < item.endMs - interludeNextLineFocusLeadMs
+    );
+
+    if (previousInterludeIndex < 0) return null;
+
+    const previousInterlude = displayItems[previousInterludeIndex];
+    if (previousInterlude?.type !== 'interlude') return null;
+
+    const stillInSameInterlude =
+        currentMs >= previousInterlude.startMs &&
+        currentMs < previousInterlude.endMs;
+
+    return stillInSameInterlude ? null : previousInterludeIndex;
 }

@@ -6,15 +6,19 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import {
     interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
-    interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
     topInsetPx,
 } from '@/features/player/lyrics/constants';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
-import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
-import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
+import {
+    buildDisplayItems,
+    getActiveDisplayIndex,
+    getInterludeExitIndexForPlaybackJump,
+    getLineEndMsByIndex,
+} from '@/features/player/lyrics/lyricsDisplay';
+import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
 const scrollMaskStyle = {
@@ -59,9 +63,11 @@ export default function LyricsPanel({
     const pausedScrollRef = useRef(false);
     const interludeExitTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const previousPlaybackMsRef = useRef(currentTime * 1000);
+    const exitingInterludeIndexRef = useRef<number | null>(null);
     const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
     const [interludeExitKey, setInterludeExitKey] = useState(0);
     const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
+    const [layoutPreviousPlaybackMs, setLayoutPreviousPlaybackMs] = useState(currentTime * 1000);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const userScrollTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const lastTouchYRef = useRef<number | null>(null);
@@ -173,6 +179,26 @@ export default function LyricsPanel({
         () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000),
         [currentLyricIndex, displayItems, lines, renderCurrentMs]
     );
+    const pendingInterludeExitIndex = useMemo(
+        () => getInterludeExitIndexForPlaybackJump(
+            displayItems,
+            layoutPreviousPlaybackMs,
+            renderCurrentMs
+        ),
+        [displayItems, layoutPreviousPlaybackMs, renderCurrentMs]
+    );
+    const visualExitingInterludeIndex = exitingInterludeIndex ?? pendingInterludeExitIndex;
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => {
+            setLayoutPreviousPlaybackMs(renderCurrentMs);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [renderCurrentMs]);
+
+    useEffect(() => {
+        exitingInterludeIndexRef.current = exitingInterludeIndex;
+    }, [exitingInterludeIndex]);
 
     const getVisualInterludeShift = useCallback(
         (displayIndex: number) => {
@@ -183,24 +209,27 @@ export default function LyricsPanel({
                 const itemIndex = displayItems.indexOf(item);
                 const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
                 const isOpen =
-                    itemIndex === exitingInterludeIndex ||
+                    itemIndex === visualExitingInterludeIndex ||
                     (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
                 return isOpen ? shift : shift - rowHeight;
             }, 0);
         },
-        [displayItems, exitingInterludeIndex, renderCurrentMs]
+        [displayItems, renderCurrentMs, visualExitingInterludeIndex]
     );
 
     const startInterludeExit = useCallback((displayIndex: number) => {
         if (displayItems[displayIndex]?.type !== 'interlude') return;
+        if (exitingInterludeIndexRef.current === displayIndex) return;
 
         if (interludeExitTimeoutRef.current) {
             clearTimeout(interludeExitTimeoutRef.current);
         }
 
+        exitingInterludeIndexRef.current = displayIndex;
         setExitingInterludeIndex(displayIndex);
         setInterludeExitKey(key => key + 1);
         interludeExitTimeoutRef.current = window.setTimeout(() => {
+            exitingInterludeIndexRef.current = null;
             setExitingInterludeIndex(null);
             interludeExitTimeoutRef.current = null;
         }, interludeExitCollapseDelayMs);
@@ -236,25 +265,14 @@ export default function LyricsPanel({
             return;
         }
 
+        const exitInterludeIndex = getInterludeExitIndexForPlaybackJump(displayItems, previousMs, currentMs);
+
         const syncFrame = requestAnimationFrame(() => {
             setPlaybackSyncKey(key => key + 1);
         });
 
-        const previousInterludeIndex = displayItems.findIndex((item) =>
-            item.type === 'interlude' &&
-            previousMs >= item.startMs + interludeGapOpenDurationMs &&
-            previousMs < item.endMs - interludeNextLineFocusLeadMs
-        );
-
-        if (previousInterludeIndex < 0) return () => cancelAnimationFrame(syncFrame);
-
-        const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
-        const stillInSameInterlude =
-            currentMs >= previousInterlude.startMs &&
-            currentMs < previousInterlude.endMs;
-
-        if (!stillInSameInterlude) {
-            startInterludeExit(previousInterludeIndex);
+        if (exitInterludeIndex !== null) {
+            startInterludeExit(exitInterludeIndex);
         }
 
         return () => cancelAnimationFrame(syncFrame);

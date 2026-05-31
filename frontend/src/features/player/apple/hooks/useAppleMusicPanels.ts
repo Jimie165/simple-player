@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SidePanel } from '@/features/player/apple/shared/types';
 
@@ -44,9 +44,11 @@ export function useAppleMusicPanels({
     }, [isLyricsOpen]);
 
     useEffect(() => {
-        if (mainContentWidth >= 520) {
+        if (mainContentWidth < 520) return;
+        const frame = requestAnimationFrame(() => {
             setClosingPanel(null);
-        }
+        });
+        return () => cancelAnimationFrame(frame);
     }, [mainContentWidth]);
 
     useEffect(() => {
@@ -79,26 +81,26 @@ export function useAppleMusicPanels({
         };
     }, []);
 
-    const setQueuePanelOpen = (open: boolean) => {
+    const setQueuePanelOpen = useCallback((open: boolean) => {
         usePlayerStore.setState((state) => ({
             isQueueOpen: open,
             isLyricsOpen: open ? false : state.isLyricsOpen,
         }));
-    };
+    }, []);
 
-    const setLyricsPanelOpen = (open: boolean) => {
+    const setLyricsPanelOpen = useCallback((open: boolean) => {
         usePlayerStore.setState((state) => ({
             isLyricsOpen: open,
             isQueueOpen: open ? false : state.isQueueOpen,
         }));
-    };
+    }, []);
 
-    const cancelPendingPanelClose = () => {
+    const cancelPendingPanelClose = useCallback(() => {
         if (panelCloseRafRef.current !== null) {
             window.cancelAnimationFrame(panelCloseRafRef.current);
             panelCloseRafRef.current = null;
         }
-    };
+    }, []);
 
     const startPanelFlip = (target: SidePanel, toggle: () => void) => {
         const sequence = ++panelFlipSequenceRef.current;
@@ -122,7 +124,7 @@ export function useAppleMusicPanels({
         });
     };
 
-    const resetPanelFlipState = () => {
+    const resetPanelFlipState = useCallback(() => {
         panelFlipSequenceRef.current += 1;
         if (panelFlipRafRef.current !== null) {
             window.cancelAnimationFrame(panelFlipRafRef.current);
@@ -134,9 +136,9 @@ export function useAppleMusicPanels({
         }
         setIsPanelFlipping(false);
         setPanelFlipTarget(null);
-    };
+    }, []);
 
-    const closePanel = (panel: SidePanel) => {
+    const closePanel = useCallback((panel: SidePanel) => {
         cancelPendingPanelClose();
         resetPanelFlipState();
         if (mainContentWidth < 520) {
@@ -158,7 +160,7 @@ export function useAppleMusicPanels({
             return;
         }
         setLyricsPanelOpen(false);
-    };
+    }, [cancelPendingPanelClose, mainContentWidth, resetPanelFlipState, setLyricsPanelOpen, setQueuePanelOpen]);
 
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
@@ -198,8 +200,9 @@ export function useAppleMusicPanels({
 
     useEffect(() => {
         if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
-        closePanel('lyrics');
-    }, [lyricsStatus, isLyricsOpen]);
+        const frame = requestAnimationFrame(() => closePanel('lyrics'));
+        return () => cancelAnimationFrame(frame);
+    }, [lyricsStatus, isLyricsOpen, closePanel]);
 
     return {
         queueMounted,

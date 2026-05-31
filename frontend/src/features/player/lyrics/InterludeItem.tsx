@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { motion, type Transition } from 'framer-motion';
 import {
     interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
@@ -29,6 +29,54 @@ const exitCompleteRatio = Math.max(
 );
 const exitMaxRatio = Math.max(0.2, exitCompleteRatio - ENTER_SCALE_DURATION_MS / interludeExitDurationMs);
 const exitTimes = [0, 0.2, exitMaxRatio, exitCompleteRatio, 1];
+const normalExitScaleFrames = [1, EXIT_SCALE_MIN, EXIT_SCALE_MAX, 0, 0];
+const normalExitOpacityFrames = [1, 1, 1, 0, 0];
+
+const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
+
+const interpolateKeyframeValue = (values: number[], progress: number) => {
+    const clampedProgress = clamp01(progress);
+
+    for (let index = 1; index < exitTimes.length; index++) {
+        const previousTime = exitTimes[index - 1];
+        const nextTime = exitTimes[index];
+        if (clampedProgress > nextTime) continue;
+
+        const segmentDuration = nextTime - previousTime;
+        if (segmentDuration <= 0) return values[index];
+
+        const segmentProgress = clamp01((clampedProgress - previousTime) / segmentDuration);
+        return values[index - 1] + (values[index] - values[index - 1]) * segmentProgress;
+    }
+
+    return values[values.length - 1];
+};
+
+const buildSyncedExitFrames = (values: number[], progress: number) => {
+    const clampedProgress = clamp01(progress);
+    if (clampedProgress >= 1) {
+        return {
+            values: [values[values.length - 1], values[values.length - 1]],
+            times: [0, 1],
+            duration: 0.01,
+        };
+    }
+
+    const syncedValues = [interpolateKeyframeValue(values, clampedProgress)];
+    const syncedTimes = [0];
+
+    exitTimes.forEach((time, index) => {
+        if (time <= clampedProgress) return;
+        syncedValues.push(values[index]);
+        syncedTimes.push((time - clampedProgress) / (1 - clampedProgress));
+    });
+
+    return {
+        values: syncedValues,
+        times: syncedTimes,
+        duration: Math.max(0.01, exitDurationSeconds * (1 - clampedProgress)),
+    };
+};
 
 interface InterludeItemProps {
     isActive: boolean;
@@ -54,9 +102,11 @@ export default function InterludeItem({
     endMs
 }: InterludeItemProps) {
     const [hasShownDots, setHasShownDots] = useState(false);
+    const [syncedExitProgress, setSyncedExitProgress] = useState<number | null>(null);
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const dotsVisibleSinceRef = useRef<number | null>(null);
+    const latestTimingRef = useRef({ currentMs, suppressDots });
     const remainingMs = endMs - currentMs;
     const isActuallyActive = isCurrentlyActive && remainingMs > interludeExitDurationMs;
     const isWithinInterludeWindow = currentMs >= startMs && currentMs < endMs;
@@ -66,7 +116,29 @@ export default function InterludeItem({
         currentMs >= startMs + interludeGapOpenDurationMs;
 
     useEffect(() => {
-        const frame = requestAnimationFrame(() => setHasShownDots(false));
+        latestTimingRef.current = { currentMs, suppressDots };
+    }, [currentMs, suppressDots]);
+
+    useEffect(() => {
+        const frame = requestAnimationFrame(() => {
+            const syncedMs = latestTimingRef.current.currentMs;
+            const shouldHaveShownDots =
+                !latestTimingRef.current.suppressDots &&
+                syncedMs >= startMs + interludeGapOpenDurationMs &&
+                syncedMs < endMs - interludeExitCollapseDelayMs;
+            const exitStartMs = endMs - interludeExitDurationMs;
+            const isSyncedIntoExit =
+                shouldHaveShownDots &&
+                syncedMs >= exitStartMs &&
+                syncedMs < endMs;
+
+            setHasShownDots(shouldHaveShownDots);
+            setSyncedExitProgress(
+                isSyncedIntoExit
+                    ? clamp01((syncedMs - exitStartMs) / interludeExitDurationMs)
+                    : null
+            );
+        });
         return () => cancelAnimationFrame(frame);
     }, [playbackSyncKey, startMs, endMs]);
 
@@ -74,14 +146,20 @@ export default function InterludeItem({
         let frame: number | null = null;
 
         if (areDotsVisible) {
-            frame = requestAnimationFrame(() => setHasShownDots(true));
+            frame = requestAnimationFrame(() => {
+                setSyncedExitProgress(null);
+                setHasShownDots(true);
+            });
             return () => {
                 if (frame !== null) cancelAnimationFrame(frame);
             };
         }
 
         if (suppressDots || (!isWithinInterludeWindow && !forceExiting)) {
-            frame = requestAnimationFrame(() => setHasShownDots(false));
+            frame = requestAnimationFrame(() => {
+                setHasShownDots(false);
+                setSyncedExitProgress(null);
+            });
         }
 
         return () => {
@@ -132,12 +210,35 @@ export default function InterludeItem({
     }, [areDotsVisible, endMs, preciseMsRef, startMs]);
 
     // 离场四阶段关键帧：变白+缩至最小 → 放大至最大 → 缩小消失
+    const syncedScaleExit = useMemo(
+        () => syncedExitProgress === null ? null : buildSyncedExitFrames(normalExitScaleFrames, syncedExitProgress),
+        [syncedExitProgress]
+    );
+    const syncedOpacityExit = useMemo(
+        () => syncedExitProgress === null ? null : buildSyncedExitFrames(normalExitOpacityFrames, syncedExitProgress),
+        [syncedExitProgress]
+    );
     const exitScaleFrames = forceExiting
         ? [1, EXIT_SCALE_MIN, EXIT_SCALE_MAX, 0, 0]
+        : syncedScaleExit
+            ? syncedScaleExit.values
         : [null, EXIT_SCALE_MIN, EXIT_SCALE_MAX, 0, 0];
     const exitOpacityFrames = forceExiting
         ? [1, 1, 1, 0, 0]
+        : syncedOpacityExit
+            ? syncedOpacityExit.values
         : [null, 1, 1, 0, 0];
+    const exitTransition: Transition = syncedScaleExit && syncedOpacityExit && !forceExiting
+        ? {
+            duration: syncedScaleExit.duration,
+            ease: 'easeInOut',
+            times: syncedScaleExit.times,
+        }
+        : {
+            duration: exitDurationSeconds,
+            ease: 'easeInOut',
+            times: exitTimes,
+        };
 
     return (
         <div
@@ -163,11 +264,7 @@ export default function InterludeItem({
                 }}
                 transition={areDotsVisible ? {
                     duration: 0,
-                } : {
-                    duration: exitDurationSeconds,
-                    ease: 'easeInOut',
-                    times: exitTimes
-                }}
+                } : exitTransition}
             >
                 <span
                     ref={dotsContainerRef}
@@ -188,11 +285,7 @@ export default function InterludeItem({
                             }}
                             transition={areDotsVisible ? {
                                 duration: 0.24, ease: 'easeOut'
-                            } : {
-                                duration: exitDurationSeconds,
-                                ease: 'easeInOut',
-                                times: exitTimes
-                            }}
+                            } : exitTransition}
                         >
                             <span
                                 ref={(node) => {
