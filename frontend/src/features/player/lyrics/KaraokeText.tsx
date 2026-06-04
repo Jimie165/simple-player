@@ -66,11 +66,11 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMs
                 // 向上浮动的缓动
                 const elapsedMs = timeMs - time_ms;
                 const hasStarted = elapsedMs > 0;
-                const attackMs = 460;
+                const attackMs = Math.min(760, Math.max(460, durationMs * 0.72 + 120));
                 const attackProgress = Math.min(1, Math.max(0, elapsedMs / attackMs));
                 const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
                 const lift = hasStarted ? liftAttack : 0;
-                const translateY = lift * -0.048;
+                const translateY = lift * -0.056;
 
                 // 长音发光缓动包络（对齐单词起止时间，使发光呈现宏观稳定性）
                 const toneReleaseMs = Math.min(240, Math.max(120, groupDurationMs * 0.22));
@@ -83,16 +83,16 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMs
 
                 const longToneEnvelope = hasStarted ? Math.min(toneAttack, release) : 0;
                 const longToneEffect = longToneAmount * longToneEnvelope;
-                const glowOpacity = longToneEffect * (0.42 + progress * 0.38);
-                const glowRadius = 2.8 + longToneEffect * 5.8;
+                const glowOpacity = longToneEffect * (0.46 + progress * 0.4);
+                const glowRadius = 3 + longToneEffect * 6.5;
                 const glowShadow = longToneEffect > 0.01
-                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
+                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.3 + longToneEffect * 0.24}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + longToneEffect * 0.22})`
                     : 'none';
                 const glowMask = hasProgress
                     ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
                     : 'linear-gradient(to right, transparent, transparent)';
 
-                el.style.transform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
+                el.style.transform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.05})`;
                 el.style.willChange = 'transform';
 
                 fillEl.style.backgroundImage = hasProgress
@@ -193,11 +193,11 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMs
 
                                 const elapsedMs = renderCurrentMs - time_ms;
                                 const hasStarted = elapsedMs > 0;
-                                const attackMs = 460;
+                                const attackMs = Math.min(760, Math.max(460, durationMs * 0.72 + 120));
                                 const attackProgress = Math.min(1, Math.max(0, elapsedMs / attackMs));
                                 const liftAttack = Math.sin((attackProgress * Math.PI) / 2);
                                 const lift = hasStarted ? liftAttack : 0;
-                                const translateY = lift * -0.048;
+                                const translateY = lift * -0.056;
 
                                 const toneReleaseMs = Math.min(240, Math.max(120, groupDurationMs * 0.22));
                                 const releaseProgress = Math.min(1, Math.max(0, (groupEndMs - renderCurrentMs) / toneReleaseMs));
@@ -209,16 +209,16 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMs
 
                                 const longToneEnvelope = hasStarted ? Math.min(toneAttack, release) : 0;
                                 longToneEffect = longToneAmount * longToneEnvelope;
-                                glowOpacity = longToneEffect * (0.42 + progress * 0.38);
-                                const glowRadius = 2.8 + longToneEffect * 5.8;
+                                glowOpacity = longToneEffect * (0.46 + progress * 0.4);
+                                const glowRadius = 3 + longToneEffect * 6.5;
                                 glowShadow = longToneEffect > 0.01
-                                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.28 + longToneEffect * 0.22}), 0 0 ${glowRadius}px rgba(255,255,255,${0.16 + longToneEffect * 0.2})`
+                                    ? `0 0 ${glowRadius * 0.45}px rgba(255,255,255,${0.3 + longToneEffect * 0.24}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + longToneEffect * 0.22})`
                                     : 'none';
                                 glowMask = hasProgress
                                     ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
                                     : 'linear-gradient(to right, transparent, transparent)';
 
-                                currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.04})`;
+                                currentTransform = `translate3d(0, ${translateY}em, 0) scale(${1 + longToneEffect * 0.05})`;
                                 currentWillChange = 'transform';
                                 fillBackgroundImage = hasProgress
                                     ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
