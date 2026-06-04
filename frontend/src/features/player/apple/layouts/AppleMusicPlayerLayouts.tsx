@@ -175,7 +175,8 @@ export function AppleMusicNarrowPanelLayout({
 
             <motion.div
                 ref={narrowControlsRef}
-                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] bottom-[clamp(1rem,5vw,2rem)] z-30 flex flex-col gap-4"
+                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] z-30 flex flex-col gap-4"
+                style={{ bottom: 'calc(clamp(1rem, 5vw, 2rem) - 12px)' }}
                 onPointerEnter={handleNarrowControlsPointerEnter}
                 onPointerMove={handleNarrowControlsPointerMove}
                 onPointerLeave={handleNarrowControlsPointerLeave}
