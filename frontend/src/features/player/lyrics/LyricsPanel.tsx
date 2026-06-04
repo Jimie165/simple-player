@@ -36,6 +36,7 @@ const narrowScrollMaskStyle = {
 };
 
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
+const SIDE_LYRICS_FOCUS_ALPHA = 0.45;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function LyricsPanel({
@@ -86,7 +87,7 @@ export default function LyricsPanel({
             const height = el.clientHeight;
             const prevSize = viewportSizeRef.current;
 
-            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : 0.5;
+            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
             setTopSpacerHeight(height * alpha);
             setBottomSpacerHeight(
                 variant === 'narrow'
@@ -286,8 +287,8 @@ export default function LyricsPanel({
             const interludeFocusOffset = item?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
 
             const baseOffset = Math.round(visualShift + interludeFocusOffset);
-            if (variant === 'narrow' && viewportSizeRef.current) {
-                const alpha = NARROW_LYRICS_FOCUS_ALPHA;
+            if (viewportSizeRef.current) {
+                const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
                 const shiftUp = Math.round(viewportSizeRef.current.height * (0.5 - alpha));
                 return baseOffset + shiftUp;
             }
