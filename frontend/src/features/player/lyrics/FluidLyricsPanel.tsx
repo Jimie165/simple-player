@@ -21,11 +21,18 @@ import {
 import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
-const scrollMaskStyle = {
+const sideScrollMaskStyle = {
     maskImage:
         'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
     WebkitMaskImage:
         'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
+};
+
+const narrowScrollMaskStyle = {
+    maskImage:
+        'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
+    WebkitMaskImage:
+        'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -374,7 +381,7 @@ export default function FluidLyricsPanel({
                         ? 'h-full mb-0'
                         : 'h-[calc(100%-3.5rem)] mb-[1.5rem]'
                 )}
-                style={scrollMaskStyle}
+                style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
                 onPan={handlePan}
                 onWheel={handleWheel}
             >
