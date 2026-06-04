@@ -37,6 +37,8 @@ interface DialogState {
     closeEditSong: () => void;
 }
 
+let editSongOpenFrame: number | null = null;
+
 export const useDialogStore = create<DialogState>((set) => ({
     deleteConfirm: {
         isOpen: false,
@@ -85,16 +87,36 @@ export const useDialogStore = create<DialogState>((set) => ({
             properties: { ...state.properties, isOpen: false },
         })),
 
-    openEditSong: (song) =>
+    openEditSong: (song) => {
+        if (editSongOpenFrame !== null) {
+            window.cancelAnimationFrame(editSongOpenFrame);
+        }
+
         set({
             editSong: {
-                isOpen: true,
+                isOpen: false,
                 song,
             },
-        }),
+        });
 
-    closeEditSong: () =>
+        editSongOpenFrame = window.requestAnimationFrame(() => {
+            editSongOpenFrame = null;
+            set((state) => ({
+                editSong: state.editSong.song === song
+                    ? { ...state.editSong, isOpen: true }
+                    : state.editSong,
+            }));
+        });
+    },
+
+    closeEditSong: () => {
+        if (editSongOpenFrame !== null) {
+            window.cancelAnimationFrame(editSongOpenFrame);
+            editSongOpenFrame = null;
+        }
+
         set((state) => ({
             editSong: { ...state.editSong, isOpen: false },
-        })),
+        }));
+    },
 }));
