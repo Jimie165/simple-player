@@ -35,6 +35,7 @@ export function BlurredCoverBackground({ src }: { src: string | null }) {
                             className="w-full h-full object-contain scale-[1.08] blur-[78px] saturate-[1.45] contrast-[1.04]"
                         />
                     </div>
+                    <div className="absolute inset-0 bg-black/15 dark:bg-black/12" />
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.06),transparent_48%)] dark:bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.03),transparent_48%)]" />
                 </motion.div>
             )}
