@@ -3,6 +3,7 @@ import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, Dialo
 import { MdAdd, MdImage, MdDelete } from 'react-icons/md';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 interface CreatePlaylistDialogProps {
     isOpen: boolean;
@@ -29,9 +30,8 @@ export default function CreatePlaylistDialog({
                     extensions: ['png', 'jpg', 'jpeg', 'webp']
                 }]
             });
-            if (selected) {
-                setCoverPath(selected as string);
-            }
+            const imagePath = getSelectedPath(selected);
+            if (imagePath) setCoverPath(imagePath);
         } catch (err) {
             console.error('Failed to pick image', err);
         }

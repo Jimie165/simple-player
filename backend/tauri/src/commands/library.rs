@@ -72,17 +72,23 @@ fn is_subpath_of(child: &str, parent: &str) -> bool {
     if child.len() <= parent.len() {
         return false;
     }
-    let (c_head, p_head) = (&child[..parent.len()], parent);
+
+    // Byte indexing into a UTF-8 path can split non-ASCII folder names. Check the
+    // separator first, then read the prefix only through `str::get`.
+    if child.as_bytes().get(parent.len()) != Some(&b'/') {
+        return false;
+    }
+
+    let Some(c_head) = child.get(..parent.len()) else {
+        return false;
+    };
+    let p_head = parent;
     let head_match = if cfg!(windows) {
         c_head.eq_ignore_ascii_case(p_head)
     } else {
         c_head == p_head
     };
-    if !head_match {
-        return false;
-    }
-    // parent 后面必须紧跟分隔符，避免 "D:/Music" 误判为 "D:/MusicExtra" 的前缀
-    child.as_bytes().get(parent.len()) == Some(&b'/')
+    head_match
 }
 
 fn compute_worker_count(total: usize) -> usize {

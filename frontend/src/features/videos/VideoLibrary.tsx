@@ -4,6 +4,7 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import clsx from 'clsx';
 import { open } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
+import { toast } from 'react-hot-toast';
 import { libraryService } from '@/services/libraryService';
 import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButton';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -16,13 +17,16 @@ import { Virtuoso } from 'react-virtuoso';
 import { VideoGrid } from '@/features/videos/components/VideoGrid';
 
 import { useVideoScanProgress } from '@/hooks/useVideoScanProgress';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 export const VideoLibrary: React.FC = () => {
     const { scanning, progress } = useVideoScanProgress();
     const { videos, fetchVideos, setVideos, videoFolders, fetchVideoFolders, foldersRefreshing, collapsedFolderIds, toggleFolderCollapse, sortBy, sortOrder, setSortBy, setSortOrder } = useVideoStore();
     const { currentTab, currentPage, lastVideoTab, setTab } = useNavigationStore();
     const { isSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds, selectItem, deselectItem, selectedIds } = useSelectionStore();
-    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    const scrollParent = useScrollViewport(true);
+    const [isAddingFolder, setIsAddingFolder] = useState(false);
 
     // Use currentTab if we are on the page, otherwise fall back to lastVideoTab to prevent switch animation during exit
     const effectiveTab = currentPage === 'videos' ? currentTab : (lastVideoTab || 'all');
@@ -68,14 +72,6 @@ export const VideoLibrary: React.FC = () => {
             }
         };
     }, [fetchVideos, fetchVideoFolders]);
-
-    useEffect(() => {
-        const el = document.querySelector('[data-scroll-viewport]');
-        if (!(el instanceof HTMLElement)) return;
-
-        const frame = requestAnimationFrame(() => setScrollParent(el));
-        return () => cancelAnimationFrame(frame);
-    }, []);
 
     const handleSelectFolder = (folderVideos: VideoMetadata[], isSelected: boolean) => {
         if (isSelected) {
@@ -136,15 +132,23 @@ export const VideoLibrary: React.FC = () => {
     }, [isSelectionMode, sortedVideos, setSelectableIds]);
 
     const handleAddFolder = async () => {
+        if (isAddingFolder) return;
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (selected && typeof selected === 'string') {
-                const updated = await libraryService.addVideoFolder(selected);
-                setVideos(updated);
-                await fetchVideoFolders();
-            }
+            const folderPath = getSelectedPath(selected);
+            if (!folderPath) return;
+
+            setIsAddingFolder(true);
+            const updated = await libraryService.addVideoFolder(folderPath);
+            setVideos(updated);
+            await fetchVideoFolders();
+            toast.success('已添加视频文件夹，正在后台扫描...', { id: 'video-add-folder' });
         } catch (err) {
             console.error('添加视频文件夹失败:', err);
+            const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '添加视频文件夹失败';
+            toast.error(message || '添加视频文件夹失败', { id: 'video-add-folder' });
+        } finally {
+            setIsAddingFolder(false);
         }
     };
 

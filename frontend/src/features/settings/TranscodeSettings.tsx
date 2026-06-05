@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-hot-toast';
 import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings, MdFolderOpen, MdRestore } from 'react-icons/md';
 import clsx from 'clsx';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 interface TranscodeCacheInfo {
     total_size_mb: number;
@@ -79,9 +80,10 @@ export default function TranscodeSettings() {
         if (changingDir) return;
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (!selected || typeof selected !== 'string') return;
+            const cacheDir = getSelectedPath(selected);
+            if (!cacheDir) return;
             setChangingDir(true);
-            const data = await invoke<TranscodeCacheInfo>('set_transcode_cache_dir', { cacheDir: selected });
+            const data = await invoke<TranscodeCacheInfo>('set_transcode_cache_dir', { cacheDir });
             setInfo(data);
             setLimit(data.limit_mb);
             toast.success('转码 MP4 文件夹已更新', { id: 'cache-dir-toast' });

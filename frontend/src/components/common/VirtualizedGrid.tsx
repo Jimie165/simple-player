@@ -1,7 +1,8 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
 import clsx from 'clsx';
 import { VirtuosoGrid } from 'react-virtuoso';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
 
 type VirtualizedGridProps<TItem> = {
     data: TItem[];
@@ -22,18 +23,8 @@ export default function VirtualizedGrid<TItem>({
     className,
     overscan = { main: 800, reverse: 800 }
 }: VirtualizedGridProps<TItem>) {
-    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
+    const scrollParent = useScrollViewport(true);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        const el = document.querySelector('[data-scroll-viewport]');
-        if (!(el instanceof HTMLElement)) return;
-
-        const frame = requestAnimationFrame(() => {
-            setScrollParent(el);
-        });
-        return () => cancelAnimationFrame(frame);
-    }, []);
 
     useLayoutEffect(() => {
         const listEl = wrapperRef.current?.querySelector('.virtualized-grid-list');

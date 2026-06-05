@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { LibraryFolder } from '@/types';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 const FOLDER_PREVIEW_COUNT = 3;
 
@@ -33,9 +34,10 @@ export default function MusicFoldersSection() {
         if (isAddingFolder) return;
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (!selected || typeof selected !== 'string') return;
+            const folderPath = getSelectedPath(selected);
+            if (!folderPath) return;
             setIsAddingFolder(true);
-            await libraryService.addFolder(selected);
+            await libraryService.addFolder(folderPath);
             await reloadFolders();
             triggerLibraryUpdate();
             toast.success('已添加文件夹，正在后台扫描...', { id: 'add-folder' });

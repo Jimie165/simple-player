@@ -9,6 +9,7 @@ import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { SongListRow } from '@/features/library/components/SongListRow';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
@@ -252,16 +253,7 @@ export default function SongListView({
     };
     const gridStyle = { gridTemplateColumns: getGridCols() };
 
-    // Find custom scroll parent
-    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-        if (!virtualize) return;
-        const el = document.querySelector('[data-scroll-viewport]');
-        if (!(el instanceof HTMLElement)) return;
-
-        const frame = requestAnimationFrame(() => setScrollParent(el));
-        return () => cancelAnimationFrame(frame);
-    }, [virtualize]);
+    const scrollParent = useScrollViewport(virtualize);
 
     // Render Row Function
     const itemContent = (index: number, song: SongMetadata) => {

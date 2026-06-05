@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
+import { toast } from 'react-hot-toast';
 
 import type { RecentItem, SongMetadata } from '@/types';
 import { fileService } from '@/services/fileService';
@@ -11,6 +12,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { sortSongs } from '@/utils/songSort';
 import { formatTime } from '@/utils/time';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 
@@ -299,14 +301,19 @@ export function useRecentPlayback() {
     const handleOpenFolder = async () => {
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (selected && typeof selected === 'string') {
-                const songs = await fileService.readFolder(selected);
-                if (songs.length === 0) return;
-                const folderName = selected.split(/[\\/]/).pop() || "Unknown Folder";
-                await playFolderItems(selected, songs, folderName);
+            const folderPath = getSelectedPath(selected);
+            if (!folderPath) return;
+
+            const songs = await fileService.readFolder(folderPath);
+            if (songs.length === 0) {
+                toast.error('文件夹中没有可播放的媒体', { id: 'open-folder' });
+                return;
             }
+            const folderName = folderPath.split(/[\\/]/).pop() || "Unknown Folder";
+            await playFolderItems(folderPath, songs, folderName);
         } catch (err) {
             console.error('Failed to open folder:', err);
+            toast.error('打开文件夹失败', { id: 'open-folder' });
         }
     };
 
@@ -318,9 +325,8 @@ export function useRecentPlayback() {
                 { name: 'Video', extensions: ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv'] }
             ]
         });
-        if (selected && typeof selected === 'string') {
-            playSingleFile(selected);
-        }
+        const filePath = getSelectedPath(selected);
+        if (filePath) playSingleFile(filePath);
     };
 
     return {

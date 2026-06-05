@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 
 import PageContainer from '@/components/layout/PageContainer';
 import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButton';
@@ -22,6 +23,7 @@ import type { SongMetadata } from '@/types';
 import type { RecentItem } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { buildAlbums, buildArtists } from '@/features/library/utils/grouping';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
@@ -45,12 +47,13 @@ export default function Library() {
     const [albumSortKey, setAlbumSortKey] = useState<'name' | 'artist'>('name');
     // Store Actions
     // Store Actions
-    const { addToRecent, libraryVersion } = useLibraryStore();
+    const { addToRecent, libraryVersion, triggerLibraryUpdate } = useLibraryStore();
     const { playSong, shufflePlay } = usePlaybackActions();
     const { push } = useNavigationStore();
 
     // Local State
     const [librarySongs, setLibrarySongs] = useState<SongMetadata[]>([]);
+    const [isAddingFolder, setIsAddingFolder] = useState(false);
 
     // Filtered & Sorted Logic
     // ...
@@ -107,13 +110,24 @@ export default function Library() {
     }, [refreshLibrary]);
 
     const handleAddFolder = async () => {
+        if (isAddingFolder) return;
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (selected && typeof selected === 'string') {
-                const songs = await libraryService.addFolder(selected);
-                setLibrarySongs(songs);
-            }
-        } catch (err) { console.error(err); }
+            const folderPath = getSelectedPath(selected);
+            if (!folderPath) return;
+
+            setIsAddingFolder(true);
+            const songs = await libraryService.addFolder(folderPath);
+            setLibrarySongs(songs);
+            triggerLibraryUpdate();
+            toast.success('已添加文件夹，正在后台扫描...', { id: 'library-add-folder' });
+        } catch (err) {
+            console.error(err);
+            const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '添加文件夹失败';
+            toast.error(message || '添加文件夹失败', { id: 'library-add-folder' });
+        } finally {
+            setIsAddingFolder(false);
+        }
     };
 
     // --------------------------------------------------------

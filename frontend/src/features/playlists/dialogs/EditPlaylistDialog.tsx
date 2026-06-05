@@ -3,6 +3,7 @@ import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, Dialo
 import { MdImage, MdAdd } from 'react-icons/md';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 interface EditPlaylistDialogProps {
     isOpen: boolean;
@@ -44,14 +45,8 @@ export default function EditPlaylistDialog({
                     extensions: ['png', 'jpg', 'jpeg', 'webp']
                 }]
             });
-            if (selected) {
-                // selected is string inside struct or just string depending on version.
-                // plugin-dialog v2 returns FileResponse or null?
-                // Usually it returns path string or array of strings.
-                // Let's assume standard Tauri v2 behavior: string | null (if multiple: false)
-                // Wait, check types if possible. Assuming string for now.
-                setCoverPath(selected as string);
-            }
+            const imagePath = getSelectedPath(selected);
+            if (imagePath) setCoverPath(imagePath);
         } catch (err) {
             console.error('Failed to pick image', err);
         }

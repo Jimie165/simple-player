@@ -4,6 +4,7 @@ import { open } from '@tauri-apps/plugin-dialog';
 import { readTextFile } from '@tauri-apps/plugin-fs';
 import { audioService } from '@/services/audioService';
 import type { SongEditFormValues } from '@/features/library/dialogs/song-edit/songEditForm';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 interface SongLyricsFieldsProps {
     songPath?: string;
@@ -61,12 +62,13 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
                 multiple: false,
                 filters: [{ name: 'LRC Lyrics', extensions: ['lrc', 'txt'] }],
             });
-            if (!selected || Array.isArray(selected)) return;
+            const lyricsPath = getSelectedPath(selected);
+            if (!lyricsPath) return;
 
-            const content = await readTextFile(selected);
+            const content = await readTextFile(lyricsPath);
             onChange({
                 lyricsText: content,
-                lyricsSourcePath: selected,
+                lyricsSourcePath: lyricsPath,
                 customLyricsEnabled: true,
             });
         } catch (error) {

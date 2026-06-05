@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Virtuoso } from 'react-virtuoso';
@@ -13,6 +13,7 @@ import type { SongMetadata } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useScrollBlur } from '@/hooks/useScrollBlur';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
 
 interface ArtistDetailViewProps {
     artist: ArtistData;
@@ -106,16 +107,7 @@ export default function ArtistDetailView({
         return sortedAlbums.flatMap(album => album.songs);
     }, [sortedAlbums]);
 
-    const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
-    useEffect(() => {
-        const el = document.querySelector('[data-scroll-viewport]');
-        if (!(el instanceof HTMLElement)) return;
-
-        const frame = requestAnimationFrame(() => {
-            setScrollParent(el);
-        });
-        return () => cancelAnimationFrame(frame);
-    }, []);
+    const scrollParent = useScrollViewport(true);
 
     const animatedAlbumIdsRef = useRef(new Set<string>());
     const getAlbumAnimationClass = (album: AlbumData) => {

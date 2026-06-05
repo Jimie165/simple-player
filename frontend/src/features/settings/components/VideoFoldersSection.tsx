@@ -7,6 +7,7 @@ import clsx from 'clsx';
 import { libraryService } from '@/services/libraryService';
 import { useVideoStore } from '@/store/useVideoStore';
 import type { LibraryFolder } from '@/types';
+import { getSelectedPath } from '@/utils/dialogSelection';
 
 const FOLDER_PREVIEW_COUNT = 3;
 
@@ -41,9 +42,10 @@ export default function VideoFoldersSection() {
         if (isAddingFolder) return;
         try {
             const selected = await open({ directory: true, multiple: false });
-            if (!selected || typeof selected !== 'string') return;
+            const folderPath = getSelectedPath(selected);
+            if (!folderPath) return;
             setIsAddingFolder(true);
-            const updated = await libraryService.addVideoFolder(selected);
+            const updated = await libraryService.addVideoFolder(folderPath);
             setVideos(updated);
             await refreshVideoState();
             toast.success('已添加视频文件夹，正在后台扫描...', { id: 'add-video-folder' });

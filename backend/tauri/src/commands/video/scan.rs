@@ -53,16 +53,21 @@ fn is_subpath_of(child: &str, parent: &str) -> bool {
     if child.len() <= parent.len() {
         return false;
     }
-    let (c_head, p_head) = (&child[..parent.len()], parent);
+
+    if child.as_bytes().get(parent.len()) != Some(&b'/') {
+        return false;
+    }
+
+    let Some(c_head) = child.get(..parent.len()) else {
+        return false;
+    };
+    let p_head = parent;
     let head_match = if cfg!(windows) {
         c_head.eq_ignore_ascii_case(p_head)
     } else {
         c_head == p_head
     };
-    if !head_match {
-        return false;
-    }
-    child.as_bytes().get(parent.len()) == Some(&b'/')
+    head_match
 }
 
 fn compute_worker_count(total: usize) -> usize {
