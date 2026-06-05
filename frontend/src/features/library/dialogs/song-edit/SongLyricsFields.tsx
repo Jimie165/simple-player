@@ -14,7 +14,6 @@ interface SongLyricsFieldsProps {
 
 export default function SongLyricsFields({ songPath, values, onChange, onError }: SongLyricsFieldsProps) {
     const [embeddedLyrics, setEmbeddedLyrics] = useState('');
-    const [loadingEmbedded, setLoadingEmbedded] = useState(false);
 
     const customEnabled = values.customLyricsEnabled;
 
@@ -25,9 +24,6 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
         }
 
         let cancelled = false;
-        const loadingFrame = requestAnimationFrame(() => {
-            if (!cancelled) setLoadingEmbedded(true);
-        });
         audioService.getRawLyrics(songPath)
             .then((text) => {
                 if (cancelled) return;
@@ -37,19 +33,15 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
                 if (cancelled) return;
                 console.warn('Failed to load embedded lyrics for edit dialog', error);
                 setEmbeddedLyrics('');
-            })
-            .finally(() => {
-                if (!cancelled) setLoadingEmbedded(false);
             });
 
         return () => {
             cancelled = true;
-            cancelAnimationFrame(loadingFrame);
         };
     }, [customEnabled, songPath]);
 
     const displayText = customEnabled ? values.lyricsText : embeddedLyrics;
-    const showEmptyState = !customEnabled && !loadingEmbedded && displayText.trim().length === 0;
+    const showEmptyState = !customEnabled && displayText.trim().length === 0;
     const customCheckboxLabel = useMemo(() => customEnabled ? '关闭自定义歌词' : '开启自定义歌词', [customEnabled]);
     const handleToggleCustom = () => {
         if (customEnabled) {
