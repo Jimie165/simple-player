@@ -39,6 +39,45 @@ interface PlayQueueParams {
     restartIfCurrent?: boolean;
 }
 
+const TRANSITION_ENDED_GRACE_MS = 1200;
+const ENDED_EVENT_DEDUPE_MS = 1200;
+
+let playbackTransitionRunning = false;
+let playbackTransitionId = 0;
+let ignoreEndedUntil = 0;
+let lastEndedHandledAt = 0;
+
+const suppressEndedBriefly = () => {
+    ignoreEndedUntil = Date.now() + TRANSITION_ENDED_GRACE_MS;
+};
+
+const canHandleEndedEvent = () => {
+    const now = Date.now();
+    if (playbackTransitionRunning || now < ignoreEndedUntil) return false;
+    if (now - lastEndedHandledAt < ENDED_EVENT_DEDUPE_MS) return false;
+    lastEndedHandledAt = now;
+    return true;
+};
+
+async function runPlaybackTransition(task: (transitionId: number) => Promise<void>) {
+    if (playbackTransitionRunning) return;
+
+    playbackTransitionRunning = true;
+    suppressEndedBriefly();
+    const transitionId = ++playbackTransitionId;
+
+    try {
+        await task(transitionId);
+    } finally {
+        if (transitionId === playbackTransitionId) {
+            playbackTransitionRunning = false;
+            suppressEndedBriefly();
+        }
+    }
+}
+
+const isActiveTransition = (transitionId: number) => transitionId === playbackTransitionId;
+
 const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
     if (!a) return false;
     return (
@@ -63,6 +102,54 @@ export function usePlaybackActions() {
         requestLyricsForPath,
     } = usePlayerStore();
 
+    const applyQueueItemPlayback = async (
+        song: SongMetadata,
+        index: number,
+        transitionId: number,
+        restartIfCurrent = false,
+        autoPlay = true
+    ) => {
+        const { currentSongIndex } = useLibraryStore.getState();
+
+        if (index === currentSongIndex && !restartIfCurrent) {
+            await togglePlay();
+            return;
+        }
+
+        restartSong();
+
+        if (!song.path) return;
+
+        try {
+            if (index === currentSongIndex && restartIfCurrent) {
+                const actualTime = await audioService.seek(0);
+                if (!isActiveTransition(transitionId)) return;
+                setPlaybackTime(actualTime);
+                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
+            }
+
+            await audioService.play(song.path, song);
+            if (!isActiveTransition(transitionId)) return;
+
+            if (!autoPlay) {
+                await audioService.pause();
+                const actualTime = await audioService.seek(0).catch(() => 0);
+                if (!isActiveTransition(transitionId)) return;
+                setPlaybackTime(actualTime);
+            }
+
+            resetPlaybackClock(song.path);
+            setCurrentSongIndex(index);
+            setMetadata(song);
+            setIsPlaying(autoPlay);
+            setAudioLoaded(true);
+            requestLyricsForPath(song.path);
+            window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
+        } catch (error) {
+            console.error('Queue play failed', error);
+        }
+    };
+
     const toggleShuffle = () => {
         const { isShuffling } = usePlayerStore.getState();
         const newShuffleState = !isShuffling;
@@ -74,7 +161,7 @@ export function usePlaybackActions() {
         toggleShuffleList(newShuffleState);
     };
 
-    const playSong = async ({ song, index, playlist, options, context }: PlaySongParams) => {
+    const playSongInternal = async ({ song, index, playlist, options, context }: PlaySongParams, transitionId: number) => {
         if (!song.path) return;
 
         const { metadata, isShuffling } = usePlayerStore.getState();
@@ -88,11 +175,14 @@ export function usePlaybackActions() {
         try {
             if (isCurrent && options?.restartIfCurrent) {
                 const actualTime = await audioService.seek(0);
+                if (!isActiveTransition(transitionId)) return;
                 setPlaybackTime(actualTime);
                 window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
 
             await audioService.play(song.path, song);
+            if (!isActiveTransition(transitionId)) return;
+
             resetPlaybackClock(song.path);
             setMetadata(song);
             setIsPlaying(true);
@@ -135,8 +225,15 @@ export function usePlaybackActions() {
         }
     };
 
+    const playSong = async (params: PlaySongParams) => {
+        await runPlaybackTransition(async (transitionId) => {
+            await playSongInternal(params, transitionId);
+        });
+    };
+
     const playList = async ({ songs, startIndex = 0, shuffle = false, options, context }: PlayListParams) => {
         if (songs.length === 0) return;
+        if (playbackTransitionRunning) return;
 
         if (shuffle) {
             await shufflePlay({ songs, options, context });
@@ -162,6 +259,7 @@ export function usePlaybackActions() {
 
     const shufflePlay = async ({ songs, options, context }: ShufflePlayParams) => {
         if (songs.length === 0) return;
+        if (playbackTransitionRunning) return;
 
         const randomIndex = Math.floor(Math.random() * songs.length);
         const song = songs[randomIndex];
@@ -195,33 +293,9 @@ export function usePlaybackActions() {
     };
 
     const playQueueItem = async ({ song, index, restartIfCurrent = false }: PlayQueueParams) => {
-        const { currentSongIndex } = useLibraryStore.getState();
-
-        if (index === currentSongIndex && !restartIfCurrent) {
-            await togglePlay();
-            return;
-        }
-
-        restartSong();
-
-        if (!song.path) return;
-
-        try {
-            if (index === currentSongIndex && restartIfCurrent) {
-                const actualTime = await audioService.seek(0);
-                setPlaybackTime(actualTime);
-                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
-            }
-            await audioService.play(song.path, song);
-            resetPlaybackClock(song.path);
-            setCurrentSongIndex(index);
-            setMetadata(song);
-            setIsPlaying(true);
-            setAudioLoaded(true);
-            requestLyricsForPath(song.path);
-        } catch (error) {
-            console.error('Queue play failed', error);
-        }
+        await runPlaybackTransition(async (transitionId) => {
+            await applyQueueItemPlayback(song, index, transitionId, restartIfCurrent);
+        });
     };
 
     // --- New Actions for Controls ---
@@ -241,44 +315,80 @@ export function usePlaybackActions() {
     };
 
     const playNext = async () => {
-        const { playlist, currentSongIndex, pushHistory } = useLibraryStore.getState();
-        if (playlist.length === 0) return;
+        await runPlaybackTransition(async (transitionId) => {
+            const { playlist, currentSongIndex, pushHistory } = useLibraryStore.getState();
+            if (playlist.length === 0) return;
 
-        pushHistory(currentSongIndex);
-        const nextIdx = (currentSongIndex + 1) % playlist.length;
-
-        const song = playlist[nextIdx];
-        if (song?.path) {
-            await playQueueItem({ song, index: nextIdx, restartIfCurrent: true });
-        }
+            pushHistory(currentSongIndex);
+            const nextIdx = (currentSongIndex + 1) % playlist.length;
+            const song = playlist[nextIdx];
+            if (song?.path) {
+                await applyQueueItemPlayback(song, nextIdx, transitionId, true);
+            }
+        });
     };
 
     const playPrev = async (currentTime: number = 0) => {
-        const { playlist, currentSongIndex, popHistory } = useLibraryStore.getState();
-        if (playlist.length === 0) return;
+        await runPlaybackTransition(async (transitionId) => {
+            const { playlist, currentSongIndex, popHistory } = useLibraryStore.getState();
+            if (playlist.length === 0) return;
 
-        // Check if we should just restart current song (> 3s)
-        if (currentTime > 3) {
-            await seek(0); // Use the seek action to ensure UI sync
-            return;
-        }
-
-        // Try history first
-        const historyIndex = popHistory();
-        if (historyIndex !== undefined && historyIndex >= 0 && historyIndex < playlist.length) {
-            const song = playlist[historyIndex];
-            if (song?.path) {
-                await playQueueItem({ song, index: historyIndex, restartIfCurrent: true });
+            // Check if we should just restart current song (> 3s)
+            if (currentTime > 3) {
+                await seek(0); // Use the seek action to ensure UI sync
                 return;
             }
-        }
 
-        // Fallback to previous index
-        const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
-        const song = playlist[prevIdx];
-        if (song?.path) {
-            await playQueueItem({ song, index: prevIdx, restartIfCurrent: true });
-        }
+            // Try history first
+            const historyIndex = popHistory();
+            if (historyIndex !== undefined && historyIndex >= 0 && historyIndex < playlist.length) {
+                const song = playlist[historyIndex];
+                if (song?.path) {
+                    await applyQueueItemPlayback(song, historyIndex, transitionId, true);
+                    return;
+                }
+            }
+
+            // Fallback to previous index
+            const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
+            const song = playlist[prevIdx];
+            if (song?.path) {
+                await applyQueueItemPlayback(song, prevIdx, transitionId, true);
+            }
+        });
+    };
+
+    const handlePlaybackEnded = async () => {
+        if (!canHandleEndedEvent()) return;
+
+        await runPlaybackTransition(async (transitionId) => {
+            const { playlist, currentSongIndex, pushHistory, getNextIndex } = useLibraryStore.getState();
+            const { repeatMode } = usePlayerStore.getState();
+            if (playlist.length === 0 || currentSongIndex < 0 || currentSongIndex >= playlist.length) return;
+
+            if (repeatMode === 'one') {
+                const song = playlist[currentSongIndex];
+                if (song?.path) {
+                    await applyQueueItemPlayback(song, currentSongIndex, transitionId, true);
+                }
+                return;
+            }
+
+            pushHistory(currentSongIndex);
+            const nextIdx = getNextIndex(repeatMode);
+            if (nextIdx === -1) {
+                const song = playlist[currentSongIndex];
+                if (song?.path) {
+                    await applyQueueItemPlayback(song, currentSongIndex, transitionId, true, false);
+                }
+                return;
+            }
+
+            const song = playlist[nextIdx];
+            if (song?.path) {
+                await applyQueueItemPlayback(song, nextIdx, transitionId, true);
+            }
+        });
     };
 
     return {
@@ -288,6 +398,7 @@ export function usePlaybackActions() {
         playQueueItem,
         playNext,
         playPrev,
+        handlePlaybackEnded,
         seek,
         toggleShuffle
     };

@@ -12,8 +12,8 @@ export function useScrollViewport(enabled = true) {
 
     useEffect(() => {
         if (!enabled) {
-            setScrollParent(null);
-            return;
+            const frame = requestAnimationFrame(() => setScrollParent(null));
+            return () => cancelAnimationFrame(frame);
         }
 
         let cancelled = false;

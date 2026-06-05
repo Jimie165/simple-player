@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { toast } from 'react-hot-toast';
 import { listen } from '@tauri-apps/api/event';
 // Store & Services
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { useLibraryStore } from '@/store/useLibraryStore';
 import { audioService } from '@/services/audioService';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { PlaybackControlButtons } from '@/features/player/controls/PlaybackControlButtons';
@@ -20,139 +18,34 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         isShuffling, repeatMode,
         togglePlay, setIsPlaying,
         toggleRepeat,
-        setMetadata,
-        setAudioLoaded,
         restartTrigger, // Destructure trigger
         currentTime,
         setPlaybackTime,
         resetPlaybackClock,
-        requestLyricsForPath,
     } = usePlayerStore();
 
-    const { playlist, currentSongIndex, getNextIndex, setCurrentSongIndex, pushHistory, popHistory } = useLibraryStore();
-    const { toggleShuffle, seek } = usePlaybackActions();
+    const { toggleShuffle, seek, playNext, playPrev, handlePlaybackEnded } = usePlaybackActions();
 
     const [isDragging, setIsDragging] = useState(false);
     const [isRemoteDragging, setIsRemoteDragging] = useState(false);
-
-    const isAutoChanging = useRef(false);
 
     // --- 监听 Metadata 变化，添加到最近播放 ---
     // 已移除：根据用户需求，仅手动点播（点击列表项）才加入最近播放。
     // 自动切歌和播放器内的上一首/下一首按钮不再记录。
 
-    // --- 核心修复：切歌/播放执行函数 ---
-    const playSongByIndex = async (index: number, autoPlay: boolean = true) => {
-        // 增加安全校验：如果索引无效，解锁并退出
-        if (index < 0 || index >= playlist.length) {
-            isAutoChanging.current = false;
-            return;
-        }
-
-        const song = playlist[index];
-        if (!song.path) {
-            isAutoChanging.current = false;
-            return;
-        }
-
-        try {
-            // 1. 先播放或加载 (Play or Load)
-            await audioService.play(song.path, song);
-
-            if (!autoPlay) {
-                // 如果不自动播放（例如列表播完回到开头暂停），马上暂停并重置进度
-                await audioService.pause();
-                await seek(0);
-            }
-
-            // 2. 成功后更新 UI (Update UI Later)
-            setMetadata(song);
-            setCurrentSongIndex(index);
-            resetPlaybackClock(song.path);
-            window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
-            requestLyricsForPath(song.path);
-
-            if (autoPlay) {
-                setIsPlaying(true);
-                setAudioLoaded(true);
-            } else {
-                setIsPlaying(false);
-            }
-
-        } catch (err) {
-            console.error("Play failed", err);
-            // 播放失败，不更新 UI，保持在上一首 (或者显示错误 toast)
-            toast.error("播放失败，请检查文件是否存在");
-        } finally {
-            // 确保在 500ms 后释放锁，防止连续触发
-            setTimeout(() => {
-                isAutoChanging.current = false;
-            }, 500);
-        }
-    };
-
     // --- 按钮逻辑：下一首 ---
     const handleNext = async () => {
-        // 手动点击：无视锁，直接切
-        pushHistory(currentSongIndex);
-        const len = playlist.length;
-        if (len === 0) return;
-
-        // 逻辑：手动点击下一首，即使是单曲循环，也切到下一首
-        const nextIdx = (currentSongIndex + 1) % len;
-        playSongByIndex(nextIdx);
+        await playNext();
     };
 
     // --- 按钮逻辑：上一首 ---
     const handlePrev = async () => {
-        const len = playlist.length;
-        if (len === 0) return;
-
-        // 3秒规则
-        if (currentTime > 3) {
-            const actualTime = await seek(0);
-            setPlaybackTime(actualTime);
-            return;
-        }
-
-        const historyIndex = popHistory();
-        if (historyIndex !== undefined) {
-            // 历史记录中的索引对应的歌可能已经不在列表里了（如果被删），但通常还在
-            // 加一个边界检查
-            if (historyIndex >= 0 && historyIndex < len) {
-                playSongByIndex(historyIndex);
-            } else {
-                // Fallback
-                const prevIdx = (currentSongIndex - 1 + len) % len;
-                playSongByIndex(prevIdx);
-            }
-        } else {
-            const prevIdx = (currentSongIndex - 1 + len) % len;
-            playSongByIndex(prevIdx);
-        }
+        await playPrev(currentTime);
     };
 
     // --- 歌曲自然结束的处理逻辑 ---
     const handleSongEnded = () => {
-        // 检查锁，防止重复触发
-        if (isAutoChanging.current) return;
-        isAutoChanging.current = true;
-
-        if (repeatMode === 'one') {
-            // 单曲循环：重播当前
-            playSongByIndex(currentSongIndex);
-        } else {
-            // 列表播放：切下一首
-            pushHistory(currentSongIndex);
-            const nextIdx = getNextIndex(repeatMode);
-
-            if (nextIdx === -1) {
-                console.log("Playlist ended, returning to start of current song.");
-                playSongByIndex(currentSongIndex, false);
-            } else {
-                playSongByIndex(nextIdx);
-            }
-        }
+        void handlePlaybackEnded();
     };
 
     const handleBtnShuffle = () => {
@@ -334,7 +227,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                     // 兜底检测 (防止后端事件丢失)
                     if (metadata && metadata.duration > 0 && prev >= metadata.duration - 0.5) {
                         handleSongEndedRef.current();
-                        return { currentTime: 0 };
+                        return {};
                     }
                     return { currentTime: prev + 0.5 };
                 });
@@ -357,8 +250,6 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         if (restartChanged || songChanged) {
             resetPlaybackClock(metadata?.path ?? null);
             window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
-            // 这里也加一道解锁保险
-            isAutoChanging.current = false;
         }
 
         prevRestartRef.current = restartTrigger;
