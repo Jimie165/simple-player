@@ -145,15 +145,19 @@ export function useAppleMusicPanels({
         resetPanelFlipState();
         if (mainContentWidth < 520) {
             onBeforeNarrowClose?.();
-            setClosingPanel(panel);
             panelCloseRafRef.current = window.requestAnimationFrame(() => {
                 panelCloseRafRef.current = window.requestAnimationFrame(() => {
-                    panelCloseRafRef.current = null;
-                    if (panel === 'queue') {
-                        setQueuePanelOpen(false);
-                        return;
-                    }
-                    setLyricsPanelOpen(false);
+                    setClosingPanel(panel);
+                    panelCloseRafRef.current = window.requestAnimationFrame(() => {
+                        panelCloseRafRef.current = window.requestAnimationFrame(() => {
+                            panelCloseRafRef.current = null;
+                            if (panel === 'queue') {
+                                setQueuePanelOpen(false);
+                                return;
+                            }
+                            setLyricsPanelOpen(false);
+                        });
+                    });
                 });
             });
             return;
