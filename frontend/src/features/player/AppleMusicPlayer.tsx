@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -60,6 +60,26 @@ export default function AppleMusicPlayer({
     const controlsRef = useRef<HTMLDivElement>(null);
 
     const {
+        narrowControlsVisible,
+        narrowControlsRef,
+        revealNarrowControls,
+        handleNarrowPanelScroll,
+        handleNarrowActivity,
+        handleNarrowPointerMove,
+        handleNarrowControlsPointerEnter,
+        handleNarrowControlsPointerMove,
+        handleNarrowControlsPointerLeave,
+    } = useNarrowPanelControls({
+        isOpen,
+        isNarrowPanelLayout,
+        isQueueOpen,
+        isLyricsOpen,
+    });
+    const handleBeforeNarrowClose = useCallback(() => {
+        revealNarrowControls(false);
+    }, [revealNarrowControls]);
+
+    const {
         queueMounted,
         queueScrollToTopSignal,
         lyricsMounted,
@@ -75,22 +95,7 @@ export default function AppleMusicPlayer({
         lyricsStatus,
         mainContentWidth,
         isNarrowPanelLayout,
-    });
-
-    const {
-        narrowControlsVisible,
-        narrowControlsRef,
-        handleNarrowPanelScroll,
-        handleNarrowActivity,
-        handleNarrowPointerMove,
-        handleNarrowControlsPointerEnter,
-        handleNarrowControlsPointerMove,
-        handleNarrowControlsPointerLeave,
-    } = useNarrowPanelControls({
-        isOpen,
-        isNarrowPanelLayout,
-        isQueueOpen,
-        isLyricsOpen,
+        onBeforeNarrowClose: handleBeforeNarrowClose,
     });
 
     const {

@@ -137,6 +137,7 @@ export function useNarrowPanelControls({
     return {
         narrowControlsVisible,
         narrowControlsRef,
+        revealNarrowControls,
         handleNarrowPanelScroll,
         handleNarrowActivity,
         handleNarrowPointerMove,

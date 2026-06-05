@@ -9,6 +9,7 @@ interface UseAppleMusicPanelsArgs {
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
     mainContentWidth: number;
     isNarrowPanelLayout: boolean;
+    onBeforeNarrowClose?: () => void;
 }
 
 export function useAppleMusicPanels({
@@ -18,6 +19,7 @@ export function useAppleMusicPanels({
     lyricsStatus,
     mainContentWidth,
     isNarrowPanelLayout,
+    onBeforeNarrowClose,
 }: UseAppleMusicPanelsArgs) {
     const [queueMounted, setQueueMounted] = useState(isQueueOpen);
     const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
@@ -142,6 +144,7 @@ export function useAppleMusicPanels({
         cancelPendingPanelClose();
         resetPanelFlipState();
         if (mainContentWidth < 520) {
+            onBeforeNarrowClose?.();
             setClosingPanel(panel);
             panelCloseRafRef.current = window.requestAnimationFrame(() => {
                 panelCloseRafRef.current = window.requestAnimationFrame(() => {
@@ -160,7 +163,7 @@ export function useAppleMusicPanels({
             return;
         }
         setLyricsPanelOpen(false);
-    }, [cancelPendingPanelClose, mainContentWidth, resetPanelFlipState, setLyricsPanelOpen, setQueuePanelOpen]);
+    }, [cancelPendingPanelClose, mainContentWidth, onBeforeNarrowClose, resetPanelFlipState, setLyricsPanelOpen, setQueuePanelOpen]);
 
     const handleToggleQueue = () => {
         if (!queueMounted) setQueueMounted(true);
