@@ -99,6 +99,15 @@ pub fn get_metadata(
     Ok(meta)
 }
 
+#[tauri::command]
+pub fn get_original_metadata(
+    app: tauri::AppHandle,
+    path: String,
+) -> Result<SongMetadata, String> {
+    let app_cache_dir = app.path().app_cache_dir().ok();
+    library::get_metadata(&path, app_cache_dir.as_deref())
+}
+
 /// 读取文件夹内的所有音频和视频文件路径
 #[tauri::command]
 pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<SongMetadata> {

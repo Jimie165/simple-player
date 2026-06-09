@@ -6,6 +6,7 @@ import { MdClose } from 'react-icons/md';
 import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
 import { libraryService } from '@/services/libraryService';
+import { fileService } from '@/services/fileService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SongInfoFields from '@/features/library/dialogs/song-edit/SongInfoFields';
@@ -39,6 +40,7 @@ function isSameSong(a: SongMetadata | null, b: SongMetadata) {
 export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialogProps) {
     const [activeTab, setActiveTab] = useState<Tab>('details');
     const [values, setValues] = useState<SongEditFormValues | null>(null);
+    const [originalValues, setOriginalValues] = useState<SongEditFormValues | null>(null);
     const [errors, setErrors] = useState<SongEditFormErrors>({});
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
@@ -54,9 +56,37 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
     useEffect(() => {
         if (!isOpen || !song) return;
         setValues(makeInitialSongEditForm(song));
+        setOriginalValues(null);
         setErrors({});
         setMessage('');
         setActiveTab('details');
+    }, [isOpen, song]);
+
+    useEffect(() => {
+        if (!isOpen || !song?.path) return;
+
+        let cancelled = false;
+        fileService.getOriginalMetadata(song.path)
+            .then((original) => {
+                if (cancelled) return;
+                setOriginalValues(makeInitialSongEditForm({
+                    ...song,
+                    ...original,
+                    id: song.id,
+                    path: song.path,
+                    lyrics_text: song.lyrics_text,
+                    lyrics_source_path: song.lyrics_source_path,
+                }));
+            })
+            .catch((error) => {
+                if (cancelled) return;
+                console.warn('Failed to load original song metadata', error);
+                setOriginalValues(null);
+            });
+
+        return () => {
+            cancelled = true;
+        };
     }, [isOpen, song]);
 
     const handleChange = (patch: Partial<SongEditFormValues>) => {
@@ -107,7 +137,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     const renderPanel = () => {
         if (activeTab === 'details') {
-            return <SongInfoFields values={resolvedValues} errors={errors} onChange={handleChange} />;
+            return <SongInfoFields values={resolvedValues} originalValues={originalValues} errors={errors} onChange={handleChange} />;
         }
         if (activeTab === 'lyrics') {
             return <SongLyricsFields songPath={song.path} values={resolvedValues} onChange={handleChange} onError={setMessage} />;

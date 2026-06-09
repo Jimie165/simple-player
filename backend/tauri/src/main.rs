@@ -78,6 +78,7 @@ fn main() {
             commands::player::set_audio_output,
             // File commands
             commands::files::get_metadata,
+            commands::files::get_original_metadata,
             commands::files::read_folder_audio_files,
             // Library commands
             commands::library::get_library_folders,
