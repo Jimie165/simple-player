@@ -712,17 +712,7 @@ const LEGACY_IGNORED_DIRS_KEY: &str = "library.ignored_dirs";
 const COMMON_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.common";
 const MUSIC_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.music";
 const VIDEO_IGNORED_DIRS_KEY: &str = "library.ignored_dirs.video";
-const DEFAULT_IGNORED_DIRS: &[&str] = &[
-    "node_modules",
-    ".git",
-    "target",
-    "build",
-    ".gradle",
-    "__pycache__",
-    "venv",
-    ".venv",
-    "dist",
-];
+const DEFAULT_IGNORED_DIRS: &[&str] = &[];
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct ScopedIgnoredDirNames {
