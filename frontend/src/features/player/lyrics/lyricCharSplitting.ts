@@ -10,6 +10,8 @@ export interface FlatCharItem {
     groupDurationMs: number;// 所属分组的整体持续时间
     wordIndex: number;     // 单词索引，用以外层单词包裹和 Ref 寻址
     charIndexInWord: number;// 字符在单词内部的相对索引
+    activeCharIndexInWord: number; // 非空白字符在单词内部的序号，空白符跟随上一字符
+    activeCharCountInWord: number; // 单词内参与演唱动画的字符数量
 }
 
 /**
@@ -42,6 +44,7 @@ export function parseLyricsWordsToChars(words: LyricsWord[], lineEndMs: number |
             const isWhitespace = /^\s$/.test(char);
             let charStart = word.time_ms;
             let charDuration = 0;
+            const activeCharIndexInWord = Math.max(0, activeCharIndex - (isWhitespace ? 1 : 0));
 
             if (nonSpaceCount === 0) {
                 // 如果全是空格，均分整个单词持续时间
@@ -68,6 +71,8 @@ export function parseLyricsWordsToChars(words: LyricsWord[], lineEndMs: number |
                 groupDurationMs: durationMs,
                 wordIndex,
                 charIndexInWord: charIndex,
+                activeCharIndexInWord,
+                activeCharCountInWord: Math.max(1, nonSpaceCount),
             });
         });
     });
