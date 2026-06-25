@@ -7,6 +7,7 @@ import KaraokeText from '@/features/player/lyrics/KaraokeText';
 interface LyricsLineItemProps {
     line: LyricsLine;
     isActive: boolean;
+    isKaraokeActive?: boolean;
     isUserScrolling: boolean;
     pausedScroll: boolean;
     distanceFromActive: number;
@@ -27,6 +28,7 @@ interface LyricsLineItemProps {
 export default function LyricsLineItem({
     line,
     isActive,
+    isKaraokeActive = isActive,
     isUserScrolling,
     pausedScroll,
     distanceFromActive,
@@ -84,9 +86,9 @@ export default function LyricsLineItem({
                         words={karaokeWords}
                         lineEndMs={lineEndMs}
                         nextLineStartMs={nextLineStartMs}
-                        currentMs={isActive ? currentMs : 0}
+                        currentMs={isKaraokeActive ? currentMs : 0}
                         preciseMsRef={preciseMsRef}
-                        isActive={isActive}
+                        isActive={isKaraokeActive}
                     />
                 ) : (
                     line.text

@@ -384,6 +384,15 @@ export default function LyricsPanel({
                         itemContent={(displayIndex, item) => {
                             const interludeShift = getVisualInterludeShift(displayIndex);
                             const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
+                            const isKaraokeActive = item.type === 'line' && item.line.words?.length
+                                ? isActive || (
+                                    typeof item.line.visual_end_ms === 'number' &&
+                                    typeof item.line.end_ms === 'number' &&
+                                    item.line.visual_end_ms < item.line.end_ms &&
+                                    renderCurrentMs >= item.line.visual_end_ms &&
+                                    renderCurrentMs < item.line.end_ms
+                                )
+                                : isActive;
 
                             if (item.type === 'interlude') {
                                 return (
@@ -413,6 +422,7 @@ export default function LyricsPanel({
                                 <LyricsLineItem
                                     line={item.line}
                                     isActive={isActive}
+                                    isKaraokeActive={isKaraokeActive}
                                     isUserScrolling={isUserScrolling}
                                     pausedScroll={pausedScrollRef.current}
                                     distanceFromActive={

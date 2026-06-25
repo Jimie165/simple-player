@@ -437,6 +437,15 @@ export default function FluidLyricsPanel({
                         {displayItems.map((item, displayIndex) => {
                             const interludeShift = getVisualInterludeShift(displayIndex);
                             const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
+                            const isKaraokeActive = item.type === 'line' && item.line.words?.length
+                                ? isActive || (
+                                    typeof item.line.visual_end_ms === 'number' &&
+                                    typeof item.line.end_ms === 'number' &&
+                                    item.line.visual_end_ms < item.line.end_ms &&
+                                    renderCurrentMs >= item.line.visual_end_ms &&
+                                    renderCurrentMs < item.line.end_ms
+                                )
+                                : isActive;
 
                             return (
                                 <div
@@ -471,6 +480,7 @@ export default function FluidLyricsPanel({
                                         <LyricsLineItem
                                             line={item.line}
                                             isActive={isActive}
+                                            isKaraokeActive={isKaraokeActive}
                                             isUserScrolling={isUserScrolling}
                                             pausedScroll={pausedScroll}
                                             distanceFromActive={

@@ -2,7 +2,7 @@ import type { LyricsWord } from '@/types';
 
 const targetHandoffLeadMs = 400;
 const tailMinDurationRatio = 0.5;
-const tailMaxWindowMs = 800;
+const tailMaxWindowMs = 700;
 const tailMaxChars = 8;
 const tailMinUsefulCutMs = 50;
 
@@ -98,8 +98,8 @@ export function getTightHandoffVisualEndMs(
 ) {
     if (!words?.length || lineEndMs === null) return lineEndMs;
     const chars = parseLyricsWordsToChars(words, lineEndMs, null);
-    const cutMs = getTightHandoffCompressionPlan(chars, lineEndMs, nextLineStartMs)?.cutMs ?? 0;
-    return cutMs > 0 ? lineEndMs - cutMs : lineEndMs;
+    const plan = getTightHandoffCompressionPlan(chars, lineEndMs, nextLineStartMs);
+    return plan ? plan.visualEndMs : lineEndMs;
 }
 
 function compressTightHandoffTail(
@@ -110,8 +110,8 @@ function compressTightHandoffTail(
     const plan = getTightHandoffCompressionPlan(chars, lineEndMs, nextLineStartMs);
     if (!plan) return chars;
 
-    const { cutMs, tailIndices, tailDurationMs } = plan;
-    const ratio = Math.max(tailMinDurationRatio, (tailDurationMs - cutMs) / tailDurationMs);
+    const { compressionCutMs, tailIndices, tailDurationMs } = plan;
+    const ratio = Math.max(tailMinDurationRatio, (tailDurationMs - compressionCutMs) / tailDurationMs);
     const firstTailStartMs = chars[tailIndices[0]].time_ms;
     const tailIndexSet = new Set(tailIndices);
     let compressedCursorMs = firstTailStartMs;
@@ -119,24 +119,31 @@ function compressTightHandoffTail(
     return chars.map((charItem, index) => {
         if (!tailIndexSet.has(index)) return charItem;
 
+        const isDecoration = /^\s$/.test(charItem.char);
         const originalDurationMs = Math.max(20, charItem.durationMs);
-        const compressedDurationMs = Math.max(20, originalDurationMs * ratio);
         const compressedStartMs = firstTailStartMs + (charItem.time_ms - firstTailStartMs) * ratio;
-        const timeMs = Math.max(compressedCursorMs, compressedStartMs);
-        const nextStart = timeMs + compressedDurationMs;
-        compressedCursorMs = nextStart;
+        const compressedDurationMs = isDecoration
+            ? Math.min(40, Math.max(20, originalDurationMs * ratio))
+            : Math.max(20, originalDurationMs * ratio);
+        const timeMs = isDecoration
+            ? Math.max(firstTailStartMs, Math.min(compressedStartMs, compressedCursorMs - compressedDurationMs))
+            : Math.max(compressedCursorMs, compressedStartMs);
+        const nextStart = isDecoration
+            ? Math.min(plan.compressedEndMs, timeMs + compressedDurationMs)
+            : timeMs + compressedDurationMs;
+        if (!isDecoration) compressedCursorMs = nextStart;
 
         const groupStartOffsetMs = Math.max(0, charItem.groupStartMs - firstTailStartMs);
         const groupStartMs = charItem.groupStartMs >= firstTailStartMs
             ? firstTailStartMs + groupStartOffsetMs * ratio
             : charItem.groupStartMs;
         const groupDurationMs = Math.max(20, charItem.groupDurationMs * ratio);
-        const groupEndMs = Math.min(plan.visualEndMs, Math.max(nextStart, groupStartMs + groupDurationMs));
+        const groupEndMs = Math.min(plan.compressedEndMs, Math.max(nextStart, groupStartMs + groupDurationMs));
 
         return {
             ...charItem,
             time_ms: timeMs,
-            durationMs: compressedDurationMs,
+            durationMs: Math.max(20, nextStart - timeMs),
             nextStart,
             groupStartMs,
             groupEndMs,
@@ -160,19 +167,21 @@ function getTightHandoffCompressionPlan(
     if (tailDurationMs <= 0) return null;
 
     const maxCutMs = tailDurationMs * (1 - tailMinDurationRatio);
-    const cutMs = Math.min(requiredCutMs, maxCutMs);
-    if (cutMs < tailMinUsefulCutMs) return null;
+    const compressionCutMs = Math.min(requiredCutMs, maxCutMs);
+    if (compressionCutMs < tailMinUsefulCutMs) return null;
 
     return {
-        cutMs,
+        compressionCutMs,
         tailIndices,
         tailDurationMs,
-        visualEndMs: lineEndMs - cutMs,
+        compressedEndMs: lineEndMs - compressionCutMs,
+        visualEndMs: lineEndMs - compressionCutMs,
     };
 }
 
 function getTightHandoffTailIndices(chars: FlatCharItem[], lineEndMs: number, requiredCutMs: number) {
     const result: number[] = [];
+    const pendingTrailingSpaces: number[] = [];
     let voicedCharCount = 0;
     const tailWindowStartMs = lineEndMs - tailMaxWindowMs;
 
@@ -181,14 +190,21 @@ function getTightHandoffTailIndices(chars: FlatCharItem[], lineEndMs: number, re
         if (charItem.nextStart < tailWindowStartMs) break;
 
         const isWhitespace = /^\s$/.test(charItem.char);
-        const isPunctuation = /^\p{P}$/u.test(charItem.char);
 
-        if (isWhitespace || isPunctuation) {
-            if (result.length > 0) result.unshift(index);
+        if (isWhitespace) {
+            if (result.length > 0) {
+                result.unshift(index);
+            } else {
+                pendingTrailingSpaces.unshift(index);
+            }
             continue;
         }
 
         result.unshift(index);
+        if (pendingTrailingSpaces.length > 0) {
+            result.push(...pendingTrailingSpaces);
+            pendingTrailingSpaces.length = 0;
+        }
         voicedCharCount++;
 
         const tailDurationMs = getPlayableTailDurationMs(chars, result);
@@ -202,7 +218,7 @@ function getTightHandoffTailIndices(chars: FlatCharItem[], lineEndMs: number, re
 function getPlayableTailDurationMs(chars: FlatCharItem[], tailIndices: number[]) {
     const voicedTail = tailIndices
         .map(index => chars[index])
-        .filter(charItem => !/^\s$/.test(charItem.char) && !/^\p{P}$/u.test(charItem.char));
+        .filter(charItem => !/^\s$/.test(charItem.char));
     if (voicedTail.length === 0) return 0;
 
     const startMs = voicedTail[0].time_ms;

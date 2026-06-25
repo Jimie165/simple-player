@@ -51,6 +51,7 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCha
     const baseAlpha = 0.34;
     const rawProgress = (timeMs - time_ms) / durationMs;
     const progress = clamp01(rawProgress);
+    const isComplete = rawProgress >= 1;
     const stopVal = progress * 100;
     const hasProgress = progress > 0;
 
@@ -91,12 +92,16 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCha
     const glowShadow = emphasisEffect > 0.01
         ? `0 0 ${Math.min(5, glowRadius * 0.45)}px rgba(255,255,255,${0.34 + emphasisEffect * 0.2}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + emphasisEffect * 0.24})`
         : 'none';
-    const glowMask = hasProgress
-        ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
-        : 'linear-gradient(to right, transparent, transparent)';
-    const fillBackgroundImage = hasProgress
-        ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
-        : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
+    const glowMask = isComplete
+        ? 'linear-gradient(to right, #fff, #fff)'
+        : hasProgress
+            ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
+            : 'linear-gradient(to right, transparent, transparent)';
+    const fillBackgroundImage = isComplete
+        ? 'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))'
+        : hasProgress
+            ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
+            : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
 
     return {
         transform: `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
