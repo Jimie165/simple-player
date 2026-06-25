@@ -115,7 +115,7 @@ export default function FluidLyricsPanel({
 
             return displayItems.slice(0, displayIndex).reduce((shift, item, sliceIndex) => {
                 if (item.type !== 'interlude') return shift;
-                const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
+                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
                 const isOpenInterlude =
                     sliceIndex === exitingInterludeIndex ||
                     (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
@@ -386,14 +386,28 @@ export default function FluidLyricsPanel({
             : (variant === 'narrow' ? 3 : 4);
         const topVisibleIndex = Math.max(0, activeDisplayIndex - visibleRowsAboveFocus);
 
-        let currentDelay = 0;
-        let baseDelay = isVisualHandoff ? 0.055 : 0.05;
+        const isFromInterlude = previousItem?.type === 'interlude';
 
-        for (let i = topVisibleIndex; i < displayItems.length; i++) {
-            delays[i] = currentDelay;
-            currentDelay += baseDelay;
-            if (i >= activeDisplayIndex) {
-                baseDelay /= 1.05;
+        if (isFromInterlude) {
+            let currentDelay = 0;
+            const baseDelay = 0.05;
+            for (let i = 0; i < displayItems.length; i++) {
+                if (i <= activeDisplayIndex) {
+                    delays[i] = 0;
+                } else {
+                    currentDelay += baseDelay;
+                    delays[i] = currentDelay;
+                }
+            }
+        } else {
+            let currentDelay = 0;
+            let baseDelay = isVisualHandoff ? 0.055 : 0.05;
+            for (let i = topVisibleIndex; i < displayItems.length; i++) {
+                delays[i] = currentDelay;
+                currentDelay += baseDelay;
+                if (i >= activeDisplayIndex) {
+                    baseDelay /= 1.05;
+                }
             }
         }
         return delays;
