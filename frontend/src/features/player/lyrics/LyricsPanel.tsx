@@ -425,6 +425,11 @@ export default function LyricsPanel({
                                             ? item.line.end_ms
                                             : getLineEndMsByIndex(lines, item.lineIndex)
                                     }
+                                    nextLineStartMs={
+                                        item.line.words?.length
+                                            ? getLineEndMsByIndex(lines, item.lineIndex)
+                                            : null
+                                    }
                                     currentTime={renderCurrentMs / 1000}
                                     preciseMsRef={preciseMsRef}
                                     onSeek={(time) => {

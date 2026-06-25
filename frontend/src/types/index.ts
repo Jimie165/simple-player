@@ -52,6 +52,9 @@ export interface LyricsLine {
     // enhanced LRC. Used to mark exactly when the previous lyric stops
     // sounding so interlude dots can appear right after the last word.
     end_ms?: number | null;
+    // Display-only end time after minimum necessary tail compression.
+    // Used only for word-timed lyrics so plain line LRC is untouched.
+    visual_end_ms?: number | null;
 }
 
 export interface LyricsData {

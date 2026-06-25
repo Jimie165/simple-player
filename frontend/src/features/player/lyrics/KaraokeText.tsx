@@ -6,6 +6,7 @@ import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
 interface KaraokeTextProps {
     words: LyricsWord[];
     lineEndMs: number | null;
+    nextLineStartMs?: number | null;
     currentMs: number;
     preciseMsRef: RefObject<number>;
     isActive: boolean;
@@ -108,12 +109,15 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCha
 }
 
 
-function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMsRef, isActive }: KaraokeTextProps) {
+function KaraokeTextBase({ words, lineEndMs, nextLineStartMs = null, currentMs: baseCurrentMs, preciseMsRef, isActive }: KaraokeTextProps) {
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
-    const flatChars = useMemo(() => parseLyricsWordsToChars(words, lineEndMs), [words, lineEndMs]);
+    const flatChars = useMemo(
+        () => parseLyricsWordsToChars(words, lineEndMs, nextLineStartMs),
+        [words, lineEndMs, nextLineStartMs]
+    );
 
     const wordGroups = useMemo(() => {
         const groups: IndexedCharItem[][] = [];
@@ -277,12 +281,15 @@ function KaraokeTextBase({ words, lineEndMs, currentMs: baseCurrentMs, preciseMs
 
 const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
     if (!prev.isActive && !next.isActive) {
-        return prev.words === next.words && prev.lineEndMs === next.lineEndMs;
+        return prev.words === next.words &&
+            prev.lineEndMs === next.lineEndMs &&
+            prev.nextLineStartMs === next.nextLineStartMs;
     }
 
     return (
         prev.words === next.words &&
         prev.lineEndMs === next.lineEndMs &&
+        prev.nextLineStartMs === next.nextLineStartMs &&
         prev.currentMs === next.currentMs &&
         prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive

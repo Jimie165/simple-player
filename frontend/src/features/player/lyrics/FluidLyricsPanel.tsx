@@ -77,7 +77,6 @@ export default function FluidLyricsPanel({
     const [bottomSpacerHeight, setBottomSpacerHeight] = useState(0);
     const [layoutVersion, setLayoutVersion] = useState(0);
     const [targetScrollY, setTargetScrollY] = useState(0);
-    const [motionDirection, setMotionDirection] = useState(1);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
     const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
@@ -142,10 +141,6 @@ export default function FluidLyricsPanel({
 
     const setTargetWithDirection = useCallback((nextTarget: number) => {
         const clamped = clamp(nextTarget, 0, maxScrollY());
-        const previous = previousTargetYRef.current;
-        if (Math.abs(clamped - previous) > 0.5) {
-            setMotionDirection(clamped > previous ? 1 : -1);
-        }
         previousTargetYRef.current = clamped;
         setTargetScrollY(clamped);
     }, [maxScrollY]);
@@ -347,30 +342,62 @@ export default function FluidLyricsPanel({
         return () => cancelAnimationFrame(syncFrame);
     }, [displayItems, renderCurrentMs, startInterludeExit]);
 
-    const getMotionDelay = useCallback(
-        (displayIndex: number) => {
-            if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return 0;
+    const dynamicSpringParams = useMemo(() => {
+        if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
+            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
+        }
 
-            const distance = Math.abs(displayIndex - activeDisplayIndex);
+        const currentItem = displayItems[activeDisplayIndex];
+        const prevItem = displayItems[activeDisplayIndex - 1];
+        const currentStartMs = currentItem.type === 'line' ? (currentItem.line.time_ms ?? 0) : currentItem.startMs;
+        const prevStartMs = prevItem.type === 'line' ? (prevItem.line.time_ms ?? 0) : prevItem.startMs;
 
-            if (motionDirection >= 0) {
-                // 向下播放（歌词上移）：此时上方的歌词先行（延迟更短），形成从上往下拉动的牵引感
-                if (displayIndex <= activeDisplayIndex) {
-                    return Math.min(0.08, distance * 0.008);
-                } else {
-                    return Math.min(0.25, distance * 0.025);
-                }
-            } else {
-                // 向上跳段（歌词下移）：此时下方的歌词先行，往下拉动上方
-                if (displayIndex >= activeDisplayIndex) {
-                    return Math.min(0.08, distance * 0.008);
-                } else {
-                    return Math.min(0.25, distance * 0.025);
-                }
+        const interval = currentStartMs - prevStartMs;
+        const MIN_INTERVAL = 100;
+        const MAX_INTERVAL = 800;
+        const clampedInterval = clamp(interval, MIN_INTERVAL, MAX_INTERVAL);
+        const MAX_STIFFNESS = 220;
+        const MIN_STIFFNESS = 170;
+
+        let ratio = 1 - (clampedInterval - MIN_INTERVAL) / (MAX_INTERVAL - MIN_INTERVAL);
+        ratio = Math.pow(ratio, 0.2);
+
+        const targetStiffness = MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
+        const targetDamping = Math.sqrt(targetStiffness) * 2.2;
+
+        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 1 } as const;
+    }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling]);
+
+    const motionDelays = useMemo(() => {
+        const delays = new Array(displayItems.length).fill(0);
+        if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return delays;
+
+        const previousItem = displayItems[activeDisplayIndex - 1];
+        const isVisualHandoff =
+            previousItem?.type === 'line' &&
+            typeof previousItem.line.visual_end_ms === 'number' &&
+            (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
+
+        // AMLL 是从实际进入可见区域后的 group 开始累计 delay。
+        // 普通换行保留较完整的牵拉；visual_end_ms 触发的紧贴换行则缩短 active 行等待，
+        // 避免“已经提前聚焦，但滚动还没启动”的小错位。
+        const visibleRowsAboveFocus = isVisualHandoff
+            ? 2
+            : (variant === 'narrow' ? 3 : 4);
+        const topVisibleIndex = Math.max(0, activeDisplayIndex - visibleRowsAboveFocus);
+
+        let currentDelay = 0;
+        let baseDelay = isVisualHandoff ? 0.055 : 0.05;
+
+        for (let i = topVisibleIndex; i < displayItems.length; i++) {
+            delays[i] = currentDelay;
+            currentDelay += baseDelay;
+            if (i >= activeDisplayIndex) {
+                baseDelay /= 1.05;
             }
-        },
-        [activeDisplayIndex, isUserScrolling, isPlaying, motionDirection]
-    );
+        }
+        return delays;
+    }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling, variant]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
@@ -409,11 +436,8 @@ export default function FluidLyricsPanel({
                                             animate={{ y: interludeShift - targetScrollY }}
                                             transition={{
                                                 y: {
-                                                    type: 'spring',
-                                                    stiffness: 85,
-                                                    damping: 14,
-                                                    mass: 0.8,
-                                                    delay: getMotionDelay(displayIndex),
+                                                    ...dynamicSpringParams,
+                                                    delay: motionDelays[displayIndex],
                                                 },
                                             }}
                                         >
@@ -445,6 +469,11 @@ export default function FluidLyricsPanel({
                                                     ? item.line.end_ms
                                                     : getLineEndMsByIndex(lines, item.lineIndex)
                                             }
+                                            nextLineStartMs={
+                                                item.line.words?.length
+                                                    ? getLineEndMsByIndex(lines, item.lineIndex)
+                                                    : null
+                                            }
                                             currentTime={renderCurrentMs / 1000}
                                             preciseMsRef={preciseMsRef}
                                             onSeek={(time) => {
@@ -454,7 +483,8 @@ export default function FluidLyricsPanel({
                                             }}
                                             fluidMotion
                                             targetScrollY={targetScrollY}
-                                            motionDelay={getMotionDelay(displayIndex)}
+                                            motionDelay={motionDelays[displayIndex]}
+                                            springParams={dynamicSpringParams}
                                             variant={variant}
                                         />
                                     )}

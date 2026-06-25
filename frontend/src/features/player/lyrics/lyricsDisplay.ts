@@ -1,4 +1,5 @@
 import type { LyricsLine } from '@/types';
+import { getTightHandoffVisualEndMs } from '@/features/player/lyrics/lyricCharSplitting';
 import {
     interludeNextLineFocusLeadMs,
     interludeThresholdMs,
@@ -19,9 +20,25 @@ export function buildDisplayItems(lines: LyricsLine[], hasTimestamps: boolean): 
     const items: DisplayItem[] = [];
     let lastLyricLineIndex = -1;
     let pendingEndMs: number | null = null;
+    const displayLines = lines.map((line, index) => {
+        const nextLineStartMs = getLineEndMsByIndex(lines, index);
+        const hasWordTiming = Boolean(line.words?.length);
+        const effectiveLineEndMs = typeof line.end_ms === 'number'
+            ? line.end_ms
+            : hasWordTiming
+                ? nextLineStartMs
+                : null;
 
-    for (let index = 0; index < lines.length; index++) {
-        const line = lines[index];
+        return {
+            ...line,
+            visual_end_ms: hasWordTiming
+                ? getTightHandoffVisualEndMs(line.words, effectiveLineEndMs, nextLineStartMs)
+                : null,
+        };
+    });
+
+    for (let index = 0; index < displayLines.length; index++) {
+        const line = displayLines[index];
 
         if (hasTimestamps && typeof line.time_ms === 'number' && line.text.length === 0) {
             if (pendingEndMs === null) pendingEndMs = line.time_ms;
@@ -105,18 +122,27 @@ export function getActiveDisplayIndex(
         if (currentLineItem.type !== 'line') return activeLineDisplayIndex;
         const currentLine = currentLineItem.line;
 
-        if (typeof currentLine.end_ms === 'number' && currentMs >= currentLine.end_ms) {
+        const hasVisualEndMs =
+            typeof currentLine.visual_end_ms === 'number' &&
+            (typeof currentLine.end_ms !== 'number' || currentLine.visual_end_ms < currentLine.end_ms);
+        const lineEndForFocusMs = hasVisualEndMs ? currentLine.visual_end_ms : currentLine.end_ms;
+
+        if (typeof lineEndForFocusMs === 'number' && currentMs >= lineEndForFocusMs) {
             const nextDisplayItem =
                 activeLineDisplayIndex >= 0 ? displayItems[activeLineDisplayIndex + 1] : null;
 
             if (nextDisplayItem?.type === 'line') {
                 const nextLineStartMs = lines[nextDisplayItem.lineIndex]?.time_ms;
                 if (typeof nextLineStartMs === 'number') {
-                    const gapMs = Math.max(0, nextLineStartMs - currentLine.end_ms);
+                    if (hasVisualEndMs) {
+                        return activeLineDisplayIndex + 1;
+                    }
+
+                    const gapMs = Math.max(0, nextLineStartMs - lineEndForFocusMs);
                     const focusNextLineAtMs =
                         gapMs > nonInterludeNextLineFocusThresholdMs
                             ? nextLineStartMs - nonInterludeNextLineFocusLeadMs
-                            : currentLine.end_ms;
+                            : lineEndForFocusMs;
                     if (currentMs >= focusNextLineAtMs) {
                         return activeLineDisplayIndex + 1;
                     }

@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { motion } from 'framer-motion';
+import { motion, type Transition } from 'framer-motion';
 import type { RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
@@ -13,12 +13,14 @@ interface LyricsLineItemProps {
     interludeShift: number;
     interludeShiftDurationMs: number;
     lineEndMs: number | null;
+    nextLineStartMs?: number | null;
     currentTime: number;
     preciseMsRef: RefObject<number>;
     onSeek: (time: number) => void;
     fluidMotion?: boolean;
     targetScrollY?: number;
     motionDelay?: number;
+    springParams?: Transition;
     variant?: 'side' | 'narrow';
 }
 
@@ -31,12 +33,14 @@ export default function LyricsLineItem({
     interludeShift,
     interludeShiftDurationMs,
     lineEndMs,
+    nextLineStartMs = null,
     currentTime,
     preciseMsRef,
     onSeek,
     fluidMotion = false,
     targetScrollY = 0,
     motionDelay = 0,
+    springParams,
     variant,
 }: LyricsLineItemProps) {
     const isNarrow = variant === 'narrow';
@@ -79,6 +83,7 @@ export default function LyricsLineItem({
                     <KaraokeText
                         words={karaokeWords}
                         lineEndMs={lineEndMs}
+                        nextLineStartMs={nextLineStartMs}
                         currentMs={isActive ? currentMs : 0}
                         preciseMsRef={preciseMsRef}
                         isActive={isActive}
@@ -116,10 +121,7 @@ export default function LyricsLineItem({
                 }}
                 transition={{
                     y: {
-                        type: 'spring',
-                        stiffness: 85,
-                        damping: 14,
-                        mass: 0.8,
+                        ...(springParams || { type: 'spring', stiffness: 85, damping: 14, mass: 0.8 }),
                         delay: motionDelay,
                     },
                     scale: { type: 'spring', stiffness: 100, damping: 18, delay: motionDelay * 0.3 },
