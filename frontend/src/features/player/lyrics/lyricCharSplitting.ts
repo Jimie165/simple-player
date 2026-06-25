@@ -8,31 +8,30 @@ const tailMinUsefulCutMs = 50;
 
 export interface FlatCharItem {
     char: string;
-    time_ms: number;       // 字符高亮的开始时间
-    durationMs: number;    // 字符高亮的持续时间
-    nextStart: number;     // 字符高亮的结束时间
-    groupStartMs: number;  // 所属分组的整体开始时间（用于整体位移/长音）
-    groupEndMs: number;    // 所属分组的整体结束时间
-    groupDurationMs: number;// 所属分组的整体持续时间
-    wordIndex: number;     // 单词索引，用以外层单词包裹和 Ref 寻址
-    charIndexInWord: number;// 字符在单词内部的相对索引
-    activeCharIndexInWord: number; // 非空白字符在单词内部的序号，空白符跟随上一字符
-    activeCharCountInWord: number; // 单词内参与演唱动画的字符数量
+    time_ms: number;
+    durationMs: number;
+    nextStart: number;
+    groupStartMs: number;
+    groupEndMs: number;
+    groupDurationMs: number;
+    wordIndex: number;
+    charIndexInWord: number;
+    activeCharIndexInWord: number;
+    activeCharCountInWord: number;
 }
 
-/**
- * 将单词级别的歌词序列解析为扁平的、时值分摊到各个字母字符的序列。
- *
- * @param words 原始单词列表
- * @param lineEndMs 当前歌词行结束时间（用于决定最后一个词的默认时值）
- * @param nextLineStartMs 下一行歌词开始时间，用于短间隔时按缺口反推最小视觉压缩。
- */
+export interface TightHandoffTimingOptions {
+    enabled?: boolean;
+    nextLineStartMs?: number | null;
+}
+
 export function parseLyricsWordsToChars(
     words: LyricsWord[],
     lineEndMs: number | null,
-    nextLineStartMs: number | null = null
+    options: TightHandoffTimingOptions = {}
 ): FlatCharItem[] {
     const result: FlatCharItem[] = [];
+    const { enabled = true, nextLineStartMs = null } = options;
 
     words.forEach((word, wordIndex) => {
         const nextStart = wordIndex + 1 < words.length
@@ -40,7 +39,6 @@ export function parseLyricsWordsToChars(
             : lineEndMs ?? word.time_ms + 600;
 
         const calculatedDuration = word.duration_ms ?? Math.max(80, nextStart - word.time_ms);
-        // 如果是最后一个单词且没有精确时间戳，限制其最长动画时值为 800ms，防止长间奏拖沓
         const isLastWord = wordIndex + 1 === words.length;
         const durationMs = (isLastWord && word.duration_ms === undefined)
             ? Math.min(800, calculatedDuration)
@@ -58,16 +56,13 @@ export function parseLyricsWordsToChars(
             const activeCharIndexInWord = Math.max(0, activeCharIndex - (isWhitespace ? 1 : 0));
 
             if (nonSpaceCount === 0) {
-                // 如果全是空格，均分整个单词持续时间
                 charDuration = durationMs / chars.length;
                 charStart = word.time_ms + charIndex * charDuration;
             } else if (!isWhitespace) {
-                // 字母或有意义字符依次平分单词时长
                 charDuration = durationMs / nonSpaceCount;
                 charStart = word.time_ms + activeCharIndex * charDuration;
                 activeCharIndex++;
             } else {
-                // 空格等空白符号不消耗主要渲染时长，其起止点紧跟在当时已播放的最新字符后
                 charDuration = 0;
                 charStart = word.time_ms + activeCharIndex * (durationMs / nonSpaceCount);
             }
@@ -75,7 +70,7 @@ export function parseLyricsWordsToChars(
             result.push({
                 char,
                 time_ms: charStart,
-                durationMs: Math.max(20, charDuration), // 设定 20ms 的最小保护值以防止计算溢出
+                durationMs: Math.max(20, charDuration),
                 nextStart: charStart + charDuration,
                 groupStartMs: word.time_ms,
                 groupEndMs: nextStart,
@@ -88,16 +83,17 @@ export function parseLyricsWordsToChars(
         });
     });
 
-    return compressTightHandoffTail(result, lineEndMs, nextLineStartMs);
+    return enabled ? compressTightHandoffTail(result, lineEndMs, nextLineStartMs) : result;
 }
 
 export function getTightHandoffVisualEndMs(
     words: LyricsWord[] | null | undefined,
     lineEndMs: number | null,
-    nextLineStartMs: number | null
+    nextLineStartMs: number | null,
+    enabled = true
 ) {
-    if (!words?.length || lineEndMs === null) return lineEndMs;
-    const chars = parseLyricsWordsToChars(words, lineEndMs, null);
+    if (!enabled || !words?.length || lineEndMs === null) return lineEndMs;
+    const chars = parseLyricsWordsToChars(words, lineEndMs, { enabled: false });
     const plan = getTightHandoffCompressionPlan(chars, lineEndMs, nextLineStartMs);
     return plan ? plan.visualEndMs : lineEndMs;
 }

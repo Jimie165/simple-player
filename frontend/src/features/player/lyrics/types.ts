@@ -1,4 +1,5 @@
 import type { LyricsLine } from '@/types';
+import type { LyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 
 export interface LyricsPanelProps {
     isOpen: boolean;
@@ -10,6 +11,7 @@ export interface LyricsPanelProps {
     onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
     variant?: 'side' | 'narrow';
     narrowControlsVisible?: boolean;
+    timingStrategy?: LyricsTimingStrategy;
 }
 
 export type DisplayItem =

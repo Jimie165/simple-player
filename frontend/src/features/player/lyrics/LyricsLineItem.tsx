@@ -15,6 +15,7 @@ interface LyricsLineItemProps {
     interludeShiftDurationMs: number;
     lineEndMs: number | null;
     nextLineStartMs?: number | null;
+    enableTightHandoffTailCompression?: boolean;
     currentTime: number;
     preciseMsRef: RefObject<number>;
     onSeek: (time: number) => void;
@@ -36,6 +37,7 @@ export default function LyricsLineItem({
     interludeShiftDurationMs,
     lineEndMs,
     nextLineStartMs = null,
+    enableTightHandoffTailCompression = false,
     currentTime,
     preciseMsRef,
     onSeek,
@@ -86,6 +88,7 @@ export default function LyricsLineItem({
                         words={karaokeWords}
                         lineEndMs={lineEndMs}
                         nextLineStartMs={nextLineStartMs}
+                        enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                         currentMs={isKaraokeActive ? currentMs : 0}
                         preciseMsRef={preciseMsRef}
                         isActive={isKaraokeActive}

@@ -4,6 +4,10 @@ import type { Variants } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 import FluidLyricsPanel from '@/features/player/lyrics/FluidLyricsPanel';
 import LyricsPanel from '@/features/player/lyrics/LyricsPanel';
+import {
+    animationLyricsTimingStrategy,
+    performanceLyricsTimingStrategy,
+} from '@/features/player/lyrics/timingStrategy';
 import type { LyricsLine } from '@/types';
 
 interface ApplePlayerLyricsPanelProps {
@@ -43,7 +47,6 @@ export default function ApplePlayerLyricsPanel({
     const isVisible = isLyricsOpen && !isFlippingOut;
     const isNormalReveal = isLyricsOpen && panelFlipTarget === null;
 
-    // 动画配置
     const variants: Variants = {
         visible: {
             opacity: 1,
@@ -83,7 +86,7 @@ export default function ApplePlayerLyricsPanel({
                         !isVisible && 'pointer-events-none'
                     )}
                     initial="hidden"
-                    animate={isVisible ? "visible" : "hidden"}
+                    animate={isVisible ? 'visible' : 'hidden'}
                     variants={variants}
                     style={variant === 'narrow' ? {
                         maskImage: narrowControlsVisible
@@ -107,6 +110,7 @@ export default function ApplePlayerLyricsPanel({
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
+                                timingStrategy={animationLyricsTimingStrategy}
                             />
                         ) : (
                             <LyricsPanel
@@ -119,6 +123,7 @@ export default function ApplePlayerLyricsPanel({
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
+                                timingStrategy={performanceLyricsTimingStrategy}
                             />
                         )
                     )}

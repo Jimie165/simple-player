@@ -6,6 +6,7 @@ import {
     nonInterludeNextLineFocusLeadMs,
     nonInterludeNextLineFocusThresholdMs,
 } from '@/features/player/lyrics/constants';
+import type { LyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 import type { DisplayItem } from '@/features/player/lyrics/types';
 
 export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): number | null {
@@ -16,8 +17,13 @@ export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): num
     return null;
 }
 
-export function buildDisplayItems(lines: LyricsLine[], hasTimestamps: boolean): DisplayItem[] {
+export function buildDisplayItems(
+    lines: LyricsLine[],
+    hasTimestamps: boolean,
+    timingStrategy?: LyricsTimingStrategy
+): DisplayItem[] {
     const items: DisplayItem[] = [];
+    const enableTightHandoffTailCompression = timingStrategy?.compressTightHandoffTail ?? false;
     let lastLyricLineIndex = -1;
     let pendingEndMs: number | null = null;
     const displayLines = lines.map((line, index) => {
@@ -32,7 +38,12 @@ export function buildDisplayItems(lines: LyricsLine[], hasTimestamps: boolean): 
         return {
             ...line,
             visual_end_ms: hasWordTiming
-                ? getTightHandoffVisualEndMs(line.words, effectiveLineEndMs, nextLineStartMs)
+                ? getTightHandoffVisualEndMs(
+                    line.words,
+                    effectiveLineEndMs,
+                    nextLineStartMs,
+                    enableTightHandoffTailCompression
+                )
                 : null,
         };
     });
@@ -89,15 +100,17 @@ export function getActiveDisplayIndex(
     displayItems: DisplayItem[],
     lines: LyricsLine[],
     currentLyricIndex: number,
-    currentTime: number
+    currentTime: number,
+    timingStrategy?: LyricsTimingStrategy
 ) {
     if (!displayItems.length) return 0;
 
+    const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
     const currentMs = currentTime * 1000;
     const interludeIndex = displayItems.findIndex((item) =>
-            item.type === 'interlude' &&
-            currentMs >= item.startMs &&
-            currentMs < item.endMs
+        item.type === 'interlude' &&
+        currentMs >= item.startMs &&
+        currentMs < item.endMs
     );
 
     if (interludeIndex >= 0) {
@@ -122,14 +135,18 @@ export function getActiveDisplayIndex(
         if (currentLineItem.type !== 'line') return activeLineDisplayIndex;
         const currentLine = currentLineItem.line;
 
+        const nextTimedLineStartMs = getLineEndMsByIndex(lines, currentLineItem.lineIndex);
+        const naturalLineEndMs = typeof currentLine.end_ms === 'number'
+            ? currentLine.end_ms
+            : nextTimedLineStartMs;
         const hasVisualEndMs =
+            focusNextLineByVisualEnd &&
             typeof currentLine.visual_end_ms === 'number' &&
-            (typeof currentLine.end_ms !== 'number' || currentLine.visual_end_ms < currentLine.end_ms);
-        const lineEndForFocusMs = hasVisualEndMs ? currentLine.visual_end_ms : currentLine.end_ms;
+            (naturalLineEndMs === null || currentLine.visual_end_ms < naturalLineEndMs);
+        const lineEndForFocusMs = hasVisualEndMs ? currentLine.visual_end_ms : naturalLineEndMs;
 
         if (typeof lineEndForFocusMs === 'number' && currentMs >= lineEndForFocusMs) {
-            const nextDisplayItem =
-                activeLineDisplayIndex >= 0 ? displayItems[activeLineDisplayIndex + 1] : null;
+            const nextDisplayItem = displayItems[activeLineDisplayIndex + 1] ?? null;
 
             if (nextDisplayItem?.type === 'line') {
                 const nextLineStartMs = lines[nextDisplayItem.lineIndex]?.time_ms;

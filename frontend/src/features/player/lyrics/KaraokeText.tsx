@@ -7,6 +7,7 @@ interface KaraokeTextProps {
     words: LyricsWord[];
     lineEndMs: number | null;
     nextLineStartMs?: number | null;
+    enableTightHandoffTailCompression?: boolean;
     currentMs: number;
     preciseMsRef: RefObject<number>;
     isActive: boolean;
@@ -36,7 +37,6 @@ const amllEmphasisEase = (value: number) => {
     if (x < 0.5) return smoothstep(x / 0.5);
     return smoothstep((1 - x) / 0.5);
 };
-
 
 function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCharStyle {
     const {
@@ -113,15 +113,25 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCha
     };
 }
 
-
-function KaraokeTextBase({ words, lineEndMs, nextLineStartMs = null, currentMs: baseCurrentMs, preciseMsRef, isActive }: KaraokeTextProps) {
+function KaraokeTextBase({
+    words,
+    lineEndMs,
+    nextLineStartMs = null,
+    enableTightHandoffTailCompression = false,
+    currentMs: baseCurrentMs,
+    preciseMsRef,
+    isActive,
+}: KaraokeTextProps) {
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
 
     const flatChars = useMemo(
-        () => parseLyricsWordsToChars(words, lineEndMs, nextLineStartMs),
-        [words, lineEndMs, nextLineStartMs]
+        () => parseLyricsWordsToChars(words, lineEndMs, {
+            enabled: enableTightHandoffTailCompression,
+            nextLineStartMs,
+        }),
+        [enableTightHandoffTailCompression, words, lineEndMs, nextLineStartMs]
     );
 
     const wordGroups = useMemo(() => {
@@ -182,7 +192,7 @@ function KaraokeTextBase({ words, lineEndMs, nextLineStartMs = null, currentMs: 
                             willChange: 'auto',
                             transition: 'none',
                             backfaceVisibility: 'hidden',
-                                        overflow: 'visible',
+                            overflow: 'visible',
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
@@ -198,7 +208,7 @@ function KaraokeTextBase({ words, lineEndMs, nextLineStartMs = null, currentMs: 
                                             willChange: 'auto',
                                             transition: 'none',
                                             backfaceVisibility: 'hidden',
-                                        overflow: 'visible',
+                                            overflow: 'visible',
                                         }}
                                     >
                                         <span
@@ -288,13 +298,15 @@ const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
     if (!prev.isActive && !next.isActive) {
         return prev.words === next.words &&
             prev.lineEndMs === next.lineEndMs &&
-            prev.nextLineStartMs === next.nextLineStartMs;
+            prev.nextLineStartMs === next.nextLineStartMs &&
+            prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression;
     }
 
     return (
         prev.words === next.words &&
         prev.lineEndMs === next.lineEndMs &&
         prev.nextLineStartMs === next.nextLineStartMs &&
+        prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
         prev.currentMs === next.currentMs &&
         prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive

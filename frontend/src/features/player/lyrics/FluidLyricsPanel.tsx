@@ -49,6 +49,7 @@ export default function FluidLyricsPanel({
     onSeek,
     onUserScrollDirection,
     variant,
+    timingStrategy,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
@@ -91,13 +92,15 @@ export default function FluidLyricsPanel({
         return null;
     }, [status, lines.length]);
 
+    const enableTightHandoffTailCompression = timingStrategy?.compressTightHandoffTail ?? false;
+    const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
     const displayItems = useMemo(
-        () => buildDisplayItems(lines, hasTimestamps),
-        [hasTimestamps, lines]
+        () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
+        [hasTimestamps, lines, timingStrategy]
     );
     const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000),
-        [currentLyricIndex, displayItems, lines, renderCurrentMs]
+        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000, timingStrategy),
+        [currentLyricIndex, displayItems, lines, renderCurrentMs, timingStrategy]
     );
 
     useEffect(() => {
@@ -374,6 +377,7 @@ export default function FluidLyricsPanel({
 
         const previousItem = displayItems[activeDisplayIndex - 1];
         const isVisualHandoff =
+            focusNextLineByVisualEnd &&
             previousItem?.type === 'line' &&
             typeof previousItem.line.visual_end_ms === 'number' &&
             (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
@@ -439,6 +443,7 @@ export default function FluidLyricsPanel({
                             const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
                             const isKaraokeActive = item.type === 'line' && item.line.words?.length
                                 ? isActive || (
+                                    focusNextLineByVisualEnd &&
                                     typeof item.line.visual_end_ms === 'number' &&
                                     typeof item.line.end_ms === 'number' &&
                                     item.line.visual_end_ms < item.line.end_ms &&
@@ -498,6 +503,7 @@ export default function FluidLyricsPanel({
                                                     ? getLineEndMsByIndex(lines, item.lineIndex)
                                                     : null
                                             }
+                                            enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                                             currentTime={renderCurrentMs / 1000}
                                             preciseMsRef={preciseMsRef}
                                             onSeek={(time) => {
