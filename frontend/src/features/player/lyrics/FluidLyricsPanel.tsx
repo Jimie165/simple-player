@@ -382,7 +382,7 @@ export default function FluidLyricsPanel({
             typeof previousItem.line.visual_end_ms === 'number' &&
             (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
 
-        // AMLL 是从实际进入可见区域后的 group 开始累计 delay。
+        // 从实际进入可见区域后的 group 开始累计 delay。
         // 普通换行保留较完整的牵拉；visual_end_ms 触发的紧贴换行则缩短 active 行等待，
         // 避免“已经提前聚焦，但滚动还没启动”的小错位。
         const visibleRowsAboveFocus = isVisualHandoff

@@ -32,7 +32,7 @@ const smoothstep = (value: number) => {
     const x = clamp01(value);
     return x * x * (3 - 2 * x);
 };
-const amllEmphasisEase = (value: number) => {
+const emphasisEase = (value: number) => {
     const x = clamp01(value);
     if (x < 0.5) return smoothstep(x / 0.5);
     return smoothstep((1 - x) / 0.5);
@@ -72,7 +72,7 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number, isActive: b
     const charDelayMs = (groupDurationMs / 2.5 / charCount) * charIndex;
     const emphasisDurationMs = Math.max(800, groupDurationMs);
     const emphasisProgress = (timeMs - groupStartMs - charDelayMs) / emphasisDurationMs;
-    const emphasisWave = amllEmphasisEase(emphasisProgress);
+    const emphasisWave = emphasisEase(emphasisProgress);
 
     const releaseMs = Math.min(260, Math.max(130, groupDurationMs * 0.24));
     const release = smoothstep((groupEndMs - timeMs) / releaseMs);
