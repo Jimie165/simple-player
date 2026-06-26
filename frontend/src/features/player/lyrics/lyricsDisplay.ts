@@ -106,6 +106,8 @@ export function getActiveDisplayIndex(
     if (!displayItems.length) return 0;
 
     const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
+    const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
+    const enableLineLyricsEarlyFocus = timingStrategy?.enableLineLyricsEarlyFocus ?? false;
     const currentMs = currentTime * 1000;
     const interludeIndex = displayItems.findIndex((item) =>
         item.type === 'interlude' &&
@@ -145,6 +147,24 @@ export function getActiveDisplayIndex(
             (naturalLineEndMs === null || currentLine.visual_end_ms < naturalLineEndMs);
         const lineEndForFocusMs = hasVisualEndMs ? currentLine.visual_end_ms : naturalLineEndMs;
 
+        // 对没有 wordTiming (逐行 LRC) 歌词提前 leadMs 聚焦切换
+        const hasWordTiming = Boolean(currentLine.words?.length);
+        if (!hasWordTiming && enableLineLyricsEarlyFocus) {
+            const nextDisplayItem = displayItems[activeLineDisplayIndex + 1] ?? null;
+            if (nextDisplayItem?.type === 'line') {
+                const nextLineStartMs = lines[nextDisplayItem.lineIndex]?.time_ms;
+                if (typeof nextLineStartMs === 'number' && typeof currentLine.time_ms === 'number') {
+                    const gapMs = nextLineStartMs - currentLine.time_ms;
+                    if (gapMs > leadMs) {
+                        const focusNextLineAtMs = nextLineStartMs - leadMs;
+                        if (currentMs >= focusNextLineAtMs) {
+                            return activeLineDisplayIndex + 1;
+                        }
+                    }
+                }
+            }
+        }
+
         if (typeof lineEndForFocusMs === 'number' && currentMs >= lineEndForFocusMs) {
             const nextDisplayItem = displayItems[activeLineDisplayIndex + 1] ?? null;
 
@@ -158,7 +178,7 @@ export function getActiveDisplayIndex(
                     const gapMs = Math.max(0, nextLineStartMs - lineEndForFocusMs);
                     const focusNextLineAtMs =
                         gapMs > nonInterludeNextLineFocusThresholdMs
-                            ? nextLineStartMs - nonInterludeNextLineFocusLeadMs
+                            ? nextLineStartMs - leadMs
                             : lineEndForFocusMs;
                     if (currentMs >= focusNextLineAtMs) {
                         return activeLineDisplayIndex + 1;

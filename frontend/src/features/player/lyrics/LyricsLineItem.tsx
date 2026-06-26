@@ -78,8 +78,11 @@ export default function LyricsLineItem({
     const content = (
         <>
             <span
+                style={{
+                    transitionDelay: `${motionDelay}s`,
+                }}
                 className={clsx(
-                    'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative',
+                    'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative transition-all duration-500 ease-in-out',
                     isActive ? 'opacity-100' : 'opacity-40 hover:opacity-75'
                 )}
             >
@@ -99,6 +102,9 @@ export default function LyricsLineItem({
             </span>
             {line.translation && (
                 <span
+                    style={{
+                        transitionDelay: `${motionDelay}s`,
+                    }}
                     className={clsx(
                         'block font-medium text-[clamp(1.08rem,2.8vmin,1.92rem)] leading-[1.34] tracking-wide mt-1 transition-all duration-300',
                         isActive
