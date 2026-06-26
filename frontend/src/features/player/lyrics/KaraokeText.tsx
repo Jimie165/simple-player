@@ -85,7 +85,7 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number, isActive: b
     const translateX = -centerOffset * emphasisEffect * 0.03;
     const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
     const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
-    const translateY = lift * -0.058 + emphasisLift * -0.05;
+    const translateY = lift * -0.068 + emphasisLift * -0.06;
     const scale = 1 + emphasisEffect * 0.1;
     const glowOpacity = hasProgress ? emphasisEffect * (0.5 + progress * 0.35) : 0;
     const glowRadius = 2.5 + emphasisEffect * 9;
