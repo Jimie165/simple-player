@@ -84,7 +84,7 @@ export function ApplePlayerNarrowBottomControls({
                     <IoShuffle className="w-5 h-5" />
                 </button>
 
-                <button onClick={playPrev} className="w-12 h-12 flex-shrink-0 flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                <button onClick={playPrev} className="w-12 h-12 flex-shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
                     <IoPlayBack className="w-9 h-9" />
                 </button>
 
@@ -95,7 +95,7 @@ export function ApplePlayerNarrowBottomControls({
                     {isPlaying ? <IoPause className="w-12 h-12" /> : <IoPlay className="w-12 h-12 ml-1" />}
                 </button>
 
-                <button onClick={playNext} className="w-12 h-12 flex-shrink-0 flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                <button onClick={playNext} className="w-12 h-12 flex-shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
                     <IoPlayForward className="w-9 h-9" />
                 </button>
 

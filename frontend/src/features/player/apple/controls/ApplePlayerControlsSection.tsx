@@ -162,7 +162,7 @@ export default function ApplePlayerControlsSection({
                     <IoShuffle className="w-[60%] h-[60%]" />
                 </button>
 
-                <button onClick={playPrev} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                <button onClick={playPrev} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:scale-105 transition-all">
                     <IoPlayBack className="w-[70%] h-[70%]" />
                 </button>
 
@@ -173,7 +173,7 @@ export default function ApplePlayerControlsSection({
                     {isPlaying ? <IoPause className="w-[75%] h-[75%]" /> : <IoPlay className="w-[75%] h-[75%] ml-[4%]" />}
                 </button>
 
-                <button onClick={playNext} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:opacity-70 transition-opacity">
+                <button onClick={playNext} className="w-[13.5%] flex-shrink-0 aspect-square max-w-[48px] flex items-center justify-center text-white hover:scale-105 transition-all">
                     <IoPlayForward className="w-[70%] h-[70%]" />
                 </button>
 

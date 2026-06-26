@@ -308,7 +308,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                         {currentVideoIndex > 0 && (
                                             <button
                                                 onClick={playPreviousVideo}
-                                                className="p-2 text-white hover:text-white/90 transition-colors"
+                                                className="p-2 text-white/90 hover:text-white transition-colors"
                                                 title="上一个"
                                             >
                                                 <MdSkipPrevious className="text-3xl" />
@@ -318,7 +318,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                         {/* Play/Pause */}
                                         <button
                                             onClick={handleTogglePlay}
-                                            className="p-2 text-white hover:text-white/90 transition-colors"
+                                            className="p-2 text-white/90 hover:text-white transition-colors"
                                         >
                                             {isPlaying ? <MdPause className="text-3xl" /> : <MdPlayArrow className="text-3xl" />}
                                         </button>
@@ -327,7 +327,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                         {currentVideoIndex < videoQueue.length - 1 && (
                                             <button
                                                 onClick={playNextVideo}
-                                                className="p-2 text-white hover:text-white/90 transition-colors"
+                                                className="p-2 text-white/90 hover:text-white transition-colors"
                                                 title="下一个"
                                             >
                                                 <MdSkipNext className="text-3xl" />
