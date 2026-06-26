@@ -38,7 +38,7 @@ const amllEmphasisEase = (value: number) => {
     return smoothstep((1 - x) / 0.5);
 };
 
-function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCharStyle {
+function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number, isActive: boolean = true): KaraokeCharStyle {
     const {
         time_ms,
         durationMs,
@@ -48,7 +48,7 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number): KaraokeCha
         activeCharIndexInWord,
         activeCharCountInWord,
     } = charItem;
-    const baseAlpha = 0.34;
+    const baseAlpha = isActive ? 0.30 : 1.0;
     const rawProgress = (timeMs - time_ms) / durationMs;
     const progress = clamp01(rawProgress);
     const isComplete = rawProgress >= 1;
@@ -155,7 +155,7 @@ function KaraokeTextBase({
                 const glowEl = glowRefs.current[index];
                 if (!el || !fillEl || !glowEl) return;
 
-                const style = getKaraokeCharStyle(charItem, timeMs);
+                const style = getKaraokeCharStyle(charItem, timeMs, true);
                 el.style.transform = style.transform;
                 el.style.willChange = style.willChange;
                 fillEl.style.backgroundImage = style.fillBackgroundImage;
@@ -196,35 +196,7 @@ function KaraokeTextBase({
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
-                            if (!isActive) {
-                                return (
-                                    <span
-                                        key={charItem.charIndexInWord}
-                                        style={{
-                                            position: 'relative',
-                                            display: 'inline-block',
-                                            whiteSpace: 'pre-wrap',
-                                            transform: 'none',
-                                            willChange: 'auto',
-                                            transition: 'none',
-                                            backfaceVisibility: 'hidden',
-                                            overflow: 'visible',
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                position: 'relative',
-                                                zIndex: 1,
-                                                color: 'currentColor',
-                                            }}
-                                        >
-                                            {charItem.char}
-                                        </span>
-                                    </span>
-                                );
-                            }
-
-                            const style = getKaraokeCharStyle(charItem, baseCurrentMs);
+                            const style = getKaraokeCharStyle(charItem, baseCurrentMs, isActive);
 
                             return (
                                 <span
