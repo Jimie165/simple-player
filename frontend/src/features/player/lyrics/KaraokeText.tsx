@@ -196,6 +196,34 @@ function KaraokeTextBase({
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
+                            if (!isActive) {
+                                return (
+                                    <span
+                                        key={charItem.charIndexInWord}
+                                        style={{
+                                            position: 'relative',
+                                            display: 'inline-block',
+                                            whiteSpace: 'pre-wrap',
+                                            transform: 'none',
+                                            willChange: 'auto',
+                                            transition: 'none',
+                                            backfaceVisibility: 'hidden',
+                                            overflow: 'visible',
+                                        }}
+                                    >
+                                        <span
+                                            style={{
+                                                position: 'relative',
+                                                zIndex: 1,
+                                                color: 'currentColor',
+                                            }}
+                                        >
+                                            {charItem.char}
+                                        </span>
+                                    </span>
+                                );
+                            }
+
                             const style = getKaraokeCharStyle(charItem, baseCurrentMs, isActive);
 
                             return (
