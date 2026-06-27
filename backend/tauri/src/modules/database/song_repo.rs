@@ -32,11 +32,12 @@ impl SongRepo {
             rating: row.get(19)?,
             lyrics_text: row.get(20)?,
             lyrics_source_path: row.get(21)?,
+            lyrics_offset_ms: row.get::<_, Option<i32>>(22)?.unwrap_or(0),
             status: row
-                .get::<_, Option<String>>(22)?
+                .get::<_, Option<String>>(23)?
                 .unwrap_or("active".to_string()),
-            created_at: row.get(23)?,
-            updated_at: row.get(24)?,
+            created_at: row.get(24)?,
+            updated_at: row.get(25)?,
             unique_id: None,
         })
     }
@@ -44,7 +45,7 @@ impl SongRepo {
     pub(crate) const SELECT_COLUMNS: &'static str =
         "id, path, title, artist, album, duration, cover, cover_path, folder_id, 
          album_artist, year, genre, track_number, track_total, disc_number, disc_total,
-         play_count, last_played_at, is_favorite, rating, lyrics_text, lyrics_source_path,
+         play_count, last_played_at, is_favorite, rating, lyrics_text, lyrics_source_path, lyrics_offset_ms,
          status, created_at, updated_at";
 
     /// 获取所有活跃歌曲
@@ -316,14 +317,16 @@ impl SongRepo {
         disc_total: Option<i32>,
         lyrics_text: Option<&str>,
         lyrics_source_path: Option<&str>,
+        lyrics_offset_ms: i32,
     ) -> Result<()> {
         conn.execute(
             "UPDATE songs SET
                 title = ?1, artist = ?2, album = ?3, album_artist = ?4,
                 year = ?5, genre = ?6, track_number = ?7, track_total = ?8,
                 disc_number = ?9, disc_total = ?10, lyrics_text = ?11,
-                lyrics_source_path = ?12, updated_at = datetime('now')
-            WHERE id = ?13",
+                lyrics_source_path = ?12, lyrics_offset_ms = ?13,
+                updated_at = datetime('now')
+            WHERE id = ?14",
             params![
                 title,
                 artist,
@@ -337,6 +340,7 @@ impl SongRepo {
                 disc_total,
                 lyrics_text,
                 lyrics_source_path,
+                lyrics_offset_ms,
                 id
             ],
         )?;

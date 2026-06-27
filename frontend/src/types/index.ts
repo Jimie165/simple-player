@@ -26,6 +26,7 @@ export interface SongMetadata {
     rating?: number;
     lyrics_text?: string | null;
     lyrics_source_path?: string | null;
+    lyrics_offset_ms?: number;
     // 队列控制
     is_queue_item?: boolean;
     // 播放列表唯一ID (用于处理重复歌曲)
@@ -60,6 +61,7 @@ export interface LyricsLine {
 export interface LyricsData {
     lines: LyricsLine[];
     has_timestamps: boolean;
+    offset_ms?: number;
 }
 
 // 库文件夹

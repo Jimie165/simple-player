@@ -9,12 +9,31 @@ import { enrichLyricsLines, parseLrcStrings } from '@/utils/lyricsParser';
 function tryParseLrc(data: LyricsData): LyricsData {
     if (data.has_timestamps) {
         return {
+            ...data,
             lines: enrichLyricsLines(data.lines),
             has_timestamps: true,
         };
     }
     const parsed = parseLrcStrings(data.lines);
-    return parsed.has_timestamps ? parsed : data;
+    return parsed.has_timestamps ? { ...parsed, offset_ms: data.offset_ms } : data;
+}
+
+function applyLyricsOffset(data: LyricsData): LyricsData {
+    const offsetMs = data.offset_ms ?? 0;
+    if (!data.has_timestamps || offsetMs === 0) return data;
+
+    return {
+        ...data,
+        lines: data.lines.map(line => ({
+            ...line,
+            time_ms: typeof line.time_ms === 'number' ? line.time_ms + offsetMs : null,
+            end_ms: typeof line.end_ms === 'number' ? line.end_ms + offsetMs : line.end_ms,
+            words: line.words?.map(word => ({
+                ...word,
+                time_ms: word.time_ms + offsetMs,
+            })) ?? line.words,
+        })),
+    };
 }
 
 let cachedAppDataDir: string | null = null;
@@ -98,7 +117,7 @@ export const audioService = {
     // 获取歌词 (嵌入歌词)
     getLyrics: async (path: string): Promise<LyricsData> => {
         const data: LyricsData = await invoke('get_lyrics', { path });
-        return tryParseLrc(data);
+        return applyLyricsOffset(tryParseLrc(data));
     },
 
     getRawLyrics: async (path: string): Promise<string | null> => {

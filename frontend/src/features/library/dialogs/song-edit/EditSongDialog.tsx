@@ -2,9 +2,10 @@ import { Fragment, useEffect, useState } from 'react';
 import type React from 'react';
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { motion } from 'framer-motion';
-import { MdClose } from 'react-icons/md';
+import { MdChevronLeft, MdChevronRight, MdClose } from 'react-icons/md';
 import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import { libraryService } from '@/services/libraryService';
 import { fileService } from '@/services/fileService';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -31,6 +32,15 @@ const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'artwork', label: '插图' },
     { id: 'lyrics', label: '歌词' },
 ];
+
+const LYRICS_OFFSET_STEP_MS = 100;
+const LYRICS_OFFSET_LIMIT_MS = 5000;
+
+function formatLyricsOffset(offsetMs: number) {
+    if (offsetMs === 0) return '歌词偏移：0.0 秒';
+    const seconds = (Math.abs(offsetMs) / 1000).toFixed(1);
+    return offsetMs > 0 ? '延后 ' + seconds + ' 秒' : '提前 ' + seconds + ' 秒';
+}
 
 function isSameSong(a: SongMetadata | null, b: SongMetadata) {
     if (!a) return false;
@@ -76,6 +86,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                     path: song.path,
                     lyrics_text: song.lyrics_text,
                     lyrics_source_path: song.lyrics_source_path,
+                    lyrics_offset_ms: song.lyrics_offset_ms,
                 }));
             })
             .catch((error) => {
@@ -117,7 +128,13 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
             if (isSameSong(playerMetadata, updated)) {
                 setPlayerMetadata({ ...playerMetadata, ...updated });
-                if (updated.path && request.lyrics_text !== song.lyrics_text) {
+                if (
+                    updated.path &&
+                    (
+                        request.lyrics_text !== song.lyrics_text ||
+                        request.lyrics_offset_ms !== (song.lyrics_offset_ms ?? 0)
+                    )
+                ) {
                     await reloadLyricsForPath(updated.path);
                 }
             }
@@ -199,17 +216,17 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
                                         <div className="mt-8 flex justify-center">
                                             <div className="flex items-center gap-7 overflow-x-auto px-2 text-[16px] font-bold">
-                                            {tabs.map(tab => (
-                                                <button
-                                                    key={tab.id}
-                                                    type="button"
-                                                    onClick={() => setActiveTab(tab.id)}
+                                                {tabs.map(tab => (
+                                                    <button
+                                                        key={tab.id}
+                                                        type="button"
+                                                        onClick={() => setActiveTab(tab.id)}
                                                         className={`relative whitespace-nowrap pb-4 transition-colors ${activeTab === tab.id
                                                             ? 'text-neutral-950 dark:text-neutral-50'
                                                             : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
-                                                        }`}
-                                                >
-                                                    {tab.label}
+                                                            }`}
+                                                    >
+                                                        {tab.label}
                                                         {activeTab === tab.id && (
                                                             <motion.span
                                                                 layoutId="edit-song-tab-underline"
@@ -217,8 +234,8 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                                                 className="absolute bottom-0 left-0 h-1 w-full rounded-full bg-primary"
                                                             />
                                                         )}
-                                                </button>
-                                            ))}
+                                                    </button>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
@@ -228,8 +245,53 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                         {message && <div className="mt-4 text-sm text-red-500">{message}</div>}
                                     </div>
 
-                                    <div className="flex shrink-0 items-center justify-between px-6 pb-4 pt-3">
-                                        <div />
+                                    <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-6 pb-4 pt-3">
+                                        {activeTab === 'lyrics' ? (
+                                            <div className="flex min-w-0 items-center gap-1">
+                                                <CustomTooltip text="歌词延后 0.1 秒" placement="top">
+                                                    <button
+                                                        type="button"
+                                                        aria-label="歌词延后 0.1 秒"
+                                                        disabled={resolvedValues.lyricsOffsetMs >= LYRICS_OFFSET_LIMIT_MS}
+                                                        onClick={() => handleChange({
+                                                            lyricsOffsetMs: Math.min(
+                                                                LYRICS_OFFSET_LIMIT_MS,
+                                                                resolvedValues.lyricsOffsetMs + LYRICS_OFFSET_STEP_MS
+                                                            ),
+                                                        })}
+                                                        className="grid h-9 w-9 place-items-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-30"
+                                                    >
+                                                        <MdChevronLeft className="text-[26px]" />
+                                                    </button>
+                                                </CustomTooltip>
+
+                                                <span
+                                                    aria-live="polite"
+                                                    className="min-w-[92px] text-center text-[13px] font-medium tabular-nums text-neutral-600 dark:text-neutral-300"
+                                                >
+                                                    {formatLyricsOffset(resolvedValues.lyricsOffsetMs)}
+                                                </span>
+
+                                                <CustomTooltip text="歌词提前 0.1 秒" placement="top">
+                                                    <button
+                                                        type="button"
+                                                        aria-label="歌词提前 0.1 秒"
+                                                        disabled={resolvedValues.lyricsOffsetMs <= -LYRICS_OFFSET_LIMIT_MS}
+                                                        onClick={() => handleChange({
+                                                            lyricsOffsetMs: Math.max(
+                                                                -LYRICS_OFFSET_LIMIT_MS,
+                                                                resolvedValues.lyricsOffsetMs - LYRICS_OFFSET_STEP_MS
+                                                            ),
+                                                        })}
+                                                        className="grid h-9 w-9 place-items-center rounded-full text-primary transition-colors hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-30"
+                                                    >
+                                                        <MdChevronRight className="text-[26px]" />
+                                                    </button>
+                                                </CustomTooltip>
+                                            </div>
+                                        ) : (
+                                            <div />
+                                        )}
                                         <div className="flex gap-2">
                                             <button
                                                 type="submit"
@@ -238,14 +300,14 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                             >
                                                 {saving ? '保存中...' : '确定'}
                                             </button>
-                                        <button
-                                            type="button"
-                                            onClick={onClose}
-                                            disabled={saving}
+                                            <button
+                                                type="button"
+                                                onClick={onClose}
+                                                disabled={saving}
                                                 className="h-10 min-w-[120px] rounded-[7px] border border-neutral-300 bg-white px-7 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                                        >
-                                            取消
-                                        </button>
+                                            >
+                                                取消
+                                            </button>
                                         </div>
                                     </div>
                                 </form>

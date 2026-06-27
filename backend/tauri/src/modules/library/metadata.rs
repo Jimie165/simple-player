@@ -20,6 +20,7 @@ pub struct LyricsLine {
 pub struct LyricsData {
     pub lines: Vec<LyricsLine>,
     pub has_timestamps: bool,
+    pub offset_ms: i32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -50,6 +51,7 @@ pub struct SongMetadata {
     pub rating: Option<i32>,
     pub lyrics_text: Option<String>,
     pub lyrics_source_path: Option<String>,
+    pub lyrics_offset_ms: i32,
     pub unique_id: Option<i64>, // Playlist Entry ID
     // 媒体详细信息
     pub width: Option<u32>,
@@ -77,6 +79,7 @@ fn build_unsynced_lyrics(content: &str) -> Option<LyricsData> {
     Some(LyricsData {
         lines,
         has_timestamps: false,
+        offset_ms: 0,
     })
 }
 
@@ -84,6 +87,7 @@ pub fn lyrics_from_text(content: &str) -> LyricsData {
     build_unsynced_lyrics(content).unwrap_or(LyricsData {
         lines: Vec::new(),
         has_timestamps: false,
+        offset_ms: 0,
     })
 }
 
@@ -120,6 +124,7 @@ fn build_synced_lyrics(frame: &SynchronizedTextFrame<'_>) -> Option<LyricsData> 
     Some(LyricsData {
         lines,
         has_timestamps,
+        offset_ms: 0,
     })
 }
 
@@ -184,6 +189,7 @@ pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
     Ok(LyricsData {
         lines: Vec::new(),
         has_timestamps: false,
+        offset_ms: 0,
     })
 }
 
@@ -263,6 +269,7 @@ impl SongMetadata {
             rating: song.rating,
             lyrics_text: song.lyrics_text.clone(),
             lyrics_source_path: song.lyrics_source_path.clone(),
+            lyrics_offset_ms: song.lyrics_offset_ms,
             unique_id: song.unique_id,
             width: None,
             height: None,
@@ -388,6 +395,7 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         rating: None,
         lyrics_text: None,
         lyrics_source_path: None,
+        lyrics_offset_ms: 0,
         unique_id: None,
         width: None,
         height: None,

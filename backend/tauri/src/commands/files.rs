@@ -49,6 +49,7 @@ pub fn get_metadata(
             rating: None,
             lyrics_text: None,
             lyrics_source_path: None,
+            lyrics_offset_ms: 0,
             unique_id: None,
             width: video_meta.width,
             height: video_meta.height,
@@ -88,6 +89,7 @@ pub fn get_metadata(
             meta.disc_total = db_song.disc_total;
             meta.lyrics_text = db_song.lyrics_text;
             meta.lyrics_source_path = db_song.lyrics_source_path;
+            meta.lyrics_offset_ms = db_song.lyrics_offset_ms;
             meta.is_favorite = Some(db_song.is_favorite);
             meta.play_count = Some(db_song.play_count);
             meta.last_played_at = db_song.last_played_at;
@@ -160,6 +162,7 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 rating: None,
                 lyrics_text: None,
                 lyrics_source_path: None,
+                lyrics_offset_ms: 0,
                 unique_id: None,
                 width: video_meta.width,
                 height: video_meta.height,
@@ -203,6 +206,7 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 rating: None,
                 lyrics_text: None,
                 lyrics_source_path: None,
+                lyrics_offset_ms: 0,
                 unique_id: None,
                 width: None,
                 height: None,

@@ -16,6 +16,7 @@ export interface UpdateSongDetailsRequest {
     disc_total?: number | null;
     lyrics_text?: string | null;
     lyrics_source_path?: string | null;
+    lyrics_offset_ms: number;
 }
 
 export const libraryService = {

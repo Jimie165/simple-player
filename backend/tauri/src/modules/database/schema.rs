@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 12;
+const SCHEMA_VERSION: i32 = 13;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -98,6 +98,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 12 {
         migrate_v12(conn)?;
+        set_db_version(conn, 12)?;
+    }
+
+    if current_version < 13 {
+        migrate_v13(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -516,4 +521,46 @@ fn migrate_v12(conn: &Connection) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Version 13: per-song lyrics timeline offset in milliseconds.
+fn migrate_v13(conn: &Connection) -> Result<()> {
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(songs)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"lyrics_offset_ms".to_string()) {
+        conn.execute(
+            "ALTER TABLE songs ADD COLUMN lyrics_offset_ms INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+
+    Ok(())
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn migration_v13_defaults_existing_songs_to_zero() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute("CREATE TABLE songs (id INTEGER PRIMARY KEY)", [])
+            .expect("create legacy songs table");
+        conn.execute("INSERT INTO songs (id) VALUES (1)", [])
+            .expect("insert legacy song");
+
+        migrate_v13(&conn).expect("run v13 migration");
+        migrate_v13(&conn).expect("v13 migration remains idempotent");
+
+        let offset: i32 = conn
+            .query_row(
+                "SELECT lyrics_offset_ms FROM songs WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read migrated offset");
+        assert_eq!(offset, 0);
+    }
 }

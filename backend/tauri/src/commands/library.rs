@@ -58,6 +58,7 @@ pub struct UpdateSongDetailsRequest {
     pub disc_total: Option<i32>,
     pub lyrics_text: Option<String>,
     pub lyrics_source_path: Option<String>,
+    pub lyrics_offset_ms: i32,
 }
 
 fn clean_optional_string(value: Option<String>) -> Option<String> {
@@ -635,6 +636,13 @@ pub fn update_song_details(
         None
     };
 
+    if request.lyrics_offset_ms < -5000
+        || request.lyrics_offset_ms > 5000
+        || request.lyrics_offset_ms % 100 != 0
+    {
+        return Err("歌词偏移必须是 -5000 到 5000 毫秒之间的 100 毫秒整数倍".to_string());
+    }
+
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     SongRepo::update_details(
         &conn,
@@ -651,6 +659,7 @@ pub fn update_song_details(
         request.disc_total,
         lyrics_text.as_deref(),
         lyrics_source_path.as_deref(),
+        request.lyrics_offset_ms,
     )
     .map_err(|e| e.to_string())?;
 

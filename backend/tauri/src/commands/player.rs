@@ -52,6 +52,7 @@ pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
 
 #[tauri::command]
 pub fn get_lyrics(db: State<'_, DbState>, path: String) -> Result<LyricsData, String> {
+    let mut offset_ms = 0;
     if let Ok(conn) = db.0.lock() {
         let normalized_path = normalize_db_path(Path::new(&path));
         let db_song = match SongRepo::get_by_path(&conn, &path) {
@@ -60,15 +61,20 @@ pub fn get_lyrics(db: State<'_, DbState>, path: String) -> Result<LyricsData, St
             Err(error) => Err(error),
         };
         if let Ok(Some(song)) = db_song {
+            offset_ms = song.lyrics_offset_ms;
             if let Some(lyrics_text) = song.lyrics_text.as_deref() {
                 if !lyrics_text.trim().is_empty() {
-                    return Ok(crate::modules::library::lyrics_from_text(lyrics_text));
+                    let mut lyrics = crate::modules::library::lyrics_from_text(lyrics_text);
+                    lyrics.offset_ms = offset_ms;
+                    return Ok(lyrics);
                 }
             }
         }
     }
 
-    crate::modules::library::get_lyrics(&path)
+    let mut lyrics = crate::modules::library::get_lyrics(&path)?;
+    lyrics.offset_ms = offset_ms;
+    Ok(lyrics)
 }
 
 #[tauri::command]
