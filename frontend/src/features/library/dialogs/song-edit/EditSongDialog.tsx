@@ -36,10 +36,19 @@ const tabs: Array<{ id: Tab; label: string }> = [
 const LYRICS_OFFSET_STEP_MS = 100;
 const LYRICS_OFFSET_LIMIT_MS = 5000;
 
+function formatSeconds(seconds: number) {
+    return Number.isInteger(seconds)
+        ? String(seconds)
+        : seconds.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+const LYRICS_OFFSET_STEP_LABEL = `${formatSeconds(LYRICS_OFFSET_STEP_MS / 1000)} 秒`;
+
 function formatLyricsOffset(offsetMs: number) {
-    if (offsetMs === 0) return '歌词偏移：0.0 秒';
-    const seconds = (Math.abs(offsetMs) / 1000).toFixed(1);
-    return offsetMs > 0 ? '延后 ' + seconds + ' 秒' : '提前 ' + seconds + ' 秒';
+    if (offsetMs === 0) return '歌词偏移：0 秒';
+    const seconds = Math.abs(offsetMs) / 1000;
+    const secondsStr = formatSeconds(seconds);
+    return offsetMs > 0 ? '延后 ' + secondsStr + ' 秒' : '提前 ' + secondsStr + ' 秒';
 }
 
 function isSameSong(a: SongMetadata | null, b: SongMetadata) {
@@ -248,10 +257,10 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-6 pb-4 pt-3">
                                         {activeTab === 'lyrics' ? (
                                             <div className="flex min-w-0 items-center gap-1">
-                                                <CustomTooltip text="歌词延后 0.1 秒" placement="top">
+                                                <CustomTooltip text={`歌词延后 ${LYRICS_OFFSET_STEP_LABEL}`} placement="top">
                                                     <button
                                                         type="button"
-                                                        aria-label="歌词延后 0.1 秒"
+                                                        aria-label={`歌词延后 ${LYRICS_OFFSET_STEP_LABEL}`}
                                                         disabled={resolvedValues.lyricsOffsetMs >= LYRICS_OFFSET_LIMIT_MS}
                                                         onClick={() => handleChange({
                                                             lyricsOffsetMs: Math.min(
@@ -272,10 +281,10 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                                     {formatLyricsOffset(resolvedValues.lyricsOffsetMs)}
                                                 </span>
 
-                                                <CustomTooltip text="歌词提前 0.1 秒" placement="top">
+                                                <CustomTooltip text={`歌词提前 ${LYRICS_OFFSET_STEP_LABEL}`} placement="top">
                                                     <button
                                                         type="button"
-                                                        aria-label="歌词提前 0.1 秒"
+                                                        aria-label={`歌词提前 ${LYRICS_OFFSET_STEP_LABEL}`}
                                                         disabled={resolvedValues.lyricsOffsetMs <= -LYRICS_OFFSET_LIMIT_MS}
                                                         onClick={() => handleChange({
                                                             lyricsOffsetMs: Math.max(
