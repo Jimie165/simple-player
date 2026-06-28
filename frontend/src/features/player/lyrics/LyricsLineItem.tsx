@@ -71,7 +71,7 @@ export default function LyricsLineItem({
         onSeek(line.time_ms / 1000);
     };
     const className = clsx(
-        'w-full text-left pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] py-[clamp(0.6rem,1vw,1rem)] origin-left will-change-[filter,opacity,transform]',
+        'w-full text-left pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] py-[clamp(0.7rem,1.3vw,1.25rem)] origin-left will-change-[filter,opacity,transform]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
         isActive ? 'text-white drop-shadow-xl' : 'text-white'
     );
