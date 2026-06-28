@@ -46,7 +46,7 @@ export function useAppleMusicPanels({
     }, [isLyricsOpen]);
 
     useEffect(() => {
-        if (mainContentWidth < 520) return;
+        if (mainContentWidth < 560) return;
         const frame = requestAnimationFrame(() => {
             setClosingPanel(null);
         });
@@ -143,7 +143,7 @@ export function useAppleMusicPanels({
     const closePanel = useCallback((panel: SidePanel) => {
         cancelPendingPanelClose();
         resetPanelFlipState();
-        if (mainContentWidth < 520) {
+        if (mainContentWidth < 560) {
             onBeforeNarrowClose?.();
             panelCloseRafRef.current = window.requestAnimationFrame(() => {
                 panelCloseRafRef.current = window.requestAnimationFrame(() => {

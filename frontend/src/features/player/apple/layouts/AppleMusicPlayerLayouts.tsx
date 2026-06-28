@@ -284,7 +284,7 @@ export function AppleMusicStandardLayout({
         >
             <div className={clsx(
                 "relative z-20 flex flex-col items-center justify-center mr-auto",
-                mainContentWidth < 520
+                mainContentWidth < 560
                     ? "w-full px-[clamp(1rem,4vw,3rem)]"
                     : [
                         "transition-[width,padding-left,padding-right] duration-500 ease-[0.32,0.72,0,1]",

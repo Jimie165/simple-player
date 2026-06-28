@@ -52,7 +52,7 @@ export default function AppleMusicPlayer({
     const { playerEffectMode } = useTheme();
 
     const [marqueeResetToken, setMarqueeResetToken] = useState(0);
-    const isNarrowPanelLayout = mainContentWidth < 520 && (isQueueOpen || isLyricsOpen);
+    const isNarrowPanelLayout = mainContentWidth < 560 && (isQueueOpen || isLyricsOpen);
     const coverScale = isPlaying ? 1 : 0.85;
     const bgImageSrc = useCoverBackground(metadata);
     const coverRef = useRef<HTMLDivElement>(null);
