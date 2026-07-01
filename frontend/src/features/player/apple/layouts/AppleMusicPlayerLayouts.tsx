@@ -120,7 +120,7 @@ export function AppleMusicNarrowPanelLayout({
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-0 z-20 flex flex-col px-5 pb-5"
         >
-            <div className="flex items-center gap-3 flex-shrink-0 pt-1 pb-2">
+            <div className="flex items-center gap-3 shrink-0 pt-1 pb-2">
                 <ApplePlayerCover
                     metadata={metadata}
                     bgImageSrc={bgImageSrc}
@@ -295,7 +295,7 @@ export function AppleMusicStandardLayout({
                     <div className="flex-1 min-h-0 flex items-center justify-center w-full">
                         <div
                             ref={coverShellRef}
-                            className="relative aspect-square h-auto w-auto max-h-full max-w-full flex-shrink-0"
+                            className="relative aspect-square h-auto w-auto max-h-full max-w-full shrink-0"
                         >
                             <img
                                 src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAwIiBoZWlnaHQ9IjEwMDAiPjwvc3ZnPg=="

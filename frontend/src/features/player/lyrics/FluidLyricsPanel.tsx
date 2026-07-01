@@ -425,7 +425,7 @@ export default function FluidLyricsPanel({
                     'relative z-10 mt-0 overflow-hidden touch-none',
                     variant === 'narrow'
                         ? 'h-full mb-0'
-                        : 'h-[calc(100%-3.5rem)] mb-[1.5rem]'
+                        : 'h-[calc(100%-3.5rem)] mb-6'
                 )}
                 style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
                 onPan={handlePan}
