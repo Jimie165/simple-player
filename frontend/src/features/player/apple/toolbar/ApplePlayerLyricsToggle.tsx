@@ -10,7 +10,7 @@ export default function ApplePlayerLyricsToggle({ isLyricsOpen, hasLyrics, onTog
     const isDisabled = !hasLyrics;
 
     return (
-        <div title={isDisabled ? '此歌曲无歌词' : undefined}>
+        <div>
             <button
                 type="button"
                 onClick={() => {
