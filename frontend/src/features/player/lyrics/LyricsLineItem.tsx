@@ -83,7 +83,9 @@ export default function LyricsLineItem({
                 } : undefined}
                 className={clsx(
                     'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative',
-                    !shouldRenderKaraoke && 'transition-all duration-500 ease-in-out',
+                    shouldRenderKaraoke
+                        ? (isActive ? 'transition-none' : 'transition-opacity duration-500 ease-in-out')
+                        : 'transition-all duration-500 ease-in-out',
                     isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75'
                 )}
             >
