@@ -9,47 +9,38 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import { libraryService } from '@/services/libraryService';
 
 import type { RecentItem } from '@/types';
-import type { SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
-import { sortSongs } from '@/utils/songSort';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 /**
  * 专门为最近播放列表定义的封面组件，负责内部加载歌曲数据以生成拼接封面
  */
 function PlaylistGridCover({ item }: { item: RecentItem }) {
-    const [songs, setSongs] = useState<SongMetadata[]>([]);
-    const { getPlaylistSettings, libraryVersion, playlistVersion } = useLibraryStore();
+    const [coverPaths, setCoverPaths] = useState<string[]>([]);
+    const { libraryVersion, playlistVersion } = useLibraryStore();
 
     useEffect(() => {
+        let cancelled = false;
         const load = async () => {
-            const plIdStr = item.id.replace('playlist:', '');
-            let plSongs: SongMetadata[] = [];
-            if (plIdStr === 'favorites') {
-                plSongs = await libraryService.getFavorites();
-            } else {
-                const plId = parseInt(plIdStr);
-                if (!isNaN(plId)) {
-                    const raw = await libraryService.getPlaylistSongs(plId);
-                    const settings = getPlaylistSettings(plIdStr);
-                    plSongs = sortSongs(raw, settings.sortKey, settings.sortOrder);
-                }
-            }
-            setSongs(plSongs);
+            const playlistId = Number.parseInt(item.id.replace('playlist:', ''), 10);
+            if (!Number.isInteger(playlistId)) return;
+            const paths = await libraryService.getPlaylistCoverPaths(playlistId);
+            if (!cancelled) setCoverPaths(paths);
         };
-        load();
-    }, [item.id, getPlaylistSettings, libraryVersion, playlistVersion]);
+        void load();
+        return () => { cancelled = true; };
+    }, [item.id, libraryVersion, playlistVersion]);
 
-    return <PlaylistCoverCollage songs={songs} className="w-full h-full" />;
+    return <PlaylistCoverCollage songs={[]} coverPaths={coverPaths} className="w-full h-full" />;
 }
-
 export default function MusicGrid() {
     const mainContentWidth = useMainContentWidth();
     // Store Actions
@@ -138,11 +129,12 @@ export default function MusicGrid() {
                 {recentHistory.length === 0 ? (
                     <EmptyState />
                 ) : (
-                    <div
-                        className="grid content-grid-cover gap-6"
-                        style={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
-                    >
-                        {recentHistory.map((item) => {
+                    <VirtualizedGrid
+                        data={recentHistory}
+                        itemKey={(_index, item) => item.id}
+                        listClassName="grid content-grid-cover gap-6"
+                        listStyle={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
+                        itemContent={(_index, item) => {
                             const isSelected = selectedIds.has(item.id);
 
                             return (
@@ -244,8 +236,8 @@ export default function MusicGrid() {
                                     </div>
                                 </div>
                             );
-                        })}
-                    </div>
+                        }}
+                    />
                 )}
 
                 {contextMenu && (

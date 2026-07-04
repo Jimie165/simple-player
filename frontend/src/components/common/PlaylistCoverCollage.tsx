@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import clsx from 'clsx';
-import { resolveCover } from '@/utils/mediaPath';
+import { getCoverThumbnailPath, resolveMediaPath } from '@/utils/mediaPath';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
 
@@ -9,6 +9,7 @@ interface PlaylistCoverCollageProps {
     songs: SongMetadata[];
     className?: string;
     iconClassName?: string;
+    coverPaths?: string[];
 }
 
 /**
@@ -17,7 +18,7 @@ interface PlaylistCoverCollageProps {
  * - 少于4首歌曲: 显示第一首歌曲封面
  * - 无歌曲: 显示默认图标
  */
-export default function PlaylistCoverCollage({ songs, className, iconClassName }: PlaylistCoverCollageProps) {
+export default function PlaylistCoverCollage({ songs, className, iconClassName, coverPaths }: PlaylistCoverCollageProps) {
     const [coverUrls, setCoverUrls] = useState<(string | null)[]>([]);
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const blobUrlsRef = useRef<string[]>([]);
@@ -26,36 +27,24 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
         let isMounted = true;
 
         const loadCovers = async () => {
-            if (songs.length === 0) {
+            const paths = coverPaths?.length
+                ? coverPaths.slice(0, 4)
+                : Array.from(new Set(
+                    songs.map(song => song.cover_path).filter((path): path is string => !!path)
+                )).slice(0, 4);
+
+            if (paths.length === 0) {
                 if (isMounted) setCoverUrls([]);
                 return;
             }
 
-            // 取前4首不同封面的歌曲
-            const uniqueCovers = new Map<string, SongMetadata>();
-            for (const song of songs) {
-                const key = song.cover_path || song.path || '';
-                if (key && !uniqueCovers.has(key) && uniqueCovers.size < 4) {
-                    uniqueCovers.set(key, song);
-                }
-            }
-
-            const songsToResolve = Array.from(uniqueCovers.values());
-
-            // 如果少于4首不同封面，只取第一首
-            if (songsToResolve.length < 4) {
-                const url = await resolveCover(songs[0]);
-                if (isMounted) setCoverUrls(url ? [url] : []);
-                return;
-            }
-
-            // 解析4张封面
-            const urls = await Promise.all(
-                songsToResolve.slice(0, 4).map(song => resolveCover(song))
-            );
+            const selectedPaths = paths.length < 4 ? paths.slice(0, 1) : paths;
+            const urls = await Promise.all(selectedPaths.map(async path => {
+                const thumbnailPath = getCoverThumbnailPath(path, 512);
+                return resolveMediaPath(thumbnailPath ?? path);
+            }));
             if (isMounted) setCoverUrls(urls);
         };
-
         loadCovers();
 
         return () => {
@@ -63,7 +52,7 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName }
             blobUrlsRef.current.forEach(u => URL.revokeObjectURL(u));
             blobUrlsRef.current = [];
         };
-    }, [songs, libraryVersion]);
+    }, [songs, coverPaths, libraryVersion]);
 
     useEffect(() => {
         const nextBlobUrls = coverUrls.filter((u): u is string => !!u && u.startsWith('blob:'));

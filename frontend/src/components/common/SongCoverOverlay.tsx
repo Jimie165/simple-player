@@ -70,6 +70,7 @@ export default function SongCoverOverlay({
         >
             <CoverImage
                 song={song}
+                thumbnail={128}
                 className={clsx("w-full h-full object-cover", coverClassName)}
                 iconClassName={iconClassName}
             />

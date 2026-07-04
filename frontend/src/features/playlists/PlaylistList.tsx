@@ -5,7 +5,7 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 
 import PageContainer from '@/components/layout/PageContainer';
 import { libraryService } from '@/services/libraryService';
-import type { Playlist, SongMetadata } from '@/types';
+import type { Playlist } from '@/types';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -23,7 +23,7 @@ type PlaylistListItem = Playlist | FavoritesPlaylist;
 
 export default function PlaylistList() {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
-    const [playlistSongs, setPlaylistSongs] = useState<Record<number, SongMetadata[]>>({});
+    const [playlistCoverPaths, setPlaylistCoverPaths] = useState<Record<number, string[]>>({});
     const [favoritesCount, setFavoritesCount] = useState(0);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<SortKey>(() => {
@@ -43,7 +43,7 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { push } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, playlistVersion, getPlaylistSettings, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
+    const { addMultipleToNext, libraryVersion, playlistVersion, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
@@ -59,7 +59,7 @@ export default function PlaylistList() {
 
     useEffect(() => {
         const frame = requestAnimationFrame(() => {
-            setPlaylistSongs({});
+            setPlaylistCoverPaths({});
             loadPlaylists();
             libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
         });
@@ -154,24 +154,29 @@ export default function PlaylistList() {
         loadPlaylists();
     };
 
-    // 加载播放列表歌曲（用于封面展示）
+    // 完整歌曲只在播放或加入队列时按需查询，不再为卡片常驻缓存。
     const loadPlaylistSongs = useCallback(async (playlistId: number) => {
-        if (playlistSongs[playlistId]) return playlistSongs[playlistId];
         try {
-            const songs = await libraryService.getPlaylistSongs(playlistId);
-            setPlaylistSongs(prev => ({ ...prev, [playlistId]: songs }));
-            return songs;
+            return await libraryService.getPlaylistSongs(playlistId);
         } catch (error) {
             console.warn(`Failed to load playlist songs for ${playlistId}`, error);
             return [];
         }
-    }, [playlistSongs]);
+    }, []);
 
-    // 加载所有播放列表的歌曲
+    // 卡片只查询并保存最多四条封面路径。
     useEffect(() => {
-        playlists.forEach(pl => loadPlaylistSongs(pl.id));
-    }, [playlists, loadPlaylistSongs]);
-
+        let cancelled = false;
+        const loadCoverPaths = async () => {
+            const entries = await Promise.all(playlists.map(async playlist => [
+                playlist.id,
+                await libraryService.getPlaylistCoverPaths(playlist.id),
+            ] as const));
+            if (!cancelled) setPlaylistCoverPaths(Object.fromEntries(entries));
+        };
+        void loadCoverPaths();
+        return () => { cancelled = true; };
+    }, [playlists]);
     // 播放播放列表
     const handlePlayPlaylist = async (pl: Playlist, shuffle = false) => {
         const songs = await loadPlaylistSongs(pl.id);
@@ -335,8 +340,7 @@ export default function PlaylistList() {
                 setEditPlaylist={(pl) => setEditPlaylist(pl)}
                 setContextMenu={setContextMenu}
                 setFavoritesContextMenu={setFavoritesContextMenu}
-                getPlaylistSettings={getPlaylistSettings}
-                playlistSongs={playlistSongs}
+                playlistCoverPaths={playlistCoverPaths}
             />
 
             {/* Context Menu */}

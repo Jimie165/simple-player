@@ -86,3 +86,17 @@ export async function resolveCover(song: SongMetadata): Promise<string | null> {
     // 2. 无封面
     return null;
 }
+
+export type CoverThumbnailSize = 128 | 512;
+
+/** 返回内置音乐封面对应档位的列表缩略图路径。 */
+export function getCoverThumbnailPath(
+    path: string | null | undefined,
+    size: CoverThumbnailSize,
+): string | null {
+    if (!path) return null;
+    const normalized = path.replace(/\\/g, '/');
+    const match = normalized.match(/^(cache\/covers\/)([^/]+)\.(jpg|jpeg|png|gif|webp)$/i);
+    if (!match || match[2].includes('.thumb')) return null;
+    return `${match[1]}${match[2]}.thumb-${size}.jpg`;
+}

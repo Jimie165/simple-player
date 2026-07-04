@@ -135,10 +135,16 @@ export default function Library() {
     // --------------------------------------------------------
 
     // 1. 生成专辑列表 (带排序)
-    const albums = useMemo(() => buildAlbums(librarySongs, albumSortKey), [librarySongs, albumSortKey]);
+    const albums = useMemo(
+        () => activeTab === 'albums' ? buildAlbums(librarySongs, albumSortKey) : [],
+        [activeTab, librarySongs, albumSortKey]
+    );
 
     // 2. 生成艺人列表 (包含专辑)
-    const artists = useMemo(() => buildArtists(librarySongs), [librarySongs]);
+    const artists = useMemo(
+        () => activeTab === 'artists' ? buildArtists(librarySongs) : [],
+        [activeTab, librarySongs]
+    );
 
 
     // --------------------------------------------------------
@@ -155,15 +161,28 @@ export default function Library() {
     };
 
     const handleOpenArtistByName = (name: string) => {
-        const found = artists.find(a => a.name === name);
-        if (found) handleOpenArtist(found);
+        const songs = librarySongs.filter(song => (song.artist || 'Unknown Artist') === name);
+        if (songs.length === 0) return;
+        handleOpenArtist({
+            name,
+            cover: songs.find(song => song.cover_path)?.cover_path || null,
+            count: songs.length,
+            albumCount: new Set(songs.map(song => song.album)).size,
+            songs,
+        });
     };
 
     const handleOpenAlbumByName = (name: string) => {
-        // Find album by name (and artist if possible, but song list might only give name)
-        // Ideally we need strict matching. Simple for now:
-        const found = albums.find(a => a.name === name);
-        if (found) handleOpenAlbum(found);
+        const songs = librarySongs.filter(song => (song.album || 'Unknown Album') === name);
+        if (songs.length === 0) return;
+        const first = songs[0];
+        handleOpenAlbum({
+            name,
+            artist: first.artist || 'Unknown Artist',
+            cover: first.cover_path || null,
+            cover_path: first.cover_path || null,
+            songs,
+        });
     };
 
     const buildRecentForSong = (song: SongMetadata): RecentItem => ({
@@ -308,11 +327,7 @@ export default function Library() {
                                         }
                                     }}
                                     onOpenAlbum={handleOpenAlbum}
-                                    onOpenArtist={(artistName) => {
-                                        // Find artist data by name
-                                        const found = artists.find(a => a.name === artistName);
-                                        if (found) handleOpenArtist(found);
-                                    }}
+                                    onOpenArtist={handleOpenArtistByName}
                                 />
                             </motion.div>
                         )}

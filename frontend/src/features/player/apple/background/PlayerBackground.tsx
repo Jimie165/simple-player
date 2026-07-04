@@ -129,8 +129,9 @@ const TRANSPARENT_PIXEL = new Uint8Array([0, 0, 0, 255]);
 
 // --- React Component ---
 
-const WebGLCanvas = ({ src }: { src: string | null }) => {
+const WebGLCanvas = ({ src, active }: { src: string | null; active: boolean }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
+    const snapshotRef = useRef<HTMLImageElement>(null);
     const glRef = useRef<WebGLRenderingContext | null>(null);
     const programRef = useRef<WebGLProgram | null>(null);
     const textureRef = useRef<WebGLTexture | null>(null);
@@ -140,8 +141,8 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
     const adaptiveScaleFactorRef = useRef<number>(1);
     const adaptCheckCounterRef = useRef<number>(0);
     const isVisibleRef = useRef<boolean>(true);
+    const isActiveRef = useRef<boolean>(active);
     const scaleRef = useRef<number>(0.3);
-    const imgRef = useRef<HTMLImageElement>(new Image());
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -206,6 +207,10 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         }
         programRef.current = program;
         gl.useProgram(program);
+        gl.detachShader(program, vShader);
+        gl.detachShader(program, fShader);
+        gl.deleteShader(vShader);
+        gl.deleteShader(fShader);
 
         // 设置全屏矩形顶点位置
         const positionBuffer = gl.createBuffer();
@@ -287,7 +292,7 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
         // 渲染循环
         const render = (time: number) => {
             if (!gl || !program) return;
-            if (!isVisibleRef.current) return;
+            if (!isVisibleRef.current || !isActiveRef.current) return;
 
             const elapsed = time - lastFrameRef.current;
 
@@ -327,11 +332,13 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
             }
 
             gl.drawArrays(gl.TRIANGLES, 0, 6);
+            canvas.style.visibility = 'visible';
+            if (snapshotRef.current) snapshotRef.current.style.display = 'none';
             requestRef.current = requestAnimationFrame(render);
         };
         const handleVisibility = () => {
             isVisibleRef.current = !document.hidden;
-            if (isVisibleRef.current) {
+            if (isVisibleRef.current && isActiveRef.current) {
                 lastFrameRef.current = performance.now();
                 emaFrameTimeRef.current = FRAME_INTERVAL;
                 adaptCheckCounterRef.current = 0;
@@ -339,74 +346,145 @@ const WebGLCanvas = ({ src }: { src: string | null }) => {
             }
         };
         document.addEventListener('visibilitychange', handleVisibility);
+        const handleResume = () => {
+            cancelAnimationFrame(requestRef.current);
+            if (isVisibleRef.current && isActiveRef.current) {
+                updateSize();
+                canvas.style.visibility = 'hidden';
+                if (snapshotRef.current?.src) snapshotRef.current.style.display = 'block';
+                lastFrameRef.current = performance.now();
+                requestRef.current = requestAnimationFrame(render);
+            }
+        };
+        const handleSuspend = () => {
+            cancelAnimationFrame(requestRef.current);
+            if (snapshotRef.current?.src) snapshotRef.current.style.display = 'block';
+            canvas.style.visibility = 'hidden';
+            canvas.width = 1;
+            canvas.height = 1;
+            gl.viewport(0, 0, 1, 1);
+        };
+        window.addEventListener('player-background-resume', handleResume);
+        window.addEventListener('player-background-suspend', handleSuspend);
         requestRef.current = requestAnimationFrame(render);
 
         return () => {
             window.removeEventListener('resize', updateSize);
             document.removeEventListener('fullscreenchange', updateSize);
             document.removeEventListener('visibilitychange', handleVisibility);
+            window.removeEventListener('player-background-resume', handleResume);
+            window.removeEventListener('player-background-suspend', handleSuspend);
             cancelAnimationFrame(requestRef.current);
             if (gl) {
                 if (textureRef.current) gl.deleteTexture(textureRef.current);
+                if (positionBuffer) gl.deleteBuffer(positionBuffer);
+                if (texCoordBuffer) gl.deleteBuffer(texCoordBuffer);
                 if (program) gl.deleteProgram(program);
+                gl.getExtension('WEBGL_lose_context')?.loseContext();
             }
         };
     }, []);
 
-    // 监听 src 变化，加载纹理
+    useEffect(() => {
+        isActiveRef.current = active;
+        cancelAnimationFrame(requestRef.current);
+        if (active && !document.hidden) {
+            window.dispatchEvent(new Event('player-background-resume'));
+        } else {
+            window.dispatchEvent(new Event('player-background-suspend'));
+        }
+    }, [active]);
+
+    // 监听 src 变化，异步缩放解码；采样尺寸保持 256×256。
     useEffect(() => {
         const gl = glRef.current;
         const texture = textureRef.current;
         if (!gl || !texture || !src) return;
 
-        // 重用 Image 对象
-        const img = imgRef.current;
-        img.crossOrigin = "anonymous";
+        let cancelled = false;
+        let fallbackImage: HTMLImageElement | null = null;
+        const size = 256;
 
-        const handleLoad = () => {
-            // 直接准备一张包含整张封面原图各区域色彩分布的离屏画布，并实施高斯模糊打底
-            const size = 256; // 稍微提高一点离屏画质，以便宽广平滑后不断层
-
+        const uploadSource = (source: CanvasImageSource) => {
+            if (cancelled) return;
             const offscreen = document.createElement('canvas');
             offscreen.width = size;
             offscreen.height = size;
             const ctx = offscreen.getContext('2d');
+            if (!ctx) return;
 
-            if (ctx) {
-                // 这个模糊直接消灭了封面图中所有的线条和具象细节，只剩“块面”色彩
-                ctx.filter = 'blur(34px) saturate(170%)';
+            ctx.filter = 'blur(34px) saturate(170%)';
+            ctx.drawImage(source, -16, -16, size + 32, size + 32);
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, offscreen);
 
-                // 向外微调扩围一点点（16px 代表只吃掉绝对黑边），保留绝大部分封面的边缘主色
-                ctx.drawImage(img, -16, -16, size + 32, size + 32);
-
-                // 绑定给 WebGL 中进行最后的二维拉扯挤压
-                gl.bindTexture(gl.TEXTURE_2D, texture);
-                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, offscreen);
+            // 隐藏全屏播放器时用低分辨率静态图托底，Canvas 可安全缩到 1×1。
+            if (snapshotRef.current) {
+                snapshotRef.current.src = offscreen.toDataURL('image/jpeg', 0.78);
             }
         };
 
-        img.onload = handleLoad;
-        img.src = src;
+        const load = async () => {
+            try {
+                if ('createImageBitmap' in window) {
+                    const response = await fetch(src);
+                    if (!response.ok) throw new Error(`Cover fetch failed: ${response.status}`);
+                    const blob = await response.blob();
+                    const bitmap = await createImageBitmap(blob, {
+                        resizeWidth: size,
+                        resizeHeight: size,
+                        resizeQuality: 'low',
+                    });
+                    try {
+                        uploadSource(bitmap);
+                    } finally {
+                        bitmap.close();
+                    }
+                    return;
+                }
+            } catch (error) {
+                console.warn('Background ImageBitmap decode failed, falling back to Image', error);
+            }
 
+            fallbackImage = new Image();
+            fallbackImage.crossOrigin = 'anonymous';
+            fallbackImage.onload = () => uploadSource(fallbackImage!);
+            fallbackImage.src = src;
+        };
+
+        void load();
         return () => {
-            img.onload = null;
+            cancelled = true;
+            if (fallbackImage) {
+                fallbackImage.onload = null;
+                fallbackImage.src = '';
+            }
         };
     }, [src]);
 
     return (
-        <canvas
-            ref={canvasRef}
-            className="w-full h-full object-cover"
-        />
+        <div className="relative w-full h-full overflow-hidden">
+            <img
+                ref={snapshotRef}
+                alt=""
+                aria-hidden
+                className="absolute inset-0 hidden w-full h-full object-cover"
+            />
+            <canvas
+                ref={canvasRef}
+                className="absolute inset-0 w-full h-full object-cover"
+            />
+        </div>
     );
 };
-
 export const PlayerBackground = React.memo(({
     src,
-    variant = 'fluid'
+    variant = 'fluid',
+    active = true,
 }: {
     src: string | null;
     variant?: 'fluid' | 'blurred';
+    active?: boolean;
 }) => {
     return (
         <div className="absolute inset-0 z-0 overflow-hidden select-none pointer-events-none bg-[#1a1a1a]">
@@ -427,7 +505,7 @@ export const PlayerBackground = React.memo(({
                                 transition={{ duration: 1.5, ease: "easeInOut" }}
                                 className="absolute inset-0 w-full h-full opacity-80 dark:opacity-60"
                             >
-                                <WebGLCanvas src={src} />
+                                <WebGLCanvas src={src} active={active} />
                             </motion.div>
                         )}
                     </AnimatePresence>

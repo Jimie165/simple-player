@@ -125,10 +125,18 @@ export const useVideoStore = create<VideoState>()(persist((set) => ({
 }), {
     name: 'video-store',
     storage: createJSONStorage(() => localStorage),
+    version: 1,
+    migrate: (persistedState) => {
+        const state = persistedState as Partial<VideoState>;
+        return {
+            viewMode: state.viewMode ?? 'grid',
+            collapsedFolderIds: state.collapsedFolderIds ?? [],
+            sortBy: state.sortBy ?? 'created',
+            sortOrder: state.sortOrder ?? 'desc',
+        };
+    },
     partialize: (state) => ({
-        videos: state.videos,
         viewMode: state.viewMode,
-        videoFolders: state.videoFolders,
         collapsedFolderIds: state.collapsedFolderIds,
         sortBy: state.sortBy,
         sortOrder: state.sortOrder,

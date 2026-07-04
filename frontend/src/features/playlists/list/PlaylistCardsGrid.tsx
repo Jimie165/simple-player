@@ -1,16 +1,15 @@
 import { MdCheck, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
-import type { Playlist, SongMetadata } from '@/types';
+import type { Playlist } from '@/types';
 import type { ViewState } from '@/store/useNavigationStore';
-import type { SortKey, SortOrder } from '@/utils/songSort';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
-import { sortSongs } from '@/utils/songSort';
 import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/PlaylistCardMenus';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 type PlaylistGridItem = Playlist | (Omit<Playlist, 'id'> & { id: 'favorites' | 'playlist:favorites' });
 
@@ -29,8 +28,7 @@ interface PlaylistCardsGridProps {
     setEditPlaylist: (pl: Playlist) => void;
     setContextMenu: (value: { x: number; y: number; playlist: Playlist } | null) => void;
     setFavoritesContextMenu: (value: { x: number; y: number } | null) => void;
-    getPlaylistSettings: (playlistId: string) => { sortKey: SortKey; sortOrder: SortOrder };
-    playlistSongs: Record<number, SongMetadata[]>;
+    playlistCoverPaths: Record<number, string[]>;
 }
 
 export default function PlaylistCardsGrid({
@@ -48,17 +46,17 @@ export default function PlaylistCardsGrid({
     setEditPlaylist,
     setContextMenu,
     setFavoritesContextMenu,
-    getPlaylistSettings,
-    playlistSongs,
+    playlistCoverPaths,
 }: PlaylistCardsGridProps) {
     const mainContentWidth = useMainContentWidth();
 
     return (
-        <div
-            className="grid content-grid-cover gap-6 pb-8"
-            style={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
-        >
-            {filteredPlaylists.map(pl => {
+        <VirtualizedGrid
+            data={filteredPlaylists}
+            itemKey={(_index, playlist) => getMusicItemId(playlist)}
+            listClassName="grid content-grid-cover gap-6 pb-8"
+            listStyle={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
+            itemContent={(_index, pl) => {
                 if (pl.id === 'favorites' || pl.id === 'playlist:favorites') {
                     const favoritesSelectionId = getMusicItemId(pl);
                     const isSelected = selectedIds.has(favoritesSelectionId);
@@ -167,11 +165,8 @@ export default function PlaylistCardsGrid({
                                 <CoverImage src={playlist.cover_path} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
                             ) : (
                                 <PlaylistCoverCollage
-                                    songs={(() => {
-                                        const rawSongs = playlistSongs[playlist.id] || [];
-                                        const settings = getPlaylistSettings(playlist.id.toString());
-                                        return sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
-                                    })()}
+                                    songs={[]}
+                                    coverPaths={playlistCoverPaths[playlist.id] || []}
                                     className="transition-transform duration-500 group-hover:scale-105"
                                 />
                             )}
@@ -231,7 +226,7 @@ export default function PlaylistCardsGrid({
                         </div>
                     </div>
                 );
-            })}
-        </div>
+            }}
+        />
     );
 }

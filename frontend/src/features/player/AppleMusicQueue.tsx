@@ -356,7 +356,8 @@ export default function AppleMusicQueue({
                                 >
                                     <div className="group flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] bg-white/10 rounded-md shadow-xl backdrop-blur-sm">
                                         <div className="relative w-[clamp(2rem,4vw,2.5rem)] h-[clamp(2rem,4vw,2.5rem)] rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800">
-                                            <CoverImage song={activeDragEntry.song} className="w-full h-full object-cover" />
+                                            <CoverImage thumbnail={128}
+song={activeDragEntry.song} className="w-full h-full object-cover" />
                                         </div>
                                         <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 py-1.5">
                                             <div className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-medium text-white truncate leading-tight">

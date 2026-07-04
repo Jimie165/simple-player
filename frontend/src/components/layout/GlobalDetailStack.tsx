@@ -80,7 +80,8 @@ export default function GlobalDetailStack() {
     // Render the stack
     return (
         <AnimatePresence>
-            {overlayStack.map((activeView, index) => {
+            {overlayStack.slice(-1).map((activeView) => {
+                const index = overlayStack.length - 1;
                 let key = `${activeView.type}-${index}`;
                 if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;

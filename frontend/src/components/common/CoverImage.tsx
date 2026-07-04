@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { MdMusicNote, MdVideocam } from 'react-icons/md';
 import clsx from 'clsx';
-import { resolveCover, resolveMediaPath } from '@/utils/mediaPath';
+import { getCoverThumbnailPath, resolveCover, resolveMediaPath } from '@/utils/mediaPath';
+import type { CoverThumbnailSize } from '@/utils/mediaPath';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
 // Actually MusicGrid logic is not exported or complex. We can just check extension.
@@ -19,10 +20,12 @@ interface CoverImageProps {
     src?: string | null; // Allow direct src
     className?: string;
     iconClassName?: string;
+    thumbnail?: CoverThumbnailSize | false;
 }
 
-export default function CoverImage({ song, src, className, iconClassName }: CoverImageProps) {
+export default function CoverImage({ song, src, className, iconClassName, thumbnail = 512 }: CoverImageProps) {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
+    const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const blobUrlRef = useRef<string | null>(null);
 
@@ -36,11 +39,16 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
                 blobUrlRef.current = null;
             }
 
-            // 1. Try src first
-            if (src && src.length > 0) {
-                const url = await resolveMediaPath(src);
+            const originalPath = src && src.length > 0 ? src : song?.cover_path;
+            if (originalPath) {
+                const thumbnailPath = thumbnail ? getCoverThumbnailPath(originalPath, thumbnail) : null;
+                const [url, originalUrl] = await Promise.all([
+                    resolveMediaPath(thumbnailPath ?? originalPath),
+                    thumbnailPath ? resolveMediaPath(originalPath) : Promise.resolve(null),
+                ]);
                 if (isMounted) {
                     if (url && url.startsWith('blob:')) blobUrlRef.current = url;
+                    setFallbackSrc(originalUrl);
                     setImageSrc(url);
                 }
                 return;
@@ -68,7 +76,7 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
                 blobUrlRef.current = null;
             }
         };
-    }, [song, src, libraryVersion]);
+    }, [song, src, libraryVersion, thumbnail]);
 
     if (imageSrc) {
         return (
@@ -76,6 +84,12 @@ export default function CoverImage({ song, src, className, iconClassName }: Cove
                 src={imageSrc}
                 className={clsx("w-full h-full object-cover", className)}
                 alt={song?.title || "Cover"}
+                onError={() => {
+                    if (fallbackSrc && imageSrc !== fallbackSrc) {
+                        setImageSrc(fallbackSrc);
+                        setFallbackSrc(null);
+                    }
+                }}
             />
         );
     }

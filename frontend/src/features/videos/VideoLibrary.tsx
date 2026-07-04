@@ -154,6 +154,7 @@ export const VideoLibrary: React.FC = () => {
 
     // Group videos by folder (Sorted inside)
     const groupedVideos = useMemo(() => {
+        if (activeTab !== 'folders') return [];
         const groups = new Map<number, VideoMetadata[]>();
         const groupMaxPlayed = new Map<number, number>();
 
@@ -205,7 +206,7 @@ export const VideoLibrary: React.FC = () => {
             folder: f,
             videos: groups.get(f.id) || []
         })).filter(g => g.videos.length > 0);
-    }, [sortedVideos, videoFolders, sortBy, sortOrder]);
+    }, [activeTab, sortedVideos, videoFolders, sortBy, sortOrder]);
 
 
     const handleTabChange = (tab: 'all' | 'folders') => {

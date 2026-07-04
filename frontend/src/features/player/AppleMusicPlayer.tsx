@@ -216,7 +216,7 @@ export default function AppleMusicPlayer({
             onPointerDown={handleNarrowPointerMove}
             onPointerMove={handleNarrowPointerMove}
         >
-            <PlayerBackground src={bgImageSrc} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
+            <PlayerBackground src={bgImageSrc} active={isOpen} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
 
             <ApplePlayerTopBar
                 isFullscreen={isFullscreen}

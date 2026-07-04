@@ -183,6 +183,9 @@ export const libraryService = {
         return invoke('get_playlist_songs', { playlistId });
     },
 
+    getPlaylistCoverPaths: async (playlistId: number): Promise<string[]> => {
+        return invoke('get_playlist_cover_paths', { playlistId });
+    },
     markPlaylistAsPlayed: async (playlistId: number): Promise<void> => {
         return invoke('mark_playlist_as_played', { playlistId });
     },

@@ -9,7 +9,7 @@ use modules::player::AudioState;
 use rusqlite::Connection;
 use std::fs;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// 数据库状态，用于 Tauri 状态管理
 pub struct DbState(pub Arc<Mutex<Connection>>);
@@ -32,6 +32,14 @@ fn main() {
 
             fs::create_dir_all(&app_data_dir)?;
             fs::create_dir_all(&app_cache_dir)?;
+
+            // 后台补齐旧封面的列表缩略图，避免阻塞窗口首次显示。
+            let thumbnail_app = app.handle().clone();
+            let thumbnail_cache_dir = app_cache_dir.clone();
+            std::thread::spawn(move || {
+                modules::library::covers::ensure_cached_cover_thumbnails(&thumbnail_cache_dir);
+                let _ = thumbnail_app.emit("cover-thumbnails-ready", ());
+            });
 
             let db_path = app_data_dir.join("library.db");
             let conn = Connection::open(&db_path).expect("Failed to open database");
@@ -114,6 +122,7 @@ fn main() {
             commands::playlist::update_playlist_info,
             commands::playlist::update_playlist_cover,
             commands::playlist::get_playlist_songs,
+            commands::playlist::get_playlist_cover_paths,
             commands::playlist::mark_playlist_as_played,
             // Queue commands
             commands::queue::save_play_queue,

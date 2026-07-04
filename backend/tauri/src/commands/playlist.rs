@@ -120,6 +120,12 @@ pub fn get_playlist_songs(db: State<'_, DbState>, playlist_id: i64) -> Result<Ve
     Ok(songs.iter().map(SongMetadata::from_db_song).collect())
 }
 
+/// 获取播放列表卡片所需的最多四张不同封面。
+#[tauri::command]
+pub fn get_playlist_cover_paths(db: State<'_, DbState>, playlist_id: i64) -> Result<Vec<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    PlaylistRepo::get_cover_paths(&conn, playlist_id).map_err(|e| e.to_string())
+}
 /// 标记播放列表为已播放（更新 last_played_at）
 #[tauri::command]
 pub fn mark_playlist_as_played(db: State<'_, DbState>, playlist_id: i64) -> Result<(), String> {

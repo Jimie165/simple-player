@@ -4,6 +4,49 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use crate::utils::paths::COVERS_DIR;
 
+const COVER_THUMBNAIL_SIZES: [u32; 2] = [128, 512];
+
+fn ensure_cover_thumbnail(covers_dir: &Path, hash: &str, cover_bytes: &[u8], max_size: u32) {
+    let thumbnail_path = covers_dir.join(format!("{}.thumb-{}.jpg", hash, max_size));
+    if thumbnail_path.exists() { return; }
+    let Ok(image) = image::load_from_memory(cover_bytes) else { return; };
+
+    // 小于目标档位的原图保持其原始像素尺寸，绝不为了凑 128/512 而放大。
+    let thumbnail = if image.width() <= max_size && image.height() <= max_size {
+        image.to_rgb8()
+    } else {
+        image.thumbnail(max_size, max_size).to_rgb8()
+    };
+    let Ok(file) = fs::File::create(&thumbnail_path) else { return; };
+    let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, 86);
+    if encoder.encode_image(&thumbnail).is_err() {
+        let _ = fs::remove_file(thumbnail_path);
+    }
+}
+
+fn ensure_cover_thumbnail_set(covers_dir: &Path, hash: &str, cover_bytes: &[u8]) {
+    for size in COVER_THUMBNAIL_SIZES {
+        ensure_cover_thumbnail(covers_dir, hash, cover_bytes, size);
+    }
+}
+/// 为旧版本已经缓存的原始封面补齐列表缩略图。
+pub fn ensure_cached_cover_thumbnails(app_cache_dir: &Path) {
+    let covers_dir = get_covers_dir(app_cache_dir);
+    let Ok(entries) = fs::read_dir(&covers_dir) else { return; };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() { continue; }
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else { continue; };
+        if stem.contains(".thumb") { continue; }
+        let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
+        if !matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp") {
+            continue;
+        }
+        let Ok(bytes) = fs::read(&path) else { continue; };
+        ensure_cover_thumbnail_set(&covers_dir, stem, &bytes);
+    }
+}
 /// 获取封面缓存目录
 pub fn get_covers_dir(app_cache_dir: &Path) -> PathBuf {
     app_cache_dir.join(COVERS_DIR)
@@ -60,6 +103,7 @@ pub fn save_cover_bytes(
     for ext in &["jpg", "png", "gif", "webp"] {
         let existing_path = covers_dir.join(format!("{}.{}", hash, ext));
         if existing_path.exists() {
+            ensure_cover_thumbnail_set(&covers_dir, &hash, cover_bytes);
             // 返回相对路径（带 cache/ 前缀）
             return Some(format!("{}/{}.{}", COVERS_DIR, hash, ext));
         }
@@ -73,6 +117,8 @@ pub fn save_cover_bytes(
     
     let mut file = fs::File::create(&file_path).ok()?;
     file.write_all(cover_bytes).ok()?;
+
+    ensure_cover_thumbnail_set(&covers_dir, &hash, cover_bytes);
 
     Some(format!("{}/{}", COVERS_DIR, filename))
 }

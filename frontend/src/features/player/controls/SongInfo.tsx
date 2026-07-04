@@ -39,7 +39,8 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                         : "w-14 h-14 opacity-100 translate-y-0 scale-100 mr-3 rounded-md"
                 )}>
                     <CoverImage
-                        song={metadata}
+                        thumbnail={128}
+song={metadata}
                         className="w-full h-full object-cover"
                         iconClassName="text-2xl text-neutral-400"
                     />

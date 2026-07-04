@@ -75,7 +75,12 @@ export default function LyricsLineItem({
         canSeek ? 'cursor-pointer' : 'cursor-default',
         isActive ? 'text-white drop-shadow-xl' : 'text-white'
     );
-    const content = (
+    const renderingIsolationStyle = {
+        contentVisibility: 'auto',
+        contain: 'layout style paint',
+        containIntrinsicSize: 'auto 90px',
+        backfaceVisibility: 'hidden',
+    } as const;    const content = (
         <>
             <span
                 style={!shouldRenderKaraoke ? {
@@ -127,6 +132,7 @@ export default function LyricsLineItem({
                 type="button"
                 onClick={handleClick}
                 disabled={!canSeek}
+                style={renderingIsolationStyle}
                 animate={{
                     y: interludeShift - targetScrollY,
                     scale: isActive ? 1.05 : 1,
@@ -155,6 +161,7 @@ export default function LyricsLineItem({
             onClick={handleClick}
             disabled={!canSeek}
             style={{
+                ...renderingIsolationStyle,
                 filter: rowFilter,
                 opacity: appliedOpacity,
                 transform: `translateY(${interludeShift}px) scale(${isActive ? 1.05 : 1})`,
