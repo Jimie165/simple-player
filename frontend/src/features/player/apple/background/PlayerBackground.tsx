@@ -380,7 +380,6 @@ const WebGLCanvas = ({ src, active }: { src: string | null; active: boolean }) =
                 if (positionBuffer) gl.deleteBuffer(positionBuffer);
                 if (texCoordBuffer) gl.deleteBuffer(texCoordBuffer);
                 if (program) gl.deleteProgram(program);
-                gl.getExtension('WEBGL_lose_context')?.loseContext();
             }
         };
     }, []);
