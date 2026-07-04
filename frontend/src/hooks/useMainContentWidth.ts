@@ -1,13 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useLayoutEffect, useState } from 'react';
 
 const MAIN_CONTENT_SELECTOR = '[data-main-content-query]';
 
 export function useMainContentWidth() {
-    const [width, setWidth] = useState(() => (
-        typeof window === 'undefined' ? 0 : window.innerWidth
-    ));
+    // The content area is narrower than window.innerWidth because of the
+    // sidebar and detail layers. Using the window width for the first render
+    // makes a newly mounted grid pick the wrong card width for one frame.
+    const [width, setWidth] = useState(0);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const target = document.querySelector(MAIN_CONTENT_SELECTOR);
         if (!(target instanceof HTMLElement)) return;
 

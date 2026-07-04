@@ -38,14 +38,31 @@ export function useScrollBlur(options: UseScrollBlurOptions = {}) {
 
         const observer = new IntersectionObserver(
             ([entry]) => {
+                const rootRect = resolvedRoot?.getBoundingClientRect();
+                const targetRect = entry.boundingClientRect;
+                const rootIsHidden = !!rootRect && (rootRect.width <= 0 || rootRect.height <= 0);
+                const targetIsHidden = targetRect.width <= 0 || targetRect.height <= 0;
+
+                // display:none reports the sentinel as non-intersecting. Keep
+                // the last real scroll state while the base layer is suspended.
+                if (rootIsHidden || targetIsHidden) return;
                 setIsScrolled(!entry.isIntersecting);
             },
             { threshold, rootMargin, root: resolvedRoot }
         );
-
         observer.observe(target);
 
-        return () => observer.disconnect();
+        const syncAfterBaseLayerRestore = () => {
+            // Hidden targets are reported as non-intersecting. Recompute from
+            // the preserved scroll position before the player reveals them.
+            setIsScrolled((resolvedRoot?.scrollTop ?? 0) > 1);
+        };
+        window.addEventListener('base-layer-restored', syncAfterBaseLayerRestore);
+
+        return () => {
+            observer.disconnect();
+            window.removeEventListener('base-layer-restored', syncAfterBaseLayerRestore);
+        };
     }, [enabled, threshold, rootMargin, root]);
 
     return { isScrolled, topSentinelRef };

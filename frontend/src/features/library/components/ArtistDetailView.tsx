@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Virtuoso } from 'react-virtuoso';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
@@ -123,7 +123,7 @@ export default function ArtistDetailView({
 
             {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
             <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-[60] transition-all duration-300 border-b",
+                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
                 isScrolled
                     ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
                     : "bg-transparent border-transparent opacity-0 pointer-events-none"
@@ -220,15 +220,14 @@ export default function ArtistDetailView({
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 px-2 pb-20">
-                <AnimatePresence mode="wait">
+            <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2 pb-20">
                     {activeTab === 'albums' ? (
                         <motion.div
                             key="albums"
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 10 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <AlbumGridView
                                 albums={sortedAlbums}
@@ -241,11 +240,10 @@ export default function ArtistDetailView({
                     ) : (
                         <motion.div
                             key="songs"
-                            initial={{ opacity: 0, x: 10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -10 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
-                            className="w-full"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             {scrollParent ? (
                                 <Virtuoso
@@ -282,7 +280,7 @@ export default function ArtistDetailView({
                                                                     e.stopPropagation();
                                                                     onPlayAlbum(album);
                                                                 }}
-                                                                className="!static !inset-auto !translate-x-0 scale-125 hover:!scale-[1.35] active:!scale-110"
+                                                                className="static! inset-auto! translate-x-0! scale-125 hover:scale-[1.35]! active:scale-110!"
                                                             />
                                                         </div>
                                                     </div>
@@ -338,7 +336,6 @@ export default function ArtistDetailView({
                             )}
                         </motion.div>
                     )}
-                </AnimatePresence>
             </div>
         </div>
     );

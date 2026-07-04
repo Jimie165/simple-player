@@ -260,6 +260,17 @@ function App() {
               />
             )}
 
+            {/* 顶角填充：主内容区左上角为圆角，此处填充侧边栏主题色以实现视觉无缝衔接 */}
+            <div className="absolute top-0 left-0 w-8 h-8 bg-primary/5 dark:bg-primary/8 pointer-events-none">
+              <div
+                className="absolute inset-0 opacity-0 dark:opacity-100 pointer-events-none"
+                style={{
+                  backgroundImage:
+                    'linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%)'
+                }}
+              />
+            </div>
+
             {/* Reuse mainContent variable content inline or wrapper */}
             {mainContent}
           </div>
@@ -270,7 +281,7 @@ function App() {
       </div>
 
       {/* 4. 底部播放控制 - M3 Surface Container */}
-      <div className="relative z-[70]" style={baseLayerSuspended ? { display: 'none' } : undefined}>
+      <div className="relative z-70" style={baseLayerSuspended ? { display: 'none' } : undefined}>
         <PlayerControl
           isFullScreen={isFullScreen}
           onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}
