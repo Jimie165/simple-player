@@ -99,17 +99,7 @@ function App() {
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [baseLayerSuspended, setBaseLayerSuspended] = useState(false);
 
-  // 全屏进入动画结束后停止底层页面绘制；退出前立即恢复，保留页面状态和滚动位置。
-  useEffect(() => {
-    if (!isFullScreen) {
-      setBaseLayerSuspended(false);
-      return;
-    }
-    const timer = window.setTimeout(() => setBaseLayerSuspended(true), 450);
-    return () => window.clearTimeout(timer);
-  }, [isFullScreen]);
 
   // Listen for Full Screen Player Events
   useEffect(() => {
@@ -236,8 +226,9 @@ function App() {
 
         {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
         <div
-          className="absolute inset-0 flex"
-          style={baseLayerSuspended ? { display: 'none', contentVisibility: 'hidden', contain: 'strict' } : undefined}
+          className={`absolute inset-0 flex ${isFullScreen ? 'base-layer-paused' : ''}`}
+          inert={isFullScreen}
+          aria-hidden={isFullScreen}
         >
           <Sidebar
             activeId={currentPage}
@@ -281,7 +272,7 @@ function App() {
       </div>
 
       {/* 4. 底部播放控制 - M3 Surface Container */}
-      <div className="relative z-70" style={baseLayerSuspended ? { display: 'none' } : undefined}>
+      <div className="relative z-70">
         <PlayerControl
           isFullScreen={isFullScreen}
           onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}

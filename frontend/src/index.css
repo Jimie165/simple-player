@@ -269,6 +269,20 @@ body {
     @apply bg-glass-surface backdrop-blur-md border border-glass-border active:scale-95 transition-all duration-200;
   }
 
+
+  /* Keep the covered page laid out for seamless player transitions, while
+     stopping decorative CSS animation work behind the opaque player. */
+  .base-layer-paused,
+  .base-layer-paused * {
+    pointer-events: none !important;
+  }
+
+  .base-layer-paused *,
+  .base-layer-paused *::before,
+  .base-layer-paused *::after {
+    animation-play-state: paused !important;
+  }
+
   .main-content-query {
     container: main-content / inline-size;
   }

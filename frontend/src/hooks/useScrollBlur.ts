@@ -52,17 +52,7 @@ export function useScrollBlur(options: UseScrollBlurOptions = {}) {
         );
         observer.observe(target);
 
-        const syncAfterBaseLayerRestore = () => {
-            // Hidden targets are reported as non-intersecting. Recompute from
-            // the preserved scroll position before the player reveals them.
-            setIsScrolled((resolvedRoot?.scrollTop ?? 0) > 1);
-        };
-        window.addEventListener('base-layer-restored', syncAfterBaseLayerRestore);
-
-        return () => {
-            observer.disconnect();
-            window.removeEventListener('base-layer-restored', syncAfterBaseLayerRestore);
-        };
+        return () => observer.disconnect();
     }, [enabled, threshold, rootMargin, root]);
 
     return { isScrolled, topSentinelRef };

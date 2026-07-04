@@ -212,6 +212,7 @@ export default function AppleMusicPlayer({
                 pointerEvents: isOpen ? 'auto' : 'none'
             }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+            style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}
             onPointerMove={handleNarrowPointerMove}
