@@ -28,6 +28,7 @@ pub enum OutputPreference {
 
 #[derive(Serialize, Clone)]
 pub struct AudioOutputInfo {
+    pub id: String,
     pub name: String,
     pub is_system_default: bool,
     pub is_active: bool,
@@ -50,6 +51,7 @@ struct PlaybackHandle {
 
 pub struct AudioState {
     player: Arc<Mutex<Option<PlaybackHandle>>>,
+    output_switch: Arc<Mutex<()>>,
     volume: Arc<Mutex<f32>>,
     output_preference: Arc<Mutex<OutputPreference>>,
     active_device_name: Arc<Mutex<Option<String>>>,
@@ -64,6 +66,7 @@ impl AudioState {
     pub fn new() -> Self {
         Self {
             player: Arc::new(Mutex::new(None)),
+            output_switch: Arc::new(Mutex::new(())),
             volume: Arc::new(Mutex::new(1.0)),
             output_preference: Arc::new(Mutex::new(OutputPreference::SystemDefault)),
             active_device_name: Arc::new(Mutex::new(None)),
@@ -93,6 +96,10 @@ impl AudioState {
         metadata: Option<SongMetadata>,
         autoplay: bool,
     ) -> Result<(), String> {
+        let _switch_guard = self.output_switch.lock().unwrap();
+        let previous = self.player.lock().unwrap().take();
+        Self::dispose_playback(previous);
+
         let handle = Self::build_playback_handle(
             &self.volume,
             &self.output_preference,
@@ -103,14 +110,7 @@ impl AudioState {
             0.0,
         )?;
         let monitor_stop = handle.monitor_stop.clone();
-
-        let previous = {
-            let mut player_lock = self.player.lock().unwrap();
-            let previous = player_lock.take();
-            *player_lock = Some(handle);
-            previous
-        };
-        Self::dispose_playback(previous);
+        *self.player.lock().unwrap() = Some(handle);
 
         if let Some(meta) = metadata.as_ref() {
             let app_handle = self.app_handle.lock().ok().and_then(|h| h.clone());
@@ -122,6 +122,7 @@ impl AudioState {
             Self::emit_output_changed(&app_handle, &self.active_device_name);
             Self::start_monitor(
                 self.player.clone(),
+                self.output_switch.clone(),
                 self.volume.clone(),
                 self.output_preference.clone(),
                 self.active_device_name.clone(),
@@ -186,27 +187,17 @@ impl AudioState {
     ) -> Result<(MixerDeviceSink, Option<String>), String> {
         let error_flag = stream_error;
         let (builder, picked_name) = match preference {
-            OutputPreference::Pinned(target) => match Self::find_output_device(&target) {
-                Some(device) => {
-                    let name = device.name().ok();
-                    (
-                        DeviceSinkBuilder::from_device(device)
-                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
-                        name,
-                    )
-                }
-                None => {
-                    eprintln!(
-                        "audio: pinned device '{target}' not available, falling back to system default"
-                    );
-                    let name = Self::default_output_name();
-                    (
-                        DeviceSinkBuilder::from_default_device()
-                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
-                        name,
-                    )
-                }
-            },
+            OutputPreference::Pinned(target_id) => {
+                let device = Self::find_output_device(&target_id).ok_or_else(|| {
+                    format!("Selected audio output is no longer available: {target_id}")
+                })?;
+                let name = Self::device_display_name(&device);
+                (
+                    DeviceSinkBuilder::from_device(device)
+                        .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                    name,
+                )
+            }
             OutputPreference::SystemDefault => {
                 let name = Self::default_output_name();
                 (
@@ -228,23 +219,51 @@ impl AudioState {
         Ok((sink, picked_name))
     }
 
-    fn find_output_device(target_name: &str) -> Option<cpal::Device> {
-        let host = cpal::default_host();
-        let devices = host.output_devices().ok()?;
-        for d in devices {
-            if let Ok(name) = d.name() {
-                if name == target_name {
-                    return Some(d);
-                }
-            }
+    fn device_id(device: &cpal::Device) -> Option<String> {
+        device.id().ok().map(|id| id.1)
+    }
+
+    fn device_display_name(device: &cpal::Device) -> Option<String> {
+        let description = device.description().ok()?;
+        description
+            .extended()
+            .iter()
+            .find(|line| !line.trim().is_empty())
+            .cloned()
+            .or_else(|| Some(description.name().to_string()))
+    }
+
+    fn find_output_device(target_id: &str) -> Option<cpal::Device> {
+        cpal::default_host()
+            .output_devices()
+            .ok()?
+            .find(|device| Self::device_id(device).as_deref() == Some(target_id))
+    }
+
+    fn resolve_output_device_id(value: &str) -> Option<String> {
+        let devices: Vec<_> = cpal::default_host().output_devices().ok()?.collect();
+
+        // Current preferences use endpoint IDs. Name matching is only a one-time
+        // migration path for preferences persisted by older app versions.
+        if let Some(id) = devices
+            .iter()
+            .filter_map(Self::device_id)
+            .find(|id| id == value)
+        {
+            return Some(id);
         }
-        None
+
+        devices.into_iter().find_map(|device| {
+            let matches_old_name = device.name().ok().as_deref() == Some(value)
+                || Self::device_display_name(&device).as_deref() == Some(value);
+            matches_old_name.then(|| Self::device_id(&device)).flatten()
+        })
     }
 
     fn default_output_name() -> Option<String> {
         cpal::default_host()
             .default_output_device()
-            .and_then(|d| d.name().ok())
+            .and_then(|device| Self::device_display_name(&device))
     }
 
     fn emit_output_changed(
@@ -260,16 +279,17 @@ impl AudioState {
             previous.monitor_stop.store(true, Ordering::SeqCst);
             previous.player.stop();
 
-            // Dropping a WASAPI stream joins CPAL's audio thread. If the output
-            // device was just removed, that join can stall, so keep it off Tauri's command path.
-            let _ = thread::Builder::new()
-                .name("audio_stream_drop".to_string())
-                .spawn(move || drop(previous));
+            // Dropping joins CPAL's WASAPI thread. Do this before opening any new
+            // stream so this process never owns overlapping output clients. If a
+            // removed device stalls here, recovery deliberately stops instead of
+            // risking another endpoint/client instance.
+            drop(previous);
         }
     }
 
     fn start_monitor(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
+        output_switch: Arc<Mutex<()>>,
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
@@ -315,8 +335,10 @@ impl AudioState {
 
                 if let Some((path, metadata, should_play, position)) = recovery {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        let _switch_guard = output_switch.lock().unwrap();
                         match Self::recover_output_device(
                             player_arc.clone(),
+                            output_switch.clone(),
                             volume_arc.clone(),
                             preference.clone(),
                             active_device_name.clone(),
@@ -361,6 +383,7 @@ impl AudioState {
 
     fn recover_output_device(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
+        output_switch: Arc<Mutex<()>>,
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
@@ -371,17 +394,6 @@ impl AudioState {
         autoplay: bool,
         position: f32,
     ) -> Result<(), String> {
-        let new_handle = Self::build_playback_handle(
-            &volume_arc,
-            &preference,
-            &active_device_name,
-            path,
-            metadata.clone(),
-            autoplay,
-            position,
-        )?;
-        let new_monitor_stop = new_handle.monitor_stop.clone();
-
         let previous = {
             let mut player_lock = player_arc.lock().unwrap();
             let Some(current) = player_lock.as_ref() else {
@@ -392,12 +404,23 @@ impl AudioState {
                 return Ok(());
             }
 
-            let previous = player_lock.take();
-            *player_lock = Some(new_handle);
-            previous
+            player_lock.take()
         };
-
         Self::dispose_playback(previous);
+
+        // Never overlap WASAPI clients: the old stream is fully closed before a
+        // replacement is opened. This avoids exercising endpoint/driver races.
+        let new_handle = Self::build_playback_handle(
+            &volume_arc,
+            &preference,
+            &active_device_name,
+            path,
+            metadata.clone(),
+            autoplay,
+            position,
+        )?;
+        let new_monitor_stop = new_handle.monitor_stop.clone();
+        *player_arc.lock().unwrap() = Some(new_handle);
 
         if let Some(meta) = metadata.as_ref() {
             let _ = smtc::apply_metadata(meta, Some(&app_handle));
@@ -408,6 +431,7 @@ impl AudioState {
 
         Self::start_monitor(
             player_arc,
+            output_switch,
             volume_arc,
             preference,
             active_device_name,
@@ -463,23 +487,28 @@ impl AudioState {
 
     pub fn list_outputs(&self) -> Result<Vec<AudioOutputInfo>, String> {
         let host = cpal::default_host();
-        let default_name = Self::default_output_name();
+        let default_id = host
+            .default_output_device()
+            .as_ref()
+            .and_then(Self::device_id);
         let active = self.active_device_name.lock().ok().and_then(|g| g.clone());
         let devices = host
             .output_devices()
             .map_err(|e| format!("Failed to enumerate output devices: {}", e))?;
         let mut out: Vec<AudioOutputInfo> = Vec::new();
-        for d in devices {
-            if let Ok(name) = d.name() {
-                if out.iter().any(|info| info.name == name) {
-                    continue;
-                }
-                out.push(AudioOutputInfo {
-                    is_system_default: default_name.as_deref() == Some(name.as_str()),
-                    is_active: active.as_deref() == Some(name.as_str()),
-                    name,
-                });
-            }
+        for device in devices {
+            let Some(id) = Self::device_id(&device) else {
+                continue;
+            };
+            let Some(name) = Self::device_display_name(&device) else {
+                continue;
+            };
+            out.push(AudioOutputInfo {
+                is_system_default: default_id.as_deref() == Some(id.as_str()),
+                is_active: active.as_deref() == Some(name.as_str()),
+                id,
+                name,
+            });
         }
         Ok(out)
     }
@@ -497,14 +526,29 @@ impl AudioState {
     }
 
     pub fn set_output_preference(&self, device: Option<String>) -> Result<(), String> {
+        // Tauri commands can overlap. Keep preference updates and stream swaps as one
+        // transaction so rapid selections cannot cancel an in-flight swap and then
+        // incorrectly report success without applying the last selected device.
+        let _switch_guard = self.output_switch.lock().unwrap();
+        let previous_preference = self.output_preference.lock().unwrap().clone();
         {
             let mut lock = self.output_preference.lock().unwrap();
             *lock = match device {
-                Some(name) if !name.is_empty() => OutputPreference::Pinned(name),
+                Some(value) if !value.is_empty() => {
+                    let id = Self::resolve_output_device_id(&value).ok_or_else(|| {
+                        format!("Selected audio output is no longer available: {value}")
+                    })?;
+                    OutputPreference::Pinned(id)
+                }
                 _ => OutputPreference::SystemDefault,
             };
         }
-        self.swap_output_now()
+
+        if let Err(error) = self.swap_output_now() {
+            *self.output_preference.lock().unwrap() = previous_preference;
+            return Err(error);
+        }
+        Ok(())
     }
 
     fn swap_output_now(&self) -> Result<(), String> {
@@ -543,6 +587,7 @@ impl AudioState {
 
         Self::recover_output_device(
             self.player.clone(),
+            self.output_switch.clone(),
             self.volume.clone(),
             self.output_preference.clone(),
             self.active_device_name.clone(),
