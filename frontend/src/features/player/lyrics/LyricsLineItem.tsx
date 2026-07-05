@@ -80,8 +80,40 @@ export default function LyricsLineItem({
         contain: 'layout style paint',
         containIntrinsicSize: 'auto 90px',
         backfaceVisibility: 'hidden',
-    } as const;    const content = (
-        <>
+    } as const;
+    const targetScale = isActive ? 1.05 : 1;
+    const content = (
+        <motion.div
+            initial={false}
+            animate={fluidMotion ? { scale: targetScale } : undefined}
+            transition={fluidMotion ? {
+                scale: {
+                    type: 'spring',
+                    mass: 2,
+                    damping: 25,
+                    stiffness: 100,
+                    restDelta: 0.0001,
+                    restSpeed: 0.001,
+                    delay: motionDelay,
+                },
+            } : undefined}
+            transformTemplate={(_, generatedTransform) =>
+                generatedTransform === 'none'
+                    ? 'translateZ(0)'
+                    : generatedTransform + ' translateZ(0)'
+            }
+            style={fluidMotion ? {
+                transformOrigin: 'left center',
+                willChange: 'transform',
+                backfaceVisibility: 'hidden',
+            } : {
+                transform: 'scale(' + targetScale + ') translateZ(0)',
+                transformOrigin: 'left center',
+                transition: 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
+                willChange: 'transform',
+                backfaceVisibility: 'hidden',
+            }}
+        >
             <span
                 style={!shouldRenderKaraoke ? {
                     transitionDelay: `${motionDelay}s`,
@@ -123,7 +155,7 @@ export default function LyricsLineItem({
                     {line.translation}
                 </span>
             )}
-        </>
+        </motion.div>
     );
 
     if (fluidMotion) {
@@ -135,7 +167,6 @@ export default function LyricsLineItem({
                 style={renderingIsolationStyle}
                 animate={{
                     y: interludeShift - targetScrollY,
-                    scale: isActive ? 1.05 : 1,
                     filter: rowFilter,
                     opacity: appliedOpacity,
                 }}
@@ -144,7 +175,6 @@ export default function LyricsLineItem({
                         ...(springParams || { type: 'spring', stiffness: 85, damping: 14, mass: 0.8 }),
                         delay: motionDelay,
                     },
-                    scale: { type: 'spring', stiffness: 100, damping: 18, delay: motionDelay * 0.3 },
                     filter: { duration: 0.38, ease: 'easeOut', delay: motionDelay * 0.2 },
                     opacity: { duration: 0.35, ease: 'easeOut', delay: motionDelay * 0.2 },
                 }}
@@ -164,8 +194,8 @@ export default function LyricsLineItem({
                 ...renderingIsolationStyle,
                 filter: rowFilter,
                 opacity: appliedOpacity,
-                transform: `translateY(${interludeShift}px) scale(${isActive ? 1.05 : 1})`,
-                transition: `filter 300ms, opacity 300ms, transform ${interludeShiftDurationMs}ms cubic-bezier(0.25, 1, 0.5, 1)`,
+                transform: 'translateY(' + interludeShift + 'px)',
+                transition: 'filter 300ms, opacity 300ms, transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
             }}
             className={className}
         >
