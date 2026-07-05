@@ -58,7 +58,7 @@ song={metadata}
                     </div>
                     <OverflowMarquee
                         className="mt-0.5 w-full text-xs leading-4 text-neutral-600 dark:text-white/56"
-                        contentClassName="flex w-max min-w-full items-center whitespace-nowrap"
+                        contentClassName="flex w-max items-center whitespace-nowrap"
                         resetToken={`meta-${metadata?.path || metadata?.artist || 'empty'}`}
                     >
                         <span
