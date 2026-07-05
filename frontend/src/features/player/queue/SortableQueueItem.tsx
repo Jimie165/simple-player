@@ -9,8 +9,6 @@ import MusicContextMenu from '@/components/common/MusicContextMenu';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { SongMetadata } from '@/types';
 
-export const QUEUE_ROW_HEIGHT = 56;
-
 interface QueueRowMenuProps {
     song: SongMetadata;
     onRemove?: () => void;
@@ -87,15 +85,11 @@ function SongRow({
     return (
         <div
             ref={itemRef}
-            style={{
-                ...style,
-                contentVisibility: 'auto',
-                containIntrinsicSize: `${QUEUE_ROW_HEIGHT}px`,
-            }}
+            style={style}
             {...(isDraggable ? dragAttributes : {})}
             {...(isDraggable ? dragListeners : {})}
             className={clsx(
-                'group flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] rounded-md transition-colors select-none',
+                'group h-14 flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] rounded-md transition-colors select-none',
                 isActive ? 'bg-white/10' : 'hover:bg-white/5'
             )}
         >

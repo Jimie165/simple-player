@@ -26,7 +26,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { IoEllipsisHorizontal } from 'react-icons/io5';
 import CoverImage from '@/components/common/CoverImage';
 import { navigateFromQueueContext } from '@/features/player/utils/queueContextNavigation';
-import { SortableQueueItem, QUEUE_ROW_HEIGHT } from '@/features/player/queue/SortableQueueItem';
+import { SortableQueueItem } from '@/features/player/queue/SortableQueueItem';
 import {
     type QueueEntry,
     getQueueItemId,
@@ -133,9 +133,32 @@ export default function AppleMusicQueue({
     const queueSortableItems = useMemo(() => queueList.map(getQueueItemId), [queueList]);
     const nextFromSortableItems = useMemo(() => nextFromList.map(getQueueItemId), [nextFromList]);
     const allQueueEntries = useMemo(() => [...queueList, ...nextFromList], [queueList, nextFromList]);
+    const virtualItems = useMemo(() => {
+        const items: Array<
+            | { kind: 'user-header' }
+            | { kind: 'context-header' }
+            | { kind: 'empty' }
+            | { kind: 'entry'; entry: QueueEntry }
+        > = [];
 
-    const QueueVirtuosoList = useMemo(() => createSortableList(queueSortableItems), [queueSortableItems]);
-    const NextVirtuosoList = useMemo(() => createSortableList(nextFromSortableItems), [nextFromSortableItems]);
+        if (queueList.length > 0) {
+            items.push({ kind: 'user-header' });
+            queueList.forEach((entry) => items.push({ kind: 'entry', entry }));
+        }
+        items.push({ kind: 'context-header' });
+        if (nextFromList.length > 0) {
+            nextFromList.forEach((entry) => items.push({ kind: 'entry', entry }));
+        } else {
+            items.push({ kind: 'empty' });
+        }
+        return items;
+    }, [queueList, nextFromList]);
+
+    const allSortableItems = useMemo(
+        () => [...queueSortableItems, ...nextFromSortableItems],
+        [queueSortableItems, nextFromSortableItems]
+    );
+    const QueueVirtuosoList = useMemo(() => createSortableList(allSortableItems), [allSortableItems]);
 
 
     const handleDragStart = useCallback((event: DragStartEvent) => {
@@ -195,31 +218,58 @@ export default function AppleMusicQueue({
         };
     };
 
-    const renderQueueItem = useCallback((_: number, item: QueueEntry) => {
-        return (
-            <SortableQueueItem
-                key={getQueueItemId(item)}
-                song={item.song}
-                index={item.originalIndex}
-                onPlayIndex={handlePlay}
-                onRemoveIndex={handleRemove}
-                onNavigate={onNavigate}
-            />
-        );
-    }, [handlePlay, handleRemove, onNavigate]);
+    const renderVirtualItem = useCallback((_: number, item: (typeof virtualItems)[number]) => {
+        if (item.kind === 'user-header') {
+            return (
+                <div className="h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] flex items-center justify-between">
+                    <span className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">队列中的下一首歌</span>
+                    <button
+                        onClick={clearUserQueue}
+                        className="text-[clamp(0.625rem,1.2vw,0.75rem)] font-bold text-white/60 hover:text-white transition-colors"
+                    >
+                        清空队列
+                    </button>
+                </div>
+            );
+        }
 
-    const renderNextFromItem = useCallback((_: number, item: QueueEntry) => {
+        if (item.kind === 'context-header') {
+            return (
+                <div className="h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] flex items-center gap-1 text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">
+                    {queueContext?.type === 'home' ? (
+                        <span>下一首</span>
+                    ) : (
+                        <>
+                            <span>下一首歌来自:</span>
+                            <span
+                                onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
+                                className={clsx(
+                                    'truncate text-white/70 transition-colors',
+                                    queueContext && 'hover:text-primary cursor-pointer hover:underline'
+                                )}
+                            >
+                                {queueContext?.name || '播放列表'}
+                            </span>
+                        </>
+                    )}
+                </div>
+            );
+        }
+
+        if (item.kind === 'empty') {
+            return <div className="h-20 flex items-center justify-center text-white/30 text-[clamp(0.75rem,1.5vw,0.875rem)] italic">没有待播放的歌曲</div>;
+        }
+
         return (
             <SortableQueueItem
-                key={getQueueItemId(item)}
-                song={item.song}
-                index={item.originalIndex}
+                song={item.entry.song}
+                index={item.entry.originalIndex}
                 onPlayIndex={handlePlay}
                 onRemoveIndex={handleRemove}
                 onNavigate={onNavigate}
             />
         );
-    }, [handlePlay, handleRemove, onNavigate]);
+    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext]);
 
     const activeDragEntry = useMemo(() => {
         if (!activeDragId) return null;
@@ -274,76 +324,23 @@ export default function AppleMusicQueue({
                     onDragCancel={handleDragCancel}
                     modifiers={[restrictToVerticalAxis, restrictToQueueViewport]}
                 >
-                    {/* Section 1: User Queue */}
-                    {queueList.length > 0 && (
-                        <div className="mb-6">
-                            <div className="px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] flex items-center justify-between">
-                                <span className="text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">队列中的下一首歌</span>
-                                <button
-                                    onClick={clearUserQueue}
-                                    className="text-[clamp(0.625rem,1.2vw,0.75rem)] font-bold text-white/60 hover:text-white transition-colors"
-                                >
-                                    清空队列
-                                </button>
-                            </div>
-                            {scrollParent ? (
-                                <Virtuoso
-                                    data={queueList}
-                                    customScrollParent={scrollParent}
-                                    useWindowScroll={false}
-                                    fixedItemHeight={QUEUE_ROW_HEIGHT}
-                                    overscan={VIRTUOSO_OVERSCAN}
-                                    className="w-full"
-                                    components={{ List: QueueVirtuosoList as Components['List'] }}
-                                    itemContent={renderQueueItem}
-                                />
-                            ) : (
-                                <div className="flex flex-col opacity-0" />
-                            )}
-                        </div>
+                    {scrollParent ? (
+                        <Virtuoso
+                            data={virtualItems}
+                            customScrollParent={scrollParent}
+                            useWindowScroll={false}
+                            overscan={VIRTUOSO_OVERSCAN}
+                            className="w-full"
+                            components={{ List: QueueVirtuosoList as Components['List'] }}
+                            computeItemKey={(_, item) => {
+                                if (item.kind === 'entry') return getQueueItemId(item.entry);
+                                return item.kind;
+                            }}
+                            itemContent={renderVirtualItem}
+                        />
+                    ) : (
+                        <div className="flex flex-col opacity-0" />
                     )}
-
-                    {/* Section 2: Next From Context */}
-                    {/* Section 2: Next From Context */}
-                    {/* Section 2: Next From Context */}
-                    <div className="px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] flex items-center gap-1 text-[clamp(0.75rem,1.5vw,0.875rem)] font-bold text-white">
-                        {queueContext?.type === 'home' ? (
-                            <span>下一首</span>
-                        ) : (
-                            <>
-                                <span>下一首歌来自:</span>
-                                <span
-                                    onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
-                                    className={clsx(
-                                        "truncate text-white/70 transition-colors",
-                                        queueContext && "hover:text-primary cursor-pointer hover:underline"
-                                    )}
-                                >
-                                    {queueContext?.name || "播放列表"}
-                                </span>
-                            </>
-                        )}
-                    </div>
-
-                    <div className="flex flex-col min-h-[100px]">
-                        {nextFromList.length === 0 && (<div className="text-white/30 py-8 text-[clamp(0.75rem,1.5vw,0.875rem)] text-center italic">没有待播放的歌曲</div>)}
-                        {nextFromList.length > 0 && (
-                            scrollParent ? (
-                                <Virtuoso
-                                    data={nextFromList}
-                                    customScrollParent={scrollParent}
-                                    useWindowScroll={false}
-                                    fixedItemHeight={QUEUE_ROW_HEIGHT}
-                                    overscan={VIRTUOSO_OVERSCAN}
-                                    className="w-full"
-                                    components={{ List: NextVirtuosoList as Components['List'] }}
-                                    itemContent={renderNextFromItem}
-                                />
-                            ) : (
-                                <div className="flex flex-col opacity-0" />
-                            )
-                        )}
-                    </div>
 
                     {typeof document !== 'undefined' && createPortal(
                         <DragOverlay>
