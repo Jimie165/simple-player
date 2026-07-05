@@ -135,6 +135,7 @@ export const audioService = {
 };
 
 export interface AudioOutputInfo {
+    id: string;
     name: string;
     is_system_default: boolean;
     is_active: boolean;

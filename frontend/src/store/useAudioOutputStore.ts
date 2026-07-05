@@ -20,13 +20,19 @@ export const useAudioOutputStore = create<AudioOutputState>()(
             hydrated: false,
 
             setPreferredDevice: async (device) => {
+                const previousDevice = get().preferredDevice;
                 set({ preferredDevice: device });
                 try {
                     await audioService.setAudioOutput(device);
                     const state = await audioService.getAudioOutput();
-                    set({ activeDevice: state.active_device });
+                    set({
+                        preferredDevice: state.preference,
+                        activeDevice: state.active_device,
+                    });
                 } catch (e) {
+                    set({ preferredDevice: previousDevice });
                     console.error('Failed to apply audio output preference', e);
+                    throw e;
                 }
             },
 
@@ -37,7 +43,7 @@ export const useAudioOutputStore = create<AudioOutputState>()(
                 try {
                     await audioService.setAudioOutput(preferredDevice);
                     const state = await audioService.getAudioOutput();
-                    set({ activeDevice: state.active_device, hydrated: true });
+                    set({ preferredDevice: state.preference, activeDevice: state.active_device, hydrated: true });
                 } catch (e) {
                     console.error('Failed to sync audio output preference to backend', e);
                     set({ hydrated: true });

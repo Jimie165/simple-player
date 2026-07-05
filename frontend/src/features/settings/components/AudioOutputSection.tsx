@@ -19,11 +19,11 @@ export default function AudioOutputSection() {
     const [audioOutputs, setAudioOutputs] = useState<AudioOutputInfo[]>([]);
 
     const preferredDeviceAvailable = preferredDevice
-        ? audioOutputs.some((device) => device.name === preferredDevice)
+        ? audioOutputs.some((device) => device.id === preferredDevice)
         : true;
     const selectedAudioOutput = preferredDeviceAvailable ? (preferredDevice ?? '') : '';
     const selectedAudioOutputLabel = selectedAudioOutput
-        ? selectedAudioOutput
+        ? audioOutputs.find((device) => device.id === selectedAudioOutput)?.name ?? selectedAudioOutput
         : `跟随系统默认${activeDevice ? `（当前：${activeDevice}）` : ''}`;
 
     const reloadAudioOutputs = async () => {
@@ -134,8 +134,8 @@ export default function AudioOutputSection() {
 
                                             {audioOutputs.map((d) => (
                                                 <ListboxOption
-                                                    key={d.name}
-                                                    value={d.name}
+                                                    key={d.id}
+                                                    value={d.id}
                                                     className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-[focus]:bg-primary/10 data-[selected]:text-primary"
                                                 >
                                                     <div className="flex flex-col">
@@ -146,7 +146,7 @@ export default function AudioOutputSection() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    {selectedAudioOutput === d.name && <MdCheck className="text-primary" />}
+                                                    {selectedAudioOutput === d.id && <MdCheck className="text-primary" />}
                                                 </ListboxOption>
                                             ))}
                                         </div>
