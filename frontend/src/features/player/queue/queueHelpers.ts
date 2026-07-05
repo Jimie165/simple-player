@@ -22,17 +22,24 @@ export function splitQueueEntries(
     currentSongIndex: number
 ): { queueList: QueueEntry[]; nextFromList: QueueEntry[] } {
     const nextItems = playlist.slice(currentSongIndex + 1);
-    const queueList: QueueEntry[] = [];
-    const nextFromList: QueueEntry[] = [];
-
-    nextItems.forEach((song, index) => {
-        const originalIndex = currentSongIndex + 1 + index;
-        if (song.is_queue_item) {
-            queueList.push({ song, originalIndex });
-        } else {
-            nextFromList.push({ song, originalIndex });
+    let lastQueuedOffset = -1;
+    for (let index = nextItems.length - 1; index >= 0; index--) {
+        if (nextItems[index].is_queue_item) {
+            lastQueuedOffset = index;
+            break;
         }
-    });
+    }
+    const entries = nextItems.map((song, index) => ({
+        song,
+        originalIndex: currentSongIndex + 1 + index,
+    }));
+
+    // Keep the displayed queue in playback order. Context songs between the
+    // current position and the last manual queue item belong to that queue block.
+    const queueList = lastQueuedOffset >= 0
+        ? entries.slice(0, lastQueuedOffset + 1)
+        : [];
+    const nextFromList = entries.slice(lastQueuedOffset + 1);
 
     return { queueList, nextFromList };
 }
