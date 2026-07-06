@@ -51,7 +51,6 @@ struct PlaybackHandle {
 
 pub struct AudioState {
     player: Arc<Mutex<Option<PlaybackHandle>>>,
-    output_switch: Arc<Mutex<()>>,
     volume: Arc<Mutex<f32>>,
     output_preference: Arc<Mutex<OutputPreference>>,
     active_device_name: Arc<Mutex<Option<String>>>,
@@ -66,7 +65,6 @@ impl AudioState {
     pub fn new() -> Self {
         Self {
             player: Arc::new(Mutex::new(None)),
-            output_switch: Arc::new(Mutex::new(())),
             volume: Arc::new(Mutex::new(1.0)),
             output_preference: Arc::new(Mutex::new(OutputPreference::SystemDefault)),
             active_device_name: Arc::new(Mutex::new(None)),
@@ -96,10 +94,6 @@ impl AudioState {
         metadata: Option<SongMetadata>,
         autoplay: bool,
     ) -> Result<(), String> {
-        let _switch_guard = self.output_switch.lock().unwrap();
-        let previous = self.player.lock().unwrap().take();
-        Self::dispose_playback(previous);
-
         let handle = Self::build_playback_handle(
             &self.volume,
             &self.output_preference,
@@ -110,7 +104,13 @@ impl AudioState {
             0.0,
         )?;
         let monitor_stop = handle.monitor_stop.clone();
-        *self.player.lock().unwrap() = Some(handle);
+        let previous = {
+            let mut player_lock = self.player.lock().unwrap();
+            let previous = player_lock.take();
+            *player_lock = Some(handle);
+            previous
+        };
+        Self::dispose_playback(previous);
 
         if let Some(meta) = metadata.as_ref() {
             let app_handle = self.app_handle.lock().ok().and_then(|h| h.clone());
@@ -122,7 +122,6 @@ impl AudioState {
             Self::emit_output_changed(&app_handle, &self.active_device_name);
             Self::start_monitor(
                 self.player.clone(),
-                self.output_switch.clone(),
                 self.volume.clone(),
                 self.output_preference.clone(),
                 self.active_device_name.clone(),
@@ -279,17 +278,16 @@ impl AudioState {
             previous.monitor_stop.store(true, Ordering::SeqCst);
             previous.player.stop();
 
-            // Dropping joins CPAL's WASAPI thread. Do this before opening any new
-            // stream so this process never owns overlapping output clients. If a
-            // removed device stalls here, recovery deliberately stops instead of
-            // risking another endpoint/client instance.
-            drop(previous);
+            // Dropping a WASAPI stream joins CPAL's audio thread. If the output
+            // device was removed, that join can stall, so keep it off the command path.
+            let _ = thread::Builder::new()
+                .name("audio_stream_drop".to_string())
+                .spawn(move || drop(previous));
         }
     }
 
     fn start_monitor(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
-        output_switch: Arc<Mutex<()>>,
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
@@ -335,10 +333,8 @@ impl AudioState {
 
                 if let Some((path, metadata, should_play, position)) = recovery {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
-                        let _switch_guard = output_switch.lock().unwrap();
                         match Self::recover_output_device(
                             player_arc.clone(),
-                            output_switch.clone(),
                             volume_arc.clone(),
                             preference.clone(),
                             active_device_name.clone(),
@@ -383,7 +379,6 @@ impl AudioState {
 
     fn recover_output_device(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
-        output_switch: Arc<Mutex<()>>,
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
@@ -394,22 +389,6 @@ impl AudioState {
         autoplay: bool,
         position: f32,
     ) -> Result<(), String> {
-        let previous = {
-            let mut player_lock = player_arc.lock().unwrap();
-            let Some(current) = player_lock.as_ref() else {
-                return Ok(());
-            };
-
-            if !Arc::ptr_eq(&current.monitor_stop, &expected_monitor) {
-                return Ok(());
-            }
-
-            player_lock.take()
-        };
-        Self::dispose_playback(previous);
-
-        // Never overlap WASAPI clients: the old stream is fully closed before a
-        // replacement is opened. This avoids exercising endpoint/driver races.
         let new_handle = Self::build_playback_handle(
             &volume_arc,
             &preference,
@@ -420,7 +399,22 @@ impl AudioState {
             position,
         )?;
         let new_monitor_stop = new_handle.monitor_stop.clone();
-        *player_arc.lock().unwrap() = Some(new_handle);
+
+        let previous = {
+            let mut player_lock = player_arc.lock().unwrap();
+            let Some(current) = player_lock.as_ref() else {
+                return Ok(());
+            };
+
+            if !Arc::ptr_eq(&current.monitor_stop, &expected_monitor) {
+                return Ok(());
+            }
+
+            let previous = player_lock.take();
+            *player_lock = Some(new_handle);
+            previous
+        };
+        Self::dispose_playback(previous);
 
         if let Some(meta) = metadata.as_ref() {
             let _ = smtc::apply_metadata(meta, Some(&app_handle));
@@ -431,7 +425,6 @@ impl AudioState {
 
         Self::start_monitor(
             player_arc,
-            output_switch,
             volume_arc,
             preference,
             active_device_name,
@@ -526,10 +519,8 @@ impl AudioState {
     }
 
     pub fn set_output_preference(&self, device: Option<String>) -> Result<(), String> {
-        // Tauri commands can overlap. Keep preference updates and stream swaps as one
-        // transaction so rapid selections cannot cancel an in-flight swap and then
-        // incorrectly report success without applying the last selected device.
-        let _switch_guard = self.output_switch.lock().unwrap();
+        // Resolve the persisted/user-facing value before applying it. Output stream
+        // recovery remains lock-free because WASAPI device calls may block during hot-plug.
         let previous_preference = self.output_preference.lock().unwrap().clone();
         {
             let mut lock = self.output_preference.lock().unwrap();
@@ -573,10 +564,9 @@ impl AudioState {
             return Ok(());
         };
 
-        if monitor_stop.swap(true, Ordering::SeqCst) {
-            // A swap is already in flight; nothing to do.
-            return Ok(());
-        }
+        // A failed automatic recovery may already have stopped this monitor. Manual
+        // selection must still attempt a fresh swap instead of returning a false success.
+        monitor_stop.store(true, Ordering::SeqCst);
 
         let app_handle = self
             .app_handle
@@ -587,7 +577,6 @@ impl AudioState {
 
         Self::recover_output_device(
             self.player.clone(),
-            self.output_switch.clone(),
             self.volume.clone(),
             self.output_preference.clone(),
             self.active_device_name.clone(),
