@@ -148,8 +148,17 @@ impl AudioState {
 
         let stream_error = Arc::new(AtomicBool::new(false));
         let pref_snapshot = preference.lock().unwrap().clone();
-        let (mut stream, picked_name) =
-            Self::open_output_sink(pref_snapshot, stream_error.clone())?;
+        let (mut stream, picked_name, fell_back_to_default) =
+            Self::open_output_sink(pref_snapshot.clone(), stream_error.clone())?;
+        if fell_back_to_default {
+            let mut current = preference.lock().unwrap();
+            if matches!((&*current, &pref_snapshot),
+                (OutputPreference::Pinned(current_id), OutputPreference::Pinned(opened_id))
+                    if current_id == opened_id)
+            {
+                *current = OutputPreference::SystemDefault;
+            }
+        }
         stream.log_on_drop(false);
         *active_device_name.lock().unwrap() = picked_name;
 
@@ -183,26 +192,39 @@ impl AudioState {
     fn open_output_sink(
         preference: OutputPreference,
         stream_error: Arc<AtomicBool>,
-    ) -> Result<(MixerDeviceSink, Option<String>), String> {
+    ) -> Result<(MixerDeviceSink, Option<String>, bool), String> {
         let error_flag = stream_error;
-        let (builder, picked_name) = match preference {
-            OutputPreference::Pinned(target_id) => {
-                let device = Self::find_output_device(&target_id).ok_or_else(|| {
-                    format!("Selected audio output is no longer available: {target_id}")
-                })?;
-                let name = Self::device_display_name(&device);
-                (
-                    DeviceSinkBuilder::from_device(device)
-                        .map_err(|e| format!("Failed to open audio output: {}", e))?,
-                    name,
-                )
-            }
+        let (builder, picked_name, fell_back_to_default) = match preference {
+            OutputPreference::Pinned(target_id) => match Self::find_output_device(&target_id) {
+                Some(device) => {
+                    let name = Self::device_display_name(&device);
+                    (
+                        DeviceSinkBuilder::from_device(device)
+                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                        name,
+                        false,
+                    )
+                }
+                None => {
+                    eprintln!(
+                        "audio: pinned endpoint '{target_id}' is unavailable; using system default"
+                    );
+                    let name = Self::default_output_name();
+                    (
+                        DeviceSinkBuilder::from_default_device()
+                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                        name,
+                        true,
+                    )
+                }
+            },
             OutputPreference::SystemDefault => {
                 let name = Self::default_output_name();
                 (
                     DeviceSinkBuilder::from_default_device()
                         .map_err(|e| format!("Failed to open audio output: {}", e))?,
                     name,
+                    false,
                 )
             }
         };
@@ -215,7 +237,7 @@ impl AudioState {
             .open_sink_or_fallback()
             .map_err(|e| format!("Failed to open audio output: {}", e))?;
 
-        Ok((sink, picked_name))
+        Ok((sink, picked_name, fell_back_to_default))
     }
 
     fn device_id(device: &cpal::Device) -> Option<String> {
@@ -526,9 +548,9 @@ impl AudioState {
             let mut lock = self.output_preference.lock().unwrap();
             *lock = match device {
                 Some(value) if !value.is_empty() => {
-                    let id = Self::resolve_output_device_id(&value).ok_or_else(|| {
-                        format!("Selected audio output is no longer available: {value}")
-                    })?;
+                    // Preserve a stable endpoint ID even while that device is unplugged.
+                    // Older name-based preferences are migrated whenever the device is present.
+                    let id = Self::resolve_output_device_id(&value).unwrap_or(value);
                     OutputPreference::Pinned(id)
                 }
                 _ => OutputPreference::SystemDefault,

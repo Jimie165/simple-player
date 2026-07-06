@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
+import { audioService } from '@/services/audioService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
@@ -48,7 +49,16 @@ function App() {
   useEffect(() => {
     useAudioOutputStore.getState().syncToBackend();
     const unlisten = listen<string | null>('audio:output-changed', (e) => {
-      useAudioOutputStore.getState().setActiveDevice(e.payload ?? null);
+      audioService.getAudioOutput()
+        .then((state) => {
+          useAudioOutputStore.setState({
+            preferredDevice: state.preference,
+            activeDevice: state.active_device,
+          });
+        })
+        .catch(() => {
+          useAudioOutputStore.getState().setActiveDevice(e.payload ?? null);
+        });
     });
     return () => {
       unlisten.then((fn) => fn()).catch(() => { });
