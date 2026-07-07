@@ -347,7 +347,7 @@ export default function FluidLyricsPanel({
 
     const dynamicSpringParams = useMemo(() => {
         if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
-            return { type: 'spring', stiffness: 90, damping: 15, mass: 0.9 } as const;
+            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
         }
 
         const currentItem = displayItems[activeDisplayIndex];
@@ -357,7 +357,7 @@ export default function FluidLyricsPanel({
 
         const isInterludeTransition = currentItem.type === 'interlude' || prevItem.type === 'interlude';
         if (isInterludeTransition) {
-            return { type: 'spring', stiffness: 90, damping: 15, mass: 0.9 } as const;
+            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
         }
 
         const interval = currentStartMs - prevStartMs;
@@ -373,7 +373,7 @@ export default function FluidLyricsPanel({
         const targetStiffness = MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
         const targetDamping = Math.sqrt(targetStiffness) * 2.2;
 
-        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 0.9 } as const;
+        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 1 } as const;
     }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling]);
 
     const motionDelays = useMemo(() => {
