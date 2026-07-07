@@ -347,13 +347,18 @@ export default function FluidLyricsPanel({
 
     const dynamicSpringParams = useMemo(() => {
         if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
-            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
+            return { type: 'spring', stiffness: 90, damping: 15, mass: 0.9 } as const;
         }
 
         const currentItem = displayItems[activeDisplayIndex];
         const prevItem = displayItems[activeDisplayIndex - 1];
         const currentStartMs = currentItem.type === 'line' ? (currentItem.line.time_ms ?? 0) : currentItem.startMs;
         const prevStartMs = prevItem.type === 'line' ? (prevItem.line.time_ms ?? 0) : prevItem.startMs;
+
+        const isInterludeTransition = currentItem.type === 'interlude' || prevItem.type === 'interlude';
+        if (isInterludeTransition) {
+            return { type: 'spring', stiffness: 90, damping: 15, mass: 0.9 } as const;
+        }
 
         const interval = currentStartMs - prevStartMs;
         const MIN_INTERVAL = 100;
@@ -368,7 +373,7 @@ export default function FluidLyricsPanel({
         const targetStiffness = MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
         const targetDamping = Math.sqrt(targetStiffness) * 2.2;
 
-        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 1 } as const;
+        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 0.9 } as const;
     }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling]);
 
     const motionDelays = useMemo(() => {
@@ -415,7 +420,7 @@ export default function FluidLyricsPanel({
             }
         }
         return delays;
-    }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling, variant]);
+    }, [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">

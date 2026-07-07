@@ -1,6 +1,6 @@
 export const topInsetPx = 12;
 export const manualResumeFollowDelayMs = 2000;
-export const interludeThresholdMs = 7000;
+export const interludeThresholdMs = 4250;
 export const interludeGapOpenDurationMs = 420;
 export const interludeExitDurationMs = 1600;
 export const interludeNextLineFocusLeadMs = 600;

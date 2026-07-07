@@ -75,12 +75,19 @@ export default function LyricsLineItem({
         canSeek ? 'cursor-pointer' : 'cursor-default',
         isActive ? 'text-white drop-shadow-xl' : 'text-white'
     );
-    const renderingIsolationStyle = {
-        contentVisibility: 'auto',
-        contain: 'layout style paint',
-        containIntrinsicSize: 'auto 90px',
-        backfaceVisibility: 'hidden',
-    } as const;
+    // Fluid scrolling depends on every row's real geometry. Intrinsic placeholders
+    // would shift later rows as they enter the viewport and restart their springs.
+    const renderingIsolationStyle = fluidMotion
+        ? {
+            contain: 'layout style paint',
+            backfaceVisibility: 'hidden',
+        } as const
+        : {
+            contentVisibility: 'auto',
+            contain: 'layout style paint',
+            containIntrinsicSize: 'auto 90px',
+            backfaceVisibility: 'hidden',
+        } as const;
     const targetScale = isActive ? 1.05 : 1;
     const content = (
         <motion.div
