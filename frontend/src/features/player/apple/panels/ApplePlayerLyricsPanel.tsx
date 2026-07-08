@@ -4,6 +4,7 @@ import type { Variants } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
 import FluidLyricsPanel from '@/features/player/lyrics/FluidLyricsPanel';
 import LyricsPanel from '@/features/player/lyrics/LyricsPanel';
+import PlainLyricsPanel from '@/features/player/lyrics/PlainLyricsPanel';
 import {
     animationLyricsTimingStrategy,
     performanceLyricsTimingStrategy,
@@ -99,7 +100,12 @@ export default function ApplePlayerLyricsPanel({
                     } : undefined}
                 >
                     {lyricsMounted && (
-                        playerEffectMode === 'animation' ? (
+                        !hasTimestamps ? (
+                            <PlainLyricsPanel
+                                lyrics={lyrics}
+                                status={lyricsStatus}
+                            />
+                        ) : playerEffectMode === 'animation' ? (
                             <FluidLyricsPanel
                                 key={`fluid-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
@@ -109,7 +115,6 @@ export default function ApplePlayerLyricsPanel({
                                 currentTime={currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
-                                variant={variant}
                                 timingStrategy={animationLyricsTimingStrategy}
                             />
                         ) : (
@@ -122,7 +127,6 @@ export default function ApplePlayerLyricsPanel({
                                 currentTime={currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
-                                variant={variant}
                                 timingStrategy={performanceLyricsTimingStrategy}
                             />
                         )

@@ -69,6 +69,16 @@ interface PlayerState {
 
 const sanitizeLyricsLines = (data: LyricsData | null): LyricsLine[] | null => {
     if (!data?.lines?.length) return null;
+    if (!data.has_timestamps) {
+        const lines = data.lines.map((line) => ({
+            time_ms: null,
+            text: line.text,
+            translation: null,
+            words: null,
+            end_ms: null,
+        }));
+        return lines.some((line) => line.text.trim().length > 0) ? lines : null;
+    }
     const lines = data.lines
         .map((line) => {
             const translation = line.translation ? line.translation.trim() : '';

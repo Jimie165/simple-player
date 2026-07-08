@@ -61,20 +61,19 @@ pub struct SongMetadata {
 }
 
 fn build_unsynced_lyrics(content: &str) -> Option<LyricsData> {
+    if content.trim().is_empty() {
+        return None;
+    }
+
     let lines: Vec<LyricsLine> = content
-        .lines()
-        .map(|line| line.trim())
-        .filter(|line| !line.is_empty())
+        .split('\n')
+        .map(|line| line.strip_suffix('\r').unwrap_or(line))
         .map(|line| LyricsLine {
             time_ms: None,
             text: line.to_string(),
             translation: None,
         })
         .collect();
-
-    if lines.is_empty() {
-        return None;
-    }
 
     Some(LyricsData {
         lines,
