@@ -52,6 +52,8 @@ fn main() {
 
             // 注入数据库状态
             app.manage(DbState(Arc::new(Mutex::new(conn))));
+            let db = app.state::<DbState>().0.clone();
+            modules::window_state::initialize(app, db);
 
             // 初始化 AudioState 的 AppHandle (用于未来的 SMTC 事件)
             let audio_state: tauri::State<AudioState> = app.state();
