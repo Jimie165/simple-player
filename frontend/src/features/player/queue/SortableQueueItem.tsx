@@ -89,12 +89,13 @@ function SongRow({
             {...(isDraggable ? dragAttributes : {})}
             {...(isDraggable ? dragListeners : {})}
             className={clsx(
-                'group h-14 flex items-center gap-[clamp(0.5rem,1.5vw,0.75rem)] px-[clamp(0.5rem,1.5vw,0.75rem)] py-[clamp(0.375rem,1vw,0.5rem)] rounded-md transition-colors select-none',
+                'group min-h-[clamp(3.3rem,5.1vw,5.1rem)] flex items-center gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.5rem,1.5vw,1rem)] py-[clamp(0.2rem,0.4vw,0.45rem)] rounded-md transition-colors select-none',
                 isActive ? 'bg-white/10' : 'hover:bg-white/5'
             )}
         >
             <div
-                className="relative w-[clamp(2rem,4vw,2.5rem)] h-[clamp(2rem,4vw,2.5rem)] rounded-[4px] overflow-hidden flex-shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
+                className="relative rounded-sm overflow-hidden shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
+                style={{ width: 'clamp(2.75rem, 4.25vw, 4.25rem)', height: 'clamp(2.75rem, 4.25vw, 4.25rem)' }}
                 onPointerDown={(event) => event.stopPropagation()}
                 onClick={(event) => {
                     event.stopPropagation();
@@ -104,20 +105,20 @@ function SongRow({
                 <CoverImage thumbnail={128}
 song={song} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <IoPlay className="text-white text-base" />
+                    <IoPlay className="text-[clamp(1rem,1.8vw,1.5rem)] text-white" />
                 </div>
             </div>
 
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5 h-full py-1.5 border-b border-white/5 group-last:border-none">
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-[0.18em] self-stretch py-[clamp(0.2rem,0.4vw,0.45rem)] border-b border-white/5 group-last:border-none">
                 <div
                     className={clsx(
-                        'text-[clamp(0.75rem,1.5vw,0.875rem)] font-medium truncate leading-tight',
+                        'text-[clamp(0.75rem,1.5vw,1.125rem)] font-medium truncate leading-[1.55]',
                         isActive ? 'text-primary' : 'text-white/90'
                     )}
                 >
                     {song.title}
                 </div>
-                <div className="text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/50 truncate leading-tight">
+                <div className="text-[clamp(0.625rem,1.2vw,0.875rem)] text-white/50 truncate leading-[1.55]">
                     {song.artist}
                 </div>
             </div>
