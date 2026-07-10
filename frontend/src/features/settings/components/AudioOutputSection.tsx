@@ -73,7 +73,7 @@ export default function AudioOutputSection() {
                 <span>音频输出</span>
             </div>
 
-            <div className="rounded-2xl border border-outline-variant/30 bg-surface-container-high p-4 space-y-3">
+            <div className="settings-card rounded-2xl p-4 space-y-3">
                 <div className="flex flex-col gap-1">
                     <span className="text-base font-medium text-on-surface">输出设备</span>
                     <span className="text-sm text-on-surface-variant">
@@ -88,7 +88,7 @@ export default function AudioOutputSection() {
                         <div className="relative">
                             <ListboxButton
                                 className={clsx(
-                                    "flex items-center justify-between w-full px-4 py-2.5 rounded-xl bg-surface-container text-sm text-on-surface border transition-all duration-200 focus:outline-none",
+                                    "settings-control flex items-center justify-between w-full px-4 py-2.5 rounded-xl text-sm text-on-surface border transition-all duration-200 focus:outline-none",
                                     open
                                         ? "border-primary/50 ring-1 ring-primary/20 rounded-b-none"
                                         : "border-outline-variant/30 hover:border-primary/30"
@@ -114,7 +114,7 @@ export default function AudioOutputSection() {
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } }}
                                         exit={{ opacity: 0, y: -10, transition: { duration: 0.2, ease: "easeOut" } }}
-                                        className="z-50 w-[var(--button-width)] mt-[-1px] rounded-b-xl border border-primary/50 border-t-0 bg-surface-container-high shadow-xl focus:outline-none overflow-hidden"
+                                        className="settings-card z-50 w-[var(--button-width)] mt-[-1px] rounded-b-xl border border-primary/50 border-t-0 shadow-xl focus:outline-none overflow-hidden"
                                     >
                                         <div className="py-1 max-h-60 overflow-y-auto scrollbar-hidden">
                                             <ListboxOption

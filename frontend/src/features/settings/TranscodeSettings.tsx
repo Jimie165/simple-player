@@ -170,7 +170,7 @@ export default function TranscodeSettings() {
                     <MdVideoSettings className="text-lg" />
                     <span>视频转码设置</span>
                 </div>
-                <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 p-5">
+                <div className="settings-card rounded-2xl p-5">
                     <p className="text-sm text-on-surface-variant">
                         {loadError ?? '正在加载转码缓存设置...'}
                     </p>
@@ -195,7 +195,7 @@ export default function TranscodeSettings() {
                 <span>视频转码设置</span>
             </div>
 
-            <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 p-5 space-y-6">
+            <div className="settings-card rounded-2xl p-5 space-y-6">
 
                 {/* 硬件加速状态 */}
                 <div className="flex items-center justify-between">
@@ -212,7 +212,7 @@ export default function TranscodeSettings() {
                     </div>
                 </div>
 
-                <div className="h-px bg-outline-variant/20" />
+                <div className="h-px" style={{ backgroundColor: 'var(--settings-divider)' }} />
 
                 {/* 缓存管理 */}
                 <div className="space-y-4">
@@ -241,7 +241,7 @@ export default function TranscodeSettings() {
                         </button>
                     </div>
 
-                    <div className="flex items-start justify-between gap-3 rounded-xl bg-surface-container px-3 py-3">
+                    <div className="settings-control flex items-start justify-between gap-3 rounded-xl px-3 py-3">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium text-on-surface-variant mb-1">转码 MP4 文件夹</p>
                             <p className="text-sm text-on-surface truncate" title={info.cache_dir}>
@@ -256,7 +256,7 @@ export default function TranscodeSettings() {
                                 <button
                                     onClick={handleResetCacheDir}
                                     disabled={changingDir}
-                                    className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-surface-container-highest hover:text-primary transition-colors active:scale-95 disabled:opacity-50"
+                                    className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors active:scale-95 disabled:opacity-50"
                                     title={`恢复默认文件夹：${info.default_cache_dir}`}
                                 >
                                     <MdRestore className="text-lg" />

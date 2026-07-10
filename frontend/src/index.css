@@ -81,6 +81,16 @@
   /* Gaussian Blur Button (Light) */
   --glass-surface: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.5);
+
+  /* Settings use a foreground-first hierarchy: cards and controls are brighter
+     than the surrounding page, rather than following the generic MD surface ramp. */
+  --settings-card: #FFFFFF;
+  --settings-option: #FBFBFD;
+  --settings-option-hover: #F3F6FF;
+  --settings-subtle: #F5F6FA;
+  --settings-border: rgba(68, 71, 79, 0.16);
+  --settings-divider: rgba(68, 71, 79, 0.12);
+  --settings-shadow: 0 10px 28px rgba(25, 28, 32, 0.05);
 }
 
 :root.dark {
@@ -122,6 +132,14 @@
   /* Gaussian Blur Button (Dark) */
   --glass-surface: rgba(30, 30, 30, 0.5);
   --glass-border: rgba(255, 255, 255, 0.1);
+
+  --settings-card: #2A2A2A;
+  --settings-option: #353535;
+  --settings-option-hover: #3B3F47;
+  --settings-subtle: #303030;
+  --settings-border: rgba(255, 255, 255, 0.11);
+  --settings-divider: rgba(255, 255, 255, 0.08);
+  --settings-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
 }
 
 body {
@@ -131,6 +149,50 @@ body {
   overscroll-behavior: none;
   user-select: none;
   cursor: default;
+}
+
+@layer components {
+  .settings-card {
+    background-color: var(--settings-card);
+    border: 1px solid var(--settings-border);
+    box-shadow: var(--settings-shadow);
+  }
+
+  .settings-list {
+    background-color: var(--settings-divider);
+    border: 1px solid var(--settings-border);
+    box-shadow: var(--settings-shadow);
+  }
+
+  .settings-row {
+    background-color: var(--settings-option);
+    transition: background-color 180ms ease, box-shadow 180ms ease;
+  }
+
+  .settings-row:hover {
+    background-color: var(--settings-option-hover);
+  }
+
+  .settings-static-row {
+    background-color: var(--settings-option);
+  }
+
+  .settings-control {
+    background-color: var(--settings-option);
+    border-color: var(--settings-border);
+  }
+
+  .settings-control:not(:disabled):hover {
+    background-color: var(--settings-option-hover);
+  }
+
+  .settings-subtle {
+    background-color: var(--settings-subtle);
+  }
+
+  .settings-divider {
+    border-color: var(--settings-divider);
+  }
 }
 
 :where(button, [role="button"]):focus,

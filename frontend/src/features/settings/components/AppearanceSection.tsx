@@ -23,7 +23,7 @@ function ThemeOption({
                 "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
                 current === val
                     ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
-                    : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                    : "settings-control border text-on-surface-variant"
             )}
         >
             <span>{label}</span>
@@ -74,7 +74,7 @@ export default function AppearanceSection() {
                             "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
                             playerEffectMode === 'performance'
                                 ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
-                                : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                                : "settings-control border text-on-surface-variant"
                         )}
                     >
                         <span>性能优先</span>
@@ -86,7 +86,7 @@ export default function AppearanceSection() {
                             "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
                             playerEffectMode === 'animation'
                                 ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
-                                : "bg-surface-container-high border-outline-variant/30 text-on-surface-variant hover:bg-surface-container-highest"
+                                : "settings-control border text-on-surface-variant"
                         )}
                     >
                         <span>动画优先</span>
@@ -105,7 +105,7 @@ export default function AppearanceSection() {
                     </div>
                 </div>
 
-                <div className="bg-surface-container-high rounded-2xl border border-outline-variant/30 p-5">
+                <div className="settings-card rounded-2xl p-5">
                     <div className="flex flex-wrap gap-4 items-center">
                         {/* Presets */}
                         {presetColors.map((color) => {

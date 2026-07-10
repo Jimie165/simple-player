@@ -20,7 +20,7 @@ export default function AboutSection() {
     }, []);
 
     return (
-        <section className="rounded-2xl bg-surface-container-high p-6 border border-outline-variant/30">
+        <section className="settings-card rounded-2xl p-6">
             <h3 className="text-lg font-semibold mb-2 text-on-surface">关于 {appName || 'Simple Player'}</h3>
             <p className="text-sm text-on-surface-variant leading-relaxed">
                 这是一个基于 Tauri v2 和 React 构建的本地音乐播放器。

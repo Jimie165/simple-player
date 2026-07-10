@@ -71,7 +71,7 @@ export default function MusicFoldersSection() {
                 <span>音乐文件夹</span>
             </div>
 
-            <div className="rounded-2xl overflow-hidden border border-outline-variant/30 bg-surface-container-high">
+            <div className="settings-card rounded-2xl overflow-hidden">
                 {musicFolders.length === 0 ? (
                     <div className="p-4 text-sm text-on-surface-variant">
                         尚未添加任何音乐文件夹
@@ -82,7 +82,7 @@ export default function MusicFoldersSection() {
                             {(foldersExpanded ? musicFolders : musicFolders.slice(0, FOLDER_PREVIEW_COUNT)).map((folder) => (
                                 <li
                                     key={folder.id}
-                                    className="flex items-center justify-between gap-3 p-4 hover:bg-surface-container-highest transition-colors"
+                                    className="settings-static-row flex items-center justify-between gap-3 p-4"
                                 >
                                     <div className="min-w-0 flex-1">
                                         <p className="text-sm font-medium text-on-surface truncate">
@@ -102,7 +102,7 @@ export default function MusicFoldersSection() {
                         {musicFolders.length > FOLDER_PREVIEW_COUNT && (
                             <button
                                 onClick={() => setFoldersExpanded((v) => !v)}
-                                className="flex items-center justify-center gap-1 w-full py-2.5 text-sm font-medium text-primary hover:bg-surface-container-highest transition-colors border-t border-outline-variant/30"
+                                className="settings-row settings-divider flex items-center justify-center gap-1 w-full py-2.5 text-sm font-medium text-primary border-t"
                             >
                                 {foldersExpanded ? (
                                     <>
@@ -119,14 +119,14 @@ export default function MusicFoldersSection() {
                         )}
                     </>
                 )}
-                <div className="p-3 border-t border-outline-variant/30 bg-surface-container">
+                <div className="settings-subtle settings-divider p-3 border-t">
                     <button
                         onClick={handleAddFolder}
                         disabled={isAddingFolder}
                         className={clsx(
                             "flex items-center justify-center gap-2 w-full py-2.5 rounded-xl font-medium text-sm transition-all active:scale-95",
                             isAddingFolder
-                                ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
+                                ? "settings-control text-on-surface-variant cursor-wait"
                                 : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
                         )}
                     >

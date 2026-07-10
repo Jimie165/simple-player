@@ -59,9 +59,9 @@ export default function GeneralSettingsSection() {
             </div>
 
             {/* M3 Expressive Style: Grouped container with hairline gap */}
-            <div className="flex flex-col gap-[2px] rounded-2xl overflow-hidden border border-outline-variant/30 bg-outline-variant/20">
+            <div className="settings-list flex flex-col gap-px rounded-2xl overflow-hidden">
                 {/* Refresh Music */}
-                <div className="flex items-center justify-between p-4 bg-surface-container-high hover:bg-surface-container-highest transition-colors">
+                <div className="settings-static-row flex items-center justify-between p-4">
                     <div className="flex flex-col gap-1">
                         <span className="text-base font-medium text-on-surface">刷新音乐库</span>
                         <span className="text-sm text-on-surface-variant">重新扫描音乐文件夹并更新元数据</span>
@@ -72,7 +72,7 @@ export default function GeneralSettingsSection() {
                         className={clsx(
                             "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
                             isRefreshingMusic
-                                ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
+                                ? "settings-subtle text-on-surface-variant cursor-wait"
                                 : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
                         )}
                     >
@@ -82,7 +82,7 @@ export default function GeneralSettingsSection() {
                 </div>
 
                 {/* Refresh Video */}
-                <div className="flex items-center justify-between p-4 bg-surface-container-high hover:bg-surface-container-highest transition-colors">
+                <div className="settings-static-row flex items-center justify-between p-4">
                     <div className="flex flex-col gap-1">
                         <span className="text-base font-medium text-on-surface">刷新视频库</span>
                         <span className="text-sm text-on-surface-variant">重新扫描视频文件夹并更新缩略图</span>
@@ -93,7 +93,7 @@ export default function GeneralSettingsSection() {
                         className={clsx(
                             "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
                             isRefreshingVideo
-                                ? "bg-surface-container-highest text-on-surface-variant cursor-wait"
+                                ? "settings-subtle text-on-surface-variant cursor-wait"
                                 : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
                         )}
                     >

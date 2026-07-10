@@ -17,7 +17,7 @@ const SCOPE_CONFIG: Record<IgnoreScope, { title: string; emptyText: string; plac
     common: {
         title: '通用忽略目录',
         emptyText: '列表为空，音乐库和视频库不会共用额外忽略目录',
-        placeholder: '输入目录名后回车添加，例如 node_modules',
+        placeholder: '输入通用忽略的目录名',
         description: '同时应用于音乐库和视频库扫描。',
     },
     music: {
@@ -155,7 +155,7 @@ export default function IgnoredDirsSection() {
                             }
                         }}
                         placeholder={config.placeholder}
-                        className="flex-1 px-3 py-2 rounded-xl bg-surface-container text-sm text-on-surface placeholder:text-on-surface-variant/60 border border-outline-variant/30 focus:outline-none focus:border-primary/50"
+                        className="settings-control flex-1 px-3 py-2 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/60 border focus:outline-none focus:border-primary/50"
                     />
                     <button
                         onClick={() => addIgnoredDir(scope)}
@@ -163,7 +163,7 @@ export default function IgnoredDirsSection() {
                         className={clsx(
                             "px-4 py-2 rounded-xl font-medium text-sm transition-all active:scale-95",
                             !input.trim() || savingIgnored
-                                ? "bg-surface-container-highest text-on-surface-variant cursor-not-allowed"
+                                ? "settings-control text-on-surface-variant cursor-not-allowed"
                                 : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
                         )}
                     >
@@ -181,19 +181,19 @@ export default function IgnoredDirsSection() {
                 <span>扫描忽略目录</span>
             </div>
 
-            <div className="flex flex-col gap-[2px] rounded-2xl overflow-hidden border border-outline-variant/30 bg-outline-variant/20">
-                <div className="bg-surface-container-high p-4">
+            <div className="settings-list flex flex-col gap-px rounded-2xl overflow-hidden">
+                <div className="settings-static-row p-4">
                     <p className="text-sm text-on-surface-variant">
                         扫描时会跳过名称匹配以下任一项的目录（不区分大小写）。常用于排除项目目录里的非音乐内容。
                     </p>
                 </div>
-                <div className="bg-surface-container-high p-4">
+                <div className="settings-static-row p-4">
                     {renderScope('common')}
                 </div>
-                <div className="bg-surface-container-high p-4">
+                <div className="settings-static-row p-4">
                     {renderScope('music')}
                 </div>
-                <div className="bg-surface-container-high p-4">
+                <div className="settings-static-row p-4">
                     {renderScope('video')}
                 </div>
             </div>
