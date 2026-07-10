@@ -115,6 +115,7 @@ export default function ApplePlayerLyricsPanel({
                                 currentTime={currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
+                                variant={variant}
                                 timingStrategy={animationLyricsTimingStrategy}
                             />
                         ) : (
@@ -127,6 +128,7 @@ export default function ApplePlayerLyricsPanel({
                                 currentTime={currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
+                                variant={variant}
                                 timingStrategy={performanceLyricsTimingStrategy}
                             />
                         )
