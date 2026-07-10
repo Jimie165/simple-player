@@ -302,4 +302,17 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         isQueueOpen: state.isQueueOpen,
         // Don't persist isVideoMode, always start closed
     }),
+    // Zustand 只恢复前端状态；同时把持久化音量写回后端，避免 UI 与实际播放音量脱节。
+    onRehydrateStorage: () => (state, error) => {
+        if (error) {
+            console.error('Failed to restore player settings', error);
+            return;
+        }
+
+        if (state) {
+            void audioService.setVolume(state.volume / 100).catch((restoreError) => {
+                console.error('Failed to restore audio volume', restoreError);
+            });
+        }
+    },
 }));
