@@ -1,6 +1,6 @@
 import type { LyricsWord } from '@/types';
 
-const targetHandoffLeadMs = 400;
+const targetHandoffLeadMs = 600;
 const tailMinDurationRatio = 0.5;
 const tailMaxWindowMs = 700;
 const tailMaxChars = 8;
