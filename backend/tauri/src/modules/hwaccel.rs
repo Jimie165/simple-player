@@ -1,5 +1,6 @@
 use std::process::Stdio;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, atomic::{AtomicBool, Ordering}};
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -9,6 +10,7 @@ pub enum HwAccelType {
     VideoToolbox, // macOS
     Vaapi,        // Linux (AMD/Intel/NVIDIA)
     None,         // 软件编码
+    Detecting,    // 正在后台检测
 }
 
 impl std::fmt::Display for HwAccelType {
@@ -19,12 +21,33 @@ impl std::fmt::Display for HwAccelType {
             Self::VideoToolbox => write!(f, "videotoolbox"),
             Self::Vaapi => write!(f, "vaapi"),
             Self::None => write!(f, "software"),
+            Self::Detecting => write!(f, "detecting"),
         }
     }
 }
 
 // 全局缓存，只检测一次
 static DETECTED_HWACCEL: OnceLock<HwAccelType> = OnceLock::new();
+static DETECTION_STARTED: AtomicBool = AtomicBool::new(false);
+
+/// 返回已完成的检测结果，不会启动外部进程或阻塞调用方。
+pub fn cached_hardware_encoder() -> Option<HwAccelType> {
+    DETECTED_HWACCEL.get().copied()
+}
+
+/// 在后台预热检测。设置页调用它后可以立即渲染，避免等待 FFmpeg 启动和编码器探测。
+pub fn start_hardware_encoder_detection(app_handle: AppHandle, ffmpeg: String) {
+    if DETECTED_HWACCEL.get().is_some()
+        || DETECTION_STARTED.swap(true, Ordering::AcqRel)
+    {
+        return;
+    }
+
+    std::thread::spawn(move || {
+        let detected = detect_hardware_encoder(&ffmpeg);
+        let _ = app_handle.emit("hardware-encoder-detected", detected.to_string());
+    });
+}
 
 /// 检测可用的硬件编码器（懒加载 + 缓存）
 pub fn detect_hardware_encoder(ffmpeg: &str) -> HwAccelType {
@@ -76,6 +99,7 @@ pub fn get_encode_args(hw_type: HwAccelType) -> Vec<String> {
         HwAccelType::VideoToolbox => vec!["-c:v", "h264_videotoolbox", "-b:v", "5M"],
         HwAccelType::Vaapi => vec!["-vaapi_device", "/dev/dri/renderD128", "-c:v", "h264_vaapi", "-b:v", "5M"],
         HwAccelType::None => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"],
+        HwAccelType::Detecting => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"],
     }
     .into_iter()
     .map(String::from)

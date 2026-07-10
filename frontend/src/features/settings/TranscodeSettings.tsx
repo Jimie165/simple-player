@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-hot-toast';
 import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings, MdFolderOpen, MdRestore } from 'react-icons/md';
@@ -37,7 +38,44 @@ export default function TranscodeSettings() {
     };
 
     useEffect(() => {
-        fetchInfo();
+        let cancelled = false;
+        let unlisten: (() => void) | undefined;
+
+        const load = async () => {
+            try {
+                const data = await invoke<TranscodeCacheInfo>('get_transcode_cache_info');
+                if (cancelled) return;
+                setInfo(data);
+                setLimit(data.limit_mb);
+                setLoadError(null);
+            } catch (error) {
+                if (!cancelled) {
+                    console.error('Failed to get transcode info:', error);
+                    setLoadError(typeof error === 'string' ? error : '无法加载转码缓存设置');
+                }
+            }
+        };
+
+        const subscribe = async () => {
+            // 先订阅再请求状态，避免后台检测完成的事件落在两者之间。
+            const unlistenFn = await listen('hardware-encoder-detected', () => {
+                void load();
+            });
+
+            if (cancelled) {
+                unlistenFn();
+                return;
+            }
+
+            unlisten = unlistenFn;
+            await load();
+        };
+
+        void subscribe();
+        return () => {
+            cancelled = true;
+            unlisten?.();
+        };
     }, []);
 
     const handleClearCache = async () => {
@@ -120,6 +158,7 @@ export default function TranscodeSettings() {
             case 'vaapi': return 'VA-API (Linux)';
             case 'software': return '软件编码 (CPU)';
             case 'none': return '软件编码 (CPU)';
+            case 'detecting': return '正在检测…';
             default: return type;
         }
     };

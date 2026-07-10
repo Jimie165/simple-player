@@ -8,7 +8,7 @@ use serde::Serialize;
 use tauri::{AppHandle, State};
 use crate::DbState;
 use crate::modules::database::TranscodeCacheRepo;
-use crate::modules::hwaccel::detect_hardware_encoder;
+use crate::modules::hwaccel::{HwAccelType, cached_hardware_encoder, start_hardware_encoder_detection};
 use crate::modules::transcode_cache::resolve_cache_file_path;
 use crate::utils::ffmpeg::resolve_ffmpeg_binary;
 
@@ -178,7 +178,11 @@ pub fn get_transcode_cache_info(
     
     let ffmpeg = resolve_ffmpeg_binary(&app_handle, "ffmpeg")
         .unwrap_or_else(|| "ffmpeg".to_string());
-    let hw_type = detect_hardware_encoder(&ffmpeg);
+    // 硬件检测会启动 FFmpeg 并实际编码一秒测试视频。不能让设置页等待它完成。
+    let hw_type = cached_hardware_encoder().unwrap_or_else(|| {
+        start_hardware_encoder_detection(app_handle.clone(), ffmpeg);
+        HwAccelType::Detecting
+    });
     
     let current_limit = get_setting(&conn, "max_transcode_cache_mb", 5120);
     
