@@ -174,13 +174,13 @@ export default function CustomTooltip({
 
                     {/* 小三角箭头 */}
                     {placement === 'top' && (
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-primary/90" />
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-primary/90" />
                     )}
                     {placement === 'right' && (
-                        <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-[1px] border-4 border-transparent border-r-primary/90" />
+                        <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-px border-4 border-transparent border-r-primary/90" />
                     )}
                     {placement === 'bottom' && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-[1px] border-4 border-transparent border-b-primary/90" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-px border-4 border-transparent border-b-primary/90" />
                     )}
                 </div>,
                 document.body
