@@ -38,7 +38,24 @@ const emphasisEase = (value: number) => {
     return smoothstep((1 - x) / 0.5);
 };
 
-function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number, isActive: boolean = true): KaraokeCharStyle {
+function getLineFloatRelease(
+    timeMs: number,
+    lineFloatReleaseStartMs: number | null,
+    lineEndMs: number | null
+) {
+    if (lineFloatReleaseStartMs === null || lineEndMs === null) return 1;
+    const releaseDurationMs = lineEndMs - lineFloatReleaseStartMs;
+    if (releaseDurationMs <= 0) return 1;
+    return 1 - smoothstep((timeMs - lineFloatReleaseStartMs) / releaseDurationMs);
+}
+
+function getKaraokeCharStyle(
+    charItem: FlatCharItem,
+    timeMs: number,
+    isActive: boolean = true,
+    lineFloatReleaseStartMs: number | null = null,
+    lineEndMs: number | null = null
+): KaraokeCharStyle {
     const {
         time_ms,
         durationMs,
@@ -82,10 +99,11 @@ function getKaraokeCharStyle(charItem: FlatCharItem, timeMs: number, isActive: b
     const emphasisEffect = longToneEffect * emphasisWave;
 
     const centerOffset = (charCount - 1) / 2 - charIndex;
-    const translateX = -centerOffset * emphasisEffect * 0.03;
+    const lineFloatRelease = getLineFloatRelease(timeMs, lineFloatReleaseStartMs, lineEndMs);
+    const translateX = -centerOffset * emphasisEffect * 0.03 * lineFloatRelease;
     const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
     const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
-    const translateY = lift * -0.078 + emphasisLift * -0.07;
+    const translateY = (lift * -0.078 + emphasisLift * -0.07) * lineFloatRelease;
     const scale = 1 + emphasisEffect * 0.1;
     const glowOpacity = hasProgress ? emphasisEffect * (0.5 + progress * 0.35) : 0;
     const glowRadius = 2.5 + emphasisEffect * 9;
@@ -145,6 +163,15 @@ function KaraokeTextBase({
         return groups;
     }, [flatChars]);
 
+    const lineFloatReleaseStartMs = useMemo(() => {
+        if (flatChars.length === 0 || lineEndMs === null) return null;
+        const lastVisualMs = Math.max(...flatChars.map(charItem =>
+            Math.max(charItem.nextStart, charItem.groupEndMs)
+        ));
+
+        return lastVisualMs < lineEndMs ? lastVisualMs : null;
+    }, [flatChars, lineEndMs]);
+
     useEffect(() => {
         if (!isActive) return;
 
@@ -155,7 +182,13 @@ function KaraokeTextBase({
                 const glowEl = glowRefs.current[index];
                 if (!el || !fillEl || !glowEl) return;
 
-                const style = getKaraokeCharStyle(charItem, timeMs, true);
+                const style = getKaraokeCharStyle(
+                    charItem,
+                    timeMs,
+                    true,
+                    lineFloatReleaseStartMs,
+                    lineEndMs
+                );
                 el.style.transform = style.transform;
                 el.style.willChange = style.willChange;
                 fillEl.style.backgroundImage = style.fillBackgroundImage;
@@ -175,7 +208,7 @@ function KaraokeTextBase({
 
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [flatChars, isActive, preciseMsRef, wordGroups]);
+    }, [flatChars, isActive, lineEndMs, lineFloatReleaseStartMs, preciseMsRef, wordGroups]);
 
     return (
         <>
@@ -224,7 +257,13 @@ function KaraokeTextBase({
                                 );
                             }
 
-                            const style = getKaraokeCharStyle(charItem, baseCurrentMs, isActive);
+                            const style = getKaraokeCharStyle(
+                                charItem,
+                                baseCurrentMs,
+                                isActive,
+                                lineFloatReleaseStartMs,
+                                lineEndMs
+                            );
 
                             return (
                                 <span
