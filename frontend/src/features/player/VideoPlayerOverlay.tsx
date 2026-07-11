@@ -173,7 +173,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`fixed inset-0 z-[100] bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible ? 'cursor-none' : ''}`}
+                className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible ? 'cursor-none' : ''}`}
                 data-controls-visible={isControlsVisible}
                 onMouseMove={showControls}
                 onMouseLeave={() => {
@@ -222,7 +222,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         initial={false}
                         animate={{ opacity: isControlsVisible ? 1 : 0 }}
                         transition={{ duration: 0.2 }}
-                        className="h-20 bg-gradient-to-b from-black/70 to-transparent flex items-start justify-between p-4 pointer-events-auto relative"
+                        className="h-20 bg-linear-to-b from-black/70 to-transparent flex items-start justify-between p-4 pointer-events-auto relative"
                     >
                         {/* Drag Region for Window Move */}
                         <div className="absolute inset-0 z-0" data-tauri-drag-region />
@@ -280,7 +280,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                             transition={{ duration: 0.2 }}
                             className="pointer-events-auto"
                         >
-                            <div className="bg-gradient-to-t from-black/90 via-black/60 to-transparent pt-10 pb-2 px-3 overflow-x-auto">
+                            <div className="bg-linear-to-t from-black/90 via-black/60 to-transparent pt-10 pb-2 px-3 overflow-x-auto">
 
                                 {/* Progress Bar */}
                                 <div className="w-full group/slider mb-1 px-1 h-4 flex items-end">
@@ -301,7 +301,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                 </div>
 
                                 {/* Controls Row */}
-                                <div className="w-full flex items-center justify-between h-12 min-w-[280px]">
+                                <div className="w-full flex items-center justify-between h-12 min-w-70">
 
                                     {/* LEFT */}
                                     <div className="flex items-center gap-2 shrink-0">

@@ -77,7 +77,7 @@ export default function PlaylistCardsGrid({
                             }}
                             className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02] rounded-2xl overflow-hidden"
                         >
-                            <div className="absolute inset-0 bg-gradient-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
+                            <div className="absolute inset-0 bg-linear-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
 
                             <div className="absolute inset-0 p-5 flex flex-col justify-between">
                                 <div className="flex justify-end">
@@ -109,7 +109,7 @@ export default function PlaylistCardsGrid({
                             )}
 
                             <div className={clsx(
-                                'absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 rounded-2xl',
+                                'absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 rounded-2xl',
                                 !isSelectionMode ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
                             )}>
                                 {!isSelectionMode && (
@@ -189,7 +189,7 @@ export default function PlaylistCardsGrid({
                             )}
 
                             {!isSelectionMode && (
-                                <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                     <CardPlayButton
                                         onClick={(e) => {
                                             e.stopPropagation();

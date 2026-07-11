@@ -261,10 +261,10 @@ export default function AddToPlaylistSheet() {
     return (
         <Fragment>
             <Transition show={isOpen} as={Fragment}>
-                <Dialog as="div" className="relative z-[200]" onClose={close}>
+                <Dialog as="div" className="relative z-200" onClose={close}>
                     <DialogBackdrop
                         transition
-                        className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                        className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-closed:opacity-0 data-enter:duration-300 data-leave:duration-200 data-enter:ease-out data-leave:ease-in"
                     />
 
                     <div className="fixed inset-0 overflow-y-auto p-3 sm:p-4">

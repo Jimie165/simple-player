@@ -171,7 +171,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         <Portal>
             <>
                 <div
-                    className="fixed inset-0 z-[9998]"
+                    className="fixed inset-0 z-9998"
                     style={{ touchAction: 'none' }}
                     onMouseDown={(e) => {
                         e.preventDefault();
@@ -188,7 +188,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                 <div
                     ref={menuRef}
                     data-menu-portal="true"
-                    className={`fixed z-[9999] w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
+                    className={`fixed z-9999 w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
                         ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
                         : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
                         }`}

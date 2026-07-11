@@ -25,7 +25,7 @@ export function VideoPlaylistDrawer({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 z-[60]"
+                    className="absolute inset-0 z-60"
                     onClick={onClose}
                     key="video-drawer-backdrop"
                 />
@@ -38,7 +38,7 @@ export function VideoPlaylistDrawer({
                     animate={{ x: 0 }}
                     exit={{ x: '100%' }}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                    className="absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-xl border-l border-white/10 z-[70] flex flex-col shadow-2xl pointer-events-auto"
+                    className="absolute top-0 right-0 h-full w-80 bg-black/80 backdrop-blur-xl border-l border-white/10 z-70 flex flex-col shadow-2xl pointer-events-auto"
                     onClick={(e) => e.stopPropagation()}
                 >
                     <div className="flex items-center justify-between p-4 border-b border-white/10">

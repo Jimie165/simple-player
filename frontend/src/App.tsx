@@ -228,7 +228,7 @@ function App() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans">
 
-      {/* 1. 标题栏 (始终在最顶层 z-[100]) */}
+      {/* 1. 标题栏（始终在最顶层 z-100） */}
       <TitleBar />
       <SelectionMenuBar />
 

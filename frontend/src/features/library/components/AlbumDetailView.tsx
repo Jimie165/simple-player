@@ -50,7 +50,7 @@ export default function AlbumDetailView({
 
             {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
             <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-[60] transition-all duration-300 border-b",
+                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
                 isScrolled
                     ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
                     : "bg-transparent border-transparent opacity-0 pointer-events-none"

@@ -114,12 +114,12 @@ export default function AudioOutputSection() {
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0, transition: { duration: 0.2, ease: "easeOut" } }}
                                         exit={{ opacity: 0, y: -10, transition: { duration: 0.2, ease: "easeOut" } }}
-                                        className="settings-card z-50 w-[var(--button-width)] mt-[-1px] rounded-b-xl border border-primary/50 border-t-0 shadow-xl focus:outline-none overflow-hidden"
+                                        className="settings-card z-50 w-(--button-width) -mt-px rounded-b-xl border border-primary/50 border-t-0 shadow-xl focus:outline-none overflow-hidden"
                                     >
                                         <div className="py-1 max-h-60 overflow-y-auto scrollbar-hidden">
                                             <ListboxOption
                                                 value=""
-                                                className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-[focus]:bg-primary/10 data-[selected]:text-primary"
+                                                className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/10 data-selected:text-primary"
                                             >
                                                 <div className="flex flex-col">
                                                     <span>跟随系统默认</span>
@@ -136,7 +136,7 @@ export default function AudioOutputSection() {
                                                 <ListboxOption
                                                     key={d.id}
                                                     value={d.id}
-                                                    className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-[focus]:bg-primary/10 data-[selected]:text-primary"
+                                                    className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/10 data-selected:text-primary"
                                                 >
                                                     <div className="flex flex-col">
                                                         <span>{d.name}</span>

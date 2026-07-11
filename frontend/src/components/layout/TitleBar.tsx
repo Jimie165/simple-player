@@ -25,7 +25,7 @@ export default function TitleBar() {
 
     return (
         // 修改点 1: 添加 pr-3 (右侧留白)，gap-1 (按钮间距)
-        <div className="fixed top-0 right-0 z-[100] flex h-10 items-center pr-3 gap-1">
+        <div className="fixed top-0 right-0 z-100 flex h-10 items-center pr-3 gap-1">
 
             {/* 最小化 */}
             <button

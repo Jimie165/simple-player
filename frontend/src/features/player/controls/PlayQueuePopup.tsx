@@ -175,7 +175,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         <div className={clsx(
             "absolute bottom-full right-0 mb-4 w-80 rounded-2xl shadow-xl border overflow-hidden flex flex-col",
             "bg-white/95 dark:bg-[#2d2d2d]/95 backdrop-blur-md border-neutral-200 dark:border-neutral-700",
-            "transition-all duration-200 origin-bottom-right z-[60]",
+            "transition-all duration-200 origin-bottom-right z-60",
             show ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible pointer-events-none"
         )} style={{ maxHeight: `${popupMaxHeight}px` }}>
 

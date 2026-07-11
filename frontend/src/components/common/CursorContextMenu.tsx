@@ -70,7 +70,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
     return createPortal(
         <>
             <div
-                className="fixed inset-0 z-[9998]"
+                className="fixed inset-0 z-9998"
                 style={{ touchAction: 'none' }}
                 onMouseDown={(e) => {
                     e.preventDefault();
@@ -86,7 +86,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             />
             <div
                 ref={ref}
-                className="fixed z-[9999] w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl dark:border-white/10 dark:text-white pointer-events-auto"
+                className="fixed z-9999 w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl dark:border-white/10 dark:text-white pointer-events-auto"
                 style={{ top: position.top, left: position.left }}
                 onClick={(e) => e.stopPropagation()} // Prevent triggering other clicks
                 onContextMenu={(e) => e.preventDefault()} // Prevent browser context menu on the menu itself

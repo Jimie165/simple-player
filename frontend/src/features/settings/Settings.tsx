@@ -12,7 +12,7 @@ export default function Settings() {
     return (
         <PageContainer title="设置">
             <div className="w-full pb-20">
-                <div className="columns-1 lg:columns-2 gap-6 [&>*]:break-inside-avoid [&>*]:mb-6">
+                <div className="columns-1 lg:columns-2 gap-6 *:break-inside-avoid *:mb-6">
                     <AppearanceSection />
                     <GeneralSettingsSection />
                     <MusicFoldersSection />

@@ -153,7 +153,7 @@ export default function CustomTooltip({
             {shouldRender && createPortal(
                 <div
                     className={clsx(
-                        "fixed z-[99999] px-2.5 py-1.5 pointer-events-none",
+                        "fixed z-99999 px-2.5 py-1.5 pointer-events-none",
                         "bg-primary/90 text-on-primary backdrop-blur-sm",
                         "text-xs font-medium rounded-md shadow-sm whitespace-nowrap",
                         // 定位基准点变换

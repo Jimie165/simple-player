@@ -291,19 +291,19 @@ export const VideoLibrary: React.FC = () => {
                             className="w-40 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white z-50 mt-2"
                         >
                             <MenuItem>
-                                <button onClick={() => { setSortBy('played'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
+                                <button onClick={() => { setSortBy('played'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
                                     最近播放
                                     {sortBy === 'played' && <MdCheck />}
                                 </button>
                             </MenuItem>
                             <MenuItem>
-                                <button onClick={() => { setSortBy('created'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
+                                <button onClick={() => { setSortBy('created'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
                                     最近添加
                                     {sortBy === 'created' && <MdCheck />}
                                 </button>
                             </MenuItem>
                             <MenuItem>
-                                <button onClick={() => { setSortBy('name'); setSortOrder('asc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10">
+                                <button onClick={() => { setSortBy('name'); setSortOrder('asc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
                                     名称
                                     {sortBy === 'name' && <MdCheck />}
                                 </button>

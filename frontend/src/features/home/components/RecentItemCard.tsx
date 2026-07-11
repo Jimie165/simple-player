@@ -96,7 +96,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                         <MenuItems
                             transition
                             anchor="bottom end"
-                            className="w-48 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-50"
+                            className="w-48 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-50"
                         >
                             {/* 播放 */}
                             <MenuItem>

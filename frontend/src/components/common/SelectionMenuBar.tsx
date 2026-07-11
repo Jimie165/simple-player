@@ -112,7 +112,7 @@ export default function SelectionMenuBar() {
     const overflowActions = flattenedActions.slice(visibleCount);
 
     return (
-        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-[95] w-max max-w-[calc(100%-48px)] transition-all duration-300 pointer-events-auto" ref={containerRef}>
+        <div className="fixed top-12 left-1/2 -translate-x-1/2 z-95 w-max max-w-[calc(100%-48px)] transition-all duration-300 pointer-events-auto" ref={containerRef}>
             <div className="flex items-center gap-3 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-2 pl-3 pr-3 rounded-2xl shadow-2xl border border-neutral-200/30 dark:border-white/10">
                 {/* Select All Toggle */}
                 <button
@@ -175,7 +175,7 @@ export default function SelectionMenuBar() {
                             </MenuButton>
                             <MenuItems
                                 anchor={{ to: 'top end', gap: 9 }}
-                                className="w-48 origin-bottom-right rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm shadow-2xl dark:border-white/10 z-[100]"
+                                className="w-48 origin-bottom-right rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm shadow-2xl dark:border-white/10 z-100"
                             >
                                 {overflowActions.map(action => (
                                     <MenuItem key={action.id}>
@@ -184,7 +184,7 @@ export default function SelectionMenuBar() {
                                                 action.onClick();
                                                 clearSelection();
                                             }}
-                                            className={`group flex w-full items-center gap-2 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10 ${action.variant === 'danger' ? 'text-red-600' : 'text-neutral-700 dark:text-neutral-200'
+                                            className={`group flex w-full items-center gap-2 rounded-lg py-2 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10 ${action.variant === 'danger' ? 'text-red-600' : 'text-neutral-700 dark:text-neutral-200'
                                                 }`}
                                         >
                                             <action.icon className="text-lg" />

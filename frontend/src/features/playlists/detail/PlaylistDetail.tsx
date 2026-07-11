@@ -263,7 +263,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
             {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
             <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-[60] transition-all duration-300 border-b",
+                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
                 isScrolled
                     ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
                     : "bg-transparent border-transparent opacity-0 pointer-events-none"
@@ -287,13 +287,13 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         <PlaylistCoverCollage songs={sortedSongs} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
                     ) : (
                         <div className={clsx(
-                            "w-full h-full bg-gradient-to-br opacity-30",
+                            "w-full h-full bg-linear-to-br opacity-30",
                             isFavorites ? "from-red-500 to-pink-600" : "from-primary/20 to-secondary/20"
                         )} />
                     )
                 )}
                 {/* Gradient Scrim for Readability - Optimized gradient for smoother transition */}
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
+                <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
             </div>
 
             {/* Header Section */}
@@ -326,7 +326,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     <div className="shrink-0 group relative">
                         <div className={clsx(
                             "w-48 h-48 md:w-56 md:h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
-                            isFavorites ? "bg-gradient-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
+                            isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
                                 <MdFavorite className="text-8xl text-white drop-shadow-md" />

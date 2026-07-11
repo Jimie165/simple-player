@@ -167,7 +167,7 @@ function MenuContent({
             <>
                 {open && (
                     <div
-                        className="fixed inset-0 z-[9998]"
+                        className="fixed inset-0 z-9998"
                         style={{ touchAction: 'none' }}
                         onMouseDown={(e) => {
                             e.preventDefault();
@@ -186,7 +186,7 @@ function MenuContent({
                     ref={menuRef}
                     data-menu-portal="true"
                     transition
-                    className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-[closed]:scale-95 data-[closed]:opacity-0 z-[9999] pointer-events-auto"
+                    className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-9999 pointer-events-auto"
                     style={positionedStyle}
                     onMouseDown={(e) => e.stopPropagation()}
                 >
@@ -197,7 +197,7 @@ function MenuContent({
                                 <MenuItem key={item.id}>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); item.onClick(); }}
-                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-[focus]:bg-neutral-100 dark:data-[focus]:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-[focus]:bg-red-50 dark:data-[focus]:bg-red-900/20' : ''
+                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-focus:bg-red-50 dark:data-focus:bg-red-900/20' : ''
                                             }`}
                                     >
                                         <div className="flex flex-1 items-center gap-3">

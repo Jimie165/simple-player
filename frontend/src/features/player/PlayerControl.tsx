@@ -25,7 +25,7 @@ export default function PlayerControl({ isFullScreen, onToggleFullScreen, sideba
     return (
         <>
             <div className={clsx(
-                "pointer-events-none fixed bottom-4 right-0 z-[75] flex justify-center px-4 transition-[left] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+                "pointer-events-none fixed bottom-4 right-0 z-75 flex justify-center px-4 transition-[left] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
             )}
                 style={{ left: sidebarOffset }}
             >

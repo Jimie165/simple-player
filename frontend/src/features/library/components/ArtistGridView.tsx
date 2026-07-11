@@ -114,7 +114,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                             onClick={(e) => handleItemClick(artist, e)}
                             onContextMenu={(e) => handleContextMenu(e, artist)}
                         >
-                            <div className="relative w-full aspect-square max-w-[160px] shrink-0">
+                            <div className="relative w-full aspect-square max-w-40 shrink-0">
                                 <div className="w-full h-full rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative z-10 border border-black/5 dark:border-white/5">
                                     <CoverImage
                                         song={artist.songs[0]}

@@ -29,7 +29,7 @@ export default function ConfirmDialog({
             <Dialog as="div" className="relative z-50" onClose={onClose}>
                 <DialogBackdrop
                     transition
-                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-closed:opacity-0 data-enter:duration-300 data-leave:duration-200 data-enter:ease-out data-leave:ease-in"
                 />
 
                 <div className="fixed inset-0 overflow-y-auto p-3 sm:p-4">

@@ -328,7 +328,7 @@ export default function TranscodeSettings() {
 
                             {/* Thumb (Vertical Line) */}
                             <div
-                                className="absolute top-1/2 h-9 w-[4px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm pointer-events-none"
+                                className="absolute top-1/2 h-9 w-1 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary shadow-sm pointer-events-none"
                                 style={{ left: `${limitPercent}%` }}
                             />
 

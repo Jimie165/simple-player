@@ -57,7 +57,7 @@ export default function PlaylistSortControl({
                             setSuppressSortTooltip(true);
                         }}
                     />
-                    <div className="absolute right-0 mt-2 w-56 bg-white/60 dark:bg-primary/10 border border-primary/10 rounded-xl shadow-2xl py-2 z-[70] backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
+                    <div className="absolute right-0 mt-2 w-56 bg-white/60 dark:bg-primary/10 border border-primary/10 rounded-xl shadow-2xl py-2 z-70 backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
                         <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-wider">排序依据</div>
                         {[
                             { label: '播放列表顺序', key: 'manual' as SortKey },

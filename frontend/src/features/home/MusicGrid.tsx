@@ -82,7 +82,7 @@ export default function MusicGrid() {
         >
             <section>
                 {pendingFolderPlay && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/50 backdrop-blur-sm">
                         <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
                             <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                                 检测到混合媒体
@@ -161,7 +161,7 @@ export default function MusicGrid() {
                                             )
                                         ) : item.type === 'playlist' ? (
                                             item.id === 'playlist:favorites' ? (
-                                                <div className="w-full h-full bg-gradient-to-br from-red-500 to-pink-600 flex items-center justify-center">
+                                                <div className="w-full h-full bg-linear-to-br from-red-500 to-pink-600 flex items-center justify-center">
                                                     <MdFavorite className="text-6xl text-white drop-shadow-md" />
                                                 </div>
                                             ) : item.cover_path ? (
@@ -204,7 +204,7 @@ export default function MusicGrid() {
                                         )}
 
                                         {!isSelectionMode && (
-                                            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                            <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                                                 <CardPlayButton onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
                                                 <SmartMusicContextMenu
                                                     className="absolute bottom-3 right-3"

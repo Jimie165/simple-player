@@ -64,7 +64,7 @@ function Field({
                             type="button"
                             aria-label={`恢复${label}`}
                             onClick={onRestore}
-                            className="grid h-8 w-10 place-items-center rounded-[6px] border border-neutral-300 bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary"
+                            className="grid h-8 w-10 place-items-center rounded-md border border-neutral-300 bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary"
                         >
                             <MdUndo className="text-xl" />
                         </button>

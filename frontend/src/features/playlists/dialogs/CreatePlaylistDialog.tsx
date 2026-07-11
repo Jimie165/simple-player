@@ -58,10 +58,10 @@ export default function CreatePlaylistDialog({
 
     return (
         <Transition show={isOpen} as={Fragment}>
-            <Dialog as="div" className="relative z-[9999]" onClose={onClose}>
+            <Dialog as="div" className="relative z-9999" onClose={onClose}>
                 <DialogBackdrop
                     transition
-                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
+                    className="fixed inset-0 bg-black/25 backdrop-blur-sm transition-opacity data-closed:opacity-0 data-enter:duration-300 data-leave:duration-200 data-enter:ease-out data-leave:ease-in"
                 />
 
                 <div className="fixed inset-0 overflow-y-auto p-3 sm:p-4">
@@ -75,7 +75,7 @@ export default function CreatePlaylistDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-[360px] sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
                                 <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
                                     <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-5 flex flex-col items-center">
                                         <DialogTitle

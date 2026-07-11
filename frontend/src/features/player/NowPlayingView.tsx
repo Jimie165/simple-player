@@ -60,7 +60,7 @@ export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
                             alt="Background"
                             className="w-full h-full object-cover blur-[60px] opacity-60 dark:opacity-40 transition-all duration-700"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-white/80 via-transparent to-white/30 dark:from-[#121212] dark:via-transparent dark:to-black/20" />
+                        <div className="absolute inset-0 bg-linear-to-t from-white/80 via-transparent to-white/30 dark:from-[#121212] dark:via-transparent dark:to-black/20" />
                     </div>
                 ) : (
                     <div className="w-full h-full bg-neutral-100 dark:bg-[#1c1c1c]" />

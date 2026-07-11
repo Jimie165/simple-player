@@ -94,10 +94,10 @@ export default function GlobalDetailStack() {
                         animate={{ x: 0 }}
                         exit={{ x: '100%' }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-[50]"
+                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-50"
                         style={{ zIndex: 50 + index }}
                     >
-                        <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-[100] bg-transparent" />
+                        <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
                         <ScrollArea className="h-full" topOffset={48}>
                             <ErrorBoundary>
                                 {(() => {
