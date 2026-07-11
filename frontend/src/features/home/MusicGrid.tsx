@@ -15,6 +15,7 @@ import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
@@ -222,17 +223,21 @@ export default function MusicGrid() {
                                     </div>
 
                                     <div className="flex flex-col gap-0.5 px-1">
-                                        <span className={clsx(
-                                            "truncate text-base font-semibold",
-                                            isSelected ? "text-primary" : "text-neutral-900 dark:text-neutral-50"
-                                        )} title={item.title}>
-                                            {item.title}
-                                        </span>
-                                        <span className="truncate text-sm text-neutral-500 dark:text-neutral-400" title={item.description}>
-                                            {item.description}
-                                            {/* 如果是非视频且有专辑信息才显示专辑 */}
-                                            {!isVideoFile(item.path) && item.album && ` — ${item.album}`}
-                                        </span>
+                                        <CustomTooltip text={item.title} className="block min-w-0">
+                                            <span className={clsx(
+                                                "block truncate text-base font-semibold",
+                                                isSelected ? "text-primary" : "text-neutral-900 dark:text-neutral-50"
+                                            )}>
+                                                {item.title}
+                                            </span>
+                                        </CustomTooltip>
+                                        <CustomTooltip text={item.description} className="block min-w-0">
+                                            <span className="block truncate text-sm text-neutral-500 dark:text-neutral-400">
+                                                {item.description}
+                                                {/* 如果是非视频且有专辑信息才显示专辑 */}
+                                                {!isVideoFile(item.path) && item.album && ` — ${item.album}`}
+                                            </span>
+                                        </CustomTooltip>
                                     </div>
                                 </div>
                             );

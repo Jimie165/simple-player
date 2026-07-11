@@ -2,6 +2,7 @@ import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdWeb } from 'react-icons/m
 import clsx from 'clsx';
 
 import { useTheme } from '@/hooks/useTheme';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -111,20 +112,21 @@ export default function AppearanceSection() {
                         {presetColors.map((color) => {
                             const isSelected = !isCustomColor && sourceColor === color.value;
                             return (
-                                <button
-                                    key={color.id}
-                                    onClick={() => setSourceColor(color.value, false)}
-                                    className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
-                                    title={color.name}
-                                >
-                                    <div
-                                        className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
-                                        style={{ backgroundColor: color.value }}
-                                    />
-                                    {isSelected && (
-                                        <MdCheck className="relative z-10 text-white text-xl drop-shadow-md" />
-                                    )}
-                                </button>
+                                <CustomTooltip key={color.id} text={color.name}>
+                                    <button
+                                        onClick={() => setSourceColor(color.value, false)}
+                                        aria-label={color.name}
+                                        className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                                    >
+                                        <div
+                                            className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
+                                            style={{ backgroundColor: color.value }}
+                                        />
+                                        {isSelected && (
+                                            <MdCheck className="relative z-10 text-white text-xl drop-shadow-md" />
+                                        )}
+                                    </button>
+                                </CustomTooltip>
                             );
                         })}
 
@@ -132,7 +134,7 @@ export default function AppearanceSection() {
                         <div className="w-px h-8 bg-outline-variant/30 mx-2" />
 
                         {/* Custom Picker */}
-                        <div className="relative group">
+                        <CustomTooltip text="自定义颜色" className="relative group">
                             <div
                                 className={clsx(
                                     "w-12 h-12 rounded-full flex items-center justify-center border transition-all cursor-pointer overflow-hidden",
@@ -156,7 +158,7 @@ export default function AppearanceSection() {
                                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                                     value={sourceColor}
                                     onChange={(e) => setSourceColor(e.target.value, true)}
-                                    title="自定义颜色"
+                                    aria-label="自定义颜色"
                                 />
                             </div>
                             {isCustomColor && (
@@ -164,7 +166,7 @@ export default function AppearanceSection() {
                                     <MdCheck className="text-white text-xl drop-shadow-md mix-blend-difference" />
                                 </div>
                             )}
-                        </div>
+                        </CustomTooltip>
                         <span className="text-sm text-on-surface-variant ml-2">自定义</span>
                     </div>
                 </div>

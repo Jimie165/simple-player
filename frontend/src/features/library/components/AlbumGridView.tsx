@@ -7,6 +7,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import type { SongMetadata } from '@/types';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import CardPlayButton from '@/components/common/CardPlayButton';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
@@ -164,25 +165,28 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                             </div>
 
                             <div className="flex flex-col gap-0.5 px-1">
-                                <span className="truncate text-base font-semibold text-neutral-900 dark:text-neutral-50" title={album.name}>
-                                    {album.name}
-                                </span>
-                                {!hideArtist && (
-                                    <span
-                                        className={clsx(
-                                            "truncate text-sm text-neutral-500 dark:text-neutral-400",
-                                            onOpenArtist && "hover:text-primary transition-colors"
-                                        )}
-                                        title={album.artist}
-                                        onClick={(e) => {
-                                            if (onOpenArtist) {
-                                                e.stopPropagation();
-                                                onOpenArtist(album.artist);
-                                            }
-                                        }}
-                                    >
-                                        {album.artist}
+                                <CustomTooltip text={album.name} className="block min-w-0">
+                                    <span className="block truncate text-base font-semibold text-neutral-900 dark:text-neutral-50">
+                                        {album.name}
                                     </span>
+                                </CustomTooltip>
+                                {!hideArtist && (
+                                    <CustomTooltip text={album.artist} className="block min-w-0">
+                                        <span
+                                            className={clsx(
+                                                "block truncate text-sm text-neutral-500 dark:text-neutral-400",
+                                                onOpenArtist && "hover:text-primary transition-colors"
+                                            )}
+                                            onClick={(e) => {
+                                                if (onOpenArtist) {
+                                                    e.stopPropagation();
+                                                    onOpenArtist(album.artist);
+                                                }
+                                            }}
+                                        >
+                                            {album.artist}
+                                        </span>
+                                    </CustomTooltip>
                                 )}
                                 <span className="truncate text-xs text-neutral-400 dark:text-neutral-500">
                                     {album.songs[0]?.year || "Unknown Year"}

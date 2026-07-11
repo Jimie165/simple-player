@@ -6,6 +6,7 @@ import { formatTime } from '@/utils/time';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CoverImage from '@/components/common/CoverImage';
 import CardPlayButton from '@/components/common/CardPlayButton';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 
 interface VideoCardProps {
@@ -105,7 +106,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
             {/* Info */}
             <div className="flex flex-col gap-0.5 px-1 text-center">
-                <h3 className="font-medium truncate text-sm" title={video.title}>{video.title}</h3>
+                <CustomTooltip text={video.title} className="block min-w-0">
+                    <h3 className="font-medium truncate text-sm">{video.title}</h3>
+                </CustomTooltip>
                 <p className="text-xs opacity-60 truncate">
                     {formatTime(video.duration)}
                 </p>

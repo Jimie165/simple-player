@@ -11,6 +11,7 @@ import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -144,16 +145,18 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                 {!isSelectionMode && (
                                     <div className="absolute inset-0 z-20 pointer-events-none">
                                         <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity">
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onPlayArtist(artist);
-                                                }}
-                                                className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white hover:bg-white/30 hover:scale-105 transition-all"
-                                                title="播放艺人"
-                                            >
-                                                <MdPlayArrow className="translate-x-0.5 text-xl" />
-                                            </button>
+                                            <CustomTooltip text="播放艺人">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onPlayArtist(artist);
+                                                    }}
+                                                    aria-label="播放艺人"
+                                                    className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white hover:bg-white/30 hover:scale-105 transition-all"
+                                                >
+                                                    <MdPlayArrow className="translate-x-0.5 text-xl" />
+                                                </button>
+                                            </CustomTooltip>
                                         </div>
 
                                         <SmartMusicContextMenu
@@ -176,9 +179,11 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                             </div>
 
                             <div className="text-center w-full">
-                                <h3 className="font-bold text-neutral-900 dark:text-neutral-50 truncate w-full" title={artist.name}>
-                                    {artist.name}
-                                </h3>
+                                <CustomTooltip text={artist.name} className="block min-w-0">
+                                    <h3 className="font-bold text-neutral-900 dark:text-neutral-50 truncate w-full">
+                                        {artist.name}
+                                    </h3>
+                                </CustomTooltip>
                                 <p className="text-sm text-neutral-500 dark:text-neutral-400 truncate">
                                     {artist.count} 首歌曲
                                 </p>

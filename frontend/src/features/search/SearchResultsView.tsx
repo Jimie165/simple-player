@@ -16,6 +16,7 @@ import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 interface SearchResultsViewProps {
     query: string;
@@ -333,7 +334,9 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                             )}
                                         </div>
                                         <div className="flex flex-col gap-0.5 px-1 text-center">
-                                            <h3 className="font-medium truncate text-sm" title={video.title}>{video.title}</h3>
+                                            <CustomTooltip text={video.title} className="block min-w-0">
+                                                <h3 className="font-medium truncate text-sm">{video.title}</h3>
+                                            </CustomTooltip>
                                             <p className="text-xs opacity-60 truncate">
                                                 {formatTime(video.duration)}
                                             </p>

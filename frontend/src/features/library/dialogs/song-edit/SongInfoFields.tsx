@@ -2,6 +2,7 @@ import type React from 'react';
 import { MdUndo } from 'react-icons/md';
 import clsx from 'clsx';
 import type { SongEditFormErrors, SongEditFormValues } from '@/features/library/dialogs/song-edit/songEditForm';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 interface SongInfoFieldsProps {
     values: SongEditFormValues;
@@ -58,15 +59,16 @@ function Field({
                     className={clsx(textInputClass, canRestore && "pr-12")}
                 />
                 {canRestore && onRestore && (
-                    <button
-                        type="button"
-                        aria-label={`恢复${label}`}
-                        title={`恢复${label}`}
-                        onClick={onRestore}
-                        className="absolute right-0 top-1/2 grid h-8 w-10 -translate-y-[calc(50%+0.25rem)] place-items-center rounded-[6px] border border-neutral-300 bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary"
-                    >
-                        <MdUndo className="text-xl" />
-                    </button>
+                    <CustomTooltip text={`恢复${label}`} className="absolute right-0 top-1/2 -translate-y-[calc(50%+0.25rem)]">
+                        <button
+                            type="button"
+                            aria-label={`恢复${label}`}
+                            onClick={onRestore}
+                            className="grid h-8 w-10 place-items-center rounded-[6px] border border-neutral-300 bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary"
+                        >
+                            <MdUndo className="text-xl" />
+                        </button>
+                    </CustomTooltip>
                 )}
             </div>
             {error && <span className="text-xs text-red-500">{error}</span>}

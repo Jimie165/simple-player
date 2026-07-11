@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings, MdFolderOpen, MdRestore } from 'react-icons/md';
 import clsx from 'clsx';
 import { getSelectedPath } from '@/utils/dialogSelection';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 interface TranscodeCacheInfo {
     total_size_mb: number;
@@ -244,32 +245,38 @@ export default function TranscodeSettings() {
                     <div className="settings-control flex items-start justify-between gap-3 rounded-xl px-3 py-3">
                         <div className="min-w-0 flex-1">
                             <p className="text-xs font-medium text-on-surface-variant mb-1">转码 MP4 文件夹</p>
-                            <p className="text-sm text-on-surface truncate" title={info.cache_dir}>
-                                {info.cache_dir}
-                            </p>
+                            <CustomTooltip text={info.cache_dir} className="block min-w-0">
+                                <p className="text-sm text-on-surface truncate">
+                                    {info.cache_dir}
+                                </p>
+                            </CustomTooltip>
                             <p className="mt-1 text-[10px] text-on-surface-variant/70">
                                 {info.is_custom_cache_dir ? '自定义位置' : '默认位置'}
                             </p>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                             {info.is_custom_cache_dir && (
-                                <button
-                                    onClick={handleResetCacheDir}
-                                    disabled={changingDir}
-                                    className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors active:scale-95 disabled:opacity-50"
-                                    title={`恢复默认文件夹：${info.default_cache_dir}`}
-                                >
-                                    <MdRestore className="text-lg" />
-                                </button>
+                                <CustomTooltip text={`恢复默认文件夹：${info.default_cache_dir}`} disabled={changingDir}>
+                                    <button
+                                        onClick={handleResetCacheDir}
+                                        disabled={changingDir}
+                                        aria-label="恢复默认转码 MP4 文件夹"
+                                        className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-primary/10 hover:text-primary transition-colors active:scale-95 disabled:opacity-50"
+                                    >
+                                        <MdRestore className="text-lg" />
+                                    </button>
+                                </CustomTooltip>
                             )}
-                            <button
-                                onClick={handleChooseCacheDir}
-                                disabled={changingDir}
-                                className="flex items-center justify-center w-9 h-9 rounded-full text-primary hover:bg-primary/10 transition-colors active:scale-95 disabled:opacity-50"
-                                title="选择转码 MP4 文件夹"
-                            >
-                                <MdFolderOpen className="text-lg" />
-                            </button>
+                            <CustomTooltip text="选择转码 MP4 文件夹" disabled={changingDir}>
+                                <button
+                                    onClick={handleChooseCacheDir}
+                                    disabled={changingDir}
+                                    aria-label="选择转码 MP4 文件夹"
+                                    className="flex items-center justify-center w-9 h-9 rounded-full text-primary hover:bg-primary/10 transition-colors active:scale-95 disabled:opacity-50"
+                                >
+                                    <MdFolderOpen className="text-lg" />
+                                </button>
+                            </CustomTooltip>
                         </div>
                     </div>
 

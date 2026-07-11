@@ -5,6 +5,7 @@ import { MdAdd, MdDelete, MdExpandLess, MdExpandMore, MdFolder } from 'react-ico
 import clsx from 'clsx';
 
 import { libraryService } from '@/services/libraryService';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import type { LibraryFolder } from '@/types';
 import { getSelectedPath } from '@/utils/dialogSelection';
@@ -89,13 +90,15 @@ export default function MusicFoldersSection() {
                                             {folder.path}
                                         </p>
                                     </div>
-                                    <button
-                                        onClick={() => handleRemoveFolder(folder)}
-                                        className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors active:scale-95 shrink-0"
-                                        title="移除此文件夹"
-                                    >
-                                        <MdDelete className="text-lg" />
-                                    </button>
+                                    <CustomTooltip text="移除此文件夹">
+                                        <button
+                                            onClick={() => handleRemoveFolder(folder)}
+                                            aria-label="移除此文件夹"
+                                            className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors active:scale-95 shrink-0"
+                                        >
+                                            <MdDelete className="text-lg" />
+                                        </button>
+                                    </CustomTooltip>
                                 </li>
                             ))}
                         </ul>

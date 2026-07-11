@@ -4,6 +4,7 @@ import { MdBlockFlipped, MdClose } from 'react-icons/md';
 import clsx from 'clsx';
 
 import { libraryService, type ScopedIgnoredDirNames } from '@/services/libraryService';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 type IgnoreScope = keyof ScopedIgnoredDirNames;
 
@@ -128,19 +129,21 @@ export default function IgnoredDirsSection() {
                         <span className="text-sm text-on-surface-variant/70">{config.emptyText}</span>
                     )}
                     {dirs.map((name) => (
-                        <span
+                        <div
                             key={name}
                             className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary-container text-on-secondary-container text-sm"
                         >
                             {name}
-                            <button
-                                onClick={() => removeIgnoredDir(scope, name)}
-                                className="ml-1 -mr-1 w-5 h-5 rounded-full flex items-center justify-center hover:bg-on-secondary-container/10 active:scale-90"
-                                title="移除"
-                            >
-                                <MdClose className="text-sm" />
-                            </button>
-                        </span>
+                            <CustomTooltip text="移除">
+                                <button
+                                    onClick={() => removeIgnoredDir(scope, name)}
+                                    aria-label={`移除 ${name}`}
+                                    className="ml-1 -mr-1 w-5 h-5 rounded-full flex items-center justify-center hover:bg-on-secondary-container/10 active:scale-90"
+                                >
+                                    <MdClose className="text-sm" />
+                                </button>
+                            </CustomTooltip>
+                        </div>
                     ))}
                 </div>
                 <div className="flex items-center gap-2">

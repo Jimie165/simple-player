@@ -16,6 +16,7 @@ import { VideoPlaylistDrawer } from '@/features/player/video/VideoPlaylistDrawer
 import { VideoStatusOverlays } from '@/features/player/video/VideoStatusOverlays';
 import { useVideoPlayback } from '@/features/player/hooks/useVideoPlayback';
 import { useVideoControls } from '@/features/player/hooks/useVideoControls';
+import CustomTooltip from '@/components/common/CustomTooltip';
 
 export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
     const {
@@ -306,13 +307,15 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                     <div className="flex items-center gap-2 shrink-0">
                                         {/* Prev Button */}
                                         {currentVideoIndex > 0 && (
-                                            <button
-                                                onClick={playPreviousVideo}
-                                                className="p-2 text-white/90 hover:text-white transition-colors"
-                                                title="上一个"
-                                            >
-                                                <MdSkipPrevious className="text-3xl" />
-                                            </button>
+                                            <CustomTooltip text="上一个">
+                                                <button
+                                                    onClick={playPreviousVideo}
+                                                    aria-label="上一个"
+                                                    className="p-2 text-white/90 hover:text-white transition-colors"
+                                                >
+                                                    <MdSkipPrevious className="text-3xl" />
+                                                </button>
+                                            </CustomTooltip>
                                         )}
 
                                         {/* Play/Pause */}
@@ -325,13 +328,15 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                                         {/* Next Button */}
                                         {currentVideoIndex < videoQueue.length - 1 && (
-                                            <button
-                                                onClick={playNextVideo}
-                                                className="p-2 text-white/90 hover:text-white transition-colors"
-                                                title="下一个"
-                                            >
-                                                <MdSkipNext className="text-3xl" />
-                                            </button>
+                                            <CustomTooltip text="下一个">
+                                                <button
+                                                    onClick={playNextVideo}
+                                                    aria-label="下一个"
+                                                    className="p-2 text-white/90 hover:text-white transition-colors"
+                                                >
+                                                    <MdSkipNext className="text-3xl" />
+                                                </button>
+                                            </CustomTooltip>
                                         )}
 
                                         {/* Volume */}
@@ -368,13 +373,15 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                                     {/* RIGHT */}
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <button
-                                            onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
-                                            className={`p-2 transition-colors ${isPlaylistOpen ? 'text-primary' : 'text-white/90 hover:text-white'}`}
-                                            title="播放列表"
-                                        >
-                                            <MdPlaylistPlay className="text-2xl" />
-                                        </button>
+                                        <CustomTooltip text="播放列表">
+                                            <button
+                                                onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
+                                                aria-label="播放列表"
+                                                className={`p-2 transition-colors ${isPlaylistOpen ? 'text-primary' : 'text-white/90 hover:text-white'}`}
+                                            >
+                                                <MdPlaylistPlay className="text-2xl" />
+                                            </button>
+                                        </CustomTooltip>
                                         <button onClick={toggleAppFullscreen} className="p-2 text-white/90 hover:text-white transition-colors">
                                             {isFullscreen ? <MdFullscreenExit className="text-2xl" /> : <MdFullscreen className="text-2xl" />}
                                         </button>

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
 interface CustomTooltipProps {
     text: string;
@@ -141,7 +142,7 @@ export default function CustomTooltip({
     return (
         <div
             ref={triggerRef}
-            className={clsx("group/tooltip relative flex items-center justify-center", className)}
+            className={twMerge("group/tooltip relative flex items-center justify-center", className)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
             // 避免点击后仍然顽固显示的情况
