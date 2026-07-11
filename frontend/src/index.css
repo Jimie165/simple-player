@@ -86,7 +86,7 @@
      than the surrounding page, rather than following the generic MD surface ramp. */
   --settings-card: #FFFFFF;
   --settings-option: #FBFBFD;
-  --settings-option-hover: #F3F6FF;
+  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 6%, var(--settings-option));
   --settings-subtle: #F5F6FA;
   --settings-border: rgba(68, 71, 79, 0.16);
   --settings-divider: rgba(68, 71, 79, 0.12);
@@ -135,7 +135,7 @@
 
   --settings-card: #2A2A2A;
   --settings-option: #353535;
-  --settings-option-hover: #3B3F47;
+  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 9%, var(--settings-option));
   --settings-subtle: #303030;
   --settings-border: rgba(255, 255, 255, 0.11);
   --settings-divider: rgba(255, 255, 255, 0.08);

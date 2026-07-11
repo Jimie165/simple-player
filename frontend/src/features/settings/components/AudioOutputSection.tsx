@@ -119,7 +119,7 @@ export default function AudioOutputSection() {
                                         <div className="py-1 max-h-60 overflow-y-auto scrollbar-hidden">
                                             <ListboxOption
                                                 value=""
-                                                className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/10 data-selected:text-primary"
+                                                className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/5 data-selected:text-primary"
                                             >
                                                 <div className="flex flex-col">
                                                     <span>跟随系统默认</span>
@@ -136,7 +136,7 @@ export default function AudioOutputSection() {
                                                 <ListboxOption
                                                     key={d.id}
                                                     value={d.id}
-                                                    className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/10 data-selected:text-primary"
+                                                    className="group flex items-center justify-between px-4 py-2 text-sm cursor-pointer data-focus:bg-primary/5 data-selected:text-primary"
                                                 >
                                                     <div className="flex flex-col">
                                                         <span>{d.name}</span>

@@ -23,7 +23,7 @@ function ThemeOption({
             className={clsx(
                 "flex items-center justify-between rounded-xl px-4 py-3 text-sm font-medium transition-all border",
                 current === val
-                    ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                    ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
                     : "settings-control border text-on-surface-variant"
             )}
         >
@@ -74,7 +74,7 @@ export default function AppearanceSection() {
                         className={clsx(
                             "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
                             playerEffectMode === 'performance'
-                                ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
                                 : "settings-control border text-on-surface-variant"
                         )}
                     >
@@ -86,7 +86,7 @@ export default function AppearanceSection() {
                         className={clsx(
                             "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
                             playerEffectMode === 'animation'
-                                ? "bg-primary/10 text-primary border-primary/30 ring-1 ring-primary/20"
+                                ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
                                 : "settings-control border text-on-surface-variant"
                         )}
                     >
