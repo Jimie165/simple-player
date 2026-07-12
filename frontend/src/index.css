@@ -345,6 +345,12 @@ body {
     animation-play-state: paused !important;
   }
 
+  /* 保留 React 状态和滚动位置，但让完全被播放器遮挡的页面退出渲染管线。 */
+  .base-layer-frozen {
+    content-visibility: hidden;
+    contain: strict;
+  }
+
   .main-content-query {
     container: main-content / inline-size;
   }

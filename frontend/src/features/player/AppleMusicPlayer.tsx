@@ -21,10 +21,12 @@ import { useNarrowPanelControls } from '@/features/player/apple/hooks/useNarrowP
 
 export default function AppleMusicPlayer({
     onClose,
+    onOpened,
     isOpen,
     mainContentWidth,
 }: {
     onClose: () => void;
+    onOpened: () => void;
     isOpen: boolean;
     mainContentWidth: number;
 }) {
@@ -136,7 +138,7 @@ export default function AppleMusicPlayer({
     }, [metadata?.path, lyricsPath, requestLyricsForPath]);
 
     useEffect(() => {
-        if (isNarrowPanelLayout) return;
+        if (!isOpen || isNarrowPanelLayout) return;
 
         let observer: ResizeObserver | null = null;
         const updateWidth = () => {
@@ -161,7 +163,7 @@ export default function AppleMusicPlayer({
             if (observer) observer.disconnect();
             window.removeEventListener('resize', updateWidth);
         };
-    }, [isNarrowPanelLayout]);
+    }, [isOpen, isNarrowPanelLayout]);
 
     const layoutProps = {
         metadata,
@@ -212,6 +214,9 @@ export default function AppleMusicPlayer({
                 pointerEvents: isOpen ? 'auto' : 'none'
             }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+            onAnimationComplete={() => {
+                if (isOpen) onOpened();
+            }}
             style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}

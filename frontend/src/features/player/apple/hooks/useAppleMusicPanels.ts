@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SidePanel } from '@/features/player/apple/shared/types';
 
+const PANEL_RELEASE_DELAY_MS = 450;
+
 interface UseAppleMusicPanelsArgs {
     isOpen: boolean;
     isQueueOpen: boolean;
@@ -21,10 +23,10 @@ export function useAppleMusicPanels({
     isNarrowPanelLayout,
     onBeforeNarrowClose,
 }: UseAppleMusicPanelsArgs) {
-    const [queueMounted, setQueueMounted] = useState(isQueueOpen);
+    const [queueMounted, setQueueMounted] = useState(isOpen && isQueueOpen);
     const [queueScrollToTopSignal, setQueueScrollToTopSignal] = useState(0);
     const queueScrollDidMountRef = useRef(false);
-    const [lyricsMounted, setLyricsMounted] = useState(isLyricsOpen);
+    const [lyricsMounted, setLyricsMounted] = useState(isOpen && isLyricsOpen);
     const [panelFlipTarget, setPanelFlipTarget] = useState<SidePanel | null>(null);
     const [isPanelFlipping, setIsPanelFlipping] = useState(false);
     const panelFlipRafRef = useRef<number | null>(null);
@@ -34,16 +36,22 @@ export function useAppleMusicPanels({
     const [closingPanel, setClosingPanel] = useState<SidePanel | null>(null);
 
     useEffect(() => {
-        if (!isQueueOpen) return;
-        const frame = requestAnimationFrame(() => setQueueMounted(true));
-        return () => cancelAnimationFrame(frame);
-    }, [isQueueOpen]);
+        if (isOpen && isQueueOpen) {
+            const frame = requestAnimationFrame(() => setQueueMounted(true));
+            return () => cancelAnimationFrame(frame);
+        }
+        const timeout = window.setTimeout(() => setQueueMounted(false), PANEL_RELEASE_DELAY_MS);
+        return () => window.clearTimeout(timeout);
+    }, [isOpen, isQueueOpen]);
 
     useEffect(() => {
-        if (!isLyricsOpen) return;
-        const frame = requestAnimationFrame(() => setLyricsMounted(true));
-        return () => cancelAnimationFrame(frame);
-    }, [isLyricsOpen]);
+        if (isOpen && isLyricsOpen) {
+            const frame = requestAnimationFrame(() => setLyricsMounted(true));
+            return () => cancelAnimationFrame(frame);
+        }
+        const timeout = window.setTimeout(() => setLyricsMounted(false), PANEL_RELEASE_DELAY_MS);
+        return () => window.clearTimeout(timeout);
+    }, [isOpen, isLyricsOpen]);
 
     useEffect(() => {
         if (mainContentWidth < 560) return;

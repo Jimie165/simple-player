@@ -26,6 +26,7 @@ import SearchResultsView from '@/features/search/SearchResultsView';
 import PlaylistsRoot from '@/features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from '@/hooks/playback/useQueuePersistence';
 import { useGlobalEvents } from '@/hooks/useGlobalEvents';
+import { useImmersivePlayerTransition } from '@/features/player/hooks/useImmersivePlayerTransition';
 import SelectionMenuBar from '@/components/common/SelectionMenuBar';
 import AddToPlaylistSheet from '@/features/playlists/dialogs/AddToPlaylistSheet';
 import GlobalDialogLayer from '@/components/common/GlobalDialogLayer';
@@ -108,22 +109,13 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-
-
-  // Listen for Full Screen Player Events
-  useEffect(() => {
-    const handleOpen = () => setIsFullScreen(true);
-    const handleClose = () => setIsFullScreen(false);
-
-    window.addEventListener('open-fullscreen-player', handleOpen);
-    window.addEventListener('close-fullscreen-player', handleClose);
-
-    return () => {
-      window.removeEventListener('open-fullscreen-player', handleOpen);
-      window.removeEventListener('close-fullscreen-player', handleClose);
-    };
-  }, []);
+  const {
+    isOpen: isFullScreen,
+    isBaseLayerFrozen,
+    close: closeFullScreenPlayer,
+    toggle: toggleFullScreenPlayer,
+    handleOpened: handleFullScreenPlayerOpened,
+  } = useImmersivePlayerTransition();
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -152,7 +144,7 @@ function App() {
     // Clear selection mode when switching pages
     useSelectionStore.getState().clearSelection();
 
-    if (isFullScreen) setIsFullScreen(false);
+    if (isFullScreen) void closeFullScreenPlayer();
   };
 
   const handleSearch = (query: string) => {
@@ -172,7 +164,7 @@ function App() {
 
       // Priority 2: Full Screen
       if (isFullScreen) {
-        setIsFullScreen(false);
+        void closeFullScreenPlayer();
         return true;
       }
 
@@ -236,7 +228,7 @@ function App() {
 
         {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
         <div
-          className={`absolute inset-0 flex ${isFullScreen ? 'base-layer-paused' : ''}`}
+          className={`absolute inset-0 flex ${isFullScreen ? 'base-layer-paused' : ''} ${isBaseLayerFrozen ? 'base-layer-frozen' : ''}`}
           inert={isFullScreen}
           aria-hidden={isFullScreen}
         >
@@ -285,7 +277,7 @@ function App() {
       <div className="relative z-70">
         <PlayerControl
           isFullScreen={isFullScreen}
-          onToggleFullScreen={() => setIsFullScreen(!isFullScreen)}
+          onToggleFullScreen={toggleFullScreenPlayer}
           sidebarOffset={sidebarOffset}
           mode={playerMode}
         />
@@ -300,7 +292,8 @@ function App() {
 
       <AppleMusicPlayer
         isOpen={isFullScreen}
-        onClose={() => setIsFullScreen(false)}
+        onClose={() => void closeFullScreenPlayer()}
+        onOpened={handleFullScreenPlayerOpened}
         mainContentWidth={mainContentWidth}
       />
       <Toaster
