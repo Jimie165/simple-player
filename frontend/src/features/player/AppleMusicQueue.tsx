@@ -1,7 +1,7 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback, forwardRef } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
-import { Virtuoso, type Components } from 'react-virtuoso';
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import {
     DndContext,
     DragOverlay,
@@ -19,7 +19,6 @@ import {
     SortableContext,
     sortableKeyboardCoordinates,
     verticalListSortingStrategy,
-    type SortableContextProps,
 } from '@dnd-kit/sortable';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
@@ -43,22 +42,6 @@ export interface AppleMusicQueueProps {
     narrowControlsVisible?: boolean;
 }
 
-function createSortableList(items: string[]) {
-    return forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(function SortableList(
-        { children, ...props },
-        ref
-    ) {
-        return (
-            <SortableContext
-                items={items as SortableContextProps['items']}
-                strategy={verticalListSortingStrategy}
-            >
-                <div ref={ref} {...props}>{children}</div>
-            </SortableContext>
-        );
-    });
-}
-
 /**
  * Apple 风格播放队列面板，负责队列分区、拖拽与虚拟渲染编排。
  */
@@ -71,6 +54,7 @@ export default function AppleMusicQueue({
     narrowControlsVisible = true,
 }: AppleMusicQueueProps) {
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const lastScrollTopRef = useRef(0);
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
@@ -92,21 +76,12 @@ export default function AppleMusicQueue({
         }
     }, []);
 
-    useEffect(() => {
-        if (!scrollContainerRef.current) return;
-        if (!isOpen) return;
-        const el = scrollContainerRef.current;
-        const scrollNow = () => {
-            el.scrollTop = 0;
-        };
-        scrollNow();
-        const rafId = window.requestAnimationFrame(scrollNow);
-        const timeoutId = window.setTimeout(scrollNow, 550);
-        return () => {
-            window.cancelAnimationFrame(rafId);
-            window.clearTimeout(timeoutId);
-        };
-    }, [scrollToTopSignal, isOpen]);
+    useLayoutEffect(() => {
+        if (!isOpen || !scrollParent || !virtuosoRef.current) return;
+        // 面板仍不可见时由虚拟列表完成一次定位，避免进入动画后再次跳动。
+        virtuosoRef.current.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
+        lastScrollTopRef.current = 0;
+    }, [isOpen, scrollParent, scrollToTopSignal]);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -158,9 +133,6 @@ export default function AppleMusicQueue({
         () => [...queueSortableItems, ...nextFromSortableItems],
         [queueSortableItems, nextFromSortableItems]
     );
-    const QueueVirtuosoList = useMemo(() => createSortableList(allSortableItems), [allSortableItems]);
-
-
     const handleDragStart = useCallback((event: DragStartEvent) => {
         setActiveDragId(String(event.active.id));
         const initialRect = event.active.rect.current.initial;
@@ -305,14 +277,15 @@ export default function AppleMusicQueue({
                     overflowAnchor: 'none',
                     maskImage: variant === 'narrow'
                         ? (narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
-                            : 'linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)')
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
                         : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
                     WebkitMaskImage: variant === 'narrow'
                         ? (narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)'
-                            : 'linear-gradient(to bottom, black calc(100% - 20px), transparent 100%)')
+                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
                         : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
+                    transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out',
                 }}
             >
                 <DndContext
@@ -323,23 +296,28 @@ export default function AppleMusicQueue({
                     onDragCancel={handleDragCancel}
                     modifiers={[restrictToVerticalAxis, restrictToQueueViewport]}
                 >
-                    {scrollParent ? (
-                        <Virtuoso
-                            data={virtualItems}
-                            customScrollParent={scrollParent}
-                            useWindowScroll={false}
-                            overscan={VIRTUOSO_OVERSCAN}
-                            className="w-full"
-                            components={{ List: QueueVirtuosoList as Components['List'] }}
-                            computeItemKey={(_, item) => {
-                                if (item.kind === 'entry') return getQueueItemId(item.entry);
-                                return item.kind;
-                            }}
-                            itemContent={renderVirtualItem}
-                        />
-                    ) : (
-                        <div className="flex flex-col opacity-0" />
-                    )}
+                    <SortableContext
+                        items={allSortableItems}
+                        strategy={verticalListSortingStrategy}
+                    >
+                        {scrollParent ? (
+                            <Virtuoso
+                                ref={virtuosoRef}
+                                data={virtualItems}
+                                customScrollParent={scrollParent}
+                                useWindowScroll={false}
+                                overscan={VIRTUOSO_OVERSCAN}
+                                className="w-full"
+                                computeItemKey={(_, item) => {
+                                    if (item.kind === 'entry') return getQueueItemId(item.entry);
+                                    return item.kind;
+                                }}
+                                itemContent={renderVirtualItem}
+                            />
+                        ) : (
+                            <div className="flex flex-col opacity-0" />
+                        )}
+                    </SortableContext>
 
                     {typeof document !== 'undefined' && createPortal(
                         <DragOverlay>

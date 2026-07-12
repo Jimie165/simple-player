@@ -72,15 +72,6 @@ export default function ApplePlayerQueuePanel({
                     initial="hidden"
                     animate={isVisible ? "visible" : "hidden"}
                     variants={variants}
-                    style={variant === 'narrow' ? {
-                        maskImage: narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
-                        WebkitMaskImage: narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
-                        transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out'
-                    } : undefined}
                 >
                     {queueMounted && (
                         <AppleMusicQueue
