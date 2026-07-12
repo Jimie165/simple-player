@@ -25,7 +25,6 @@ interface PlaylistSettings {
 
 interface LibraryState {
     recentHistory: RecentItem[];
-    playHistory: number[];
     playlistSettings: Record<string, PlaylistSettings>;
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
@@ -46,9 +45,6 @@ interface LibraryState {
     setPlaylist: (songs: SongMetadata[]) => void;
     updateSongInQueues: (song: SongMetadata) => void;
     setCurrentSongIndex: (index: number) => void;
-    pushHistory: (index: number) => void;
-    popHistory: () => number | undefined;
-    clearPlayHistory: () => void;
 
     // 修改：参数变了，不再需要 mode 参数，因为状态在 store 里
     // 或者为了解耦，我们依然接收参数，或者在组件层处理
@@ -139,7 +135,6 @@ const safeStorage = createJSONStorage(() => ({
 export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     recentHistory: [],
     playlistSettings: {},
-    playHistory: [],
     playlist: [],
     originalPlaylist: [],
     currentSongIndex: -1,
@@ -293,8 +288,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
     setPlaylist: (songs) => set({
         playlist: songs,
-        originalPlaylist: songs,
-        playHistory: []
+        originalPlaylist: songs
     }),
 
     updateSongInQueues: (song) => set((state) => {
@@ -313,19 +307,6 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     }),
 
     setCurrentSongIndex: (currentSongIndex) => set({ currentSongIndex }),
-
-    pushHistory: (index) => set((state) => ({ playHistory: [...state.playHistory, index] })),
-
-    clearPlayHistory: () => set({ playHistory: [] }),
-
-    popHistory: () => {
-        const { playHistory } = get();
-        if (playHistory.length === 0) return undefined;
-        const newHistory = [...playHistory];
-        const prevIndex = newHistory.pop();
-        set({ playHistory: newHistory });
-        return prevIndex;
-    },
 
     toggleShuffleList: (enable) => {
         const next = toggleShuffleListFn(get(), enable);

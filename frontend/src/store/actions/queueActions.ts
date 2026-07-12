@@ -4,7 +4,6 @@ export interface QueueStateSlice {
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
     currentSongIndex: number;
-    playHistory: number[];
 }
 
 export function toggleShuffleListFn(state: QueueStateSlice, enable: boolean): Partial<QueueStateSlice> | null {
@@ -28,7 +27,7 @@ export function toggleShuffleListFn(state: QueueStateSlice, enable: boolean): Pa
             }
         }
 
-        return { playlist: shuffled, currentSongIndex: 0, playHistory: [] };
+        return { playlist: shuffled, currentSongIndex: 0 };
     }
 
     if (originalPlaylist.length === 0) return null;
@@ -38,7 +37,7 @@ export function toggleShuffleListFn(state: QueueStateSlice, enable: boolean): Pa
         if (newIndex === -1) newIndex = 0;
     }
 
-    return { playlist: originalPlaylist, currentSongIndex: newIndex, playHistory: [] };
+    return { playlist: originalPlaylist, currentSongIndex: newIndex };
 }
 
 export function getNextIndexFn(state: Pick<QueueStateSlice, 'playlist' | 'currentSongIndex'>, repeatMode: 'off' | 'all' | 'one'): number {
@@ -83,8 +82,7 @@ export function removeSongFromPlaylistFn(state: QueueStateSlice, path: string): 
     return {
         playlist: newPlaylist,
         originalPlaylist: newOriginalPlaylist,
-        currentSongIndex: newIndex,
-        playHistory: []
+        currentSongIndex: newIndex
     };
 }
 
@@ -116,8 +114,7 @@ export function removeSongFromPlaylistByIndexFn(state: QueueStateSlice, index: n
     return {
         playlist: newPlaylist,
         originalPlaylist: newOriginalPlaylist,
-        currentSongIndex: newIndex,
-        playHistory: []
+        currentSongIndex: newIndex
     };
 }
 

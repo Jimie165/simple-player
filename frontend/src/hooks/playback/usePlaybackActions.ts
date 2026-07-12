@@ -316,10 +316,9 @@ export function usePlaybackActions() {
 
     const playNext = async () => {
         await runPlaybackTransition(async (transitionId) => {
-            const { playlist, currentSongIndex, pushHistory } = useLibraryStore.getState();
+            const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
 
-            pushHistory(currentSongIndex);
             const nextIdx = (currentSongIndex + 1) % playlist.length;
             const song = playlist[nextIdx];
             if (song?.path) {
@@ -330,7 +329,7 @@ export function usePlaybackActions() {
 
     const playPrev = async (currentTime: number = 0) => {
         await runPlaybackTransition(async (transitionId) => {
-            const { playlist, currentSongIndex, popHistory } = useLibraryStore.getState();
+            const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
 
             // Check if we should just restart current song (> 3s)
@@ -339,17 +338,9 @@ export function usePlaybackActions() {
                 return;
             }
 
-            // Try history first
-            const historyIndex = popHistory();
-            if (historyIndex !== undefined && historyIndex >= 0 && historyIndex < playlist.length) {
-                const song = playlist[historyIndex];
-                if (song?.path) {
-                    await applyQueueItemPlayback(song, historyIndex, transitionId, true);
-                    return;
-                }
-            }
-
-            // Fallback to previous index
+            // Previous follows the visible playback order. For example, manually
+            // selecting item 5 and pressing Previous plays item 4, not the item
+            // that happened to be playing before item 5 was selected.
             const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
             const song = playlist[prevIdx];
             if (song?.path) {
@@ -362,7 +353,7 @@ export function usePlaybackActions() {
         if (!canHandleEndedEvent()) return;
 
         await runPlaybackTransition(async (transitionId) => {
-            const { playlist, currentSongIndex, pushHistory, getNextIndex } = useLibraryStore.getState();
+            const { playlist, currentSongIndex, getNextIndex } = useLibraryStore.getState();
             const { repeatMode } = usePlayerStore.getState();
             if (playlist.length === 0 || currentSongIndex < 0 || currentSongIndex >= playlist.length) return;
 
@@ -374,7 +365,6 @@ export function usePlaybackActions() {
                 return;
             }
 
-            pushHistory(currentSongIndex);
             const nextIdx = getNextIndex(repeatMode);
             if (nextIdx === -1) {
                 const song = playlist[currentSongIndex];
