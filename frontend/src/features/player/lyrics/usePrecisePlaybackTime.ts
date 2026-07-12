@@ -7,11 +7,13 @@ const CALIBRATION_INTERVAL_MS = 1500;
 const SOFT_SYNC_MS = 150;
 const HARD_SYNC_MS = 600;
 const SOFT_NUDGE_DURATION_MS = 900;
+const BACKGROUND_PAUSE_DELAY_MS = 10_000;
 
 export function usePrecisePlaybackTime(currentTime: number) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const playbackRevision = usePlayerStore(state => state.playbackRevision);
     const [renderCurrentMs, setRenderCurrentMs] = useState(currentTime * 1000);
+    const [isVisibilityActive, setIsVisibilityActive] = useState(!document.hidden);
     const lastTick = useRef(0);
     const lastExternalMs = useRef(currentTime * 1000);
     const lastRenderTickRef = useRef(0);
@@ -21,6 +23,9 @@ export function usePrecisePlaybackTime(currentTime: number) {
     const softNudgeRemainingMsRef = useRef(0);
     const softNudgeTimeLeftMsRef = useRef(0);
     const calibrationRequestRef = useRef(false);
+    const isPlayingRef = useRef(isPlaying);
+    const backgroundPauseTimerRef = useRef<number | null>(null);
+    const backgroundPausedAtRef = useRef<number | null>(null);
 
     const hardSync = useCallback((ms: number) => {
         preciseMsRef.current = ms;
@@ -55,6 +60,57 @@ export function usePrecisePlaybackTime(currentTime: number) {
     }, [hardSync]);
 
     useEffect(() => {
+        isPlayingRef.current = isPlaying;
+    }, [isPlaying]);
+
+    useEffect(() => {
+        const clearBackgroundPauseTimer = () => {
+            if (backgroundPauseTimerRef.current === null) return;
+            window.clearTimeout(backgroundPauseTimerRef.current);
+            backgroundPauseTimerRef.current = null;
+        };
+
+        const handleVisibilityChange = () => {
+            clearBackgroundPauseTimer();
+
+            if (document.hidden) {
+                // 短暂最小化时维持热状态，避免频繁切回窗口造成歌词动画冷启动。
+                backgroundPauseTimerRef.current = window.setTimeout(() => {
+                    const now = performance.now();
+                    if (isPlayingRef.current) {
+                        preciseMsRef.current += Math.max(0, now - lastTick.current);
+                    }
+                    lastTick.current = now;
+                    backgroundPausedAtRef.current = now;
+                    backgroundPauseTimerRef.current = null;
+                    setIsVisibilityActive(false);
+                }, BACKGROUND_PAUSE_DELAY_MS);
+                return;
+            }
+
+            const now = performance.now();
+            const pausedAt = backgroundPausedAtRef.current;
+            if (pausedAt !== null && isPlayingRef.current) {
+                preciseMsRef.current += Math.max(0, now - pausedAt);
+            } else if (isPlayingRef.current) {
+                preciseMsRef.current += Math.max(0, now - lastTick.current);
+            }
+            backgroundPausedAtRef.current = null;
+            lastTick.current = now;
+            lastExternalMs.current = preciseMsRef.current;
+            setRenderCurrentMs(preciseMsRef.current);
+            setIsVisibilityActive(true);
+            void calibrateFromAudio();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearBackgroundPauseTimer();
+        };
+    }, [calibrateFromAudio]);
+
+    useEffect(() => {
         currentTimeRef.current = currentTime;
     }, [currentTime]);
 
@@ -64,7 +120,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
         const driftMs = Math.abs(externalMs - preciseMsRef.current);
         let frame: number | null = null;
 
-        if (!isPlaying || externalStepMs > HARD_SYNC_MS || driftMs > HARD_SYNC_MS) {
+        if (isVisibilityActive && (!isPlaying || externalStepMs > HARD_SYNC_MS || driftMs > HARD_SYNC_MS)) {
             frame = requestAnimationFrame(() => hardSync(externalMs));
         }
         lastExternalMs.current = externalMs;
@@ -72,13 +128,13 @@ export function usePrecisePlaybackTime(currentTime: number) {
         return () => {
             if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [currentTime, hardSync, isPlaying]);
+    }, [currentTime, hardSync, isPlaying, isVisibilityActive]);
 
     useEffect(() => {
         const syncFrame = requestAnimationFrame(() => {
             hardSync(currentTimeRef.current * 1000);
         });
-        if (!isPlaying) {
+        if (!isPlaying || !isVisibilityActive) {
             return () => cancelAnimationFrame(syncFrame);
         }
 
@@ -121,7 +177,7 @@ export function usePrecisePlaybackTime(currentTime: number) {
             cancelAnimationFrame(syncFrame);
             cancelAnimationFrame(frame);
         };
-    }, [calibrateFromAudio, hardSync, isPlaying, playbackRevision]);
+    }, [calibrateFromAudio, hardSync, isPlaying, isVisibilityActive, playbackRevision]);
 
     return { renderCurrentMs, preciseMsRef };
 }

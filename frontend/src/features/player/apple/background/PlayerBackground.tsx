@@ -336,34 +336,43 @@ const WebGLCanvas = ({ src, active }: { src: string | null; active: boolean }) =
             if (snapshotRef.current) snapshotRef.current.style.display = 'none';
             requestRef.current = requestAnimationFrame(render);
         };
-        const handleVisibility = () => {
-            isVisibleRef.current = !document.hidden;
+        const handleResume = () => {
+            cancelAnimationFrame(requestRef.current);
             if (isVisibleRef.current && isActiveRef.current) {
+                const hasSnapshot = !!snapshotRef.current?.src;
+                if (hasSnapshot) {
+                    updateSize();
+                    canvas.style.visibility = 'hidden';
+                    snapshotRef.current!.style.display = 'block';
+                } else {
+                    // 没有静态快照时保留上一帧，避免恢复窗口时短暂露出空背景。
+                    canvas.style.visibility = 'visible';
+                }
                 lastFrameRef.current = performance.now();
                 emaFrameTimeRef.current = FRAME_INTERVAL;
                 adaptCheckCounterRef.current = 0;
                 requestRef.current = requestAnimationFrame(render);
             }
         };
-        document.addEventListener('visibilitychange', handleVisibility);
-        const handleResume = () => {
-            cancelAnimationFrame(requestRef.current);
-            if (isVisibleRef.current && isActiveRef.current) {
-                updateSize();
-                canvas.style.visibility = 'hidden';
-                if (snapshotRef.current?.src) snapshotRef.current.style.display = 'block';
-                lastFrameRef.current = performance.now();
-                requestRef.current = requestAnimationFrame(render);
-            }
-        };
         const handleSuspend = () => {
             cancelAnimationFrame(requestRef.current);
-            if (snapshotRef.current?.src) snapshotRef.current.style.display = 'block';
-            canvas.style.visibility = 'hidden';
-            canvas.width = 1;
-            canvas.height = 1;
-            gl.viewport(0, 0, 1, 1);
+            if (snapshotRef.current?.src) {
+                snapshotRef.current.style.display = 'block';
+                canvas.style.visibility = 'hidden';
+                canvas.width = 1;
+                canvas.height = 1;
+                gl.viewport(0, 0, 1, 1);
+            }
         };
+        const handleVisibility = () => {
+            isVisibleRef.current = !document.hidden;
+            if (isVisibleRef.current) {
+                handleResume();
+            } else {
+                handleSuspend();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
         window.addEventListener('player-background-resume', handleResume);
         window.addEventListener('player-background-suspend', handleSuspend);
         requestRef.current = requestAnimationFrame(render);
