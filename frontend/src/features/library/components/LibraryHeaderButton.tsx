@@ -11,8 +11,9 @@ export default function LibraryHeaderButton({ onClick }: LibraryHeaderButtonProp
             onClick={onClick}
             className={clsx(
                 "relative inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium z-20 transition-all duration-200",
-                "bg-surface-container-high hover:bg-surface-container-highest active:bg-secondary-container",
-                "text-on-surface-variant hover:text-on-surface active:text-on-secondary-container",
+                "bg-surface-container-low hover:bg-surface-container-lowest active:bg-surface-container-lowest",
+                "dark:bg-surface-container-high dark:hover:bg-surface-container-highest dark:active:bg-surface-container-highest",
+                "text-on-surface-variant hover:text-on-surface",
                 "border border-outline-variant/20 shadow-sm",
                 "hover:elevation-1 active:scale-95"
             )}

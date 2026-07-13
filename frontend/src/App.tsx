@@ -200,7 +200,10 @@ function App() {
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className="pt-12 min-h-full pb-24">
+        <div className={`pt-12 min-h-full pb-24 transition-colors duration-300 ${activePlaylistDetail
+          ? 'bg-surface dark:bg-surface-container'
+          : ''
+          }`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}

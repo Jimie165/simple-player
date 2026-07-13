@@ -9,43 +9,75 @@ interface OpenFileMenuProps {
 
 export default function OpenFileMenu({ onOpenFile, onOpenFolder }: OpenFileMenuProps) {
     return (
-        <Menu>
-            <MenuButton className={clsx(
-                "relative inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium z-20 transition-all duration-200",
-                "bg-secondary-container text-on-secondary-container hover:bg-secondary-container/80 hover:shadow-md",
-                "active:scale-95 border border-transparent"
-            )}>
-                <MdFileOpen className="text-lg" />
-                <span>打开</span>
-                <div className="w-px h-4 bg-outline/20 mx-0.5" />
-                <MdKeyboardArrowDown className="text-xl" />
-            </MenuButton>
-
-            <MenuItems
-                transition
-                className="absolute right-2 md:right-4 mt-2 w-48 origin-top-right rounded-xl bg-surface-container-high shadow-lg ring-1 ring-outline-variant/30 focus:outline-none z-50 transition duration-100 ease-out data-closed:scale-95 data-closed:opacity-0 overflow-hidden"
-            >
-                <div className="p-1 flex flex-col gap-0.5">
-                    <MenuItem>
+        <Menu as="div" className="relative z-20 inline-flex">
+            {({ open }) => (
+                <>
+                    <div
+                        className={clsx(
+                            "inline-flex h-10 items-stretch overflow-hidden rounded-full border border-transparent bg-secondary-container text-on-secondary-container shadow-sm transition-[border-color,box-shadow,background-color,filter] duration-200",
+                            open
+                                ? "brightness-105 shadow-md dark:brightness-125"
+                                : "hover:brightness-105 hover:shadow-md dark:hover:brightness-125"
+                        )}
+                    >
                         <button
+                            type="button"
                             onClick={onOpenFile}
-                            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors text-on-surface data-focus:bg-secondary-container data-focus:text-on-secondary-container"
+                            className="inline-flex items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/15 focus:outline-none focus-visible:bg-white/20 active:bg-black/10"
                         >
-                            <MdFileOpen className="text-lg opacity-80" />
-                            打开文件
+                            <MdFileOpen className="text-[19px]" aria-hidden="true" />
+                            <span>打开</span>
                         </button>
-                    </MenuItem>
-                    <MenuItem>
-                        <button
-                            onClick={onOpenFolder}
-                            className="group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors text-on-surface data-focus:bg-secondary-container data-focus:text-on-secondary-container"
+
+                        <span className="my-2 w-px bg-outline/20" aria-hidden="true" />
+
+                        <MenuButton
+                            aria-label="选择打开方式"
+                            className="group grid w-10 place-items-center text-on-secondary-container/85 transition-colors hover:bg-white/15 hover:text-on-secondary-container focus:outline-none focus-visible:bg-white/20 focus-visible:text-on-secondary-container active:bg-black/10"
                         >
-                            <MdFolderOpen className="text-lg opacity-80" />
-                            打开文件夹
-                        </button>
-                    </MenuItem>
-                </div>
-            </MenuItems>
+                            <MdKeyboardArrowDown
+                                className={clsx(
+                                    "text-xl transition-transform duration-200 ease-out",
+                                    open && "rotate-180"
+                                )}
+                                aria-hidden="true"
+                            />
+                        </MenuButton>
+                    </div>
+
+                    <MenuItems
+                        transition
+                        anchor={{ to: 'bottom end', gap: 8 }}
+                        className="z-50 w-52 origin-top-right overflow-hidden rounded-xl bg-surface-container-high p-1.5 text-on-surface shadow-xl ring-1 ring-outline-variant/30 focus:outline-none transition duration-150 ease-out data-closed:-translate-y-1 data-closed:scale-[0.98] data-closed:opacity-0"
+                    >
+                        <MenuItem>
+                            <button
+                                type="button"
+                                onClick={onOpenFile}
+                                className="group flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm transition-colors data-focus:bg-secondary-container data-focus:text-on-secondary-container"
+                            >
+                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-surface/80 transition-colors group-data-focus:text-on-secondary-container">
+                                    <MdFileOpen className="text-lg" aria-hidden="true" />
+                                </span>
+                                <span className="font-medium">打开文件</span>
+                            </button>
+                        </MenuItem>
+
+                        <MenuItem>
+                            <button
+                                type="button"
+                                onClick={onOpenFolder}
+                                className="group flex w-full items-center gap-3 rounded-md px-2.5 py-2 text-left text-sm transition-colors data-focus:bg-secondary-container data-focus:text-on-secondary-container"
+                            >
+                                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-on-surface/80 transition-colors group-data-focus:text-on-secondary-container">
+                                    <MdFolderOpen className="text-lg" aria-hidden="true" />
+                                </span>
+                                <span className="font-medium">打开文件夹</span>
+                            </button>
+                        </MenuItem>
+                    </MenuItems>
+                </>
+            )}
         </Menu>
     );
 }

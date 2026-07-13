@@ -20,7 +20,7 @@ export default function PlaylistListActions({
                     placeholder="搜索..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-neutral-100 dark:bg-neutral-800 border-none rounded-full py-1.5 pl-9 pr-4 text-sm w-40 focus:w-60 focus:ring-2 focus:ring-primary transition-all duration-300 placeholder:text-neutral-500"
+                    className="bg-surface-container-low dark:bg-surface-container-high border-none rounded-full py-1.5 pl-9 pr-4 text-sm w-40 outline-none ring-0 focus:w-60 focus:outline-none focus-visible:outline-none focus:ring-0 focus:bg-surface-container-lowest dark:focus:bg-surface-container-highest transition-all duration-300 placeholder:text-neutral-500"
                 />
             </div>
 

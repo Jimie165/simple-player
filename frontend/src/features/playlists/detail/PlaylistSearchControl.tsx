@@ -26,8 +26,8 @@ export default function PlaylistSearchControl({
                 className={clsx(
                     'flex items-center transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
                     isSearchOpen
-                        ? 'w-64 bg-surface-container-highest/50 backdrop-blur-md border border-outline-variant/20 mr-2'
-                        : 'w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-highest hover:text-primary cursor-pointer'
+                        ? 'w-64 bg-surface-container-lowest/90 dark:bg-surface-container-highest/90 backdrop-blur-md border border-outline-variant/20 shadow-sm mr-2'
+                        : 'w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-lowest dark:hover:bg-surface-container-highest hover:text-primary cursor-pointer'
                 )}
                 onClick={() => !isSearchOpen && setIsSearchOpen(true)}
             >
