@@ -4,8 +4,6 @@ use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 const WINDOW_STATE_KEY: &str = "main_window_state";
-const MIN_WINDOW_WIDTH: u32 = 600;
-const MIN_WINDOW_HEIGHT: u32 = 500;
 const MIN_VISIBLE_EDGE: i64 = 64;
 
 #[derive(Clone, Copy, Deserialize, Serialize)]
@@ -30,6 +28,12 @@ struct MonitorBounds {
     height: u32,
 }
 
+#[derive(Clone, Copy, Default)]
+struct MinimumWindowSize {
+    width: f64,
+    height: f64,
+}
+
 /// 恢复主窗口状态，并在关闭时保存下一次启动所需的边界与最大化状态。
 pub fn initialize(app: &tauri::App, db: Arc<Mutex<Connection>>) {
     let saved_state = db.lock().ok().and_then(|conn| load(&conn));
@@ -37,9 +41,11 @@ pub fn initialize(app: &tauri::App, db: Arc<Mutex<Connection>>) {
         return;
     };
 
+    let minimum_size = configured_minimum_size(app, window.label());
     let monitor_bounds = available_monitor_bounds(&window);
     let restored_state = saved_state.filter(|state| {
-        has_valid_size(&state.bounds) && is_visible_on_any_monitor(&state.bounds, &monitor_bounds)
+        has_valid_size(&state.bounds, minimum_size)
+            && is_visible_on_any_monitor(&state.bounds, &monitor_bounds)
     });
 
     if let Some(state) = restored_state.as_ref() {
@@ -81,7 +87,7 @@ pub fn initialize(app: &tauri::App, db: Arc<Mutex<Connection>>) {
             if let (Ok(size), Ok(mut current)) = (window_for_events.outer_size(), bounds.lock()) {
                 // On Windows a minimized window reports a tiny/zero outer size. Never let that
                 // transient geometry replace the last usable normal-window bounds.
-                if size.width >= MIN_WINDOW_WIDTH && size.height >= MIN_WINDOW_HEIGHT {
+                if has_valid_dimensions(size.width, size.height, minimum_size) {
                     current.width = size.width;
                     current.height = size.height;
                 }
@@ -90,7 +96,9 @@ pub fn initialize(app: &tauri::App, db: Arc<Mutex<Connection>>) {
         tauri::WindowEvent::CloseRequested { .. } => {
             if let Ok(current) = bounds.lock() {
                 let monitors = available_monitor_bounds(&window_for_events);
-                if has_valid_size(&current) && is_visible_on_any_monitor(&current, &monitors) {
+                if has_valid_size(&current, minimum_size)
+                    && is_visible_on_any_monitor(&current, &monitors)
+                {
                     save(
                         &db,
                         PersistedWindowState {
@@ -112,6 +120,19 @@ fn is_normal_window(window: &tauri::WebviewWindow) -> bool {
     !window.is_minimized().unwrap_or(false) && !window.is_maximized().unwrap_or(false)
 }
 
+fn configured_minimum_size(app: &tauri::App, window_label: &str) -> MinimumWindowSize {
+    app.config()
+        .app
+        .windows
+        .iter()
+        .find(|config| config.label == window_label)
+        .map(|config| MinimumWindowSize {
+            width: config.min_width.unwrap_or_default(),
+            height: config.min_height.unwrap_or_default(),
+        })
+        .unwrap_or_default()
+}
+
 fn available_monitor_bounds(window: &tauri::WebviewWindow) -> Vec<MonitorBounds> {
     window
         .available_monitors()
@@ -129,8 +150,12 @@ fn available_monitor_bounds(window: &tauri::WebviewWindow) -> Vec<MonitorBounds>
         .collect()
 }
 
-fn has_valid_size(bounds: &WindowBounds) -> bool {
-    bounds.width >= MIN_WINDOW_WIDTH && bounds.height >= MIN_WINDOW_HEIGHT
+fn has_valid_size(bounds: &WindowBounds, minimum_size: MinimumWindowSize) -> bool {
+    has_valid_dimensions(bounds.width, bounds.height, minimum_size)
+}
+
+fn has_valid_dimensions(width: u32, height: u32, minimum_size: MinimumWindowSize) -> bool {
+    f64::from(width) >= minimum_size.width && f64::from(height) >= minimum_size.height
 }
 
 fn is_visible_on_any_monitor(bounds: &WindowBounds, monitors: &[MonitorBounds]) -> bool {
