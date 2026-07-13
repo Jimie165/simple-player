@@ -4,11 +4,10 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { libraryService } from '@/services/libraryService';
 import AlbumDetailView from '@/features/library/components/AlbumDetailView';
 import ArtistDetailView from '@/features/library/components/ArtistDetailView';
-import PlaylistDetail from '@/features/playlists/detail/PlaylistDetail';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { SongMetadata } from '@/types';
-import type { Playlist, RecentItem } from '@/types';
+import type { RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
@@ -27,7 +26,7 @@ const overlayVariants: Variants = {
 };
 
 export default function GlobalDetailStack() {
-    const { overlayStack, push, pop } = useNavigationStore();
+    const { overlayStack, push } = useNavigationStore();
     const { addToRecent } = useLibraryStore();
     const { playSong, shufflePlay } = usePlaybackActions();
     const [settledOverlayDepth, setSettledOverlayDepth] = useState(overlayStack.length);
@@ -117,7 +116,6 @@ export default function GlobalDetailStack() {
                 let key = `${activeView.type}-${index}`;
                 if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
-                if (activeView.type === 'playlist_detail') key += `-${(activeView.data as Playlist).id}`;
 
                 return (
                     <motion.div
@@ -167,14 +165,6 @@ export default function GlobalDetailStack() {
                                                     onOpenArtistByName={handleOpenArtistByName}
                                                 />
                                             );
-                                        case 'playlist_detail': {
-                                            const plData = activeView.data as { id: number | 'favorites', name: string };
-                                            return (
-                                                <div className="h-full">
-                                                    <PlaylistDetail id={plData.id} name={plData.name} onClose={() => pop()} />
-                                                </div>
-                                            );
-                                        }
                                         default:
                                             return null;
                                     }

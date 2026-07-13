@@ -2,7 +2,12 @@ import { create } from 'zustand';
 import type { PageId } from '@/types/index';
 
 // ViewConfig for Overlays
-export type ViewType = 'artist_detail' | 'album_detail' | 'playlist_detail';
+export type ViewType = 'artist_detail' | 'album_detail';
+
+export interface PlaylistDetailState {
+    id: number | 'favorites';
+    name: string;
+}
 
 export interface ViewState {
     type: ViewType;
@@ -13,6 +18,7 @@ interface MainState {
     page: PageId;
     tab?: string;
     overlayStack?: ViewState[];
+    playlistDetail?: PlaylistDetailState | null;
 }
 
 interface NavigationState {
@@ -20,6 +26,7 @@ interface NavigationState {
     currentPage: PageId;
     currentTab: string;
     mainHistory: MainState[];
+    activePlaylistDetail: PlaylistDetailState | null;
 
     // Overlay Stack
     overlayStack: ViewState[];
@@ -33,6 +40,8 @@ interface NavigationState {
     navigate: (page: PageId, tab?: string) => void;
     setTab: (tab: string) => void; // For tab-only changes within current page
     setArtistDetailTab: (tab: string) => void;
+    openPlaylistDetail: (detail: PlaylistDetailState) => void;
+    closePlaylistDetail: () => void;
     push: (view: ViewState) => void;
     pop: () => void;
     goBack: (onPreBack?: () => boolean) => void;
@@ -62,6 +71,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     currentPage: 'home',
     currentTab: 'songs',
     mainHistory: [],
+    activePlaylistDetail: null,
     overlayStack: [],
     activeOverlay: null,
     hasOverlay: false,
@@ -84,7 +94,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             {
                 page: state.currentPage,
                 tab: state.currentTab,
-                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined
+                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
+                playlistDetail: state.activePlaylistDetail,
             }
         ];
 
@@ -104,6 +115,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             currentPage: page,
             currentTab: targetTab,
             mainHistory: newHistory,
+            activePlaylistDetail: null,
             overlayStack: [],
             activeOverlay: null,
             hasOverlay: false
@@ -122,7 +134,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             {
                 page: state.currentPage,
                 tab: state.currentTab,
-                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined
+                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
+                playlistDetail: state.activePlaylistDetail,
             }
         ];
 
@@ -142,6 +155,37 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     }),
 
     setArtistDetailTab: (tab) => set({ lastArtistDetailTab: tab }),
+
+    openPlaylistDetail: (detail) => set((state) => {
+        if (state.currentPage === 'playlists') {
+            return {
+                activePlaylistDetail: detail,
+                overlayStack: [],
+                activeOverlay: null,
+                hasOverlay: false,
+            };
+        }
+
+        return {
+            currentPage: 'playlists',
+            currentTab: 'songs',
+            mainHistory: [
+                ...state.mainHistory,
+                {
+                    page: state.currentPage,
+                    tab: state.currentTab,
+                    overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
+                    playlistDetail: state.activePlaylistDetail,
+                },
+            ],
+            activePlaylistDetail: detail,
+            overlayStack: [],
+            activeOverlay: null,
+            hasOverlay: false,
+        };
+    }),
+
+    closePlaylistDetail: () => set({ activePlaylistDetail: null }),
 
     push: (view) => set((state) => {
         const now = Date.now();
@@ -183,7 +227,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         // 0. Custom pre-back check (e.g. selection mode or full screen)
         if (onPreBack && onPreBack()) return;
 
-        const { overlayStack, mainHistory, pop } = get();
+        const { overlayStack, mainHistory, currentPage, activePlaylistDetail, pop } = get();
 
         // 1. Pop Overlays first
         if (overlayStack.length > 0) {
@@ -191,7 +235,13 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             return;
         }
 
-        // 2. Pop Main History
+        // 2. Playlist detail is a first-class page inside the playlists module.
+        if (currentPage === 'playlists' && activePlaylistDetail) {
+            set({ activePlaylistDetail: null });
+            return;
+        }
+
+        // 3. Pop Main History
         if (mainHistory.length > 0) {
             const newHistory = [...mainHistory];
             const prevState = newHistory.pop();
@@ -200,6 +250,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
                     currentPage: prevState.page,
                     currentTab: prevState.tab || 'songs',
                     mainHistory: newHistory,
+                    activePlaylistDetail: prevState.playlistDetail ?? null,
                     overlayStack: prevState.overlayStack ?? [],
                     activeOverlay: prevState.overlayStack && prevState.overlayStack.length > 0
                         ? prevState.overlayStack[prevState.overlayStack.length - 1]

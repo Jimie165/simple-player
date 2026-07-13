@@ -42,7 +42,7 @@ export default function PlaylistList() {
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null);
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
-    const { push } = useNavigationStore();
+    const { openPlaylistDetail } = useNavigationStore();
     const { addMultipleToNext, libraryVersion, playlistVersion, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
     const { setShuffleState } = usePlayerStore();
     const { playList, shufflePlay } = usePlaybackActions();
@@ -332,7 +332,7 @@ export default function PlaylistList() {
                 selectedIds={selectedIds}
                 toggleSelection={toggleSelection}
                 toggleSelectionMode={toggleSelectionMode}
-                push={push}
+                onOpenPlaylist={openPlaylistDetail}
                 handlePlayFavorites={handlePlayFavorites}
                 handleAddFavoritesToQueue={handleAddFavoritesToQueue}
                 handlePlayPlaylist={handlePlayPlaylist}

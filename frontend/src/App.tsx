@@ -92,6 +92,7 @@ function App() {
     currentPage,
     mainHistory,
     hasOverlay,
+    activePlaylistDetail,
     navigate: storeNavigate,
     goBack: storeGoBack
   } = useNavigationStore();
@@ -192,7 +193,10 @@ function App() {
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
         data-tauri-drag-region
-        className="absolute top-0 left-0 right-0 h-12 bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl z-40 border-b border-outline-variant/5"
+        className={`absolute top-0 left-0 right-0 h-12 z-40 border-b transition-colors duration-300 ${activePlaylistDetail
+          ? 'bg-transparent border-transparent'
+          : 'bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl border-outline-variant/5'
+          }`}
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
@@ -237,7 +241,7 @@ function App() {
             onNavigate={handleNavigate}
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed((prev) => !prev)}
-            canGoBack={mainHistory.length > 0 || hasOverlay || isFullScreen}
+            canGoBack={mainHistory.length > 0 || hasOverlay || activePlaylistDetail !== null || isFullScreen}
             onBack={handleBack}
             onSearch={handleSearch}
             isOverlay={isSidebarOverlay}

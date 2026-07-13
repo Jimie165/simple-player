@@ -1,7 +1,7 @@
 import { MdCheck, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
 import type { Playlist } from '@/types';
-import type { ViewState } from '@/store/useNavigationStore';
+import type { PlaylistDetailState } from '@/store/useNavigationStore';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
@@ -20,7 +20,7 @@ interface PlaylistCardsGridProps {
     selectedIds: Set<string>;
     toggleSelection: (id: string, type: 'playlist', data: unknown) => void;
     toggleSelectionMode: (item: { id: string; type: 'playlist'; data: unknown }) => void;
-    push: (entry: ViewState) => void;
+    onOpenPlaylist: (detail: PlaylistDetailState) => void;
     handlePlayFavorites: (shuffle?: boolean) => void;
     handleAddFavoritesToQueue: () => void;
     handlePlayPlaylist: (pl: Playlist, shuffle?: boolean) => Promise<void>;
@@ -38,7 +38,7 @@ export default function PlaylistCardsGrid({
     selectedIds,
     toggleSelection,
     toggleSelectionMode,
-    push,
+    onOpenPlaylist,
     handlePlayFavorites,
     handleAddFavoritesToQueue,
     handlePlayPlaylist,
@@ -67,7 +67,7 @@ export default function PlaylistCardsGrid({
                                 if (isSelectionMode) {
                                     toggleSelection(favoritesSelectionId, 'playlist', pl);
                                 } else {
-                                    push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } });
+                                    onOpenPlaylist({ id: 'favorites', name: '喜爱歌曲' });
                                 }
                             }}
                             onContextMenu={(e) => {
@@ -150,7 +150,7 @@ export default function PlaylistCardsGrid({
                             if (isSelectionMode) {
                                 toggleSelection(id, 'playlist', playlist);
                             } else {
-                                push({ type: 'playlist_detail', data: playlist });
+                                onOpenPlaylist({ id: playlist.id, name: playlist.name });
                             }
                         }}
                         onContextMenu={(e) => {

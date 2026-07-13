@@ -11,7 +11,7 @@ import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 export default function SelectionMenuBar() {
     // Integration
     const { isSelectionMode, selectedIds, selectableIds, clearSelection, selectedItemsMap, setSelectAllRequested, selectionType } = useSelectionStore();
-    const { activeOverlay, currentPage } = useNavigationStore();
+    const { activeOverlay, activePlaylistDetail, currentPage } = useNavigationStore();
 
     const [visibleCount, setVisibleCount] = useState(4);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -41,18 +41,15 @@ export default function SelectionMenuBar() {
         }
 
         // Preference 2: Navigation context
-        if (activeOverlay?.type === 'playlist_detail') return 'playlist';
         if (activeOverlay?.type === 'album_detail') return 'album_detail';
         if (activeOverlay?.type === 'artist_detail') return 'artist_detail';
+        if (activePlaylistDetail) return 'playlist';
         if (currentPage === 'library') return 'library';
         if (currentPage === 'videos') return 'video';
         return 'other'; // generic
-    }, [activeOverlay, currentPage, selectionType, selectedIds]);
+    }, [activeOverlay, activePlaylistDetail, currentPage, selectionType, selectedIds]);
 
-    const activePlaylistData = activeOverlay?.data as { id?: unknown } | undefined;
-    const playlistId = activeOverlay?.type === 'playlist_detail' && activePlaylistData?.id
-        ? activePlaylistData.id
-        : undefined;
+    const playlistId = activePlaylistDetail?.id;
 
     // Get Items
     const selectedItems = useMemo<MusicItem[]>(() => {

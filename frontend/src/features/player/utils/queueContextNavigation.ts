@@ -13,7 +13,7 @@ export function navigateFromQueueContext(queueContext?: QueueContext | null, onN
     const { type, id, name } = queueContext;
 
     if (id === 'favorites' || id === 'playlist:favorites') {
-        navigationStore.push({ type: 'playlist_detail', data: { id: 'favorites', name: '喜爱歌曲' } });
+        navigationStore.openPlaylistDetail({ id: 'favorites', name: '喜爱歌曲' });
         onNavigate();
         return;
     }
@@ -21,7 +21,7 @@ export function navigateFromQueueContext(queueContext?: QueueContext | null, onN
     if (type === 'playlist' || type === 'playlist_detail') {
         const pid = parseInt(id || '0');
         if (pid) {
-            navigationStore.push({ type: 'playlist_detail', data: { id: pid, name } });
+            navigationStore.openPlaylistDetail({ id: pid, name: name || '播放列表' });
             onNavigate();
         }
         return;
