@@ -12,13 +12,36 @@ import type { Playlist, RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
+
+type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
+
+const overlayTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
+const overlayVariants: Variants = {
+    initial: { x: '100%' },
+    animate: { x: 0 },
+    exit: (direction: OverlayTransitionDirection) => direction === 'pop'
+        ? { x: '100%', transition: overlayTransition }
+        : { x: 0, transition: { duration: 0 } },
+};
 
 export default function GlobalDetailStack() {
     const { overlayStack, push, pop } = useNavigationStore();
     const { addToRecent } = useLibraryStore();
     const { playSong, shufflePlay } = usePlaybackActions();
+    const [settledOverlayDepth, setSettledOverlayDepth] = useState(overlayStack.length);
+
+    const transitionDirection: OverlayTransitionDirection = overlayStack.length > settledOverlayDepth
+        ? 'push'
+        : overlayStack.length < settledOverlayDepth
+            ? 'pop'
+            : 'idle';
+    // Keep the immediately covered detail mounted so back navigation restores its
+    // data and scroll position. Older detail layers can still be unmounted.
+    const visibleOverlayCount = 2;
+    const firstVisibleOverlayIndex = Math.max(0, overlayStack.length - visibleOverlayCount);
+    const visibleOverlays = overlayStack.slice(firstVisibleOverlayIndex);
 
     // Helper: Play Song Logic
     const buildRecentForSong = (song: SongMetadata): RecentItem => ({
@@ -79,9 +102,18 @@ export default function GlobalDetailStack() {
 
     // Render the stack
     return (
-        <AnimatePresence>
-            {overlayStack.slice(-1).map((activeView) => {
-                const index = overlayStack.length - 1;
+        <AnimatePresence
+            custom={transitionDirection}
+            onExitComplete={() => {
+                if (overlayStack.length < settledOverlayDepth) {
+                    setSettledOverlayDepth(overlayStack.length);
+                }
+            }}
+        >
+            {visibleOverlays.map((activeView, visibleIndex) => {
+                const index = firstVisibleOverlayIndex + visibleIndex;
+                const isTopOverlay = index === overlayStack.length - 1;
+                const isFrozenOverlay = !isTopOverlay && transitionDirection !== 'push';
                 let key = `${activeView.type}-${index}`;
                 if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
@@ -90,12 +122,24 @@ export default function GlobalDetailStack() {
                 return (
                     <motion.div
                         key={key}
-                        initial={{ x: '100%' }}
-                        animate={{ x: 0 }}
-                        exit={{ x: '100%' }}
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                        custom={transitionDirection}
+                        variants={overlayVariants}
+                        initial={transitionDirection === 'pop' ? false : 'initial'}
+                        animate="animate"
+                        exit="exit"
+                        transition={overlayTransition}
+                        onAnimationComplete={() => {
+                            if (isTopOverlay && transitionDirection === 'push') {
+                                setSettledOverlayDepth(overlayStack.length);
+                            }
+                        }}
                         className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-50"
-                        style={{ zIndex: 50 + index }}
+                        style={{
+                            zIndex: 50 + index,
+                            ...(isFrozenOverlay ? { contentVisibility: 'hidden', contain: 'strict' } : {}),
+                        }}
+                        inert={!isTopOverlay}
+                        aria-hidden={!isTopOverlay}
                     >
                         <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
                         <ScrollArea className="h-full" topOffset={48}>
@@ -156,7 +200,16 @@ interface OverlayProps {
 }
 
 function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
-    const albumInitialData = initialData as AlbumData;
+    const albumInitialData = useMemo<AlbumData>(() => {
+        const data = initialData as Partial<AlbumData>;
+        return {
+            name: data.name ?? '',
+            artist: data.artist ?? '',
+            cover: data.cover ?? data.cover_path ?? null,
+            cover_path: data.cover_path ?? data.cover ?? null,
+            songs: Array.isArray(data.songs) ? data.songs : [],
+        };
+    }, [initialData]);
     const [albumData, setAlbumData] = useState<AlbumData>(albumInitialData);
 
     useEffect(() => {
@@ -218,7 +271,16 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
 }
 
 function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
-    const artistInitialData = initialData as ArtistData;
+    const artistInitialData = useMemo<ArtistData>(() => {
+        const data = initialData as Partial<ArtistData>;
+        return {
+            name: data.name ?? '',
+            cover: data.cover ?? null,
+            count: data.count ?? 0,
+            albumCount: data.albumCount ?? 0,
+            songs: Array.isArray(data.songs) ? data.songs : [],
+        };
+    }, [initialData]);
     const [artistData, setArtistData] = useState<ArtistData>(artistInitialData);
 
     useEffect(() => {
