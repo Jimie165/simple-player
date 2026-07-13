@@ -8,6 +8,7 @@ import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
+    sideLyricsFocusAlpha,
     topInsetPx,
 } from '@/features/player/lyrics/constants';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
@@ -37,7 +38,6 @@ const narrowScrollMaskStyle = {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
-const SIDE_LYRICS_FOCUS_ALPHA = 0.45;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function FluidLyricsPanel({
@@ -138,7 +138,7 @@ export default function FluidLyricsPanel({
         const interludeFocusOffset = activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
         const itemCenter = activeEl.offsetTop + activeEl.offsetHeight / 2 + visualShift + interludeFocusOffset;
 
-        const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
+        const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
         return clamp(Math.round(itemCenter - viewportHeight * alpha), 0, maxScrollY());
     }, [activeDisplayIndex, displayItems, getVisualInterludeShift, maxScrollY, variant]);
 
@@ -161,7 +161,7 @@ export default function FluidLyricsPanel({
             viewportSizeRef.current = { width, height };
             contentHeightRef.current = nextContentHeight;
 
-            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
+            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
             setTopSpacerHeight(height * alpha);
             setBottomSpacerHeight(
                 variant === 'narrow'

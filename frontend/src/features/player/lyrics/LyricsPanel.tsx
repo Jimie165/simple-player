@@ -8,6 +8,7 @@ import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
+    sideLyricsFocusAlpha,
     topInsetPx,
 } from '@/features/player/lyrics/constants';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
@@ -36,7 +37,6 @@ const narrowScrollMaskStyle = {
 };
 
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
-const SIDE_LYRICS_FOCUS_ALPHA = 0.45;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function LyricsPanel({
@@ -88,7 +88,7 @@ export default function LyricsPanel({
             const height = el.clientHeight;
             const prevSize = viewportSizeRef.current;
 
-            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
+            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
             setTopSpacerHeight(height * alpha);
             setBottomSpacerHeight(
                 variant === 'narrow'
@@ -291,7 +291,7 @@ export default function LyricsPanel({
 
             const baseOffset = Math.round(visualShift + interludeFocusOffset);
             if (viewportSizeRef.current) {
-                const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : SIDE_LYRICS_FOCUS_ALPHA;
+                const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
                 const shiftUp = Math.round(viewportSizeRef.current.height * (0.5 - alpha));
                 return baseOffset + shiftUp;
             }
@@ -349,7 +349,7 @@ export default function LyricsPanel({
                     'relative z-10 mt-0',
                     variant === 'narrow'
                         ? 'h-full mb-0'
-                        : 'h-[calc(100%-3.5rem)] mb-[1.5rem]'
+                        : 'h-[calc(100%-3.5rem)] mb-6'
                 )}
                 style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
                 onWheel={(event) => handleUserInteraction(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
