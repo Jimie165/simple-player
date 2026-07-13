@@ -201,7 +201,7 @@ export default function LyricsPanel({
             return displayItems.slice(0, displayIndex).reduce((shift, item) => {
                 if (item.type !== 'interlude') return shift;
                 const itemIndex = displayItems.indexOf(item);
-                const closeAtMs = item.endMs - interludeExitCollapseDelayMs;
+                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
                 const isOpen =
                     itemIndex === exitingInterludeIndex ||
                     (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
