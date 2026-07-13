@@ -242,7 +242,7 @@ export default function InterludeItem({
                 const collapseScale = 1 - easeInCubic(collapseProgress);
 
                 scale *= collapseScale;
-                globalOpacity *= 1 - easeInCubic(collapseProgress);
+                globalOpacity *= 1 - collapseProgress;
             }
 
             container.style.transform = `scale(${Math.max(0, scale)})`;
