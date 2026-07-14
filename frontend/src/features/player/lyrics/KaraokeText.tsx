@@ -37,6 +37,13 @@ const emphasisEase = (value: number) => {
     if (x < 0.5) return smoothstep(x / 0.5);
     return smoothstep((1 - x) / 0.5);
 };
+const scaleEmphasisEase = (value: number) => {
+    const x = clamp01(value);
+    if (x >= 0.5) return smoothstep((1 - x) / 0.5);
+
+    const attack = smoothstep(x / 0.5);
+    return 1 - Math.pow(1 - attack, 1.35);
+};
 
 function getLineFloatRelease(
     timeMs: number,
@@ -97,14 +104,16 @@ function getKaraokeCharStyle(
     const toneEnvelope = hasStarted ? Math.min(attack, release) : 0;
     const longToneEffect = longToneAmount * toneEnvelope;
     const emphasisEffect = longToneEffect * emphasisWave;
+    // Scaling follows each character's complete staggered wave. Its slightly
+    // broader visible attack keeps trailing characters growing before the short
+    // acceleration phase, while the word-level release cannot truncate them.
+    const scaleEffect = longToneAmount * scaleEmphasisEase(emphasisProgress);
 
-    const centerOffset = (charCount - 1) / 2 - charIndex;
     const lineFloatRelease = getLineFloatRelease(timeMs, lineFloatReleaseStartMs, lineEndMs);
-    const translateX = -centerOffset * emphasisEffect * 0.03 * lineFloatRelease;
     const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
     const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
     const translateY = (lift * -0.078 + emphasisLift * -0.07) * lineFloatRelease;
-    const scale = 1 + emphasisEffect * 0.1;
+    const scale = 1 + scaleEffect * 0.1;
     const glowOpacity = hasProgress ? emphasisEffect * (0.5 + progress * 0.35) : 0;
     const glowRadius = 2.5 + emphasisEffect * 9;
     const glowShadow = emphasisEffect > 0.01
@@ -122,7 +131,7 @@ function getKaraokeCharStyle(
             : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
 
     return {
-        transform: `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
+        transform: `translate3d(0, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
         willChange: 'transform',
         fillBackgroundImage,
         glowMask,
