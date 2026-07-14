@@ -32,11 +32,6 @@ const smoothstep = (value: number) => {
     const x = clamp01(value);
     return x * x * (3 - 2 * x);
 };
-const emphasisEase = (value: number) => {
-    const x = clamp01(value);
-    if (x < 0.5) return smoothstep(x / 0.5);
-    return smoothstep((1 - x) / 0.5);
-};
 const scaleEmphasisEase = (value: number) => {
     const x = clamp01(value);
     if (x >= 0.5) return smoothstep((1 - x) / 0.5);
@@ -67,7 +62,6 @@ function getKaraokeCharStyle(
         time_ms,
         durationMs,
         groupStartMs,
-        groupEndMs,
         groupDurationMs,
         activeCharIndexInWord,
         activeCharCountInWord,
@@ -96,28 +90,27 @@ function getKaraokeCharStyle(
     const charDelayMs = (groupDurationMs / 2.5 / charCount) * charIndex;
     const emphasisDurationMs = Math.max(800, groupDurationMs);
     const emphasisProgress = (timeMs - groupStartMs - charDelayMs) / emphasisDurationMs;
-    const emphasisWave = emphasisEase(emphasisProgress);
 
-    const releaseMs = Math.min(260, Math.max(130, groupDurationMs * 0.24));
-    const release = smoothstep((groupEndMs - timeMs) / releaseMs);
-    const attack = smoothstep((timeMs - groupStartMs) / Math.min(280, Math.max(140, groupDurationMs * 0.22)));
-    const toneEnvelope = hasStarted ? Math.min(attack, release) : 0;
-    const longToneEffect = longToneAmount * toneEnvelope;
-    const emphasisEffect = longToneEffect * emphasisWave;
     // Scaling follows each character's complete staggered wave. Its slightly
     // broader visible attack keeps trailing characters growing before the short
     // acceleration phase, while the word-level release cannot truncate them.
     const scaleEffect = longToneAmount * scaleEmphasisEase(emphasisProgress);
+    const lastCharDelayMs = (groupDurationMs / 2.5 / charCount) * (charCount - 1);
+    const glowEndMs = groupStartMs + lastCharDelayMs + emphasisDurationMs;
+    const glowReleaseMs = Math.min(720, Math.max(480, groupDurationMs * 0.22));
+    const glowRelease = smoothstep((glowEndMs - timeMs) / glowReleaseMs);
+    const glowBuild = hasProgress ? 1 - Math.pow(1 - progress, 2) : 0;
+    const glowEffect = longToneAmount * glowBuild * glowRelease;
 
     const lineFloatRelease = getLineFloatRelease(timeMs, lineFloatReleaseStartMs, lineEndMs);
     const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
     const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
     const translateY = (lift * -0.078 + emphasisLift * -0.07) * lineFloatRelease;
     const scale = 1 + scaleEffect * 0.1;
-    const glowOpacity = hasProgress ? emphasisEffect * (0.5 + progress * 0.35) : 0;
-    const glowRadius = 2.5 + emphasisEffect * 9;
-    const glowShadow = emphasisEffect > 0.01
-        ? `0 0 ${Math.min(5, glowRadius * 0.45)}px rgba(255,255,255,${0.34 + emphasisEffect * 0.2}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + emphasisEffect * 0.24})`
+    const glowOpacity = glowEffect * (0.5 + progress * 0.35);
+    const glowRadius = 2.5 + glowEffect * 9;
+    const glowShadow = glowEffect > 0.01
+        ? `0 0 ${Math.min(5, glowRadius * 0.45)}px rgba(255,255,255,${0.34 + glowEffect * 0.2}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + glowEffect * 0.24})`
         : 'none';
     const glowMask = isComplete
         ? 'linear-gradient(to right, #fff, #fff)'
