@@ -16,7 +16,15 @@ interface EditCommandAvailability {
     redo: boolean;
 }
 
+interface FieldHistory {
+    undo: string[];
+    redo: string[];
+    value: string;
+}
+
 const editableInputTypes = new Set(['text', 'search', 'url', 'tel', 'email', 'password', 'number']);
+const fieldHistories = new WeakMap<EditableElement, FieldHistory>();
+const MAX_HISTORY_ENTRIES = 100;
 
 function getEditableElement(target: EventTarget | null): EditableElement | null {
     if (!(target instanceof Element)) return null;
@@ -43,15 +51,62 @@ function isReadOnly(element: EditableElement) {
         : !element.isContentEditable;
 }
 
-function getEditCommandAvailability(element: EditableElement): EditCommandAvailability {
-    element.focus();
-    return {
-        undo: document.queryCommandEnabled('undo'),
-        redo: document.queryCommandEnabled('redo'),
-    };
+function getElementValue(element: EditableElement) {
+    return element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement
+        ? element.value
+        : element.textContent ?? '';
 }
 
-function runEditCommand(command: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo', element: EditableElement) {
+function getFieldHistory(element: EditableElement) {
+    let history = fieldHistories.get(element);
+    if (!history) {
+        history = { undo: [], redo: [], value: getElementValue(element) };
+        fieldHistories.set(element, history);
+    }
+    return history;
+}
+
+function getEditCommandAvailability(element: EditableElement): EditCommandAvailability {
+    const history = getFieldHistory(element);
+    return { undo: history.undo.length > 0, redo: history.redo.length > 0 };
+}
+
+function recordInputChange(element: EditableElement) {
+    const history = getFieldHistory(element);
+    const value = getElementValue(element);
+    if (value === history.value) return;
+
+    history.undo.push(history.value);
+    if (history.undo.length > MAX_HISTORY_ENTRIES) history.undo.shift();
+    history.redo = [];
+    history.value = value;
+}
+
+function setElementValue(element: EditableElement, value: string) {
+    if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
+        const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+        setter?.call(element, value);
+    } else {
+        element.textContent = value;
+    }
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function applyHistoryCommand(command: 'undo' | 'redo', element: EditableElement) {
+    const history = getFieldHistory(element);
+    const source = command === 'undo' ? history.undo : history.redo;
+    const target = command === 'undo' ? history.redo : history.undo;
+    const previousValue = source.pop();
+    if (previousValue === undefined) return false;
+
+    target.push(history.value);
+    history.value = previousValue;
+    setElementValue(element, previousValue);
+    return true;
+}
+
+function runEditCommand(command: 'cut' | 'copy' | 'selectAll', element: EditableElement) {
     element.focus();
     return document.execCommand(command);
 }
@@ -96,6 +151,14 @@ export default function EditableContextMenu() {
     const closeMenu = useCallback(() => setMenu(null), []);
 
     useEffect(() => {
+        const initializeHistory = (event: FocusEvent) => {
+            const element = getEditableElement(event.target);
+            if (element) getFieldHistory(element);
+        };
+        const trackInput = (event: Event) => {
+            const element = getEditableElement(event.target);
+            if (element) recordInputChange(element);
+        };
         const handleContextMenu = (event: MouseEvent) => {
             const element = getEditableElement(event.target);
             if (!element) {
@@ -109,8 +172,14 @@ export default function EditableContextMenu() {
             setMenu({ x: event.clientX, y: event.clientY, element });
         };
 
+        document.addEventListener('focusin', initializeHistory, true);
+        document.addEventListener('input', trackInput, true);
         document.addEventListener('contextmenu', handleContextMenu);
-        return () => document.removeEventListener('contextmenu', handleContextMenu);
+        return () => {
+            document.removeEventListener('focusin', initializeHistory, true);
+            document.removeEventListener('input', trackInput, true);
+            document.removeEventListener('contextmenu', handleContextMenu);
+        };
     }, []);
 
     useEffect(() => {
@@ -177,11 +246,14 @@ export default function EditableContextMenu() {
                                 closeMenu();
                                 return;
                             }
-                            const changed = runEditCommand(command, menu.element);
                             if (command === 'undo' || command === 'redo') {
+                                const changed = applyHistoryCommand(command, menu.element);
                                 setCommandAvailability(getEditCommandAvailability(menu.element));
                                 if (!changed) return;
+                                closeMenu();
+                                return;
                             }
+                            runEditCommand(command, menu.element);
                             closeMenu();
                         }}
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/10"
