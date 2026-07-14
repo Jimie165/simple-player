@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 # Tauri v2 核心库
 tauri = { version = "2", features = ["protocol-asset"] }
 tauri-plugin-dialog = "2" # 用于打开文件对话框
+tauri-plugin-clipboard-manager = "2"
 tauri-plugin-fs = "2"     # 用于文件系统访问
 tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
@@ -41,7 +42,6 @@ features = [
     "Storage_Streams", 
     "System",
 ]
-
 
 
 

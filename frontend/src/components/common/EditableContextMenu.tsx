@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { MdContentCopy, MdContentCut, MdContentPaste, MdRedo, MdSelectAll, MdUndo } from 'react-icons/md';
+import { readText } from '@tauri-apps/plugin-clipboard-manager';
 
 type EditableElement = HTMLInputElement | HTMLTextAreaElement | HTMLElement;
 
@@ -53,6 +54,37 @@ function getEditCommandAvailability(element: EditableElement): EditCommandAvaila
 function runEditCommand(command: 'cut' | 'copy' | 'paste' | 'selectAll' | 'undo' | 'redo', element: EditableElement) {
     element.focus();
     return document.execCommand(command);
+}
+
+async function pasteClipboardText(element: EditableElement) {
+    element.focus();
+
+    try {
+        const text = await readText();
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+            const start = element.selectionStart ?? element.value.length;
+            const end = element.selectionEnd ?? start;
+            element.setRangeText(text, start, end, 'end');
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            return true;
+        }
+
+        const selection = window.getSelection();
+        if (!selection?.rangeCount) return false;
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(text);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+        element.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+    } catch {
+        // WebView may deny the Clipboard API; retain the native command as a fallback.
+        return document.execCommand('paste');
+    }
 }
 
 export default function EditableContextMenu() {
@@ -140,6 +172,11 @@ export default function EditableContextMenu() {
                         role="menuitem"
                         disabled={disabled}
                         onClick={() => {
+                            if (command === 'paste') {
+                                void pasteClipboardText(menu.element);
+                                closeMenu();
+                                return;
+                            }
                             const changed = runEditCommand(command, menu.element);
                             if (command === 'undo' || command === 'redo') {
                                 setCommandAvailability(getEditCommandAvailability(menu.element));
