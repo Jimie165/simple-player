@@ -142,6 +142,7 @@ export default function LyricsLineItem({
                         currentMs={isKaraokeActive ? currentMs : 0}
                         preciseMsRef={preciseMsRef}
                         isActive={isKaraokeActive}
+                        isFocused={isActive}
                     />
                 ) : (
                     line.text

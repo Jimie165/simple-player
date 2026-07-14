@@ -11,6 +11,7 @@ interface KaraokeTextProps {
     currentMs: number;
     preciseMsRef: RefObject<number>;
     isActive: boolean;
+    isFocused: boolean;
 }
 
 type IndexedCharItem = {
@@ -40,23 +41,10 @@ const scaleEmphasisEase = (value: number) => {
     return 1 - Math.pow(1 - attack, 1.35);
 };
 
-function getLineFloatRelease(
-    timeMs: number,
-    lineFloatReleaseStartMs: number | null,
-    lineEndMs: number | null
-) {
-    if (lineFloatReleaseStartMs === null || lineEndMs === null) return 1;
-    const releaseDurationMs = lineEndMs - lineFloatReleaseStartMs;
-    if (releaseDurationMs <= 0) return 1;
-    return 1 - smoothstep((timeMs - lineFloatReleaseStartMs) / releaseDurationMs);
-}
-
 function getKaraokeCharStyle(
     charItem: FlatCharItem,
     timeMs: number,
-    isActive: boolean = true,
-    lineFloatReleaseStartMs: number | null = null,
-    lineEndMs: number | null = null
+    isActive: boolean = true
 ): KaraokeCharStyle {
     const {
         time_ms,
@@ -102,10 +90,9 @@ function getKaraokeCharStyle(
     const glowBuild = hasProgress ? 1 - Math.pow(1 - progress, 2) : 0;
     const glowEffect = longToneAmount * glowBuild * glowRelease;
 
-    const lineFloatRelease = getLineFloatRelease(timeMs, lineFloatReleaseStartMs, lineEndMs);
     const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
     const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
-    const translateY = (lift * -0.078 + emphasisLift * -0.07) * lineFloatRelease;
+    const translateY = lift * -0.078 + emphasisLift * -0.07;
     const scale = 1 + scaleEffect * 0.1;
     const glowOpacity = glowEffect * (0.5 + progress * 0.35);
     const glowRadius = 2.5 + glowEffect * 9;
@@ -141,6 +128,7 @@ function KaraokeTextBase({
     currentMs: baseCurrentMs,
     preciseMsRef,
     isActive,
+    isFocused,
 }: KaraokeTextProps) {
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -165,17 +153,8 @@ function KaraokeTextBase({
         return groups;
     }, [flatChars]);
 
-    const lineFloatReleaseStartMs = useMemo(() => {
-        if (flatChars.length === 0 || lineEndMs === null) return null;
-        const lastVisualMs = Math.max(...flatChars.map(charItem =>
-            Math.max(charItem.nextStart, charItem.groupEndMs)
-        ));
-
-        return lastVisualMs < lineEndMs ? lastVisualMs : null;
-    }, [flatChars, lineEndMs]);
-
     useEffect(() => {
-        if (!isActive) return;
+        if (!isActive || !isFocused) return;
 
         const updateWordStyles = (timeMs: number) => {
             flatChars.forEach((charItem, index) => {
@@ -184,13 +163,7 @@ function KaraokeTextBase({
                 const glowEl = glowRefs.current[index];
                 if (!el || !fillEl || !glowEl) return;
 
-                const style = getKaraokeCharStyle(
-                    charItem,
-                    timeMs,
-                    true,
-                    lineFloatReleaseStartMs,
-                    lineEndMs
-                );
+                const style = getKaraokeCharStyle(charItem, timeMs, true);
                 el.style.transform = style.transform;
                 el.style.willChange = style.willChange;
                 fillEl.style.backgroundImage = style.fillBackgroundImage;
@@ -210,7 +183,7 @@ function KaraokeTextBase({
 
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [flatChars, isActive, lineEndMs, lineFloatReleaseStartMs, preciseMsRef, wordGroups]);
+    }, [flatChars, isActive, isFocused, preciseMsRef, wordGroups]);
 
     return (
         <>
@@ -231,7 +204,7 @@ function KaraokeTextBase({
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
-                            if (!isActive) {
+                            if (!isFocused) {
                                 return (
                                     <span
                                         key={charItem.charIndexInWord}
@@ -239,9 +212,9 @@ function KaraokeTextBase({
                                             position: 'relative',
                                             display: 'inline-block',
                                             whiteSpace: 'pre-wrap',
-                                            transform: 'none',
+                                            transform: 'translate3d(0, 0, 0) scale(1)',
                                             willChange: 'auto',
-                                            transition: 'none',
+                                            transition: 'transform 500ms ease-in-out',
                                             backfaceVisibility: 'hidden',
                                             overflow: 'visible',
                                         }}
@@ -259,13 +232,7 @@ function KaraokeTextBase({
                                 );
                             }
 
-                            const style = getKaraokeCharStyle(
-                                charItem,
-                                baseCurrentMs,
-                                isActive,
-                                lineFloatReleaseStartMs,
-                                lineEndMs
-                            );
+                            const style = getKaraokeCharStyle(charItem, baseCurrentMs, isActive);
 
                             return (
                                 <span
@@ -336,7 +303,7 @@ function KaraokeTextBase({
 }
 
 const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
-    if (!prev.isActive && !next.isActive) {
+    if (!prev.isFocused && !next.isFocused) {
         return prev.words === next.words &&
             prev.lineEndMs === next.lineEndMs &&
             prev.nextLineStartMs === next.nextLineStartMs &&
@@ -350,7 +317,8 @@ const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
         prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
         prev.currentMs === next.currentMs &&
         prev.preciseMsRef === next.preciseMsRef &&
-        prev.isActive === next.isActive
+        prev.isActive === next.isActive &&
+        prev.isFocused === next.isFocused
     );
 });
 
