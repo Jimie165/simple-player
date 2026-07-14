@@ -167,7 +167,11 @@ export default function InterludeItem({
                     breatheDurationMs ** 2,
             };
         };
-        const dotsDurationMs = Math.max(1, exitStartDurationMs);
+        const dotsVisibleStartDurationMs = interludeGapOpenDurationMs;
+        const dotsWhiteningDurationMs = Math.max(
+            1,
+            exitStartDurationMs - dotsVisibleStartDurationMs
+        );
         const exitMotionDurationMs = Math.max(
             1,
             exitPeakDurationMs - exitStartDurationMs
@@ -251,12 +255,15 @@ export default function InterludeItem({
                 const dot = dotRefs.current[dotIndex];
                 if (!dot) return;
 
-                const dotDelayMs = dotsDurationMs * dotIndex / 3;
-                const dotOpacity = clamp(
-                    ((currentDurationMs - dotDelayMs) * 3 / dotsDurationMs) * 0.75,
-                    0.25,
-                    1
+                const whiteningProgress = clamp01(
+                    (currentDurationMs - dotsVisibleStartDurationMs) /
+                    dotsWhiteningDurationMs
                 );
+                const dotWhiteningProgress = clamp01(
+                    whiteningProgress * dotIndexes.length - dotIndex
+                );
+                const dotOpacity =
+                    0.25 + dotWhiteningProgress * 0.75;
                 dot.style.opacity = `${clamp01(globalOpacity * dotOpacity)}`;
             });
 
