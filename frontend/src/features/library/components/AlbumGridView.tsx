@@ -112,6 +112,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                 itemContent={(_index, album) => {
                     const id = getAlbumId(album);
                     const isSelected = selectedIds.has(id);
+                    const canOpenArtist = !!onOpenArtist && album.songs.some(song => song.artist === album.artist);
 
                     return (
                         <div
@@ -175,12 +176,12 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                         <span
                                             className={clsx(
                                                 "block truncate text-sm text-neutral-500 dark:text-neutral-400",
-                                                onOpenArtist && "hover:text-primary transition-colors"
+                                                canOpenArtist && "hover:text-primary transition-colors"
                                             )}
                                             onClick={(e) => {
-                                                if (onOpenArtist) {
+                                                if (canOpenArtist) {
                                                     e.stopPropagation();
-                                                    onOpenArtist(album.artist);
+                                                    onOpenArtist?.(album.artist);
                                                 }
                                             }}
                                         >

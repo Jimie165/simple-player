@@ -10,23 +10,54 @@ const compareAlphaNum = (a: string, b: string) => {
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
 };
 
+const UNKNOWN_ALBUM = 'Unknown Album';
+const UNKNOWN_ARTIST = 'Unknown Artist';
+
+const normalize = (value: string) => value.trim().toLocaleLowerCase();
+
+export function getAlbumDisplayArtist(songs: SongMetadata[]): string {
+    const albumArtists = new Set(songs.map(song => song.album_artist?.trim()).filter(Boolean));
+    const trackArtists = new Set(songs.map(song => song.artist?.trim()).filter(Boolean));
+    if (albumArtists.size === 1) return Array.from(albumArtists)[0]!;
+    if (trackArtists.size === 1) return Array.from(trackArtists)[0]!;
+    return 'Various Artists';
+}
+
+export function songMatchesAlbum(song: SongMetadata, albumName: string, albumArtist?: string): boolean {
+    const songAlbum = song.album?.trim() || UNKNOWN_ALBUM;
+    if (normalize(songAlbum) !== normalize(albumName)) return false;
+    if (songAlbum !== UNKNOWN_ALBUM) return true;
+    return normalize(song.artist?.trim() || UNKNOWN_ARTIST) === normalize(albumArtist || UNKNOWN_ARTIST);
+}
+
 export function buildAlbums(librarySongs: SongMetadata[], albumSortKey: 'name' | 'artist'): AlbumData[] {
-    const map = new Map<string, AlbumData>();
+    const map = new Map<string, SongMetadata[]>();
     librarySongs.forEach(song => {
-        const key = (song.album || 'Unknown Album') + (song.artist || 'Unknown Artist');
-        if (!map.has(key)) {
-            map.set(key, {
-                name: song.album || 'Unknown Album',
-                artist: song.artist || 'Unknown Artist',
-                cover: song.cover_path || null,
-                cover_path: song.cover_path || null,
-                songs: [],
-            });
-        }
-        map.get(key)!.songs.push(song);
+        const albumName = song.album?.trim() || UNKNOWN_ALBUM;
+        // Track artists commonly differ on compilations and collaborations. A
+        // named album is therefore identified by its album name, not by each
+        // track's artist. Keep untagged tracks separated by artist so every
+        // unknown song is not collapsed into one giant album.
+        const key = albumName === UNKNOWN_ALBUM
+            ? `${albumName}\0${normalize(song.artist?.trim() || UNKNOWN_ARTIST)}`
+            : normalize(albumName);
+        const songs = map.get(key) ?? [];
+        songs.push(song);
+        map.set(key, songs);
     });
 
-    const list = Array.from(map.values());
+    const list = Array.from(map.values(), songs => {
+        const first = songs[0];
+        const coverPath = songs.find(song => song.cover_path)?.cover_path || null;
+
+        return {
+            name: first.album?.trim() || UNKNOWN_ALBUM,
+            artist: getAlbumDisplayArtist(songs),
+            cover: coverPath,
+            cover_path: coverPath,
+            songs,
+        };
+    });
     if (albumSortKey === 'name') {
         list.sort((a, b) => compareAlphaNum(a.name, b.name));
     } else {

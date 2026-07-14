@@ -17,6 +17,7 @@ import CoverImage from '@/components/common/CoverImage';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import { buildAlbums } from '@/features/library/utils/grouping';
 
 interface SearchResultsViewProps {
     query: string;
@@ -94,7 +95,6 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         // - Songs section: Songs whose title matches
 
         const artistMap = new Map<string, SongMetadata[]>();
-        const albumMap = new Map<string, SongMetadata[]>();
         const matchedSongs: SongMetadata[] = [];
 
         results.forEach(song => {
@@ -114,12 +114,6 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 artistMap.get(artistKey)?.push(song);
             }
 
-            // Group for Album check
-            if (song.album) {
-                const albumKey = `${song.album}||${song.artist || ''}`; // composite key
-                if (!albumMap.has(albumKey)) albumMap.set(albumKey, []);
-                albumMap.get(albumKey)?.push(song);
-            }
         });
 
         // Filter Artists
@@ -140,19 +134,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         }
 
         // Filter Albums
-        const finalAlbums: AlbumData[] = [];
-        for (const [key, songs] of albumMap.entries()) {
-            const [albumName, artistName] = key.split('||');
-            if (albumName.toLowerCase().includes(lowerQuery)) {
-                finalAlbums.push({
-                    name: albumName,
-                    artist: artistName,
-                    cover: songs.find(s => s.cover_path)?.cover_path || null,
-                    cover_path: songs.find(s => s.cover_path)?.cover_path || null,
-                    songs
-                });
-            }
-        }
+        const finalAlbums: AlbumData[] = buildAlbums(results, 'name')
+            .filter(album => album.name.toLowerCase().includes(lowerQuery));
 
         return {
             matchingArtists: finalArtists,

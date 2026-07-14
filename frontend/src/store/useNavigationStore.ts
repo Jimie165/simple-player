@@ -63,8 +63,10 @@ function getOverlayKey(view: ViewState): string {
         ? view.data as Record<string, unknown>
         : undefined;
     const idPart = data?.id ?? data?.name ?? '';
-    const artistPart = data?.artist ?? '';
-    return `${view.type}:${String(idPart)}:${String(artistPart)}`;
+    const artistPart = view.type === 'album_detail' && idPart === 'Unknown Album'
+        ? `:${String(data?.artist ?? 'Unknown Artist')}`
+        : '';
+    return `${view.type}:${String(idPart)}${artistPart}`;
 }
 
 export const useNavigationStore = create<NavigationState>()((set, get) => ({

@@ -1,7 +1,6 @@
 import { useState, useMemo, useRef } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion } from 'framer-motion';
-import { Virtuoso } from 'react-virtuoso';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
 import clsx from 'clsx';
@@ -13,7 +12,6 @@ import type { SongMetadata } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useScrollBlur } from '@/hooks/useScrollBlur';
-import { useScrollViewport } from '@/hooks/useScrollViewport';
 
 interface ArtistDetailViewProps {
     artist: ArtistData;
@@ -106,8 +104,6 @@ export default function ArtistDetailView({
     const sortedSongs = useMemo(() => {
         return sortedAlbums.flatMap(album => album.songs);
     }, [sortedAlbums]);
-
-    const scrollParent = useScrollViewport(true);
 
     const animatedAlbumIdsRef = useRef(new Set<string>());
     const getAlbumAnimationClass = (album: AlbumData) => {
@@ -245,18 +241,12 @@ export default function ArtistDetailView({
                             transition={{ duration: 0.18, ease: "easeOut" }}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
-                            {scrollParent ? (
-                                <Virtuoso
-                                    useWindowScroll={false}
-                                    customScrollParent={scrollParent}
-                                    data={sortedAlbums}
-                                    overscan={{ main: 1200, reverse: 1200 }}
-                                    components={{
-                                        Header: () => <div className="mt-4" />,
-                                        Footer: () => <div className="h-20 w-full" />
-                                    }}
-                                    itemContent={(index, album) => (
-                                        <div className={index === sortedAlbums.length - 1 ? "" : "mb-12"}>
+                            <div className="mt-4">
+                                {sortedAlbums.map((album, index) => (
+                                        <div
+                                            key={`${album.name}::${album.artist}`}
+                                            className={index === sortedAlbums.length - 1 ? "" : "pb-12"}
+                                        >
                                             <div className={clsx("flex flex-col md:flex-row gap-6 md:gap-8", getAlbumAnimationClass(album))}>
                                                 <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
                                                     <div
@@ -328,12 +318,9 @@ export default function ArtistDetailView({
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
-                                    className="w-full"
-                                />
-                            ) : (
-                                <div className="opacity-0" />
-                            )}
+                                ))}
+                                <div className="h-20 w-full" />
+                            </div>
                         </motion.div>
                     )}
             </div>

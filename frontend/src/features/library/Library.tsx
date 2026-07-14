@@ -24,6 +24,7 @@ import type { RecentItem } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { buildAlbums, buildArtists } from '@/features/library/utils/grouping';
 import { getSelectedPath } from '@/utils/dialogSelection';
+import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
@@ -306,7 +307,7 @@ export default function Library() {
                                     albums={albums}
                                     onPlayAlbum={(album) => {
                                         addToRecent({
-                                            id: `album:${album.name}:${album.artist}`,
+                                            id: getAlbumMusicItemId(album.name, album.artist),
                                             type: 'album',
                                             title: album.name,
                                             artist: album.artist,

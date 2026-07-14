@@ -21,7 +21,7 @@ const GRID_CONFIGS: Record<GridKind, GridConfig> = {
     },
 };
 
-function getActiveColumnCount(width: number, kind: GridKind) {
+export function getGridColumnCount(width: number, kind: GridKind) {
     const { breakpoints, columns } = GRID_CONFIGS[kind];
     let index = 0;
 
@@ -61,7 +61,7 @@ export function getSparseGridStyle(
 ): CSSProperties | undefined {
     if (width <= 0 || itemCount <= 0) return undefined;
 
-    const activeColumns = getActiveColumnCount(width, kind);
+    const activeColumns = getGridColumnCount(width, kind);
     if (itemCount >= activeColumns) return undefined;
 
     const lockedItemWidth = getLockedItemWidth(width, gapPx, kind);

@@ -13,6 +13,7 @@ import { useSelectionStore } from '@/store/useSelectionStore';
 import { sortSongs } from '@/utils/songSort';
 import { formatTime } from '@/utils/time';
 import { getSelectedPath } from '@/utils/dialogSelection';
+import { songMatchesAlbum } from '@/features/library/utils/grouping';
 
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 
@@ -245,10 +246,7 @@ export function useRecentPlayback() {
         } else if (item.type === 'album') {
             try {
                 const allSongs = await libraryService.scanLibrary();
-                const albumSongs = allSongs.filter(s =>
-                    s.album === item.title &&
-                    (item.artist ? s.artist === item.artist : true)
-                );
+                const albumSongs = allSongs.filter(s => songMatchesAlbum(s, item.title, item.artist));
                 await playListHelper(albumSongs);
             } catch (err) {
                 console.error("Failed to play recent album", err);

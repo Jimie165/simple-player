@@ -13,6 +13,8 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
+import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features/library/utils/grouping';
+import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
 
@@ -203,21 +205,20 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
     const [albumData, setAlbumData] = useState<AlbumData>(albumInitialData);
 
     useEffect(() => {
-        // If we have an album name but no songs (or very few, implying incomplete data from a single item context)
-        // we should fetch the full album.
+        // Always resolve the complete album from the library. An album opened
+        // from an artist page may initially contain only that artist's tracks.
         const fetchAlbumSongs = async () => {
-            const songs = albumInitialData.songs || [];
-            if (songs.length === 0 || (songs.length === 1 && !songs[0].id)) {
+            if (albumInitialData.name) {
                 try {
                     const allSongs = await libraryService.getLibrarySongs();
-                    const albumSongs = allSongs.filter(s => s.album === albumInitialData.name && (!albumInitialData.artist || s.artist === albumInitialData.artist));
+                    const albumSongs = allSongs.filter(s => songMatchesAlbum(s, albumInitialData.name, albumInitialData.artist));
                     if (albumSongs.length > 0) {
                         setAlbumData({
                             ...albumInitialData,
                             songs: albumSongs,
-                            cover: albumSongs[0].cover_path || albumInitialData.cover_path || null,
-                            cover_path: albumSongs[0].cover_path || albumInitialData.cover_path || null,
-                            artist: albumSongs[0].artist || albumInitialData.artist // refine artist if diverse
+                            cover: albumSongs.find(song => song.cover_path)?.cover_path || albumInitialData.cover_path || null,
+                            cover_path: albumSongs.find(song => song.cover_path)?.cover_path || albumInitialData.cover_path || null,
+                            artist: getAlbumDisplayArtist(albumSongs)
                         });
                     }
                 } catch (e) {
@@ -235,7 +236,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
             onPlayAll={() => {
                 const songs = albumData.songs || [];
                 addToRecent({
-                    id: `album:${albumData.name}:${albumData.artist}`,
+                    id: getAlbumMusicItemId(albumData.name, albumData.artist),
                     type: 'album',
                     title: albumData.name,
                     artist: albumData.artist,
@@ -301,21 +302,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
 
     // Correct usage of useMemo: It is now at the top level of this component
     const artistAlbums = useMemo(() => {
-        const map = new Map<string, AlbumData>();
-        (artistData.songs || []).forEach((song: SongMetadata) => {
-            const key = (song.album || "Unknown Album") + (song.artist || "Unknown Artist");
-            if (!map.has(key)) {
-                map.set(key, {
-                    name: song.album || "Unknown Album",
-                    artist: song.artist || "Unknown Artist",
-                    cover: song.cover_path || null,
-                    cover_path: song.cover_path || null,
-                    songs: []
-                });
-            }
-            map.get(key)!.songs.push(song);
-        });
-        return Array.from(map.values());
+        return buildAlbums(artistData.songs || [], 'name');
     }, [artistData.songs]);
 
     const handleOpenAlbum = (album: AlbumData) => {
@@ -328,7 +315,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
         if (songs.length === 0) return;
 
         addToRecent({
-            id: `album:${album.name}:${album.artist}`,
+            id: getAlbumMusicItemId(album.name, album.artist),
             type: 'album',
             title: album.name,
             artist: album.artist,

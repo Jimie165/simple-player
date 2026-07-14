@@ -5,6 +5,7 @@ import { fileService } from '@/services/fileService';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { VideoMetadata } from '@/types';
+import { songMatchesAlbum } from '@/features/library/utils/grouping';
 
 export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | AlbumData | VideoMetadata;
 type FlexibleMusicItem = MusicItem & Record<string, unknown>;
@@ -20,6 +21,13 @@ function asString(value: unknown): string {
 
 function asNumber(value: unknown): number | undefined {
     return typeof value === 'number' ? value : undefined;
+}
+
+export function getAlbumMusicItemId(name: string, artist?: string): string {
+    const albumName = name.trim() || 'Unknown Album';
+    return albumName === 'Unknown Album'
+        ? `album:${albumName}:${artist?.trim() || 'Unknown Artist'}`
+        : `album:${albumName}`;
 }
 
 /**
@@ -54,7 +62,7 @@ export function getMusicItemId(rawItem: unknown): string {
     if (item.name && item.songs && Array.isArray(item.songs)) {
         if (item.artist && item.albumCount === undefined) {
             // AlbumData
-            return `album:${item.name}:${item.artist}`;
+            return getAlbumMusicItemId(asString(item.name), asString(item.artist));
         }
         // ArtistData
         return `artist:${item.name}`;
@@ -138,10 +146,7 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
                 } else {
                     // 从库中查找
                     const all = await libraryService.scanLibrary();
-                    const albumSongs = all.filter(s =>
-                        s.album === asString(item.title) &&
-                        (item.artist ? s.artist === asString(item.artist) : true)
-                    );
+                    const albumSongs = all.filter(s => songMatchesAlbum(s, asString(item.title), asString(item.artist)));
                     songs.push(...albumSongs);
                 }
             } else if (type === 'artist') {

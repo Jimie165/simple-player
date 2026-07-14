@@ -6,7 +6,6 @@ import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { SongMetadata } from '@/types';
 import { useScrollBlur } from '@/hooks/useScrollBlur';
 import clsx from 'clsx';
-import CustomTooltip from '@/components/common/CustomTooltip';
 
 interface AlbumDetailViewProps {
     album: AlbumData;
@@ -70,16 +69,12 @@ export default function AlbumDetailView({
 
                 {/* Details */}
                 <div className="flex flex-col justify-center gap-2 min-w-0 flex-1 pb-2">
-                    <CustomTooltip text={album.name} className="block min-w-0">
-                        <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-50 truncate leading-tight tracking-tight mt-2">
-                            {album.name}
-                        </h1>
-                    </CustomTooltip>
-                    <CustomTooltip text={album.artist} className="block min-w-0">
-                        <h2 className="text-2xl font-medium text-primary truncate">
-                            {album.artist}
-                        </h2>
-                    </CustomTooltip>
+                    <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-50 truncate leading-tight tracking-tight mt-2">
+                        {album.name}
+                    </h1>
+                    <h2 className="text-2xl font-medium text-primary truncate">
+                        {album.artist}
+                    </h2>
 
                     <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 font-medium flex items-center gap-2">
                         <span className="bg-neutral-100 dark:bg-white/10 px-2 py-0.5 rounded-md text-xs">Album</span>

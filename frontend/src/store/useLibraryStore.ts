@@ -271,8 +271,18 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     addToRecent: (item) => set((state) => {
         if (item.type === 'artist') return state;
         const safeItem = sanitizeRecentItem(item);
-        // 使用 id 去重而不是 path，因为专辑的 id 是 album:name:artist 格式
-        const filtered = state.recentHistory.filter(i => i.id !== safeItem.id);
+        // 使用 id 去重而不是 path；专辑按 album:name 唯一标识。
+        const filtered = state.recentHistory.filter(i => {
+            if (i.id === safeItem.id) return false;
+            if (safeItem.type !== 'album' || i.type !== 'album') return true;
+
+            const sameTitle = i.title.trim().toLocaleLowerCase() === safeItem.title.trim().toLocaleLowerCase();
+            if (!sameTitle) return true;
+            if (safeItem.title !== 'Unknown Album') return false;
+
+            return (i.artist || 'Unknown Artist').trim().toLocaleLowerCase()
+                !== (safeItem.artist || 'Unknown Artist').trim().toLocaleLowerCase();
+        });
         return { recentHistory: [safeItem, ...filtered].slice(0, MAX_RECENT_ITEMS) };
     }),
 
