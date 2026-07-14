@@ -32,6 +32,7 @@ import AddToPlaylistSheet from '@/features/playlists/dialogs/AddToPlaylistSheet'
 import GlobalDialogLayer from '@/components/common/GlobalDialogLayer';
 import VideoPlayerOverlay from '@/features/player/VideoPlayerOverlay';
 import { Toaster } from 'react-hot-toast';
+import EditableContextMenu from '@/components/common/EditableContextMenu';
 
 function App() {
   const { init: initTheme } = useThemeStore();
@@ -96,16 +97,6 @@ function App() {
     navigate: storeNavigate,
     goBack: storeGoBack
   } = useNavigationStore();
-
-  useEffect(() => {
-    const handleContextMenu = (e: MouseEvent) => {
-      e.preventDefault();
-    };
-    document.addEventListener('contextmenu', handleContextMenu);
-    return () => {
-      document.removeEventListener('contextmenu', handleContextMenu);
-    };
-  }, []);
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
@@ -296,6 +287,7 @@ function App() {
         isOpen={usePlayerStore((s) => s.isVideoMode)}
         onClose={() => usePlayerStore.getState().setVideoMode(false)}
       />
+      <EditableContextMenu />
 
       <AppleMusicPlayer
         isOpen={isFullScreen}
