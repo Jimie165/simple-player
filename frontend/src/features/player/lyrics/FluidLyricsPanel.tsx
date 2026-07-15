@@ -112,20 +112,27 @@ export default function FluidLyricsPanel({
         return Math.max(0, contentHeightRef.current - viewportHeight);
     }, []);
 
-    const getVisualInterludeShift = useCallback(
-        (displayIndex: number) => {
-            const rowHeight = getInterludeRowHeightPx();
+    const visualInterludeShifts = useMemo(() => {
+        const shifts = new Array<number>(displayItems.length);
+        const rowHeight = getInterludeRowHeightPx();
+        let shift = 0;
 
-            return displayItems.slice(0, displayIndex).reduce((shift, item, sliceIndex) => {
-                if (item.type !== 'interlude') return shift;
-                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
-                const isOpenInterlude =
-                    sliceIndex === exitingInterludeIndex ||
-                    (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
-                return isOpenInterlude ? shift : shift - rowHeight;
-            }, 0);
-        },
-        [displayItems, exitingInterludeIndex, renderCurrentMs]
+        displayItems.forEach((item, displayIndex) => {
+            shifts[displayIndex] = shift;
+            if (item.type !== 'interlude') return;
+
+            const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
+            const isOpenInterlude =
+                displayIndex === exitingInterludeIndex ||
+                (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
+            if (!isOpenInterlude) shift -= rowHeight;
+        });
+
+        return shifts;
+    }, [displayItems, exitingInterludeIndex, renderCurrentMs]);
+    const getVisualInterludeShift = useCallback(
+        (displayIndex: number) => visualInterludeShifts[displayIndex] ?? 0,
+        [visualInterludeShifts]
     );
 
     const calculateAutoTargetY = useCallback(() => {
@@ -298,6 +305,12 @@ export default function FluidLyricsPanel({
 
         startInterludeExit(activeDisplayIndex);
     }, [activeDisplayIndex, displayItems, renderCurrentMs, startInterludeExit]);
+
+    const handleLineSeek = useCallback((time: number) => {
+        keepCurrentInterludeForExit();
+        setIsUserScrolling(false);
+        onSeek(time);
+    }, [keepCurrentInterludeForExit, onSeek]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
@@ -511,11 +524,7 @@ export default function FluidLyricsPanel({
                                             enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                                             currentTime={renderCurrentMs / 1000}
                                             preciseMsRef={preciseMsRef}
-                                            onSeek={(time) => {
-                                                keepCurrentInterludeForExit();
-                                                setIsUserScrolling(false);
-                                                onSeek(time);
-                                            }}
+                                            onSeek={handleLineSeek}
                                             fluidMotion
                                             targetScrollY={targetScrollY}
                                             motionDelay={motionDelays[displayIndex]}

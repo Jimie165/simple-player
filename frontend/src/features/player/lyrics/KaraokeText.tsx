@@ -171,6 +171,7 @@ function KaraokeTextBase({
     useEffect(() => {
         if (!isActive || !isFocused) return;
 
+        const previousStyles: Array<KaraokeCharStyle | undefined> = [];
         const updateWordStyles = (timeMs: number) => {
             flatChars.forEach((charItem, index) => {
                 const el = wordRefs.current[index];
@@ -179,26 +180,45 @@ function KaraokeTextBase({
                 if (!el || !fillEl || !glowEl) return;
 
                 const style = getKaraokeCharStyle(charItem, timeMs, true);
-                el.style.transform = style.transform;
-                el.style.willChange = style.willChange;
-                fillEl.style.backgroundImage = style.fillBackgroundImage;
-                glowEl.style.maskImage = style.glowMask;
-                glowEl.style.webkitMaskImage = style.glowMask;
-                glowEl.style.opacity = String(style.glowOpacity);
-                glowEl.style.textShadow = style.glowShadow;
+                const previousStyle = previousStyles[index];
+                if (style.transform !== previousStyle?.transform) {
+                    el.style.transform = style.transform;
+                }
+                if (style.willChange !== previousStyle?.willChange) {
+                    el.style.willChange = style.willChange;
+                }
+                if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
+                    fillEl.style.backgroundImage = style.fillBackgroundImage;
+                }
+                if (style.glowMask !== previousStyle?.glowMask) {
+                    glowEl.style.maskImage = style.glowMask;
+                    glowEl.style.webkitMaskImage = style.glowMask;
+                }
+                if (style.glowOpacity !== previousStyle?.glowOpacity) {
+                    glowEl.style.opacity = String(style.glowOpacity);
+                }
+                if (style.glowShadow !== previousStyle?.glowShadow) {
+                    glowEl.style.textShadow = style.glowShadow;
+                }
+                previousStyles[index] = style;
             });
         };
 
         let frame: number;
+        let lastTimeMs = Number.NaN;
 
         const tick = () => {
-            updateWordStyles(preciseMsRef.current);
+            const timeMs = preciseMsRef.current;
+            if (timeMs !== lastTimeMs) {
+                updateWordStyles(timeMs);
+                lastTimeMs = timeMs;
+            }
             frame = requestAnimationFrame(tick);
         };
 
         frame = requestAnimationFrame(tick);
         return () => cancelAnimationFrame(frame);
-    }, [flatChars, isActive, isFocused, preciseMsRef, wordGroups]);
+    }, [flatChars, isActive, isFocused, preciseMsRef]);
 
     useEffect(() => {
         if (!keepRichLayer) return;
@@ -362,19 +382,11 @@ function KaraokeTextBase({
 }
 
 const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
-    if (!prev.isFocused && !next.isFocused) {
-        return prev.words === next.words &&
-            prev.lineEndMs === next.lineEndMs &&
-            prev.nextLineStartMs === next.nextLineStartMs &&
-            prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression;
-    }
-
     return (
         prev.words === next.words &&
         prev.lineEndMs === next.lineEndMs &&
         prev.nextLineStartMs === next.nextLineStartMs &&
         prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
-        prev.currentMs === next.currentMs &&
         prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive &&
         prev.isFocused === next.isFocused

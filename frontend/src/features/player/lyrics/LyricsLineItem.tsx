@@ -1,6 +1,6 @@
 import clsx from 'clsx';
 import { motion, type Transition } from 'framer-motion';
-import type { RefObject } from 'react';
+import { memo, useEffect, useRef, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 
@@ -26,7 +26,21 @@ interface LyricsLineItemProps {
     variant?: 'side' | 'narrow';
 }
 
-export default function LyricsLineItem({
+let lyricsViewportObserver: IntersectionObserver | null = null;
+
+const getLyricsViewportObserver = () => {
+    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return null;
+
+    lyricsViewportObserver ??= new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            entry.target.toggleAttribute('data-in-lyrics-viewport', entry.isIntersecting);
+        });
+    });
+
+    return lyricsViewportObserver;
+};
+
+function LyricsLineItem({
     line,
     isActive,
     isKaraokeActive = isActive,
@@ -47,6 +61,7 @@ export default function LyricsLineItem({
     springParams,
     variant,
 }: LyricsLineItemProps) {
+    const rowRef = useRef<HTMLButtonElement | null>(null);
     const isNarrow = variant === 'narrow';
     const blurPx = isActive
         ? 0
@@ -70,8 +85,21 @@ export default function LyricsLineItem({
         if (line.time_ms === null) return;
         onSeek(line.time_ms / 1000);
     };
+    useEffect(() => {
+        const row = rowRef.current;
+        if (!row) return;
+
+        const observer = getLyricsViewportObserver();
+        if (!observer) {
+            row.setAttribute('data-in-lyrics-viewport', '');
+            return;
+        }
+
+        observer.observe(row);
+        return () => observer.unobserve(row);
+    }, []);
     const className = clsx(
-        'w-full text-left pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] py-[clamp(0.7rem,1.3vw,1.25rem)] origin-left will-change-[filter,opacity,transform]',
+        'lyrics-motion-row w-full text-left pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] py-[clamp(0.7rem,1.3vw,1.25rem)] origin-left',
         canSeek ? 'cursor-pointer' : 'cursor-default',
         isActive ? 'text-white drop-shadow-xl' : 'text-white'
     );
@@ -91,6 +119,7 @@ export default function LyricsLineItem({
     const targetScale = isActive ? 1.05 : 1;
     const content = (
         <motion.div
+            className="lyrics-line-scale-layer"
             initial={false}
             animate={fluidMotion ? { scale: targetScale } : undefined}
             transition={fluidMotion ? {
@@ -111,13 +140,11 @@ export default function LyricsLineItem({
             }
             style={fluidMotion ? {
                 transformOrigin: 'left center',
-                willChange: 'transform',
                 backfaceVisibility: 'hidden',
             } : {
                 transform: 'scale(' + targetScale + ') translateZ(0)',
                 transformOrigin: 'left center',
                 transition: 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
-                willChange: 'transform',
                 backfaceVisibility: 'hidden',
             }}
         >
@@ -169,6 +196,7 @@ export default function LyricsLineItem({
     if (fluidMotion) {
         return (
             <motion.button
+                ref={rowRef}
                 type="button"
                 onClick={handleClick}
                 disabled={!canSeek}
@@ -195,6 +223,7 @@ export default function LyricsLineItem({
 
     return (
         <button
+            ref={rowRef}
             type="button"
             onClick={handleClick}
             disabled={!canSeek}
@@ -211,3 +240,26 @@ export default function LyricsLineItem({
         </button>
     );
 }
+
+const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLineItemProps) => (
+    prev.line === next.line &&
+    prev.isActive === next.isActive &&
+    prev.isKaraokeActive === next.isKaraokeActive &&
+    prev.isUserScrolling === next.isUserScrolling &&
+    prev.pausedScroll === next.pausedScroll &&
+    prev.distanceFromActive === next.distanceFromActive &&
+    prev.interludeShift === next.interludeShift &&
+    prev.interludeShiftDurationMs === next.interludeShiftDurationMs &&
+    prev.lineEndMs === next.lineEndMs &&
+    prev.nextLineStartMs === next.nextLineStartMs &&
+    prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
+    prev.preciseMsRef === next.preciseMsRef &&
+    prev.onSeek === next.onSeek &&
+    prev.fluidMotion === next.fluidMotion &&
+    prev.targetScrollY === next.targetScrollY &&
+    prev.motionDelay === next.motionDelay &&
+    prev.springParams === next.springParams &&
+    prev.variant === next.variant
+);
+
+export default memo(LyricsLineItem, areLyricsLineItemPropsEqual);

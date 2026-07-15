@@ -194,21 +194,27 @@ export default function LyricsPanel({
         exitingInterludeIndexRef.current = exitingInterludeIndex;
     }, [exitingInterludeIndex]);
 
-    const getVisualInterludeShift = useCallback(
-        (displayIndex: number) => {
-            const rowHeight = getInterludeRowHeightPx();
+    const visualInterludeShifts = useMemo(() => {
+        const shifts = new Array<number>(displayItems.length);
+        const rowHeight = getInterludeRowHeightPx();
+        let shift = 0;
 
-            return displayItems.slice(0, displayIndex).reduce((shift, item) => {
-                if (item.type !== 'interlude') return shift;
-                const itemIndex = displayItems.indexOf(item);
-                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
-                const isOpen =
-                    itemIndex === exitingInterludeIndex ||
-                    (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
-                return isOpen ? shift : shift - rowHeight;
-            }, 0);
-        },
-        [displayItems, exitingInterludeIndex, renderCurrentMs]
+        displayItems.forEach((item, displayIndex) => {
+            shifts[displayIndex] = shift;
+            if (item.type !== 'interlude') return;
+
+            const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
+            const isOpen =
+                displayIndex === exitingInterludeIndex ||
+                (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
+            if (!isOpen) shift -= rowHeight;
+        });
+
+        return shifts;
+    }, [displayItems, exitingInterludeIndex, renderCurrentMs]);
+    const getVisualInterludeShift = useCallback(
+        (displayIndex: number) => visualInterludeShifts[displayIndex] ?? 0,
+        [visualInterludeShifts]
     );
 
     const startInterludeExit = useCallback((displayIndex: number) => {
@@ -236,6 +242,11 @@ export default function LyricsPanel({
 
         startInterludeExit(activeDisplayIndex);
     }, [activeDisplayIndex, displayItems, renderCurrentMs, startInterludeExit]);
+
+    const handleLineSeek = useCallback((time: number) => {
+        keepCurrentInterludeForExit();
+        onSeek(time);
+    }, [keepCurrentInterludeForExit, onSeek]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
@@ -447,10 +458,7 @@ export default function LyricsPanel({
                                     enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                                     currentTime={renderCurrentMs / 1000}
                                     preciseMsRef={preciseMsRef}
-                                    onSeek={(time) => {
-                                        keepCurrentInterludeForExit();
-                                        onSeek(time);
-                                    }}
+                                    onSeek={handleLineSeek}
                                     variant={variant}
                                 />
                             );

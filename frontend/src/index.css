@@ -423,6 +423,19 @@ body {
   }
 }
 
+.lyrics-motion-row,
+.lyrics-motion-row .lyrics-line-scale-layer {
+  will-change: auto;
+}
+
+.lyrics-motion-row[data-in-lyrics-viewport] {
+  will-change: filter, opacity, transform;
+}
+
+.lyrics-motion-row[data-in-lyrics-viewport] .lyrics-line-scale-layer {
+  will-change: transform;
+}
+
 /* Equalizer Animation */
 @keyframes equalizer-jump {
   0% { transform: scaleY(0.33); }
