@@ -404,25 +404,22 @@ body {
   }
 }
 
-@keyframes karaoke-rich-layer-exit {
+@keyframes karaoke-char-exit {
   from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    opacity: 0;
     transform:
-      translate3d(0, var(--karaoke-exit-correct-y, 0), 0)
-      scale(var(--karaoke-exit-inverse-scale, 1));
+      translate3d(0, var(--karaoke-char-exit-y, 0), 0)
+      scale(var(--karaoke-char-exit-scale, 1));
+  }
+
+  to {
+    transform: translate3d(0, 0, 0) scale(1);
   }
 }
 
-@keyframes karaoke-static-layer-enter {
-  from {
-    opacity: 0;
-  }
+@keyframes karaoke-glow-exit {
   to {
-    opacity: 1;
+    opacity: 0;
+    text-shadow: none;
   }
 }
 

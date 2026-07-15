@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, memo, type CSSProperties, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
@@ -205,7 +205,7 @@ function KaraokeTextBase({
         if (isFocused) return;
         const timer = window.setTimeout(() => {
             setRichLayerState(state => state.focused ? state : { ...state, visible: false });
-        }, 500);
+        }, 520);
         return () => window.clearTimeout(timer);
     }, [isFocused, keepRichLayer]);
 
@@ -215,21 +215,6 @@ function KaraokeTextBase({
             : [],
         [baseCurrentMs, flatChars, keepRichLayer]
     );
-    const exitAverages = useMemo(() => {
-        if (richStyles.length === 0) return { translateYEm: 0, scale: 1 };
-        const totals = richStyles.reduce(
-            (result, style) => ({
-                translateYEm: result.translateYEm + style.translateYEm,
-                scale: result.scale + style.scaleValue,
-            }),
-            { translateYEm: 0, scale: 0 }
-        );
-        return {
-            translateYEm: totals.translateYEm / richStyles.length,
-            scale: totals.scale / richStyles.length,
-        };
-    }, [richStyles]);
-
     const renderWordGroups = (rich: boolean) => wordGroups.map((group, wordIndex) => {
                 if (!group || group.length === 0) return null;
 
@@ -266,6 +251,10 @@ function KaraokeTextBase({
                                             style={{
                                                 position: 'relative',
                                                 zIndex: 1,
+                                                backgroundImage: 'linear-gradient(to right, currentColor, currentColor)',
+                                                WebkitBackgroundClip: 'text',
+                                                backgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent',
                                                 color: 'currentColor',
                                             }}
                                         >
@@ -277,6 +266,11 @@ function KaraokeTextBase({
 
                             const style = richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true);
                             const isExitLayer = keepRichLayer && !isFocused;
+                            const exitStyle = isExitLayer ? {
+                                animation: 'karaoke-char-exit 500ms ease-in-out both',
+                                '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
+                                '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
+                            } : undefined;
 
                             return (
                                 <span
@@ -293,6 +287,7 @@ function KaraokeTextBase({
                                         transition: 'none',
                                         backfaceVisibility: 'hidden',
                                         overflow: 'visible',
+                                        ...exitStyle,
                                     }}
                                 >
                                     <span
@@ -316,6 +311,9 @@ function KaraokeTextBase({
                                             willChange: isExitLayer ? 'auto' : 'opacity, text-shadow, mask-image',
                                             transform: 'translateZ(0)',
                                             overflow: 'visible',
+                                            animation: isExitLayer
+                                                ? 'karaoke-glow-exit 500ms ease-in-out both'
+                                                : undefined,
                                         }}
                                     >
                                         {charItem.char}
@@ -343,38 +341,18 @@ function KaraokeTextBase({
                 );
             });
 
-    const isExitLayer = keepRichLayer && !isFocused;
-    const richExitStyle = {
-        position: 'absolute',
-        inset: '0 0 auto 0',
-        display: 'block',
-        pointerEvents: 'none',
-        transformOrigin: 'left center',
-        mixBlendMode: 'plus-lighter',
-        willChange: 'transform, opacity',
-        animation: 'karaoke-rich-layer-exit 500ms ease-in-out both',
-        '--karaoke-exit-correct-y': `${(-exitAverages.translateYEm).toFixed(4)}em`,
-        '--karaoke-exit-inverse-scale': (1 / Math.max(1, exitAverages.scale)).toFixed(4),
-    } as CSSProperties;
-
     return (
-        <span style={{ position: 'relative', display: 'block', isolation: 'isolate' }}>
-            {(!keepRichLayer || isExitLayer) && (
-                <span
-                    style={isExitLayer ? {
-                        display: 'block',
-                        mixBlendMode: 'plus-lighter',
-                        animation: 'karaoke-static-layer-enter 500ms ease-in-out both',
-                    } : { display: 'block' }}
-                >
+        <span style={{ display: 'block' }}>
+            {!keepRichLayer && (
+                <span style={{ display: 'block' }}>
                     {renderWordGroups(false)}
                 </span>
             )}
 
             {keepRichLayer && (
                 <span
-                    aria-hidden={isExitLayer || undefined}
-                    style={isExitLayer ? richExitStyle : { display: 'block' }}
+                    aria-hidden={!isFocused || undefined}
+                    style={{ display: 'block' }}
                 >
                     {renderWordGroups(true)}
                 </span>
