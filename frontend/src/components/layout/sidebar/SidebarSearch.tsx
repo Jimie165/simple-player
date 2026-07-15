@@ -12,6 +12,12 @@ interface SidebarSearchProps {
 export default function SidebarSearch({ collapsed, onToggle, onSearch }: SidebarSearchProps) {
     const searchInputRef = useRef<HTMLInputElement>(null);
 
+    const submitSearch = (query: string) => {
+        const trimmedQuery = query.trim();
+        if (!trimmedQuery) return;
+        onSearch(trimmedQuery);
+    };
+
     const handleSearchClick = () => {
         if (collapsed) {
             onToggle();
@@ -24,12 +30,15 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                     input.focus();
                 }
             }, 300);
+            return;
         }
+
+        submitSearch(searchInputRef.current?.value ?? '');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter') {
-            onSearch(e.currentTarget.value);
+            submitSearch(e.currentTarget.value);
         }
     };
 
@@ -43,8 +52,11 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                 className={clsx(collapsed ? "w-12" : "w-full")} // 折叠时宽度缩小跟随搜索圆圈，居中计算就准了
             >
                 <div
-                    onClick={handleSearchClick}
-                    className="relative flex items-center w-full min-h-[48px] cursor-pointer"
+                    onClick={collapsed ? handleSearchClick : undefined}
+                    className={clsx(
+                        "relative flex items-center w-full min-h-12",
+                        collapsed && "cursor-pointer"
+                    )}
                 >
                     {/* 背景层 */}
                     <div className={clsx(
@@ -57,15 +69,23 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
 
                     {/* 内容容器 */}
                     <div className="relative z-10 flex items-center w-full">
-                        <div className={clsx(
-                            "w-12 h-12 flex items-center justify-center shrink-0",
-                            collapsed ? "" : "ml-1"
-                        )}>
+                        <button
+                            type="button"
+                            aria-label={collapsed ? "展开搜索" : "搜索"}
+                            onClick={(event) => {
+                                event.stopPropagation();
+                                handleSearchClick();
+                            }}
+                            className={clsx(
+                                "flex items-center justify-center shrink-0 rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/60",
+                                collapsed ? "w-12 h-12" : "ml-1 w-10 h-10 cursor-pointer"
+                            )}
+                        >
                             <MdSearch className={clsx(
                                 "text-[24px] transition-colors",
                                 collapsed ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-500"
                             )} />
-                        </div>
+                        </button>
 
                         {/* 输入框 */}
                         <input
