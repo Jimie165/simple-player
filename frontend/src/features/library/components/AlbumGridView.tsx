@@ -32,9 +32,10 @@ interface AlbumGridViewProps {
     onOpenArtist?: (artistName: string) => void; // Add handler for Artist navigation
     onDeleteAlbum?: (album: AlbumData) => void;
     hideArtist?: boolean; // New prop: hide artist context
+    hideYear?: boolean;
 }
 
-export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false }: AlbumGridViewProps) {
+export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false, hideYear = false }: AlbumGridViewProps) {
     const mainContentWidth = useMainContentWidth();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
@@ -166,13 +167,13 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                             </div>
 
                             <div className="flex flex-col gap-0.5 px-1">
-                                <CustomTooltip text={album.name} className="block min-w-0">
+                                <CustomTooltip text={album.name} className="inline-block w-fit max-w-full min-w-0 align-top">
                                     <span className="block truncate text-base font-semibold text-neutral-900 dark:text-neutral-50">
                                         {album.name}
                                     </span>
                                 </CustomTooltip>
                                 {!hideArtist && (
-                                    <CustomTooltip text={album.artist} className="block min-w-0">
+                                    <CustomTooltip text={album.artist} className="inline-block w-fit max-w-full min-w-0 align-top">
                                         <span
                                             className={clsx(
                                                 "block truncate text-sm text-neutral-500 dark:text-neutral-400",
@@ -189,9 +190,11 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                         </span>
                                     </CustomTooltip>
                                 )}
-                                <span className="truncate text-xs text-neutral-400 dark:text-neutral-500">
-                                    {album.songs[0]?.year || "Unknown Year"}
-                                </span>
+                                {!hideYear && (
+                                    <span className="truncate text-xs text-neutral-400 dark:text-neutral-500">
+                                        {album.songs[0]?.year || "Unknown Year"}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     );

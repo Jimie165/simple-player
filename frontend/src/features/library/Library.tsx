@@ -305,6 +305,7 @@ export default function Library() {
                             >
                                 <AlbumGridView
                                     albums={albums}
+                                    hideYear={true}
                                     onPlayAlbum={(album) => {
                                         addToRecent({
                                             id: getAlbumMusicItemId(album.name, album.artist),

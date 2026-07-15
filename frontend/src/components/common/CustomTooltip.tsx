@@ -12,6 +12,9 @@ interface CustomTooltipProps {
     className?: string;
 }
 
+const VIEWPORT_MARGIN = 12;
+const TOOLTIP_EDGE_PADDING = 12;
+
 export default function CustomTooltip({
     text,
     children,
@@ -22,8 +25,9 @@ export default function CustomTooltip({
 }: CustomTooltipProps) {
     const [isVisible, setIsVisible] = useState(false);
     const [isRendered, setIsRendered] = useState(false);
-    const [coords, setCoords] = useState({ top: 0, left: 0 });
+    const [coords, setCoords] = useState({ top: 0, left: 0, arrowOffset: 0 });
     const triggerRef = useRef<HTMLDivElement>(null);
+    const tooltipRef = useRef<HTMLDivElement>(null);
 
     // 计算弹窗位置
     const updatePosition = useCallback(() => {
@@ -32,6 +36,7 @@ export default function CustomTooltip({
 
         let top = 0;
         let left = 0;
+        let arrowOffset = 0;
 
         // 留出一定的间距，基础配置
         const offset = 8;
@@ -47,8 +52,46 @@ export default function CustomTooltip({
             left = rect.left + rect.width / 2;
         }
 
-        setCoords({ top, left });
+        const tooltip = tooltipRef.current;
+
+        if (tooltip && (placement === 'top' || placement === 'bottom')) {
+            const halfWidth = tooltip.offsetWidth / 2;
+            const minLeft = VIEWPORT_MARGIN + halfWidth;
+            const maxLeft = window.innerWidth - VIEWPORT_MARGIN - halfWidth;
+            const centeredLeft = left;
+
+            left = maxLeft < minLeft
+                ? window.innerWidth / 2
+                : Math.min(Math.max(centeredLeft, minLeft), maxLeft);
+
+            const maxArrowOffset = Math.max(0, halfWidth - TOOLTIP_EDGE_PADDING);
+            arrowOffset = Math.min(
+                Math.max(centeredLeft - left, -maxArrowOffset),
+                maxArrowOffset
+            );
+        } else if (tooltip && placement === 'right') {
+            const halfHeight = tooltip.offsetHeight / 2;
+            const minTop = VIEWPORT_MARGIN + halfHeight;
+            const maxTop = window.innerHeight - VIEWPORT_MARGIN - halfHeight;
+            const centeredTop = top;
+
+            top = maxTop < minTop
+                ? window.innerHeight / 2
+                : Math.min(Math.max(centeredTop, minTop), maxTop);
+
+            const maxArrowOffset = Math.max(0, halfHeight - TOOLTIP_EDGE_PADDING);
+            arrowOffset = Math.min(
+                Math.max(centeredTop - top, -maxArrowOffset),
+                maxArrowOffset
+            );
+        }
+
+        setCoords({ top, left, arrowOffset });
     }, [placement]);
+    const setTooltipElement = useCallback((element: HTMLDivElement | null) => {
+        tooltipRef.current = element;
+        if (element) requestAnimationFrame(updatePosition);
+    }, [updatePosition]);
     const hoverTimeoutRef = useRef<number | null>(null);
     const leaveTimeoutRef = useRef<number | null>(null);
 
@@ -152,10 +195,12 @@ export default function CustomTooltip({
 
             {shouldRender && createPortal(
                 <div
+                    key={text}
+                    ref={setTooltipElement}
                     className={clsx(
                         "fixed z-99999 px-2.5 py-1.5 pointer-events-none",
                         "bg-primary/90 text-on-primary backdrop-blur-sm",
-                        "text-xs font-medium rounded-md shadow-sm whitespace-nowrap",
+                        "text-xs font-medium leading-relaxed text-center rounded-md shadow-sm whitespace-normal",
                         // 定位基准点变换
                         placement === 'top' && "-translate-x-1/2 -translate-y-full origin-bottom",
                         placement === 'right' && "-translate-y-1/2 origin-left",
@@ -168,19 +213,31 @@ export default function CustomTooltip({
                     style={{
                         top: coords.top,
                         left: coords.left,
+                        width: 'max-content',
+                        maxWidth: 'min(30rem, calc(100vw - 24px))',
+                        overflowWrap: 'anywhere',
                     }}
                 >
                     {text}
 
                     {/* 小三角箭头 */}
                     {placement === 'top' && (
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-primary/90" />
+                        <div
+                            className="absolute top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-primary/90"
+                            style={{ left: `calc(50% + ${coords.arrowOffset}px)` }}
+                        />
                     )}
                     {placement === 'right' && (
-                        <div className="absolute right-full top-1/2 -translate-y-1/2 -mr-px border-4 border-transparent border-r-primary/90" />
+                        <div
+                            className="absolute right-full -translate-y-1/2 -mr-px border-4 border-transparent border-r-primary/90"
+                            style={{ top: `calc(50% + ${coords.arrowOffset}px)` }}
+                        />
                     )}
                     {placement === 'bottom' && (
-                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-px border-4 border-transparent border-b-primary/90" />
+                        <div
+                            className="absolute bottom-full -translate-x-1/2 -mb-px border-4 border-transparent border-b-primary/90"
+                            style={{ left: `calc(50% + ${coords.arrowOffset}px)` }}
+                        />
                     )}
                 </div>,
                 document.body

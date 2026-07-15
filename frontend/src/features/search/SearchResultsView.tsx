@@ -250,6 +250,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                             </h2>
                             <AlbumGridView
                                 albums={matchingAlbums}
+                                hideYear={true}
                                 onPlayAlbum={(album) => {
                                     if (album.songs.length > 0) {
                                         playSong({ song: album.songs[0], index: 0, playlist: album.songs });
