@@ -12,11 +12,9 @@ const BREATH_SCALE_CENTER = 0.93;
 const BREATH_SCALE_AMPLITUDE = 0.11;
 const EXIT_GROWTH_DURATION_MS = 420;
 const EXIT_OPACITY_WINDOW_MS = 250;
-const EXIT_PHASE_MIN = 0.04;
-const EXIT_PHASE_MAX = 0.22;
+const EXIT_PHASE_MIN = 0.02;
+const EXIT_PHASE_MAX = 0.08;
 const EXIT_SCALE_MAX = 1.12;
-const EXIT_VELOCITY_MATCH_MIN = 0.1;
-const EXIT_VELOCITY_MATCH_MAX = 0.24;
 const FORCED_EXIT_DURATION_MS = 250;
 
 const clamp = (value: number, min: number, max: number) =>
@@ -29,31 +27,6 @@ const easeOutExpo = (value: number) =>
 const easeOutSine = (value: number) =>
     Math.sin(clamp01(value) * Math.PI / 2);
 const easeInCubic = (value: number) => value ** 3;
-
-const smoothstep = (value: number) => {
-    const clampedValue = clamp01(value);
-    return clampedValue ** 2 * (3 - 2 * clampedValue);
-};
-
-const getQuinticHermiteProgress = (
-    progress: number,
-    initialVelocity: number,
-    initialAcceleration: number
-) => {
-    const time = clamp01(progress);
-    const time2 = time ** 2;
-    const time3 = time ** 3;
-    const time4 = time ** 4;
-    const time5 = time ** 5;
-
-    return clamp01(
-        10 * time3 - 15 * time4 + 6 * time5 +
-        initialVelocity *
-            (time - 6 * time3 + 8 * time4 - 3 * time5) +
-        initialAcceleration *
-            (time2 / 2 - 1.5 * time3 + 1.5 * time4 - time5 / 2)
-    );
-};
 
 interface InterludeItemProps {
     isActive: boolean;
@@ -147,25 +120,14 @@ export default function InterludeItem({
             breatheDurationMs = candidateBreatheDurationMs;
         }
 
-        const getBreathState = (durationMs: number) => {
+        const getBreathScale = (durationMs: number) => {
             const angle =
                 1.5 * Math.PI - (durationMs / breatheDurationMs) * 2;
 
-            return {
-                scale:
-                    BREATH_SCALE_CENTER +
-                    BREATH_SCALE_AMPLITUDE * Math.sin(angle),
-                velocity:
-                    -BREATH_SCALE_AMPLITUDE *
-                    Math.cos(angle) *
-                    2 /
-                    breatheDurationMs,
-                acceleration:
-                    -BREATH_SCALE_AMPLITUDE *
-                    Math.sin(angle) *
-                    4 /
-                    breatheDurationMs ** 2,
-            };
+            return (
+                BREATH_SCALE_CENTER +
+                BREATH_SCALE_AMPLITUDE * Math.sin(angle)
+            );
         };
         const dotsVisibleStartDurationMs = interludeGapOpenDurationMs;
         const dotsWhiteningDurationMs = Math.max(
@@ -176,22 +138,8 @@ export default function InterludeItem({
             1,
             exitPeakDurationMs - exitStartDurationMs
         );
-        const exitStartState = getBreathState(exitStartDurationMs);
-        const exitStartScale =
-            exitStartState.scale;
+        const exitStartScale = getBreathScale(exitStartDurationMs);
         const exitScaleDistance = EXIT_SCALE_MAX - exitStartScale;
-        const initialNormalizedVelocity = exitScaleDistance > 0
-            ? exitStartState.velocity * exitMotionDurationMs /
-                exitScaleDistance
-            : 0;
-        const initialNormalizedAcceleration = exitScaleDistance > 0
-            ? exitStartState.acceleration * exitMotionDurationMs ** 2 /
-                exitScaleDistance
-            : 0;
-        const velocityMatchWeight = smoothstep(
-            (initialNormalizedVelocity - EXIT_VELOCITY_MATCH_MIN) /
-            (EXIT_VELOCITY_MATCH_MAX - EXIT_VELOCITY_MATCH_MIN)
-        );
         let frame: number;
 
         const tick = () => {
@@ -222,17 +170,7 @@ export default function InterludeItem({
                 const exitProgress = clamp01(
                     exitElapsedMs / exitMotionDurationMs
                 );
-                const sineExitProgress = easeOutSine(exitProgress);
-                const velocityMatchedExitProgress =
-                    getQuinticHermiteProgress(
-                        exitProgress,
-                        initialNormalizedVelocity,
-                        initialNormalizedAcceleration
-                    );
-                const easedExitProgress =
-                    sineExitProgress +
-                    (velocityMatchedExitProgress - sineExitProgress) *
-                    velocityMatchWeight;
+                const easedExitProgress = easeOutSine(exitProgress);
 
                 scale =
                     exitStartScale +
