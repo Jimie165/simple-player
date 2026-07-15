@@ -139,7 +139,7 @@ export default function LyricsLineItem({
                         lineEndMs={lineEndMs}
                         nextLineStartMs={nextLineStartMs}
                         enableTightHandoffTailCompression={enableTightHandoffTailCompression}
-                        currentMs={isKaraokeActive ? currentMs : 0}
+                        currentMs={currentMs}
                         preciseMsRef={preciseMsRef}
                         isActive={isKaraokeActive}
                         isFocused={isActive}

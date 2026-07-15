@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, memo, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, memo, type CSSProperties, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
@@ -21,6 +21,8 @@ type IndexedCharItem = {
 
 type KaraokeCharStyle = {
     transform: string;
+    translateYEm: number;
+    scaleValue: number;
     willChange: string;
     fillBackgroundImage: string;
     glowMask: string;
@@ -112,6 +114,8 @@ function getKaraokeCharStyle(
 
     return {
         transform: `translate3d(0, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
+        translateYEm: translateY,
+        scaleValue: scale,
         willChange: 'transform',
         fillBackgroundImage,
         glowMask,
@@ -133,6 +137,17 @@ function KaraokeTextBase({
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const [richLayerState, setRichLayerState] = useState({
+        focused: isFocused,
+        visible: isFocused,
+    });
+    if (richLayerState.focused !== isFocused) {
+        setRichLayerState({
+            focused: isFocused,
+            visible: isFocused || richLayerState.visible,
+        });
+    }
+    const keepRichLayer = richLayerState.visible;
 
     const flatChars = useMemo(
         () => parseLyricsWordsToChars(words, lineEndMs, {
@@ -185,9 +200,37 @@ function KaraokeTextBase({
         return () => cancelAnimationFrame(frame);
     }, [flatChars, isActive, isFocused, preciseMsRef, wordGroups]);
 
-    return (
-        <>
-            {wordGroups.map((group, wordIndex) => {
+    useEffect(() => {
+        if (!keepRichLayer) return;
+        if (isFocused) return;
+        const timer = window.setTimeout(() => {
+            setRichLayerState(state => state.focused ? state : { ...state, visible: false });
+        }, 500);
+        return () => window.clearTimeout(timer);
+    }, [isFocused, keepRichLayer]);
+
+    const richStyles = useMemo(
+        () => keepRichLayer
+            ? flatChars.map(charItem => getKaraokeCharStyle(charItem, baseCurrentMs, true))
+            : [],
+        [baseCurrentMs, flatChars, keepRichLayer]
+    );
+    const exitAverages = useMemo(() => {
+        if (richStyles.length === 0) return { translateYEm: 0, scale: 1 };
+        const totals = richStyles.reduce(
+            (result, style) => ({
+                translateYEm: result.translateYEm + style.translateYEm,
+                scale: result.scale + style.scaleValue,
+            }),
+            { translateYEm: 0, scale: 0 }
+        );
+        return {
+            translateYEm: totals.translateYEm / richStyles.length,
+            scale: totals.scale / richStyles.length,
+        };
+    }, [richStyles]);
+
+    const renderWordGroups = (rich: boolean) => wordGroups.map((group, wordIndex) => {
                 if (!group || group.length === 0) return null;
 
                 return (
@@ -204,7 +247,7 @@ function KaraokeTextBase({
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
-                            if (!isFocused) {
+                            if (!rich) {
                                 return (
                                     <span
                                         key={charItem.charIndexInWord}
@@ -212,9 +255,9 @@ function KaraokeTextBase({
                                             position: 'relative',
                                             display: 'inline-block',
                                             whiteSpace: 'pre-wrap',
-                                            transform: 'translate3d(0, 0, 0) scale(1)',
+                                            transform: 'none',
                                             willChange: 'auto',
-                                            transition: 'transform 500ms ease-in-out',
+                                            transition: 'none',
                                             backfaceVisibility: 'hidden',
                                             overflow: 'visible',
                                         }}
@@ -232,7 +275,8 @@ function KaraokeTextBase({
                                 );
                             }
 
-                            const style = getKaraokeCharStyle(charItem, baseCurrentMs, isActive);
+                            const style = richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true);
+                            const isExitLayer = keepRichLayer && !isFocused;
 
                             return (
                                 <span
@@ -245,7 +289,7 @@ function KaraokeTextBase({
                                         display: 'inline-block',
                                         whiteSpace: 'pre-wrap',
                                         transform: style.transform,
-                                        willChange: style.willChange,
+                                        willChange: isExitLayer ? 'auto' : style.willChange,
                                         transition: 'none',
                                         backfaceVisibility: 'hidden',
                                         overflow: 'visible',
@@ -269,7 +313,7 @@ function KaraokeTextBase({
                                             WebkitMaskImage: style.glowMask,
                                             opacity: style.glowOpacity,
                                             textShadow: style.glowShadow,
-                                            willChange: 'opacity, text-shadow, mask-image',
+                                            willChange: isExitLayer ? 'auto' : 'opacity, text-shadow, mask-image',
                                             transform: 'translateZ(0)',
                                             overflow: 'visible',
                                         }}
@@ -297,8 +341,45 @@ function KaraokeTextBase({
                         })}
                     </span>
                 );
-            })}
-        </>
+            });
+
+    const isExitLayer = keepRichLayer && !isFocused;
+    const richExitStyle = {
+        position: 'absolute',
+        inset: '0 0 auto 0',
+        display: 'block',
+        pointerEvents: 'none',
+        transformOrigin: 'left center',
+        mixBlendMode: 'plus-lighter',
+        willChange: 'transform, opacity',
+        animation: 'karaoke-rich-layer-exit 500ms ease-in-out both',
+        '--karaoke-exit-correct-y': `${(-exitAverages.translateYEm).toFixed(4)}em`,
+        '--karaoke-exit-inverse-scale': (1 / Math.max(1, exitAverages.scale)).toFixed(4),
+    } as CSSProperties;
+
+    return (
+        <span style={{ position: 'relative', display: 'block', isolation: 'isolate' }}>
+            {(!keepRichLayer || isExitLayer) && (
+                <span
+                    style={isExitLayer ? {
+                        display: 'block',
+                        mixBlendMode: 'plus-lighter',
+                        animation: 'karaoke-static-layer-enter 500ms ease-in-out both',
+                    } : { display: 'block' }}
+                >
+                    {renderWordGroups(false)}
+                </span>
+            )}
+
+            {keepRichLayer && (
+                <span
+                    aria-hidden={isExitLayer || undefined}
+                    style={isExitLayer ? richExitStyle : { display: 'block' }}
+                >
+                    {renderWordGroups(true)}
+                </span>
+            )}
+        </span>
     );
 }
 
