@@ -30,6 +30,8 @@ type KaraokeCharStyle = {
     glowShadow: string;
 };
 
+const karaokeExitDurationMs = 500;
+
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
     const x = clamp01(value);
@@ -140,11 +142,13 @@ function KaraokeTextBase({
     const [richLayerState, setRichLayerState] = useState({
         focused: isFocused,
         visible: isFocused,
+        settling: false,
     });
     if (richLayerState.focused !== isFocused) {
         setRichLayerState({
             focused: isFocused,
             visible: isFocused || richLayerState.visible,
+            settling: false,
         });
     }
     const keepRichLayer = richLayerState.visible;
@@ -223,10 +227,29 @@ function KaraokeTextBase({
     useEffect(() => {
         if (!keepRichLayer) return;
         if (isFocused) return;
+
+        let settleFrame = 0;
+        let releaseFrame = 0;
         const timer = window.setTimeout(() => {
-            setRichLayerState(state => state.focused ? state : { ...state, visible: false });
-        }, 520);
-        return () => window.clearTimeout(timer);
+            setRichLayerState(state => state.focused ? state : { ...state, settling: true });
+
+            // Let the same glyphs paint without their character transforms before
+            // replacing the rich layer, so Chromium does not swap rasterization
+            // modes on the same frame as the visible exit animation.
+            settleFrame = requestAnimationFrame(() => {
+                releaseFrame = requestAnimationFrame(() => {
+                    setRichLayerState(state => state.focused
+                        ? state
+                        : { ...state, visible: false, settling: false });
+                });
+            });
+        }, karaokeExitDurationMs);
+
+        return () => {
+            window.clearTimeout(timer);
+            cancelAnimationFrame(settleFrame);
+            cancelAnimationFrame(releaseFrame);
+        };
     }, [isFocused, keepRichLayer]);
 
     const richStyles = useMemo(
@@ -285,11 +308,15 @@ function KaraokeTextBase({
                             }
 
                             const style = richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true);
-                            const isExitLayer = keepRichLayer && !isFocused;
+                            const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
+                            const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
                             const exitStyle = isExitLayer ? {
-                                animation: 'karaoke-char-exit 500ms ease-in-out both',
+                                animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
                                 '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
                                 '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
+                            } : isSettlingLayer ? {
+                                animation: 'none',
+                                transform: 'none',
                             } : undefined;
 
                             return (
@@ -303,7 +330,7 @@ function KaraokeTextBase({
                                         display: 'inline-block',
                                         whiteSpace: 'pre-wrap',
                                         transform: style.transform,
-                                        willChange: isExitLayer ? 'auto' : style.willChange,
+                                        willChange: isSettlingLayer ? 'auto' : style.willChange,
                                         transition: 'none',
                                         backfaceVisibility: 'hidden',
                                         overflow: 'visible',
@@ -328,12 +355,18 @@ function KaraokeTextBase({
                                             WebkitMaskImage: style.glowMask,
                                             opacity: style.glowOpacity,
                                             textShadow: style.glowShadow,
-                                            willChange: isExitLayer ? 'auto' : 'opacity, text-shadow, mask-image',
+                                            willChange: isSettlingLayer
+                                                ? 'auto'
+                                                : 'opacity, text-shadow, mask-image',
                                             transform: 'translateZ(0)',
                                             overflow: 'visible',
                                             animation: isExitLayer
-                                                ? 'karaoke-glow-exit 500ms ease-in-out both'
+                                                ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
                                                 : undefined,
+                                            ...(isSettlingLayer ? {
+                                                opacity: 0,
+                                                textShadow: 'none',
+                                            } : undefined),
                                         }}
                                     >
                                         {charItem.char}
