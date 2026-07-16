@@ -1,44 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
-import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLyricsSync } from '@/hooks/useLyricsSync';
+import { useFluidLyricsInterlude } from '@/features/player/lyrics/useFluidLyricsInterlude';
+import { useFluidLyricsLayout } from '@/features/player/lyrics/useFluidLyricsLayout';
+import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 import {
-    interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
-    sideLyricsFocusAlpha,
-    topInsetPx,
 } from '@/features/player/lyrics/constants';
-import InterludeItem from '@/features/player/lyrics/InterludeItem';
+import { getFluidLyricsMotionDelays, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
 import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
+import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
+import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
+import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
-import {
-    buildDisplayItems,
-    getActiveDisplayIndex,
-    getLineEndMsByIndex,
-} from '@/features/player/lyrics/lyricsDisplay';
-import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
-import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
+import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 
 const sideScrollMaskStyle = {
-    maskImage:
-        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
-    WebkitMaskImage:
-        'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
+    maskImage: 'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
 };
 
 const narrowScrollMaskStyle = {
-    maskImage:
-        'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
-    WebkitMaskImage:
-        'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
+    maskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
-
-const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
-const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
-const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function FluidLyricsPanel({
     isOpen,
@@ -48,7 +37,7 @@ export default function FluidLyricsPanel({
     currentTime,
     onSeek,
     onUserScrollDirection,
-    variant,
+    variant = 'side',
     timingStrategy,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
@@ -60,29 +49,12 @@ export default function FluidLyricsPanel({
         enabled: isOpen,
         hasTimestamps,
     });
-
-    const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-    const contentRef = useRef<HTMLDivElement | null>(null);
-    const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
-    const viewportSizeRef = useRef<{ width: number; height: number }>({ width: 0, height: 0 });
-    const contentHeightRef = useRef(0);
     const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-    const interludeExitTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-    const previousPlaybackMsRef = useRef(currentTime * 1000);
-    const exitingInterludeIndexRef = useRef<number | null>(null);
     const previousTargetYRef = useRef(0);
     const pausedScrollRef = useRef(false);
     const firstPositionDoneRef = useRef(false);
-
-    const [topSpacerHeight, setTopSpacerHeight] = useState(0);
-    const [bottomSpacerHeight, setBottomSpacerHeight] = useState(0);
-    const [layoutVersion, setLayoutVersion] = useState(0);
-    const [targetScrollY, setTargetScrollY] = useState(0);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
-    const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
-    const [interludeExitKey, setInterludeExitKey] = useState(0);
-    const [playbackSyncKey, setPlaybackSyncKey] = useState(0);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -91,8 +63,6 @@ export default function FluidLyricsPanel({
         if (!lines.length) return '暂无歌词';
         return null;
     }, [status, lines.length]);
-
-    const enableTightHandoffTailCompression = timingStrategy?.compressTightHandoffTail ?? false;
     const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
     const displayItems = useMemo(
         () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
@@ -102,16 +72,16 @@ export default function FluidLyricsPanel({
         () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000, timingStrategy),
         [currentLyricIndex, displayItems, lines, renderCurrentMs, timingStrategy]
     );
-
-    useEffect(() => {
-        exitingInterludeIndexRef.current = exitingInterludeIndex;
-    }, [exitingInterludeIndex]);
-
-    const maxScrollY = useCallback(() => {
-        const viewportHeight = viewportSizeRef.current.height;
-        return Math.max(0, contentHeightRef.current - viewportHeight);
-    }, []);
-
+    const {
+        exitingInterludeIndex,
+        interludeExitKey,
+        keepCurrentInterludeForExit,
+        playbackSyncKey,
+    } = useFluidLyricsInterlude({
+        activeDisplayIndex,
+        displayItems,
+        currentMs: renderCurrentMs,
+    });
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
         const rowHeight = getInterludeRowHeightPx();
@@ -120,134 +90,80 @@ export default function FluidLyricsPanel({
         displayItems.forEach((item, displayIndex) => {
             shifts[displayIndex] = shift;
             if (item.type !== 'interlude') return;
-
             const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
             const isOpenInterlude =
                 displayIndex === exitingInterludeIndex ||
                 (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
             if (!isOpenInterlude) shift -= rowHeight;
         });
-
         return shifts;
     }, [displayItems, exitingInterludeIndex, renderCurrentMs]);
-    const getVisualInterludeShift = useCallback(
-        (displayIndex: number) => visualInterludeShifts[displayIndex] ?? 0,
-        [visualInterludeShifts]
-    );
+    const activeItem = displayItems[activeDisplayIndex];
+    const {
+        activeTargetScrollY,
+        contentHeight,
+        itemTops,
+        observeItem,
+        scrollAreaRef,
+        setTargetScrollY,
+        targetScrollY,
+        visibleIndices,
+    } = useFluidLyricsLayout({
+        activeDisplayIndex,
+        activeFocusOffset: activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0,
+        displayItems,
+        includeActiveWindow: !isUserScrolling,
+        interludeRowHeight: getInterludeRowHeightPx(),
+        variant,
+        visualShifts: visualInterludeShifts,
+    });
 
-    const calculateAutoTargetY = useCallback(() => {
-        const viewportHeight = viewportSizeRef.current.height;
-        const activeEl = itemRefs.current[activeDisplayIndex];
-        if (!activeEl || viewportHeight <= 0) return 0;
-
-        const activeItem = displayItems[activeDisplayIndex];
-        const visualShift = getVisualInterludeShift(activeDisplayIndex);
-        const interludeFocusOffset = activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0;
-        const itemCenter = activeEl.offsetTop + activeEl.offsetHeight / 2 + visualShift + interludeFocusOffset;
-
-        const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
-        return clamp(Math.round(itemCenter - viewportHeight * alpha), 0, maxScrollY());
-    }, [activeDisplayIndex, displayItems, getVisualInterludeShift, maxScrollY, variant]);
-
-    const setTargetWithDirection = useCallback((nextTarget: number) => {
-        const clamped = clamp(nextTarget, 0, maxScrollY());
-        previousTargetYRef.current = clamped;
-        setTargetScrollY(clamped);
-    }, [maxScrollY]);
-
-    useEffect(() => {
-        const el = scrollAreaRef.current;
-        if (!el) return;
-
-        const update = () => {
-            const width = el.clientWidth;
-            const height = el.clientHeight;
-            const nextContentHeight = contentRef.current?.scrollHeight ?? 0;
-            const previous = viewportSizeRef.current;
-
-            viewportSizeRef.current = { width, height };
-            contentHeightRef.current = nextContentHeight;
-
-            const alpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
-            setTopSpacerHeight(height * alpha);
-            setBottomSpacerHeight(
-                variant === 'narrow'
-                    ? Math.max(0, height * (1 - alpha) - NARROW_LYRICS_END_STOP_OFFSET)
-                    : height * (1 - alpha)
-            );
-
-            if (previous.width !== width || previous.height !== height) {
-                setLayoutVersion(version => version + 1);
-            }
-        };
-
-        update();
-        const resizeObserver = new ResizeObserver(update);
-        resizeObserver.observe(el);
-        if (contentRef.current) resizeObserver.observe(contentRef.current);
-
-        return () => resizeObserver.disconnect();
-    }, [displayItems, variant]);
+    const updateTargetScrollY = useCallback((value: number, retainPrevious = true) => {
+        const nextTarget = setTargetScrollY(value, retainPrevious);
+        previousTargetYRef.current = nextTarget;
+    }, [setTargetScrollY]);
 
     useEffect(() => {
         firstPositionDoneRef.current = false;
         pausedScrollRef.current = false;
         previousTargetYRef.current = 0;
-
         const frame = requestAnimationFrame(() => {
             setPausedScroll(false);
             setIsUserScrolling(false);
-            setTargetScrollY(0);
+            updateTargetScrollY(0, false);
         });
-
         return () => cancelAnimationFrame(frame);
-    }, [isOpen, lines]);
+    }, [isOpen, lines, updateTargetScrollY]);
 
     useEffect(() => {
-        if (isPlaying) {
-            pausedScrollRef.current = false;
-            const frame = requestAnimationFrame(() => setPausedScroll(false));
-            return () => cancelAnimationFrame(frame);
-        }
+        if (!isPlaying) return;
+        pausedScrollRef.current = false;
+        const frame = requestAnimationFrame(() => setPausedScroll(false));
+        return () => cancelAnimationFrame(frame);
     }, [isPlaying]);
 
     useEffect(() => {
-        if (!isOpen || displayState) return;
-        if (isUserScrolling) return;
+        if (!isOpen || displayState || isUserScrolling) return;
         if (!isPlaying && firstPositionDoneRef.current) return;
-
-        const raf = requestAnimationFrame(() => {
-            setTargetWithDirection(calculateAutoTargetY());
+        const frame = requestAnimationFrame(() => {
+            updateTargetScrollY(activeTargetScrollY);
             firstPositionDoneRef.current = true;
         });
-
-        return () => cancelAnimationFrame(raf);
-    }, [
-        activeDisplayIndex,
-        calculateAutoTargetY,
-        displayState,
-        isOpen,
-        isPlaying,
-        isUserScrolling,
-        layoutVersion,
-        renderCurrentMs,
-        setTargetWithDirection,
-    ]);
+        return () => cancelAnimationFrame(frame);
+    }, [activeTargetScrollY, displayState, isOpen, isPlaying, isUserScrolling, updateTargetScrollY]);
 
     const scheduleResumeFollow = useCallback(() => {
-        if (resumeTimeoutRef.current) {
-            clearTimeout(resumeTimeoutRef.current);
-        }
-        resumeTimeoutRef.current = setTimeout(() => {
+        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+        resumeTimeoutRef.current = window.setTimeout(() => {
             setIsUserScrolling(false);
             if (!isPlaying) {
                 pausedScrollRef.current = true;
                 setPausedScroll(true);
                 return;
             }
-            setTargetWithDirection(calculateAutoTargetY());
+            updateTargetScrollY(activeTargetScrollY);
         }, manualResumeFollowDelayMs);
-    }, [calculateAutoTargetY, isPlaying, setTargetWithDirection]);
+    }, [activeTargetScrollY, isPlaying, updateTargetScrollY]);
 
     const handleManualDelta = useCallback((deltaY: number) => {
         if (deltaY !== 0) onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
@@ -256,184 +172,41 @@ export default function FluidLyricsPanel({
             pausedScrollRef.current = true;
             setPausedScroll(true);
         }
-        setTargetWithDirection(previousTargetYRef.current + deltaY);
+        updateTargetScrollY(previousTargetYRef.current + deltaY);
         scheduleResumeFollow();
-    }, [isPlaying, onUserScrollDirection, scheduleResumeFollow, setTargetWithDirection]);
+    }, [isPlaying, onUserScrollDirection, scheduleResumeFollow, updateTargetScrollY]);
 
-    const handleWheel = useCallback((event: WheelEvent<HTMLDivElement>) => {
-        event.preventDefault();
-        handleManualDelta(event.deltaY);
-    }, [handleManualDelta]);
-
-    const handlePan = useCallback((_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-        handleManualDelta(-info.delta.y);
-    }, [handleManualDelta]);
-
-    useEffect(() => {
-        return () => {
-            if (resumeTimeoutRef.current) {
-                clearTimeout(resumeTimeoutRef.current);
-            }
-            if (interludeExitTimeoutRef.current) {
-                clearTimeout(interludeExitTimeoutRef.current);
-            }
-        };
+    useEffect(() => () => {
+        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
     }, []);
-
-    const startInterludeExit = useCallback((displayIndex: number) => {
-        if (displayItems[displayIndex]?.type !== 'interlude') return;
-        if (exitingInterludeIndexRef.current === displayIndex) return;
-
-        if (interludeExitTimeoutRef.current) {
-            clearTimeout(interludeExitTimeoutRef.current);
-        }
-
-        exitingInterludeIndexRef.current = displayIndex;
-        setExitingInterludeIndex(displayIndex);
-        setInterludeExitKey(key => key + 1);
-        interludeExitTimeoutRef.current = window.setTimeout(() => {
-            exitingInterludeIndexRef.current = null;
-            setExitingInterludeIndex(null);
-            interludeExitTimeoutRef.current = null;
-        }, interludeExitCollapseDelayMs);
-    }, [displayItems]);
-
-    const keepCurrentInterludeForExit = useCallback(() => {
-        const activeItem = displayItems[activeDisplayIndex];
-        if (activeItem?.type !== 'interlude') return;
-        if (renderCurrentMs < activeItem.startMs + interludeGapOpenDurationMs) return;
-
-        startInterludeExit(activeDisplayIndex);
-    }, [activeDisplayIndex, displayItems, renderCurrentMs, startInterludeExit]);
 
     const handleLineSeek = useCallback((time: number) => {
         keepCurrentInterludeForExit();
         setIsUserScrolling(false);
         onSeek(time);
     }, [keepCurrentInterludeForExit, onSeek]);
-
-    useEffect(() => {
-        const previousMs = previousPlaybackMsRef.current;
-        const currentMs = renderCurrentMs;
-        previousPlaybackMsRef.current = currentMs;
-
-        if (Math.abs(currentMs - previousMs) < 900) return;
-
-        const findInterludeAt = (ms: number) => displayItems.findIndex((item) =>
-            item.type === 'interlude' &&
-            ms >= item.startMs &&
-            ms < item.endMs
-        );
-        const previousActiveInterludeIndex = findInterludeAt(previousMs);
-        const currentActiveInterludeIndex = findInterludeAt(currentMs);
-
-        if (
-            previousActiveInterludeIndex >= 0 &&
-            previousActiveInterludeIndex === currentActiveInterludeIndex
-        ) {
-            return;
-        }
-
-        const syncFrame = requestAnimationFrame(() => {
-            setPlaybackSyncKey(key => key + 1);
-        });
-
-        const previousInterludeIndex = displayItems.findIndex((item) =>
-            item.type === 'interlude' &&
-            previousMs >= item.startMs + interludeGapOpenDurationMs &&
-            previousMs < item.endMs - interludeNextLineFocusLeadMs
-        );
-
-        if (previousInterludeIndex < 0) return () => cancelAnimationFrame(syncFrame);
-
-        const previousInterlude = displayItems[previousInterludeIndex] as Extract<DisplayItem, { type: 'interlude' }>;
-        const stillInSameInterlude =
-            currentMs >= previousInterlude.startMs &&
-            currentMs < previousInterlude.endMs;
-
-        if (!stillInSameInterlude) {
-            startInterludeExit(previousInterludeIndex);
-        }
-
-        return () => cancelAnimationFrame(syncFrame);
-    }, [displayItems, renderCurrentMs, startInterludeExit]);
-
-    const dynamicSpringParams = useMemo(() => {
-        if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
-            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
-        }
-
-        const currentItem = displayItems[activeDisplayIndex];
-        const prevItem = displayItems[activeDisplayIndex - 1];
-        const currentStartMs = currentItem.type === 'line' ? (currentItem.line.time_ms ?? 0) : currentItem.startMs;
-        const prevStartMs = prevItem.type === 'line' ? (prevItem.line.time_ms ?? 0) : prevItem.startMs;
-
-        const isInterludeTransition = currentItem.type === 'interlude' || prevItem.type === 'interlude';
-        if (isInterludeTransition) {
-            return { type: 'spring', stiffness: 90, damping: 15, mass: 1 } as const;
-        }
-
-        const interval = currentStartMs - prevStartMs;
-        const MIN_INTERVAL = 100;
-        const MAX_INTERVAL = 800;
-        const clampedInterval = clamp(interval, MIN_INTERVAL, MAX_INTERVAL);
-        const MAX_STIFFNESS = 220;
-        const MIN_STIFFNESS = 170;
-
-        let ratio = 1 - (clampedInterval - MIN_INTERVAL) / (MAX_INTERVAL - MIN_INTERVAL);
-        ratio = Math.pow(ratio, 0.2);
-
-        const targetStiffness = MIN_STIFFNESS + ratio * (MAX_STIFFNESS - MIN_STIFFNESS);
-        const targetDamping = Math.sqrt(targetStiffness) * 2.2;
-
-        return { type: 'spring', stiffness: targetStiffness, damping: targetDamping, mass: 1 } as const;
-    }, [activeDisplayIndex, displayItems, isPlaying, isUserScrolling]);
-
-    const motionDelays = useMemo(() => {
-        const delays = new Array(displayItems.length).fill(0);
-        if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return delays;
-
-        const previousItem = displayItems[activeDisplayIndex - 1];
-        const isVisualHandoff =
-            focusNextLineByVisualEnd &&
-            previousItem?.type === 'line' &&
-            typeof previousItem.line.visual_end_ms === 'number' &&
-            (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
-
-        // 从实际进入可见区域后的 group 开始累计 delay。
-        // 普通换行保留较完整的牵拉；visual_end_ms 触发的紧贴换行则缩短 active 行等待，
-        // 避免“已经提前聚焦，但滚动还没启动”的小错位。
-        const visibleRowsAboveFocus = isVisualHandoff
-            ? 2
-            : (variant === 'narrow' ? 3 : 4);
-        const topVisibleIndex = Math.max(0, activeDisplayIndex - visibleRowsAboveFocus);
-
-        const isFromInterlude = previousItem?.type === 'interlude';
-
-        if (isFromInterlude) {
-            let currentDelay = 0;
-            const baseDelay = 0.05;
-            for (let i = 0; i < displayItems.length; i++) {
-                if (i <= activeDisplayIndex) {
-                    delays[i] = 0;
-                } else {
-                    currentDelay += baseDelay;
-                    delays[i] = currentDelay;
-                }
-            }
-        } else {
-            let currentDelay = 0;
-            let baseDelay = isVisualHandoff ? 0.055 : 0.05;
-            for (let i = topVisibleIndex; i < displayItems.length; i++) {
-                delays[i] = currentDelay;
-                currentDelay += baseDelay;
-                if (i >= activeDisplayIndex) {
-                    baseDelay /= 1.05;
-                }
-            }
-        }
-        return delays;
-    }, [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]);
+    const dynamicSpringParams = useMemo(
+        () => getFluidLyricsSpringParams({
+            activeDisplayIndex,
+            displayItems,
+            focusNextLineByVisualEnd,
+            isPlaying,
+            isUserScrolling,
+            variant,
+        }),
+        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
+    );
+    const motionDelays = useMemo(
+        () => getFluidLyricsMotionDelays({
+            activeDisplayIndex,
+            displayItems,
+            focusNextLineByVisualEnd,
+            isPlaying,
+            isUserScrolling,
+            variant,
+        }),
+        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
+    );
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
@@ -441,24 +214,23 @@ export default function FluidLyricsPanel({
                 ref={scrollAreaRef}
                 className={clsx(
                     'relative z-10 mt-0 overflow-hidden touch-none',
-                    variant === 'narrow'
-                        ? 'h-full mb-0'
-                        : 'h-[calc(100%-3.5rem)] mb-6'
+                    variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
                 )}
                 style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
-                onPan={handlePan}
-                onWheel={handleWheel}
+                onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
+                onWheel={(event: WheelEvent<HTMLDivElement>) => {
+                    event.preventDefault();
+                    handleManualDelta(event.deltaY);
+                }}
             >
                 {displayState ? (
-                    <div className="h-full flex items-center justify-center text-white/40 text-sm">
-                        {displayState}
-                    </div>
+                    <div className="h-full flex items-center justify-center text-white/40 text-sm">{displayState}</div>
                 ) : (
-                    <div ref={contentRef} className="relative">
-                        <div style={{ height: topSpacerHeight + topInsetPx }} aria-hidden />
-                        {displayItems.map((item, displayIndex) => {
-                            const interludeShift = getVisualInterludeShift(displayIndex);
-                            const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
+                    <div className="relative" style={{ height: contentHeight }}>
+                        {visibleIndices.map(displayIndex => {
+                            const item = displayItems[displayIndex];
+                            const interludeShift = visualInterludeShifts[displayIndex] ?? 0;
+                            const isActive = activeDisplayIndex >= 0 && activeItem === item;
                             const isKaraokeActive = item.type === 'line' && item.line.words?.length
                                 ? isActive || (
                                     focusNextLineByVisualEnd &&
@@ -471,21 +243,17 @@ export default function FluidLyricsPanel({
                                 : isActive;
 
                             return (
-                                <div
+                                <FluidLyricsLayoutItem
                                     key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
-                                    ref={(node) => {
-                                        itemRefs.current[displayIndex] = node;
-                                    }}
+                                    index={displayIndex}
+                                    onMount={observeItem}
+                                    top={itemTops[displayIndex]}
                                 >
                                     {item.type === 'interlude' ? (
                                         <motion.div
+                                            initial={false}
                                             animate={{ y: interludeShift - targetScrollY }}
-                                            transition={{
-                                                y: {
-                                                    ...dynamicSpringParams,
-                                                    delay: motionDelays[displayIndex],
-                                                },
-                                            }}
+                                            transition={{ y: { ...dynamicSpringParams, delay: motionDelays[displayIndex] } }}
                                         >
                                             <InterludeItem
                                                 isActive={isActive}
@@ -506,22 +274,12 @@ export default function FluidLyricsPanel({
                                             isKaraokeActive={isKaraokeActive}
                                             isUserScrolling={isUserScrolling}
                                             pausedScroll={pausedScroll}
-                                            distanceFromActive={
-                                                activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0
-                                            }
+                                            distanceFromActive={activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0}
                                             interludeShift={interludeShift}
                                             interludeShiftDurationMs={interludeGapOpenDurationMs}
-                                            lineEndMs={
-                                                typeof item.line.end_ms === 'number'
-                                                    ? item.line.end_ms
-                                                    : getLineEndMsByIndex(lines, item.lineIndex)
-                                            }
-                                            nextLineStartMs={
-                                                item.line.words?.length
-                                                    ? getLineEndMsByIndex(lines, item.lineIndex)
-                                                    : null
-                                            }
-                                            enableTightHandoffTailCompression={enableTightHandoffTailCompression}
+                                            lineEndMs={typeof item.line.end_ms === 'number' ? item.line.end_ms : getLineEndMsByIndex(lines, item.lineIndex)}
+                                            nextLineStartMs={item.line.words?.length ? getLineEndMsByIndex(lines, item.lineIndex) : null}
+                                            enableTightHandoffTailCompression={timingStrategy?.compressTightHandoffTail ?? false}
                                             currentTime={renderCurrentMs / 1000}
                                             preciseMsRef={preciseMsRef}
                                             onSeek={handleLineSeek}
@@ -532,10 +290,9 @@ export default function FluidLyricsPanel({
                                             variant={variant}
                                         />
                                     )}
-                                </div>
+                                </FluidLyricsLayoutItem>
                             );
                         })}
-                        <div style={{ height: bottomSpacerHeight }} aria-hidden />
                     </div>
                 )}
             </motion.div>

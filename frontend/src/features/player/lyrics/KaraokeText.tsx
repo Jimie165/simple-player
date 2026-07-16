@@ -31,6 +31,8 @@ type KaraokeCharStyle = {
 };
 
 const karaokeExitDurationMs = 500;
+const completedFillBackground =
+    'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
@@ -109,7 +111,7 @@ function getKaraokeCharStyle(
             ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
             : 'linear-gradient(to right, transparent, transparent)';
     const fillBackgroundImage = isComplete
-        ? 'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))'
+        ? completedFillBackground
         : hasProgress
             ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
             : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
@@ -378,7 +380,11 @@ function KaraokeTextBase({
                                         style={{
                                             position: 'relative',
                                             zIndex: 1,
-                                            backgroundImage: style.fillBackgroundImage,
+                                            // 退出层必须使用完成态填充，避免低频 currentTime
+                                            // 覆盖高精度时钟已经推进完成的尾字颜色。
+                                            backgroundImage: isFocused
+                                                ? style.fillBackgroundImage
+                                                : completedFillBackground,
                                             WebkitBackgroundClip: 'text',
                                             backgroundClip: 'text',
                                             WebkitTextFillColor: 'transparent',

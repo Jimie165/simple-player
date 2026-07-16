@@ -197,6 +197,7 @@ function LyricsLineItem({
         return (
             <motion.button
                 ref={rowRef}
+                initial={false}
                 type="button"
                 onClick={handleClick}
                 disabled={!canSeek}
