@@ -25,8 +25,8 @@ const sideScrollMaskStyle = {
 };
 
 const narrowScrollMaskStyle = {
-    maskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
-    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(2rem, 5vh, 3.5rem), black calc(100% - 40px), transparent 100%)',
+    maskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 40px), transparent 100%)',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
 
 export default function FluidLyricsPanel({
