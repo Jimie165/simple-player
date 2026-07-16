@@ -74,6 +74,7 @@ export const SongListItem = memo(({
     handleItemClick,
     handleContextMenu,
     hideAlbum,
+    hideArtist,
     formatDuration,
     toggleFavorite,
     isDragging,
@@ -95,6 +96,7 @@ export const SongListItem = memo(({
     handleItemClick?: (e: React.MouseEvent, song: SongMetadata) => void;
     handleContextMenu?: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
     hideAlbum?: boolean;
+    hideArtist?: boolean;
     formatDuration: (sec: number) => string;
     toggleFavorite?: (song: SongMetadata) => void;
     isDragging?: boolean;
@@ -191,26 +193,28 @@ export const SongListItem = memo(({
                 </span>
             </div>
 
-            <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
-                <span
-                    className={clsx(
-                        "transition-colors",
-                        !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
-                    )}
-                    onClick={(e) => {
-                        if (e.detail !== 1) return;
-                        if (isSelectionMode) return;
-                        e.stopPropagation();
-                        push({ type: 'artist_detail', data: { name: song.artist } });
-                    }}
-                    onDoubleClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                    }}
-                >
-                    {song.artist}
-                </span>
-            </div>
+            {!hideArtist && (
+                <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
+                    <span
+                        className={clsx(
+                            "transition-colors",
+                            !isSelectionMode ? "cursor-pointer hover:text-primary" : "cursor-default"
+                        )}
+                        onClick={(e) => {
+                            if (e.detail !== 1) return;
+                            if (isSelectionMode) return;
+                            e.stopPropagation();
+                            push({ type: 'artist_detail', data: { name: song.artist } });
+                        }}
+                        onDoubleClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                        }}
+                    >
+                        {song.artist}
+                    </span>
+                </div>
+            )}
 
             {!hideAlbum && (
                 <div className="text-neutral-500 dark:text-neutral-400 truncate">

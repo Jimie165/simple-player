@@ -47,6 +47,7 @@ export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
+const HIDE_ARTIST_BREAKPOINT = 650;
 
 interface SortableListContextValue {
     sortableItems: string[];
@@ -101,6 +102,7 @@ type SortableItemProps = {
     handleCheckboxClick: (e: React.MouseEvent | null, song: SongMetadata) => void;
     handleContextMenu: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
     hideAlbum: boolean;
+    hideArtist: boolean;
     formatDuration: (sec: number) => string;
     onSelect: (song: SongMetadata) => void;
     onAddToPlaylist: (song: SongMetadata) => void;
@@ -159,6 +161,7 @@ export default function SortableSongList({
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
     const mainContentWidth = useMainContentWidth();
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
+    const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
 
 
     // Use the songs prop directly as sorting is now handled by the parent component
@@ -289,7 +292,7 @@ export default function SortableSongList({
         }
     };
 
-    const gridStyle = { gridTemplateColumns: getGridTemplateColumns(shouldHideAlbum) };
+    const gridStyle = { gridTemplateColumns: getGridTemplateColumns(shouldHideAlbum, shouldHideArtist) };
 
     // Filter valid items for SortableContext using SORTED songs
     const sortableItems = useMemo(() => displaySongs.map((s, i) => getSongId(s, i)), [displaySongs]);
@@ -320,6 +323,7 @@ export default function SortableSongList({
                 handleCheckboxClick={(e: React.MouseEvent | null, s: SongMetadata) => handleCheckboxClick(e, s, index)}
                 handleContextMenu={handleContextMenu}
                 hideAlbum={shouldHideAlbum}
+                hideArtist={shouldHideArtist}
                 formatDuration={formatDuration}
                 onSelect={(s: SongMetadata) => handleCheckboxClick(null, s, index)}
                 onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
@@ -341,7 +345,7 @@ export default function SortableSongList({
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 {renderHeaderCell('标题')}
-                {renderHeaderCell('艺人')}
+                {!shouldHideArtist && renderHeaderCell('艺人')}
                 {!shouldHideAlbum && renderHeaderCell('专辑')}
                 {renderHeaderCell(<MdAccessTime className="text-base inline" />, 'pr-2', true)}
                 <div></div>
@@ -392,6 +396,7 @@ export default function SortableSongList({
                                         selected={true} // Always appear selected in overlay
                                         isOverlay={true}
                                         hideAlbum={shouldHideAlbum}
+                                        hideArtist={shouldHideArtist}
                                         formatDuration={formatDuration}
                                         dragCount={isDraggingSelection ? selectedIds.size : 1}
                                     />

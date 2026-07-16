@@ -14,6 +14,7 @@ import { useScrollViewport } from '@/hooks/useScrollViewport';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
+const HIDE_ARTIST_BREAKPOINT = 650;
 
 interface SongListVirtuosoContext {
     footerSpacerClassName: string;
@@ -68,8 +69,10 @@ export default function SongListView({
     // Responsive: auto-hide album column based on the main content area width.
     const mainContentWidth = useMainContentWidth();
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
+    const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
 
     const effectiveHideAlbum = hideAlbum || shouldHideAlbum;
+    const effectiveHideArtist = hideArtist || shouldHideArtist;
 
     // Persist sort state
     const [sortKey, setSortKey] = useState<SortKey>(() => {
@@ -246,7 +249,7 @@ export default function SongListView({
 
     const getGridCols = () => {
         let cols = "24px minmax(0,4fr)";
-        if (!hideArtist) cols += " minmax(0,3fr)";
+        if (!effectiveHideArtist) cols += " minmax(0,3fr)";
         if (!effectiveHideAlbum) cols += " minmax(0,3fr)";
         cols += " 100px 40px";
         return cols;
@@ -274,7 +277,7 @@ export default function SongListView({
                 selected={selected}
                 isFav={isFav}
                 hideCover={hideCover}
-                hideArtist={hideArtist}
+                hideArtist={effectiveHideArtist}
                 effectiveHideAlbum={effectiveHideAlbum}
                 context={context}
                 enableDelete={enableDelete}
@@ -305,7 +308,7 @@ export default function SongListView({
                 )}>
                 <div></div>
                 {renderHeaderCell('标题', 'title', 'pl-0', !disableSort)}
-                {!hideArtist && renderHeaderCell('艺人', 'artist', undefined, !disableSort)}
+                {!effectiveHideArtist && renderHeaderCell('艺人', 'artist', undefined, !disableSort)}
                 {!effectiveHideAlbum && renderHeaderCell('专辑', 'album', undefined, !disableSort)}
                 {renderHeaderCell(<MdAccessTime className="text-base" />, 'duration', 'justify-end pr-2', !disableSort)}
                 <div></div>

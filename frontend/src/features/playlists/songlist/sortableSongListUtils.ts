@@ -14,9 +14,9 @@ export function formatDuration(sec: number): string {
     return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function getGridTemplateColumns(shouldHideAlbum: boolean): string {
+export function getGridTemplateColumns(shouldHideAlbum: boolean, shouldHideArtist = false): string {
     let cols = '24px minmax(0,4fr)';
-    cols += ' minmax(0,3fr)';
+    if (!shouldHideArtist) cols += ' minmax(0,3fr)';
     if (!shouldHideAlbum) cols += ' minmax(0,3fr)';
     cols += ' 100px 40px';
     return cols;
