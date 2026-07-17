@@ -1,9 +1,9 @@
 // PlaylistRepo - 播放列表仓库
 // ============================================================================
 
-use rusqlite::{Connection, Result, params};
 use super::models::{Playlist, Song};
 use super::song_repo::SongRepo;
+use rusqlite::{params, Connection, Result};
 
 pub struct PlaylistRepo;
 
@@ -217,18 +217,18 @@ impl PlaylistRepo {
         Ok(songs)
     }
 
-    /// 获取播放列表前四张不同封面，仅用于列表卡片预览。
+    /// 按首次出现位置返回不同封面路径，供卡片预览进一步按图片内容去重。
     pub fn get_cover_paths(conn: &Connection, playlist_id: i64) -> Result<Vec<String>> {
         let mut stmt = conn.prepare(
-            "SELECT DISTINCT s.cover_path
+            "SELECT s.cover_path
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1
                AND s.status = 'active'
                AND s.cover_path IS NOT NULL
                AND s.cover_path <> ''
-             ORDER BY ps.position
-             LIMIT 4"
+             GROUP BY s.cover_path
+             ORDER BY MIN(ps.position)",
         )?;
         stmt.query_map(params![playlist_id], |row| row.get(0))?
             .collect::<Result<Vec<_>>>()

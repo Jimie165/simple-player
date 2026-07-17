@@ -358,8 +358,6 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
                 // 使用 crate 绝对路径引用 covers
                 if let Some(path) = crate::modules::library::covers::save_cover_bytes(
                     dir,
-                    &album,
-                    &artist,
                     picture.data(),
                     mime_type,
                 ) {

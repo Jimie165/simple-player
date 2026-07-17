@@ -27,11 +27,11 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName, 
         let isMounted = true;
 
         const loadCovers = async () => {
-            const paths = coverPaths?.length
-                ? coverPaths.slice(0, 4)
-                : Array.from(new Set(
-                    songs.map(song => song.cover_path).filter((path): path is string => !!path)
-                )).slice(0, 4);
+            const paths = Array.from(new Set(
+                coverPaths?.length
+                    ? coverPaths
+                    : songs.map(song => song.cover_path).filter((path): path is string => !!path)
+            )).slice(0, 4);
 
             if (paths.length === 0) {
                 if (isMounted) setCoverUrls([]);

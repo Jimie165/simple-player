@@ -59,14 +59,9 @@ pub fn ensure_covers_dir(app_cache_dir: &Path) -> std::io::Result<PathBuf> {
     Ok(covers_dir)
 }
 
-/// 根据专辑、艺术家和图片内容生成封面文件名哈希。
-/// 图片内容参与哈希，确保用户替换更高清封面后刷新音乐库会得到新的缓存路径。
-pub fn generate_cover_hash(album: &str, artist: &str, cover_bytes: &[u8]) -> String {
+/// 仅根据图片内容生成封面文件名哈希，让不同歌曲复用完全相同的封面缓存。
+pub fn generate_cover_hash(cover_bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(album.as_bytes());
-    hasher.update(b"|");
-    hasher.update(artist.as_bytes());
-    hasher.update(b"|");
     hasher.update(cover_bytes);
     let result = hasher.finalize();
     format!("{:x}", result)[..16].to_string()
@@ -85,8 +80,6 @@ fn extension_from_mime(mime: &str) -> &'static str {
 /// 相同图片内容会复用缓存；图片内容变化时会生成新的缓存文件名。
 pub fn save_cover_bytes(
     app_cache_dir: &Path,
-    album: &str,
-    artist: &str,
     cover_bytes: &[u8],
     mime_type: &str,
 ) -> Option<String> {
@@ -97,7 +90,7 @@ pub fn save_cover_bytes(
     };
 
     // 生成文件名
-    let hash = generate_cover_hash(album, artist, cover_bytes);
+    let hash = generate_cover_hash(cover_bytes);
 
     // 检查是否已存在
     for ext in &["jpg", "png", "gif", "webp"] {
