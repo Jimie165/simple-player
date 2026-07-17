@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { useFluidLyricsInterlude } from '@/features/player/lyrics/useFluidLyricsInterlude';
 import { useFluidLyricsLayout } from '@/features/player/lyrics/useFluidLyricsLayout';
 import { useFluidLyricsAnimator } from '@/features/player/lyrics/useFluidLyricsAnimator';
@@ -14,7 +13,13 @@ import {
 } from '@/features/player/lyrics/constants';
 import { getFluidLyricsMotionDelay, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
 import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
-import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
+import {
+    buildDisplayItems,
+    buildFluidLyricsRenderBoundaries,
+    getActiveDisplayIndex,
+    getFluidLyricsRenderKey,
+    getLineEndMsByIndex,
+} from '@/features/player/lyrics/lyricsDisplay';
 import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
@@ -30,7 +35,7 @@ const narrowScrollMaskStyle = {
     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
 
-export default function FluidLyricsPanel({
+function FluidLyricsPanel({
     isOpen,
     lyrics,
     status,
@@ -43,13 +48,6 @@ export default function FluidLyricsPanel({
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyrics ?? [], [lyrics]);
-    const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
-    const currentLyricIndex = useLyricsSync({
-        lyrics: lines,
-        currentTime: renderCurrentMs / 1000,
-        enabled: isOpen,
-        hasTimestamps,
-    });
     const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const previousTargetYRef = useRef(0);
     const pausedScrollRef = useRef(false);
@@ -69,9 +67,22 @@ export default function FluidLyricsPanel({
         () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
         [hasTimestamps, lines, timingStrategy]
     );
+    const renderBoundaries = useMemo(
+        () => buildFluidLyricsRenderBoundaries(displayItems, lines, timingStrategy),
+        [displayItems, lines, timingStrategy]
+    );
+    const getRenderKey = useCallback(
+        (currentMs: number) => getFluidLyricsRenderKey(renderBoundaries, currentMs),
+        [renderBoundaries]
+    );
+    const { renderCurrentMs, preciseMsRef, syncRevision } = usePrecisePlaybackTime(
+        currentTime,
+        getRenderKey,
+        true,
+    );
     const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000, timingStrategy),
-        [currentLyricIndex, displayItems, lines, renderCurrentMs, timingStrategy]
+        () => getActiveDisplayIndex(displayItems, lines, 0, renderCurrentMs / 1000, timingStrategy),
+        [displayItems, lines, renderCurrentMs, timingStrategy]
     );
     const {
         exitingInterludeIndex,
@@ -82,6 +93,7 @@ export default function FluidLyricsPanel({
         activeDisplayIndex,
         displayItems,
         currentMs: renderCurrentMs,
+        syncRevision,
     });
     const openInterludeIndex = (() => {
         const candidateIndices = [activeDisplayIndex, activeDisplayIndex - 1];
@@ -311,3 +323,17 @@ export default function FluidLyricsPanel({
         </div>
     );
 }
+
+const areFluidLyricsPanelPropsEqual = (previous: LyricsPanelProps, next: LyricsPanelProps) => (
+    previous.isOpen === next.isOpen &&
+    previous.lyrics === next.lyrics &&
+    previous.status === next.status &&
+    previous.hasTimestamps === next.hasTimestamps &&
+    previous.onSeek === next.onSeek &&
+    previous.onUserScrollDirection === next.onUserScrollDirection &&
+    previous.variant === next.variant &&
+    previous.timingStrategy === next.timingStrategy
+);
+
+// 播放时间由内部精确时钟订阅；父组件的进度刷新不应重新执行歌词布局。
+export default memo(FluidLyricsPanel, areFluidLyricsPanelPropsEqual);

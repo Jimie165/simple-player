@@ -1,6 +1,7 @@
 import type { LyricsLine } from '@/types';
 import { getTightHandoffVisualEndMs } from '@/features/player/lyrics/lyricCharSplitting';
 import {
+    interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     interludeThresholdMs,
     nonInterludeNextLineFocusLeadMs,
@@ -21,6 +22,7 @@ interface DisplayTimelineIndex {
 }
 
 const displayTimelineCache = new WeakMap<DisplayItem[], DisplayTimelineIndex>();
+const nextTimedLineCache = new WeakMap<LyricsLine[], Array<number | null>>();
 
 const getDisplayTimelineIndex = (displayItems: DisplayItem[]) => {
     const cached = displayTimelineCache.get(displayItems);
@@ -61,12 +63,89 @@ const findEntryAtOrBefore = <T extends DisplayTimelineEntry>(entries: T[], curre
     return result;
 };
 
-export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): number | null {
-    for (let index = lineIndex + 1; index < lines.length; index++) {
-        const ms = lines[index].time_ms;
-        if (typeof ms === 'number') return ms;
+export function buildFluidLyricsRenderBoundaries(
+    displayItems: DisplayItem[],
+    lines: LyricsLine[],
+    timingStrategy?: LyricsTimingStrategy,
+) {
+    const boundaries = new Set<number>();
+    const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
+    const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
+    const enableLineLyricsEarlyFocus = timingStrategy?.enableLineLyricsEarlyFocus ?? false;
+    const addBoundary = (timeMs: number | null | undefined) => {
+        if (typeof timeMs === 'number' && Number.isFinite(timeMs) && timeMs >= 0) {
+            boundaries.add(timeMs);
+        }
+    };
+
+    displayItems.forEach((item, displayIndex) => {
+        if (item.type === 'interlude') {
+            addBoundary(item.startMs);
+            addBoundary(item.startMs + interludeGapOpenDurationMs);
+            addBoundary(item.endMs - interludeNextLineFocusLeadMs);
+            addBoundary(item.endMs);
+            return;
+        }
+
+        const line = item.line;
+        const nextTimedLineStartMs = getLineEndMsByIndex(lines, item.lineIndex);
+        const naturalLineEndMs = typeof line.end_ms === 'number'
+            ? line.end_ms
+            : nextTimedLineStartMs;
+        const hasVisualEndMs =
+            focusNextLineByVisualEnd &&
+            typeof line.visual_end_ms === 'number' &&
+            (naturalLineEndMs === null || line.visual_end_ms < naturalLineEndMs);
+
+        addBoundary(line.time_ms);
+        addBoundary(line.visual_end_ms);
+        addBoundary(naturalLineEndMs);
+        addBoundary(nextTimedLineStartMs);
+
+        const nextDisplayItem = displayItems[displayIndex + 1];
+        if (nextDisplayItem?.type !== 'line') return;
+        const nextLineStartMs = lines[nextDisplayItem.lineIndex]?.time_ms;
+        if (typeof nextLineStartMs !== 'number') return;
+
+        if (!line.words?.length && enableLineLyricsEarlyFocus && typeof line.time_ms === 'number') {
+            if (nextLineStartMs - line.time_ms > leadMs) addBoundary(nextLineStartMs - leadMs);
+        }
+
+        if (hasVisualEndMs || typeof naturalLineEndMs !== 'number') return;
+        const gapMs = Math.max(0, nextLineStartMs - naturalLineEndMs);
+        addBoundary(
+            gapMs > nonInterludeNextLineFocusThresholdMs
+                ? nextLineStartMs - leadMs
+                : naturalLineEndMs,
+        );
+    });
+
+    return [...boundaries].sort((left, right) => left - right);
+}
+
+export function getFluidLyricsRenderKey(boundaries: number[], currentMs: number) {
+    let low = 0;
+    let high = boundaries.length;
+    while (low < high) {
+        const middle = (low + high) >> 1;
+        if (boundaries[middle] <= currentMs) low = middle + 1;
+        else high = middle;
     }
-    return null;
+    return low;
+}
+
+export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): number | null {
+    let nextTimedLines = nextTimedLineCache.get(lines);
+    if (!nextTimedLines) {
+        nextTimedLines = new Array<number | null>(lines.length).fill(null);
+        let nextTimeMs: number | null = null;
+        for (let index = lines.length - 1; index >= 0; index--) {
+            nextTimedLines[index] = nextTimeMs;
+            if (typeof lines[index].time_ms === 'number') nextTimeMs = lines[index].time_ms;
+        }
+        nextTimedLineCache.set(lines, nextTimedLines);
+    }
+    return nextTimedLines[lineIndex] ?? null;
 }
 
 export function buildDisplayItems(

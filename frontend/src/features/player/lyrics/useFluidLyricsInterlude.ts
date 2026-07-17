@@ -10,6 +10,7 @@ interface FluidLyricsInterludeArgs {
     activeDisplayIndex: number;
     displayItems: DisplayItem[];
     currentMs: number;
+    syncRevision: number;
 }
 
 /** 管理动画优先歌词的间奏退出与跳播同步状态。 */
@@ -17,8 +18,10 @@ export function useFluidLyricsInterlude({
     activeDisplayIndex,
     displayItems,
     currentMs,
+    syncRevision,
 }: FluidLyricsInterludeArgs) {
     const previousPlaybackMsRef = useRef(currentMs);
+    const previousSyncRevisionRef = useRef(syncRevision);
     const exitingInterludeIndexRef = useRef<number | null>(null);
     const exitTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const [exitingInterludeIndex, setExitingInterludeIndex] = useState<number | null>(null);
@@ -54,7 +57,9 @@ export function useFluidLyricsInterlude({
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
         previousPlaybackMsRef.current = currentMs;
-        if (Math.abs(currentMs - previousMs) < 900) return;
+        const didSync = previousSyncRevisionRef.current !== syncRevision;
+        previousSyncRevisionRef.current = syncRevision;
+        if (!didSync) return;
 
         const findInterludeAt = (timeMs: number) => displayItems.findIndex(item =>
             item.type === 'interlude' && timeMs >= item.startMs && timeMs < item.endMs
@@ -79,7 +84,7 @@ export function useFluidLyricsInterlude({
         }
 
         return () => cancelAnimationFrame(syncFrame);
-    }, [currentMs, displayItems, startInterludeExit]);
+    }, [currentMs, displayItems, startInterludeExit, syncRevision]);
 
     useEffect(() => () => {
         if (exitTimeoutRef.current) clearTimeout(exitTimeoutRef.current);
