@@ -100,6 +100,7 @@ fn main() {
             commands::library::refresh_library,
             commands::library::delete_song,
             commands::library::batch_delete_songs,
+            commands::library::restore_excluded_songs,
             commands::library::update_song_details,
             commands::library::search_library,
             commands::library::toggle_favorite,

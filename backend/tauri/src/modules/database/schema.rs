@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 13;
+const SCHEMA_VERSION: i32 = 14;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -103,6 +103,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 13 {
         migrate_v13(conn)?;
+        set_db_version(conn, 13)?;
+    }
+
+    if current_version < 14 {
+        migrate_v14(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -539,6 +544,28 @@ fn migrate_v13(conn: &Connection) -> Result<()> {
 
     Ok(())
 }
+
+/// Version 14: distinguish files missing from disk from songs explicitly excluded by the user.
+fn migrate_v14(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "UPDATE songs SET status = 'missing' WHERE status = 'archived'",
+        [],
+    )?;
+
+    conn.execute("DROP VIEW IF EXISTS archived_songs", [])?;
+    conn.execute(
+        "CREATE VIEW archived_songs AS
+         SELECT id, path, title, artist, album, duration, cover, cover_path, folder_id,
+                album_artist, year, genre, track_number, track_total, disc_number, disc_total,
+                play_count, last_played_at, is_favorite, rating, created_at, updated_at
+         FROM songs
+         WHERE status != 'active'
+         ORDER BY title",
+        [],
+    )?;
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -562,5 +589,54 @@ mod tests {
             )
             .expect("read migrated offset");
         assert_eq!(offset, 0);
+    }
+
+    #[test]
+    fn migration_v14_converts_legacy_archived_songs_to_missing() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute_batch(
+            "CREATE TABLE songs (
+                id INTEGER PRIMARY KEY,
+                path TEXT NOT NULL,
+                title TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                album TEXT NOT NULL,
+                duration INTEGER NOT NULL,
+                cover TEXT,
+                cover_path TEXT,
+                folder_id INTEGER,
+                album_artist TEXT,
+                year INTEGER,
+                genre TEXT,
+                track_number INTEGER,
+                track_total INTEGER,
+                disc_number INTEGER,
+                disc_total INTEGER,
+                play_count INTEGER,
+                last_played_at TEXT,
+                is_favorite INTEGER,
+                rating INTEGER,
+                created_at TEXT,
+                updated_at TEXT,
+                status TEXT NOT NULL
+            );
+            INSERT INTO songs (
+                id, path, title, artist, album, duration, status
+            ) VALUES
+                (1, 'missing.mp3', 'Missing', 'Artist', 'Album', 1, 'archived'),
+                (2, 'active.mp3', 'Active', 'Artist', 'Album', 1, 'active');",
+        )
+        .expect("create legacy songs");
+
+        migrate_v14(&conn).expect("run v14 migration");
+
+        let statuses: Vec<String> = conn
+            .prepare("SELECT status FROM songs ORDER BY id")
+            .expect("prepare status query")
+            .query_map([], |row| row.get(0))
+            .expect("query statuses")
+            .collect::<Result<Vec<_>>>()
+            .expect("collect statuses");
+        assert_eq!(statuses, vec!["missing", "active"]);
     }
 }

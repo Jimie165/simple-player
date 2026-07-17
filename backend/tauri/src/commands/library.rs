@@ -5,6 +5,7 @@ use crate::utils::path::normalize_folder_path;
 use crate::utils::paths::{is_app_relative_path, is_user_file_path};
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{
     Arc,
@@ -22,6 +23,20 @@ struct ScanProgressPayload {
 #[derive(Serialize, Clone)]
 struct ScanCompletePayload {
     folder_id: i64,
+}
+
+#[derive(Serialize)]
+pub struct AddLibraryFolderResult {
+    songs: Vec<SongMetadata>,
+    existing_folder: bool,
+    excluded_songs: Vec<SongMetadata>,
+}
+
+#[derive(Serialize)]
+pub struct RestoreExcludedSongsResult {
+    songs: Vec<SongMetadata>,
+    restored_count: usize,
+    missing_count: usize,
 }
 
 struct SongWorkItem {
@@ -170,7 +185,7 @@ fn insert_placeholder_songs(
     for file in files {
         match SongRepo::get_by_path_any_status(conn, file) {
             Ok(Some(existing)) => {
-                if existing.status == "archived" {
+                if existing.status == "missing" || existing.status == "archived" {
                     let _ = SongRepo::restore(conn, existing.id);
                 }
             }
@@ -210,7 +225,6 @@ fn insert_placeholder_songs(
 async fn scan_library_internal(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
-    force_restore: bool,
     restore_folder_id: Option<i64>,
     refresh_mode: MetadataRefreshMode,
 ) -> Result<Vec<SongMetadata>, String> {
@@ -243,7 +257,7 @@ async fn scan_library_internal(
             let stale_songs = SongRepo::get_songs_not_in_paths(&conn, folder.id, &files)
                 .map_err(|e| e.to_string())?;
             for stale in stale_songs {
-                if stale.status != "archived" {
+                if stale.status == "active" {
                     let _ = SongRepo::archive(&conn, stale.id);
                 }
             }
@@ -266,21 +280,18 @@ async fn scan_library_internal(
                         }
                     });
 
-                    if existing.status == "archived" {
-                        let should_restore = force_restore
-                            && restore_folder_id
-                                .map(|target| existing.folder_id == Some(target))
-                                .unwrap_or(true);
+                    if existing.status == "excluded" {
+                        continue;
+                    }
 
-                        if should_restore {
-                            work_items.push(SongWorkItem {
-                                path: file,
-                                folder_id: folder.id,
-                                existing_id: Some(existing.id),
-                                should_restore: true,
-                                is_new: false,
-                            });
-                        }
+                    if existing.status == "missing" || existing.status == "archived" {
+                        work_items.push(SongWorkItem {
+                            path: file,
+                            folder_id: folder.id,
+                            existing_id: Some(existing.id),
+                            should_restore: true,
+                            is_new: false,
+                        });
                         continue;
                     }
 
@@ -448,19 +459,19 @@ pub async fn add_library_folder(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
     folder: String,
-) -> Result<Vec<SongMetadata>, String> {
+) -> Result<AddLibraryFolderResult, String> {
     let folder = normalize_folder_path(&folder);
 
-    let added_folder_id = {
+    let existing_folder_id = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
 
         // 检查嵌套关系：当前已有的 music 文件夹中是否有此目录的祖先或后代
         let existing = FolderRepo::get_by_type(&conn, "music").map_err(|e| e.to_string())?;
+        let mut exact_match = None;
         for f in &existing {
             if f.path == folder {
-                // 已存在同一目录，直接返回当前歌曲列表
-                let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
-                return Ok(songs.iter().map(SongMetadata::from_db_song).collect());
+                exact_match = Some(f.id);
+                break;
             }
             if is_subpath_of(&folder, &f.path) {
                 return Err(format!("该目录已被父目录覆盖：{}", f.path));
@@ -473,6 +484,44 @@ pub async fn add_library_folder(
             }
         }
 
+        exact_match
+    };
+
+    if let Some(folder_id) = existing_folder_id {
+        let ignored_dirs = {
+            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            load_music_ignored_dirs(&conn)
+        };
+        let available_paths: HashSet<String> =
+            library::scan_audio_files_recursive(&folder, &ignored_dirs)
+                .into_iter()
+                .collect();
+
+        let (songs, excluded_songs) = {
+            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
+            let excluded =
+                SongRepo::get_excluded_by_folder(&conn, folder_id).map_err(|e| e.to_string())?;
+            let excluded_songs = excluded
+                .iter()
+                .filter(|song| available_paths.contains(&song.path))
+                .map(SongMetadata::from_db_song)
+                .collect();
+            (
+                songs.iter().map(SongMetadata::from_db_song).collect(),
+                excluded_songs,
+            )
+        };
+
+        return Ok(AddLibraryFolderResult {
+            songs,
+            existing_folder: true,
+            excluded_songs,
+        });
+    }
+
+    let added_folder_id = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
         let folder_row = FolderRepo::add(&conn, &folder).map_err(|e| e.to_string())?;
         folder_row.id
     };
@@ -499,7 +548,6 @@ pub async fn add_library_folder(
         let result = scan_library_internal(
             db_state,
             app_handle.clone(),
-            true,
             Some(added_folder_id),
             MetadataRefreshMode::Incremental,
         )
@@ -514,7 +562,11 @@ pub async fn add_library_folder(
         }
     });
 
-    Ok(songs)
+    Ok(AddLibraryFolderResult {
+        songs,
+        existing_folder: false,
+        excluded_songs: Vec::new(),
+    })
 }
 
 /// 移除文件夹
@@ -539,14 +591,8 @@ pub async fn scan_library(
     app_handle: tauri::AppHandle,
     force_restore: bool,
 ) -> Result<Vec<SongMetadata>, String> {
-    scan_library_internal(
-        db,
-        app_handle,
-        force_restore,
-        None,
-        MetadataRefreshMode::Incremental,
-    )
-    .await
+    let _ = force_restore;
+    scan_library_internal(db, app_handle, None, MetadataRefreshMode::Incremental).await
 }
 
 /// 获取库中所有缓存的歌曲（不重新扫描）
@@ -575,7 +621,6 @@ pub async fn refresh_library(
     let songs = scan_library_internal(
         db,
         app_handle.clone(),
-        false,
         None,
         MetadataRefreshMode::ForceReextract,
     )
@@ -612,6 +657,52 @@ pub fn batch_delete_songs(db: State<'_, DbState>, ids: Vec<i64>) -> Result<(), S
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     SongRepo::batch_delete(&conn, &ids).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+/// 恢复用户在重新选择文件夹后明确勾选的歌曲。
+#[tauri::command]
+pub fn restore_excluded_songs(
+    db: State<'_, DbState>,
+    app_handle: tauri::AppHandle,
+    ids: Vec<i64>,
+) -> Result<RestoreExcludedSongsResult, String> {
+    let candidates = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        ids.iter()
+            .filter_map(|id| SongRepo::get_by_id(&conn, *id).ok().flatten())
+            .filter(|song| song.status == "excluded")
+            .collect::<Vec<_>>()
+    };
+
+    // 文件存在性检查必须在数据库锁外进行。
+    let restorable_ids = candidates
+        .iter()
+        .filter(|song| Path::new(&song.path).is_file())
+        .map(|song| song.id)
+        .collect::<Vec<_>>();
+    let missing_count = candidates.len().saturating_sub(restorable_ids.len());
+
+    let (restored_count, songs) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let restored_count =
+            SongRepo::batch_restore_excluded(&conn, &restorable_ids).map_err(|e| e.to_string())?;
+        let songs = SongRepo::get_all(&conn).map_err(|e| e.to_string())?;
+        (
+            restored_count,
+            songs.iter().map(SongMetadata::from_db_song).collect(),
+        )
+    };
+
+    let _ = app_handle.emit(
+        "library_scan_complete",
+        ScanCompletePayload { folder_id: 0 },
+    );
+
+    Ok(RestoreExcludedSongsResult {
+        songs,
+        restored_count,
+        missing_count,
+    })
 }
 
 /// 更新歌曲信息和播放器内自定义歌词

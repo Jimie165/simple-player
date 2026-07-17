@@ -19,6 +19,18 @@ export interface UpdateSongDetailsRequest {
     lyrics_offset_ms: number;
 }
 
+export interface AddLibraryFolderResult {
+    songs: SongMetadata[];
+    existing_folder: boolean;
+    excluded_songs: SongMetadata[];
+}
+
+export interface RestoreExcludedSongsResult {
+    songs: SongMetadata[];
+    restored_count: number;
+    missing_count: number;
+}
+
 export const libraryService = {
     // ========== 文件夹管理 ==========
     getFolders: async (): Promise<LibraryFolder[]> => {
@@ -29,7 +41,7 @@ export const libraryService = {
         return invoke('get_video_folders');
     },
 
-    addFolder: async (folder: string): Promise<SongMetadata[]> => {
+    addFolder: async (folder: string): Promise<AddLibraryFolderResult> => {
         return invoke('add_library_folder', { folder });
     },
 
@@ -97,6 +109,10 @@ export const libraryService = {
 
     restoreSong: async (id: number): Promise<void> => {
         return invoke('restore_song', { id });
+    },
+
+    restoreExcludedSongs: async (ids: number[]): Promise<RestoreExcludedSongsResult> => {
+        return invoke('restore_excluded_songs', { ids });
     },
 
     updateSongDetails: async (request: UpdateSongDetailsRequest): Promise<SongMetadata> => {

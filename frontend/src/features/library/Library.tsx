@@ -11,6 +11,7 @@ import AlbumGridView from '@/features/library/components/AlbumGridView';
 import ArtistGridView from '@/features/library/components/ArtistGridView';
 import LibraryTabsAndShuffle from '@/features/library/components/LibraryTabsAndShuffle';
 import AlbumSortMenu from '@/features/library/components/AlbumSortMenu';
+import RestoreExcludedSongsDialog from '@/features/library/dialogs/RestoreExcludedSongsDialog';
 
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
@@ -55,6 +56,10 @@ export default function Library() {
     // Local State
     const [librarySongs, setLibrarySongs] = useState<SongMetadata[]>([]);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
+    const [restorePrompt, setRestorePrompt] = useState<{
+        folderPath: string;
+        songs: SongMetadata[];
+    } | null>(null);
 
     // Filtered & Sorted Logic
     // ...
@@ -118,16 +123,40 @@ export default function Library() {
             if (!folderPath) return;
 
             setIsAddingFolder(true);
-            const songs = await libraryService.addFolder(folderPath);
-            setLibrarySongs(songs);
-            triggerLibraryUpdate();
-            toast.success('已添加文件夹，正在后台扫描...', { id: 'library-add-folder' });
+            const result = await libraryService.addFolder(folderPath);
+            setLibrarySongs(result.songs);
+            if (result.existing_folder) {
+                if (result.excluded_songs.length > 0) {
+                    setRestorePrompt({ folderPath, songs: result.excluded_songs });
+                } else {
+                    toast('该文件夹已在音乐库中，没有可恢复的歌曲', { id: 'library-add-folder' });
+                }
+            } else {
+                triggerLibraryUpdate();
+                toast.success('已添加文件夹，正在后台扫描...', { id: 'library-add-folder' });
+            }
         } catch (err) {
             console.error(err);
             const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '添加文件夹失败';
             toast.error(message || '添加文件夹失败', { id: 'library-add-folder' });
         } finally {
             setIsAddingFolder(false);
+        }
+    };
+
+    const handleRestoreSongs = async (ids: number[]) => {
+        try {
+            const result = await libraryService.restoreExcludedSongs(ids);
+            setLibrarySongs(result.songs);
+            triggerLibraryUpdate();
+            const suffix = result.missing_count > 0
+                ? `，${result.missing_count} 首文件已不存在`
+                : '';
+            toast.success(`已恢复 ${result.restored_count} 首歌曲${suffix}`, { id: 'library-restore-songs' });
+        } catch (err) {
+            const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '恢复歌曲失败';
+            toast.error(message || '恢复歌曲失败', { id: 'library-restore-songs' });
+            throw err;
         }
     };
 
@@ -363,6 +392,13 @@ export default function Library() {
                     </AnimatePresence>
                 </div>
             </div>
+            <RestoreExcludedSongsDialog
+                isOpen={restorePrompt !== null}
+                folderPath={restorePrompt?.folderPath ?? ''}
+                songs={restorePrompt?.songs ?? []}
+                onClose={() => setRestorePrompt(null)}
+                onRestore={handleRestoreSongs}
+            />
         </PageContainer>
     );
 }

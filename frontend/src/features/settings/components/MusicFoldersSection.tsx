@@ -6,8 +6,9 @@ import clsx from 'clsx';
 
 import { libraryService } from '@/services/libraryService';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import RestoreExcludedSongsDialog from '@/features/library/dialogs/RestoreExcludedSongsDialog';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import type { LibraryFolder } from '@/types';
+import type { LibraryFolder, SongMetadata } from '@/types';
 import { getSelectedPath } from '@/utils/dialogSelection';
 
 const FOLDER_PREVIEW_COUNT = 3;
@@ -17,6 +18,10 @@ export default function MusicFoldersSection() {
     const [musicFolders, setMusicFolders] = useState<LibraryFolder[]>([]);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [foldersExpanded, setFoldersExpanded] = useState(false);
+    const [restorePrompt, setRestorePrompt] = useState<{
+        folderPath: string;
+        songs: SongMetadata[];
+    } | null>(null);
 
     const reloadFolders = useCallback(async () => {
         try {
@@ -38,10 +43,18 @@ export default function MusicFoldersSection() {
             const folderPath = getSelectedPath(selected);
             if (!folderPath) return;
             setIsAddingFolder(true);
-            await libraryService.addFolder(folderPath);
+            const result = await libraryService.addFolder(folderPath);
             await reloadFolders();
-            triggerLibraryUpdate();
-            toast.success('已添加文件夹，正在后台扫描...', { id: 'add-folder' });
+            if (result.existing_folder) {
+                if (result.excluded_songs.length > 0) {
+                    setRestorePrompt({ folderPath, songs: result.excluded_songs });
+                } else {
+                    toast('该文件夹已在音乐库中，没有可恢复的歌曲', { id: 'add-folder' });
+                }
+            } else {
+                triggerLibraryUpdate();
+                toast.success('已添加文件夹，正在后台扫描...', { id: 'add-folder' });
+            }
         } catch (e: unknown) {
             const msg = typeof e === 'string' ? e : e instanceof Error ? e.message : String(e);
             toast.error(msg || '添加失败', { id: 'add-folder' });
@@ -62,6 +75,21 @@ export default function MusicFoldersSection() {
         } catch (e) {
             console.error(e);
             toast.error('移除失败', { id: 'remove-folder' });
+        }
+    };
+
+    const handleRestoreSongs = async (ids: number[]) => {
+        try {
+            const result = await libraryService.restoreExcludedSongs(ids);
+            triggerLibraryUpdate();
+            const suffix = result.missing_count > 0
+                ? `，${result.missing_count} 首文件已不存在`
+                : '';
+            toast.success(`已恢复 ${result.restored_count} 首歌曲${suffix}`, { id: 'restore-songs' });
+        } catch (e) {
+            const message = typeof e === 'string' ? e : e instanceof Error ? e.message : '恢复歌曲失败';
+            toast.error(message || '恢复歌曲失败', { id: 'restore-songs' });
+            throw e;
         }
     };
 
@@ -138,6 +166,13 @@ export default function MusicFoldersSection() {
                     </button>
                 </div>
             </div>
+            <RestoreExcludedSongsDialog
+                isOpen={restorePrompt !== null}
+                folderPath={restorePrompt?.folderPath ?? ''}
+                songs={restorePrompt?.songs ?? []}
+                onClose={() => setRestorePrompt(null)}
+                onRestore={handleRestoreSongs}
+            />
         </section>
     );
 }
