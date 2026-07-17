@@ -1,8 +1,9 @@
-import { useState, useEffect, memo, useMemo, forwardRef } from 'react';
-import type { CSSProperties, HTMLAttributes, ReactNode } from 'react';
+import { useState, useEffect, memo, useMemo } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
 import clsx from 'clsx';
+import { Virtuoso } from 'react-virtuoso';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
@@ -42,33 +43,14 @@ import {
     getSongId,
 } from '@/features/playlists/songlist/sortableSongListUtils';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 const HIDE_ARTIST_BREAKPOINT = 650;
-
-interface SortableListContextValue {
-    sortableItems: string[];
-    disableReorder: boolean;
-    sortKey: SortKey;
-}
-
-const SortableList = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement> & { context?: SortableListContextValue }>(
-    ({ children, context, ...props }, ref) => (
-        <SortableContext
-            items={context?.sortableItems ?? []}
-            strategy={verticalListSortingStrategy}
-            disabled={context?.disableReorder || context?.sortKey !== 'manual'}
-        >
-            <div ref={ref} {...props}>
-                {children}
-            </div>
-        </SortableContext>
-    )
-);
-SortableList.displayName = 'SortableList';
 
 const renderHeaderCell = (label: ReactNode, className?: string, alignRight = false) => (
     <div
@@ -160,6 +142,8 @@ export default function SortableSongList({
     context = 'playlist' // Default to playlist
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
     const mainContentWidth = useMainContentWidth();
+    const scrollParent = useScrollViewport(true);
+    const overscan = useViewportOverscan(scrollParent);
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
     const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
 
@@ -367,12 +351,25 @@ export default function SortableSongList({
                     },
                 }}
             >
-                <SortableList
-                    context={{ sortableItems, disableReorder, sortKey }}
-                    className="w-full"
+                <SortableContext
+                    items={sortableItems}
+                    strategy={verticalListSortingStrategy}
+                    disabled={disableReorder || sortKey !== 'manual'}
                 >
-                    {displaySongs.map((song, index) => renderItem(song, index))}
-                </SortableList>
+                    {scrollParent ? (
+                        <Virtuoso
+                            useWindowScroll={false}
+                            customScrollParent={scrollParent}
+                            data={displaySongs}
+                            computeItemKey={(index, song) => getSongId(song, index)}
+                            itemContent={(index, song) => renderItem(song, index)}
+                            overscan={overscan}
+                            className="w-full"
+                        />
+                    ) : (
+                        <div className="w-full opacity-0" />
+                    )}
+                </SortableContext>
 
                 {typeof document !== 'undefined' && createPortal(
                     <DragOverlay adjustScale={true}>

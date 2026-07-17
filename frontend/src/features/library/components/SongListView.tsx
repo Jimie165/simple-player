@@ -10,6 +10,7 @@ import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { SongListRow } from '@/features/library/components/SongListRow';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
@@ -257,6 +258,7 @@ export default function SongListView({
     const gridStyle = { gridTemplateColumns: getGridCols() };
 
     const scrollParent = useScrollViewport(virtualize);
+    const overscan = useViewportOverscan(scrollParent);
 
     // Render Row Function
     const itemContent = (index: number, song: SongMetadata) => {
@@ -322,7 +324,7 @@ export default function SongListView({
                         customScrollParent={scrollParent}
                         data={sortedSongs}
                         itemContent={itemContent}
-                        overscan={{ main: 2000, reverse: 2000 }}
+                        overscan={overscan}
                         className="w-full"
                         context={{ footerSpacerClassName }}
                         components={{

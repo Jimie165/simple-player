@@ -84,6 +84,8 @@ export default function CoverImage({ song, src, className, iconClassName, thumbn
                 src={imageSrc}
                 className={clsx("w-full h-full object-cover", className)}
                 alt={song?.title || "Cover"}
+                loading="lazy"
+                decoding="async"
                 onError={() => {
                     if (fallbackSrc && imageSrc !== fallbackSrc) {
                         setImageSrc(fallbackSrc);

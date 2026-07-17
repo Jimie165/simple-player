@@ -212,7 +212,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
 
             <div
                 className={clsx(
-                    "absolute right-0 bottom-0 w-[10px] z-50 transition-opacity duration-300",
+                    "absolute right-0 bottom-0 w-2.5 z-50 transition-opacity duration-300",
                     (isHovering || isDragging) ? "opacity-100" : "opacity-0 pointer-events-none"
                 )}
                 style={{ top: topOffset }}
@@ -222,7 +222,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
                     ref={thumbRef}
                     onPointerDown={handleThumbPointerDown}
                     className={clsx(
-                        "absolute right-[2px] w-[6px] rounded-full transition-colors duration-150 cursor-default touch-none",
+                        "absolute right-0.5 w-1.5 rounded-full transition-colors duration-150 cursor-default touch-none",
                         isDragging
                             ? "bg-outline-variant/80 dark:bg-outline-variant/80"
                             : "bg-outline-variant/40 hover:bg-outline-variant/60 dark:bg-outline-variant/40"

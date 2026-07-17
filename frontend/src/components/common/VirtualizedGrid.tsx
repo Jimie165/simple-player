@@ -3,6 +3,7 @@ import type { CSSProperties, Key, ReactNode } from 'react';
 import clsx from 'clsx';
 import { VirtuosoGrid } from 'react-virtuoso';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 type VirtualizedGridProps<TItem> = {
     data: TItem[];
@@ -21,9 +22,10 @@ export default function VirtualizedGrid<TItem>({
     listClassName,
     listStyle,
     className,
-    overscan = { main: 800, reverse: 800 }
+    overscan
 }: VirtualizedGridProps<TItem>) {
     const scrollParent = useScrollViewport(true);
+    const viewportOverscan = useViewportOverscan(scrollParent);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
 
     useLayoutEffect(() => {
@@ -47,7 +49,7 @@ export default function VirtualizedGrid<TItem>({
                 data={data}
                 itemContent={itemContent}
                 computeItemKey={itemKey}
-                overscan={overscan}
+                overscan={overscan ?? viewportOverscan}
                 listClassName={clsx("virtualized-grid-list", listClassName)}
                 itemClassName="min-w-0"
                 className="w-full"

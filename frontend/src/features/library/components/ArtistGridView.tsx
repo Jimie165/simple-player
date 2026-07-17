@@ -13,6 +13,7 @@ import { getGridColumnCount } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -34,6 +35,7 @@ interface ArtistGridViewProps {
 export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
     const mainContentWidth = useMainContentWidth();
     const scrollParent = useScrollViewport(true);
+    const overscan = useViewportOverscan(scrollParent);
     const columnCount = getGridColumnCount(mainContentWidth, 'cover');
     const artistRows = useMemo(() => {
         const rows: ArtistData[][] = [];
@@ -204,7 +206,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                     customScrollParent={scrollParent}
                     data={artistRows}
                     computeItemKey={(_index, row) => row.map(artist => getMusicItemId(artist)).join('|')}
-                    overscan={{ main: 800, reverse: 800 }}
+                    overscan={overscan}
                     components={{
                         Header: () => <div className="h-4" />,
                         Footer: () => <div className="h-20" />,
