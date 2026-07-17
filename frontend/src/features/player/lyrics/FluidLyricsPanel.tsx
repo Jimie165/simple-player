@@ -5,13 +5,14 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { useFluidLyricsInterlude } from '@/features/player/lyrics/useFluidLyricsInterlude';
 import { useFluidLyricsLayout } from '@/features/player/lyrics/useFluidLyricsLayout';
+import { useFluidLyricsAnimator } from '@/features/player/lyrics/useFluidLyricsAnimator';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
 } from '@/features/player/lyrics/constants';
-import { getFluidLyricsMotionDelays, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
+import { getFluidLyricsMotionDelay, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
 import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
 import { buildDisplayItems, getActiveDisplayIndex, getLineEndMsByIndex } from '@/features/player/lyrics/lyricsDisplay';
 import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
@@ -82,6 +83,15 @@ export default function FluidLyricsPanel({
         displayItems,
         currentMs: renderCurrentMs,
     });
+    const openInterludeIndex = (() => {
+        const candidateIndices = [activeDisplayIndex, activeDisplayIndex - 1];
+        return candidateIndices.find(displayIndex => {
+            const item = displayItems[displayIndex];
+            return item?.type === 'interlude' &&
+                renderCurrentMs >= item.startMs &&
+                renderCurrentMs < item.endMs - interludeNextLineFocusLeadMs;
+        }) ?? -1;
+    })();
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
         const rowHeight = getInterludeRowHeightPx();
@@ -90,14 +100,13 @@ export default function FluidLyricsPanel({
         displayItems.forEach((item, displayIndex) => {
             shifts[displayIndex] = shift;
             if (item.type !== 'interlude') return;
-            const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
             const isOpenInterlude =
                 displayIndex === exitingInterludeIndex ||
-                (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
+                displayIndex === openInterludeIndex;
             if (!isOpenInterlude) shift -= rowHeight;
         });
         return shifts;
-    }, [displayItems, exitingInterludeIndex, renderCurrentMs]);
+    }, [displayItems, exitingInterludeIndex, openInterludeIndex]);
     const activeItem = displayItems[activeDisplayIndex];
     const {
         activeTargetScrollY,
@@ -196,17 +205,25 @@ export default function FluidLyricsPanel({
         }),
         [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
     );
-    const motionDelays = useMemo(
-        () => getFluidLyricsMotionDelays({
+    const getMotionDelay = useCallback(
+        (displayIndex: number) => getFluidLyricsMotionDelay({
             activeDisplayIndex,
             displayItems,
             focusNextLineByVisualEnd,
             isPlaying,
             isUserScrolling,
             variant,
-        }),
+        }, displayIndex),
         [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
     );
+    const registerAnimatedRow = useFluidLyricsAnimator({
+        activeDisplayIndex,
+        getDelay: getMotionDelay,
+        springParams: dynamicSpringParams,
+        targetScrollY,
+        visibleIndices,
+        visualShifts: visualInterludeShifts,
+    });
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
@@ -246,15 +263,12 @@ export default function FluidLyricsPanel({
                                 <FluidLyricsLayoutItem
                                     key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
                                     index={displayIndex}
+                                    onAnimateMount={registerAnimatedRow}
                                     onMount={observeItem}
                                     top={itemTops[displayIndex]}
                                 >
                                     {item.type === 'interlude' ? (
-                                        <motion.div
-                                            initial={false}
-                                            animate={{ y: interludeShift - targetScrollY }}
-                                            transition={{ y: { ...dynamicSpringParams, delay: motionDelays[displayIndex] } }}
-                                        >
+                                        <div>
                                             <InterludeItem
                                                 isActive={isActive}
                                                 forceExiting={displayIndex === exitingInterludeIndex}
@@ -266,7 +280,7 @@ export default function FluidLyricsPanel({
                                                 startMs={item.startMs}
                                                 endMs={item.endMs}
                                             />
-                                        </motion.div>
+                                        </div>
                                     ) : (
                                         <LyricsLineItem
                                             line={item.line}
@@ -284,9 +298,7 @@ export default function FluidLyricsPanel({
                                             preciseMsRef={preciseMsRef}
                                             onSeek={handleLineSeek}
                                             fluidMotion
-                                            targetScrollY={targetScrollY}
-                                            motionDelay={motionDelays[displayIndex]}
-                                            springParams={dynamicSpringParams}
+                                            motionDelay={getMotionDelay(displayIndex)}
                                             variant={variant}
                                         />
                                     )}

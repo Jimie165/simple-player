@@ -1,8 +1,9 @@
-import { memo, useEffect, useRef, type ReactNode } from 'react';
+import { memo, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 interface FluidLyricsLayoutItemProps {
     children: ReactNode;
     index: number;
+    onAnimateMount: (index: number, node: HTMLDivElement) => (() => void) | undefined;
     onMount: (index: number, node: HTMLDivElement) => () => void;
     top: number;
 }
@@ -11,10 +12,17 @@ interface FluidLyricsLayoutItemProps {
 function FluidLyricsLayoutItem({
     children,
     index,
+    onAnimateMount,
     onMount,
     top,
 }: FluidLyricsLayoutItemProps) {
     const elementRef = useRef<HTMLDivElement | null>(null);
+
+    useLayoutEffect(() => {
+        const element = elementRef.current;
+        if (!element) return;
+        return onAnimateMount(index, element);
+    }, [index, onAnimateMount]);
 
     useEffect(() => {
         const element = elementRef.current;

@@ -9,6 +9,58 @@ import {
 import type { LyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 import type { DisplayItem } from '@/features/player/lyrics/types';
 
+interface DisplayTimelineEntry {
+    displayIndex: number;
+    timeMs: number;
+}
+
+interface DisplayTimelineIndex {
+    interludes: Array<DisplayTimelineEntry & { endMs: number }>;
+    lineDisplayIndices: Map<number, number>;
+    timedLines: DisplayTimelineEntry[];
+}
+
+const displayTimelineCache = new WeakMap<DisplayItem[], DisplayTimelineIndex>();
+
+const getDisplayTimelineIndex = (displayItems: DisplayItem[]) => {
+    const cached = displayTimelineCache.get(displayItems);
+    if (cached) return cached;
+
+    const index: DisplayTimelineIndex = {
+        interludes: [],
+        lineDisplayIndices: new Map(),
+        timedLines: [],
+    };
+    displayItems.forEach((item, displayIndex) => {
+        if (item.type === 'interlude') {
+            index.interludes.push({ displayIndex, timeMs: item.startMs, endMs: item.endMs });
+            return;
+        }
+        index.lineDisplayIndices.set(item.lineIndex, displayIndex);
+        if (typeof item.line.time_ms === 'number') {
+            index.timedLines.push({ displayIndex, timeMs: item.line.time_ms });
+        }
+    });
+    displayTimelineCache.set(displayItems, index);
+    return index;
+};
+
+const findEntryAtOrBefore = <T extends DisplayTimelineEntry>(entries: T[], currentMs: number) => {
+    let low = 0;
+    let high = entries.length - 1;
+    let result: T | null = null;
+    while (low <= high) {
+        const middle = (low + high) >> 1;
+        if (entries[middle].timeMs <= currentMs) {
+            result = entries[middle];
+            low = middle + 1;
+        } else {
+            high = middle - 1;
+        }
+    }
+    return result;
+};
+
 export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): number | null {
     for (let index = lineIndex + 1; index < lines.length; index++) {
         const ms = lines[index].time_ms;
@@ -109,11 +161,11 @@ export function getActiveDisplayIndex(
     const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
     const enableLineLyricsEarlyFocus = timingStrategy?.enableLineLyricsEarlyFocus ?? false;
     const currentMs = currentTime * 1000;
-    const interludeIndex = displayItems.findIndex((item) =>
-        item.type === 'interlude' &&
-        currentMs >= item.startMs &&
-        currentMs < item.endMs
-    );
+    const timelineIndex = getDisplayTimelineIndex(displayItems);
+    const interludeEntry = findEntryAtOrBefore(timelineIndex.interludes, currentMs);
+    const interludeIndex = interludeEntry && currentMs < interludeEntry.endMs
+        ? interludeEntry.displayIndex
+        : -1;
 
     if (interludeIndex >= 0) {
         const item = displayItems[interludeIndex];
@@ -123,14 +175,7 @@ export function getActiveDisplayIndex(
         return interludeIndex;
     }
 
-    let activeLineDisplayIndex = -1;
-    for (let index = 0; index < displayItems.length; index++) {
-        const item = displayItems[index];
-        if (item.type !== 'line') continue;
-        if (typeof item.line.time_ms !== 'number') continue;
-        if (item.line.time_ms <= currentMs) activeLineDisplayIndex = index;
-        else break;
-    }
+    const activeLineDisplayIndex = findEntryAtOrBefore(timelineIndex.timedLines, currentMs)?.displayIndex ?? -1;
 
     if (activeLineDisplayIndex >= 0) {
         const currentLineItem = displayItems[activeLineDisplayIndex];
@@ -190,9 +235,7 @@ export function getActiveDisplayIndex(
         return activeLineDisplayIndex;
     }
 
-    const lineDisplayIndex = displayItems.findIndex((item) =>
-        item.type === 'line' && item.lineIndex === currentLyricIndex
-    );
+    const lineDisplayIndex = timelineIndex.lineDisplayIndices.get(currentLyricIndex) ?? -1;
 
     return lineDisplayIndex >= 0 ? lineDisplayIndex : 0;
 }

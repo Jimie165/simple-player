@@ -1,5 +1,4 @@
 import clsx from 'clsx';
-import { motion, type Transition } from 'framer-motion';
 import { memo, useEffect, useRef, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
@@ -20,9 +19,7 @@ interface LyricsLineItemProps {
     preciseMsRef: RefObject<number>;
     onSeek: (time: number) => void;
     fluidMotion?: boolean;
-    targetScrollY?: number;
     motionDelay?: number;
-    springParams?: Transition;
     variant?: 'side' | 'narrow';
 }
 
@@ -56,9 +53,7 @@ function LyricsLineItem({
     preciseMsRef,
     onSeek,
     fluidMotion = false,
-    targetScrollY = 0,
     motionDelay = 0,
-    springParams,
     variant,
 }: LyricsLineItemProps) {
     const rowRef = useRef<HTMLButtonElement | null>(null);
@@ -118,26 +113,9 @@ function LyricsLineItem({
         } as const;
     const targetScale = isActive ? 1.05 : 1;
     const content = (
-        <motion.div
+        <div
+            data-fluid-lyrics-scale={fluidMotion ? '' : undefined}
             className="lyrics-line-scale-layer"
-            initial={false}
-            animate={fluidMotion ? { scale: targetScale } : undefined}
-            transition={fluidMotion ? {
-                scale: {
-                    type: 'spring',
-                    mass: 2,
-                    damping: 25,
-                    stiffness: 100,
-                    restDelta: 0.0001,
-                    restSpeed: 0.001,
-                    delay: motionDelay,
-                },
-            } : undefined}
-            transformTemplate={(_, generatedTransform) =>
-                generatedTransform === 'none'
-                    ? 'translateZ(0)'
-                    : generatedTransform + ' translateZ(0)'
-            }
             style={fluidMotion ? {
                 transformOrigin: 'left center',
                 backfaceVisibility: 'hidden',
@@ -190,35 +168,29 @@ function LyricsLineItem({
                     {line.translation}
                 </span>
             )}
-        </motion.div>
+        </div>
     );
 
     if (fluidMotion) {
         return (
-            <motion.button
+            <button
                 ref={rowRef}
-                initial={false}
                 type="button"
                 onClick={handleClick}
                 disabled={!canSeek}
-                style={renderingIsolationStyle}
-                animate={{
-                    y: interludeShift - targetScrollY,
+                style={{
+                    ...renderingIsolationStyle,
                     filter: rowFilter,
                     opacity: appliedOpacity,
-                }}
-                transition={{
-                    y: {
-                        ...(springParams || { type: 'spring', stiffness: 85, damping: 14, mass: 0.8 }),
-                        delay: motionDelay,
-                    },
-                    filter: { duration: 0.38, ease: 'easeOut', delay: motionDelay * 0.2 },
-                    opacity: { duration: 0.35, ease: 'easeOut', delay: motionDelay * 0.2 },
+                    transition: [
+                        `filter 380ms ease-out ${motionDelay * 0.2}s`,
+                        `opacity 350ms ease-out ${motionDelay * 0.2}s`,
+                    ].join(', '),
                 }}
                 className={className}
             >
                 {content}
-            </motion.button>
+            </button>
         );
     }
 
@@ -257,9 +229,7 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.preciseMsRef === next.preciseMsRef &&
     prev.onSeek === next.onSeek &&
     prev.fluidMotion === next.fluidMotion &&
-    prev.targetScrollY === next.targetScrollY &&
     prev.motionDelay === next.motionDelay &&
-    prev.springParams === next.springParams &&
     prev.variant === next.variant
 );
 

@@ -1,4 +1,4 @@
-import type { Transition } from 'framer-motion';
+import type { FluidSpringParams } from '@/features/player/lyrics/fluidLyricsSpring';
 import type { DisplayItem } from '@/features/player/lyrics/types';
 
 const clamp = (value: number, min: number, max: number) =>
@@ -19,9 +19,9 @@ export function getFluidLyricsSpringParams({
     displayItems,
     isPlaying,
     isUserScrolling,
-}: FluidLyricsMotionArgs): Transition {
+}: FluidLyricsMotionArgs): FluidSpringParams {
     if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
-        return { type: 'spring', stiffness: 90, damping: 15, mass: 1 };
+        return { stiffness: 90, damping: 15, mass: 1 };
     }
 
     const currentItem = displayItems[activeDisplayIndex];
@@ -34,7 +34,7 @@ export function getFluidLyricsSpringParams({
         : previousItem.startMs;
 
     if (currentItem.type === 'interlude' || previousItem.type === 'interlude') {
-        return { type: 'spring', stiffness: 90, damping: 15, mass: 1 };
+        return { stiffness: 90, damping: 15, mass: 1 };
     }
 
     const clampedInterval = clamp(currentStartMs - previousStartMs, 100, 800);
@@ -43,7 +43,6 @@ export function getFluidLyricsSpringParams({
 
     const stiffness = 170 + ratio * 50;
     return {
-        type: 'spring',
         stiffness,
         damping: Math.sqrt(stiffness) * 2.2,
         mass: 1,
@@ -51,16 +50,15 @@ export function getFluidLyricsSpringParams({
 }
 
 /** 计算动画优先歌词原有的逐行牵拉延迟。 */
-export function getFluidLyricsMotionDelays({
+export function getFluidLyricsMotionDelay({
     activeDisplayIndex,
     displayItems,
     focusNextLineByVisualEnd,
     isPlaying,
     isUserScrolling,
     variant,
-}: FluidLyricsMotionArgs): number[] {
-    const delays = new Array(displayItems.length).fill(0);
-    if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return delays;
+}: FluidLyricsMotionArgs, displayIndex: number): number {
+    if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return 0;
 
     const previousItem = displayItems[activeDisplayIndex - 1];
     const isVisualHandoff =
@@ -72,21 +70,20 @@ export function getFluidLyricsMotionDelays({
     const topVisibleIndex = Math.max(0, activeDisplayIndex - visibleRowsAboveFocus);
 
     if (previousItem?.type === 'interlude') {
-        let currentDelay = 0;
-        for (let index = 0; index < displayItems.length; index++) {
-            if (index <= activeDisplayIndex) continue;
-            currentDelay += 0.05;
-            delays[index] = currentDelay;
-        }
-        return delays;
+        return displayIndex > activeDisplayIndex
+            ? (displayIndex - activeDisplayIndex) * 0.05
+            : 0;
     }
 
-    let currentDelay = 0;
-    let baseDelay = isVisualHandoff ? 0.055 : 0.05;
-    for (let index = topVisibleIndex; index < displayItems.length; index++) {
-        delays[index] = currentDelay;
-        currentDelay += baseDelay;
-        if (index >= activeDisplayIndex) baseDelay /= 1.05;
+    if (displayIndex < topVisibleIndex) return 0;
+    const baseDelay = isVisualHandoff ? 0.055 : 0.05;
+    if (displayIndex <= activeDisplayIndex) {
+        return (displayIndex - topVisibleIndex) * baseDelay;
     }
-    return delays;
+
+    const delayAtActive = (activeDisplayIndex - topVisibleIndex) * baseDelay;
+    const rowsAfterActive = displayIndex - activeDisplayIndex;
+    const decay = 1 / 1.05;
+    const trailingDelay = baseDelay * (1 - Math.pow(decay, rowsAfterActive)) / (1 - decay);
+    return delayAtActive + trailingDelay;
 }

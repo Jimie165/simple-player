@@ -123,28 +123,46 @@ export function useFluidLyricsLayout({
         if (includeActiveWindow) windows.push(activeTargetScrollY);
         if (retainedScrollY !== null) windows.push(retainedScrollY);
 
-        const result: number[] = [];
-        displayItems.forEach((_item, index) => {
-            const visualTop = layout.itemTops[index] + (visualShifts[index] ?? 0);
-            const visualBottom = visualTop + layout.itemHeights[index];
-            const isVisible = windows.some(windowTop =>
-                visualBottom >= windowTop - OVERSCAN_PX &&
-                visualTop <= windowTop + viewportSize.height + OVERSCAN_PX
-            );
-            if (isVisible) result.push(index);
+        const visualTops = layout.itemTops.map((top, index) => top + (visualShifts[index] ?? 0));
+        const visible = new Set<number>();
+        const lowerBound = (value: number) => {
+            let low = 0;
+            let high = visualTops.length;
+            while (low < high) {
+                const middle = (low + high) >> 1;
+                if (visualTops[middle] < value) low = middle + 1;
+                else high = middle;
+            }
+            return low;
+        };
+
+        windows.forEach(windowTop => {
+            const minimum = windowTop - OVERSCAN_PX;
+            const maximum = windowTop + viewportSize.height + OVERSCAN_PX;
+            const firstIndex = Math.max(0, lowerBound(minimum) - 1);
+            const endIndex = Math.min(displayItems.length, lowerBound(maximum) + 1);
+            for (let index = firstIndex; index < endIndex; index++) {
+                const visualBottom = visualTops[index] + layout.itemHeights[index];
+                if (visualBottom >= minimum && visualTops[index] <= maximum) visible.add(index);
+            }
         });
-        return result;
+        return [...visible].sort((left, right) => left - right);
     }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, retainedScrollY, targetScrollY, viewportSize.height, visualShifts]);
 
-    const measureItem = useCallback((index: number, height: number) => {
-        if (height <= 0) return;
+    const measureItems = useCallback((updates: ReadonlyMap<number, number>) => {
+        if (updates.size === 0) return;
         setMeasurements(previous => {
             const previousHeights = previous.items === displayItems
                 ? previous.heights
                 : new Map<number, number>();
-            if (previousHeights.get(index) === height && previous.items === displayItems) return previous;
             const nextHeights = new Map(previousHeights);
-            nextHeights.set(index, height);
+            let changed = previous.items !== displayItems;
+            updates.forEach((height, index) => {
+                if (height <= 0 || nextHeights.get(index) === height) return;
+                nextHeights.set(index, height);
+                changed = true;
+            });
+            if (!changed) return previous;
             return { items: displayItems, heights: nextHeights };
         });
     }, [displayItems]);
@@ -152,22 +170,23 @@ export function useFluidLyricsLayout({
     const observeItem = useCallback((index: number, node: HTMLDivElement) => {
         nodeIndexesRef.current.set(node, index);
         observedNodesRef.current.add(node);
-        measureItem(index, node.offsetHeight);
         itemObserverRef.current?.observe(node);
 
         return () => {
             itemObserverRef.current?.unobserve(node);
             observedNodesRef.current.delete(node);
         };
-    }, [measureItem]);
+    }, []);
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
+            const updates = new Map<number, number>();
             entries.forEach(entry => {
                 const index = nodeIndexesRef.current.get(entry.target);
                 const height = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
-                if (index !== undefined) measureItem(index, height);
+                if (index !== undefined) updates.set(index, height);
             });
+            measureItems(updates);
         });
         itemObserverRef.current = observer;
         observedNodesRef.current.forEach(node => observer.observe(node));
@@ -175,7 +194,7 @@ export function useFluidLyricsLayout({
             observer.disconnect();
             if (itemObserverRef.current === observer) itemObserverRef.current = null;
         };
-    }, [measureItem]);
+    }, [measureItems]);
 
     useEffect(() => {
         const element = scrollAreaRef.current;
