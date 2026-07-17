@@ -170,6 +170,9 @@ export function useFluidLyricsLayout({
     const observeItem = useCallback((index: number, node: HTMLDivElement) => {
         nodeIndexesRef.current.set(node, index);
         observedNodesRef.current.add(node);
+        // ResizeObserver 在下一帧才回调。行首次进入视口或窗口宽度变化时，
+        // 先同步写回当前排版高度，避免这一帧仍按旧高度排列而互相挤压。
+        measureItems(new Map([[index, node.offsetHeight]]));
         itemObserverRef.current?.observe(node);
 
         return () => {
@@ -177,7 +180,7 @@ export function useFluidLyricsLayout({
             observedNodesRef.current.delete(node);
             // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
         };
-    }, []);
+    }, [measureItems]);
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
@@ -205,8 +208,13 @@ export function useFluidLyricsLayout({
             const nextSize = { width: element.clientWidth, height: element.clientHeight };
             const previousWidth = lastViewportWidthRef.current;
             lastViewportWidthRef.current = nextSize.width;
-            if (previousWidth > 0 && previousWidth !== nextSize.width) {
-                setMeasurements({ items: displayItems, heights: new Map() });
+            if (previousWidth !== nextSize.width) {
+                const updates = new Map<number, number>();
+                observedNodesRef.current.forEach(node => {
+                    const index = nodeIndexesRef.current.get(node);
+                    if (index !== undefined) updates.set(index, node.offsetHeight);
+                });
+                measureItems(updates);
             }
             setViewportSize(previous =>
                 previous.width === nextSize.width && previous.height === nextSize.height
@@ -218,7 +226,7 @@ export function useFluidLyricsLayout({
         const observer = new ResizeObserver(update);
         observer.observe(element);
         return () => observer.disconnect();
-    }, [displayItems]);
+    }, [measureItems]);
 
     useEffect(() => {
         maxScrollYRef.current = maxScrollY;

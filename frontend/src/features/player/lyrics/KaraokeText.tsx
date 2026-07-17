@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, memo, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
@@ -174,7 +174,7 @@ function KaraokeTextBase({
         return groups;
     }, [flatChars]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!isActive || !isFocused) return;
 
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
@@ -223,6 +223,8 @@ function KaraokeTextBase({
         };
 
         frame = requestAnimationFrame(tick);
+        // 在焦点切换的提交阶段、浏览器绘制退出态之前同步停掉逐帧写入。
+        // 否则旧 rAF 可能把少数尾字重新写成未完成渐变并留在退出层中。
         return () => cancelAnimationFrame(frame);
     }, [flatChars, isActive, isFocused, preciseMsRef]);
 

@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { memo, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 interface FluidLyricsLayoutItemProps {
     children: ReactNode;
@@ -24,7 +24,7 @@ function FluidLyricsLayoutItem({
         return onAnimateMount(index, element);
     }, [index, onAnimateMount]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         const element = elementRef.current;
         if (!element) return;
         return onMount(index, element);
