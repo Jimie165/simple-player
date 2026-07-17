@@ -175,6 +175,7 @@ export function useFluidLyricsLayout({
         return () => {
             itemObserverRef.current?.unobserve(node);
             observedNodesRef.current.delete(node);
+            // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
         };
     }, []);
 

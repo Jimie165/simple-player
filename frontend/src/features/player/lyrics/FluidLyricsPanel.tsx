@@ -231,9 +231,10 @@ function FluidLyricsPanel({
     const registerAnimatedRow = useFluidLyricsAnimator({
         activeDisplayIndex,
         getDelay: getMotionDelay,
+        modelIdentity: displayItems,
+        rowCount: displayItems.length,
         springParams: dynamicSpringParams,
         targetScrollY,
-        visibleIndices,
         visualShifts: visualInterludeShifts,
     });
 
