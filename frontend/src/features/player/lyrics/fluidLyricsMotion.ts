@@ -4,6 +4,14 @@ import type { DisplayItem } from '@/features/player/lyrics/types';
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
+const countLineSteps = (displayItems: DisplayItem[], startIndex: number, endIndex: number) => {
+    let steps = 0;
+    for (let index = startIndex; index < endIndex; index++) {
+        if (displayItems[index]?.type === 'line') steps++;
+    }
+    return steps;
+};
+
 interface FluidLyricsMotionArgs {
     activeDisplayIndex: number;
     displayItems: DisplayItem[];
@@ -67,7 +75,12 @@ export function getFluidLyricsMotionDelay({
         typeof previousItem.line.visual_end_ms === 'number' &&
         (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
     const visibleRowsAboveFocus = isVisualHandoff ? 2 : (variant === 'narrow' ? 3 : 4);
-    const topVisibleIndex = Math.max(0, activeDisplayIndex - visibleRowsAboveFocus);
+    let topVisibleIndex = activeDisplayIndex;
+    let remainingRowsAboveFocus = visibleRowsAboveFocus;
+    while (topVisibleIndex > 0 && remainingRowsAboveFocus > 0) {
+        topVisibleIndex--;
+        if (displayItems[topVisibleIndex]?.type === 'line') remainingRowsAboveFocus--;
+    }
 
     if (previousItem?.type === 'interlude') {
         return displayIndex > activeDisplayIndex
@@ -78,11 +91,11 @@ export function getFluidLyricsMotionDelay({
     if (displayIndex < topVisibleIndex) return 0;
     const baseDelay = isVisualHandoff ? 0.055 : 0.05;
     if (displayIndex <= activeDisplayIndex) {
-        return (displayIndex - topVisibleIndex) * baseDelay;
+        return countLineSteps(displayItems, topVisibleIndex, displayIndex) * baseDelay;
     }
 
-    const delayAtActive = (activeDisplayIndex - topVisibleIndex) * baseDelay;
-    const rowsAfterActive = displayIndex - activeDisplayIndex;
+    const delayAtActive = countLineSteps(displayItems, topVisibleIndex, activeDisplayIndex) * baseDelay;
+    const rowsAfterActive = countLineSteps(displayItems, activeDisplayIndex + 1, displayIndex + 1);
     const decay = 1 / 1.05;
     const trailingDelay = baseDelay * (1 - Math.pow(decay, rowsAfterActive)) / (1 - decay);
     return delayAtActive + trailingDelay;
