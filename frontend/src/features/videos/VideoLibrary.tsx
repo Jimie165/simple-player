@@ -15,6 +15,7 @@ import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdSort, MdCheck, MdExpand
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { Virtuoso } from 'react-virtuoso';
 import { VideoGrid } from '@/features/videos/components/VideoGrid';
+import RestoreArchivedVideosDialog from '@/features/videos/dialogs/RestoreArchivedVideosDialog';
 
 import { useVideoScanProgress } from '@/hooks/useVideoScanProgress';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
@@ -27,6 +28,10 @@ export const VideoLibrary: React.FC = () => {
     const { isSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds, selectItem, deselectItem, selectedIds } = useSelectionStore();
     const scrollParent = useScrollViewport(true);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
+    const [restorePrompt, setRestorePrompt] = useState<{
+        folderPath: string;
+        videos: VideoMetadata[];
+    } | null>(null);
 
     // Use currentTab if we are on the page, otherwise fall back to lastVideoTab to prevent switch animation during exit
     const effectiveTab = currentPage === 'videos' ? currentTab : (lastVideoTab || 'all');
@@ -139,16 +144,39 @@ export const VideoLibrary: React.FC = () => {
             if (!folderPath) return;
 
             setIsAddingFolder(true);
-            const updated = await libraryService.addVideoFolder(folderPath);
-            setVideos(updated);
+            const result = await libraryService.addVideoFolder(folderPath);
+            setVideos(result.videos);
             await fetchVideoFolders();
-            toast.success('已添加视频文件夹，正在后台扫描...', { id: 'video-add-folder' });
+            if (result.existing_folder) {
+                if (result.archived_videos.length > 0) {
+                    setRestorePrompt({ folderPath, videos: result.archived_videos });
+                } else {
+                    toast('该文件夹已在视频库中，没有可恢复的视频', { id: 'video-add-folder' });
+                }
+            } else {
+                toast.success('已添加视频文件夹，正在后台扫描...', { id: 'video-add-folder' });
+            }
         } catch (err) {
             console.error('添加视频文件夹失败:', err);
             const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '添加视频文件夹失败';
             toast.error(message || '添加视频文件夹失败', { id: 'video-add-folder' });
         } finally {
             setIsAddingFolder(false);
+        }
+    };
+
+    const handleRestoreVideos = async (ids: number[]) => {
+        try {
+            const result = await libraryService.restoreArchivedVideos(ids);
+            setVideos(result.videos);
+            const suffix = result.missing_count > 0
+                ? `，${result.missing_count} 个文件已不存在`
+                : '';
+            toast.success(`已恢复 ${result.restored_count} 个视频${suffix}`, { id: 'video-restore-videos' });
+        } catch (err) {
+            const message = typeof err === 'string' ? err : err instanceof Error ? err.message : '恢复视频失败';
+            toast.error(message || '恢复视频失败', { id: 'video-restore-videos' });
+            throw err;
         }
     };
 
@@ -415,6 +443,13 @@ export const VideoLibrary: React.FC = () => {
                     </AnimatePresence>
                 </div>
             </div>
+            <RestoreArchivedVideosDialog
+                isOpen={restorePrompt !== null}
+                folderPath={restorePrompt?.folderPath ?? ''}
+                videos={restorePrompt?.videos ?? []}
+                onClose={() => setRestorePrompt(null)}
+                onRestore={handleRestoreVideos}
+            />
         </PageContainer>
     );
 };

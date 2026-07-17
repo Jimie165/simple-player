@@ -6,8 +6,9 @@ import clsx from 'clsx';
 
 import { libraryService } from '@/services/libraryService';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import RestoreArchivedVideosDialog from '@/features/videos/dialogs/RestoreArchivedVideosDialog';
 import { useVideoStore } from '@/store/useVideoStore';
-import type { LibraryFolder } from '@/types';
+import type { LibraryFolder, VideoMetadata } from '@/types';
 import { getSelectedPath } from '@/utils/dialogSelection';
 
 const FOLDER_PREVIEW_COUNT = 3;
@@ -19,6 +20,10 @@ export default function VideoFoldersSection() {
     const [videoFolders, setVideoFolders] = useState<LibraryFolder[]>([]);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [foldersExpanded, setFoldersExpanded] = useState(false);
+    const [restorePrompt, setRestorePrompt] = useState<{
+        folderPath: string;
+        videos: VideoMetadata[];
+    } | null>(null);
 
     const reloadFolders = useCallback(async () => {
         try {
@@ -46,10 +51,18 @@ export default function VideoFoldersSection() {
             const folderPath = getSelectedPath(selected);
             if (!folderPath) return;
             setIsAddingFolder(true);
-            const updated = await libraryService.addVideoFolder(folderPath);
-            setVideos(updated);
+            const result = await libraryService.addVideoFolder(folderPath);
+            setVideos(result.videos);
             await refreshVideoState();
-            toast.success('已添加视频文件夹，正在后台扫描...', { id: 'add-video-folder' });
+            if (result.existing_folder) {
+                if (result.archived_videos.length > 0) {
+                    setRestorePrompt({ folderPath, videos: result.archived_videos });
+                } else {
+                    toast('该文件夹已在视频库中，没有可恢复的视频', { id: 'add-video-folder' });
+                }
+            } else {
+                toast.success('已添加视频文件夹，正在后台扫描...', { id: 'add-video-folder' });
+            }
         } catch (e: unknown) {
             const msg = typeof e === 'string' ? e : e instanceof Error ? e.message : String(e);
             toast.error(msg || '添加失败', { id: 'add-video-folder' });
@@ -69,6 +82,22 @@ export default function VideoFoldersSection() {
         } catch (e) {
             console.error(e);
             toast.error('移除失败', { id: 'remove-video-folder' });
+        }
+    };
+
+    const handleRestoreVideos = async (ids: number[]) => {
+        try {
+            const result = await libraryService.restoreArchivedVideos(ids);
+            setVideos(result.videos);
+            await fetchVideos();
+            const suffix = result.missing_count > 0
+                ? `，${result.missing_count} 个文件已不存在`
+                : '';
+            toast.success(`已恢复 ${result.restored_count} 个视频${suffix}`, { id: 'restore-videos' });
+        } catch (e) {
+            const message = typeof e === 'string' ? e : e instanceof Error ? e.message : '恢复视频失败';
+            toast.error(message || '恢复视频失败', { id: 'restore-videos' });
+            throw e;
         }
     };
 
@@ -145,6 +174,13 @@ export default function VideoFoldersSection() {
                     </button>
                 </div>
             </div>
+            <RestoreArchivedVideosDialog
+                isOpen={restorePrompt !== null}
+                folderPath={restorePrompt?.folderPath ?? ''}
+                videos={restorePrompt?.videos ?? []}
+                onClose={() => setRestorePrompt(null)}
+                onRestore={handleRestoreVideos}
+            />
         </section>
     );
 }

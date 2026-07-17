@@ -88,6 +88,67 @@ impl VideoRepo {
         ).optional()
     }
 
+    pub fn get_by_id(conn: &Connection, id: i64) -> Result<Option<Video>> {
+        conn.query_row(
+            "SELECT id, path, title, duration, size, width, height, thumbnail_path,
+                    is_favorite, play_count, last_played_at, folder_id, status, created_at, updated_at
+             FROM videos
+             WHERE id = ?1",
+            [id],
+            |row| {
+                Ok(Video {
+                    id: row.get(0)?,
+                    path: row.get(1)?,
+                    title: row.get(2)?,
+                    duration: row.get(3)?,
+                    size: row.get(4)?,
+                    width: row.get(5)?,
+                    height: row.get(6)?,
+                    thumbnail_path: row.get(7)?,
+                    is_favorite: row.get(8)?,
+                    play_count: row.get(9)?,
+                    last_played_at: row.get(10)?,
+                    folder_id: row.get(11)?,
+                    status: row.get(12)?,
+                    created_at: row.get(13)?,
+                    updated_at: row.get(14)?,
+                })
+            },
+        )
+        .optional()
+    }
+
+    pub fn get_archived_by_folder(conn: &Connection, folder_id: i64) -> Result<Vec<Video>> {
+        let mut stmt = conn.prepare(
+            "SELECT id, path, title, duration, size, width, height, thumbnail_path,
+                    is_favorite, play_count, last_played_at, folder_id, status, created_at, updated_at
+             FROM videos
+             WHERE folder_id = ?1 AND status = 'archived'
+             ORDER BY title",
+        )?;
+
+        stmt.query_map([folder_id], |row| {
+            Ok(Video {
+                id: row.get(0)?,
+                path: row.get(1)?,
+                title: row.get(2)?,
+                duration: row.get(3)?,
+                size: row.get(4)?,
+                width: row.get(5)?,
+                height: row.get(6)?,
+                thumbnail_path: row.get(7)?,
+                is_favorite: row.get(8)?,
+                play_count: row.get(9)?,
+                last_played_at: row.get(10)?,
+                folder_id: row.get(11)?,
+                status: row.get(12)?,
+                created_at: row.get(13)?,
+                updated_at: row.get(14)?,
+            })
+        })?
+        .collect()
+    }
+
     pub fn upsert(
         conn: &Connection,
         path: &str,
@@ -148,6 +209,22 @@ impl VideoRepo {
         );
         conn.execute(&query, [])?;
         Ok(())
+    }
+
+    pub fn batch_restore_archived(conn: &Connection, ids: &[i64]) -> Result<usize> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let sql = format!(
+            "UPDATE videos SET status = 'active', updated_at = datetime('now')
+             WHERE status = 'archived' AND id IN ({})",
+            placeholders
+        );
+        let params_refs: Vec<&dyn rusqlite::ToSql> =
+            ids.iter().map(|id| id as &dyn rusqlite::ToSql).collect();
+        conn.execute(&sql, params_refs.as_slice())
     }
 
     pub fn toggle_favorite(conn: &Connection, id: i64) -> Result<bool> {

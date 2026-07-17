@@ -135,6 +135,7 @@ fn main() {
             // Video commands
             commands::video::scan::scan_videos,
             commands::video::scan::add_video_folder,
+            commands::video::scan::restore_archived_videos,
             commands::video::scan::get_video_folders,
             commands::video::scan::remove_video_folder,
             commands::video::query::get_all_videos,

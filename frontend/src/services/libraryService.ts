@@ -31,6 +31,18 @@ export interface RestoreExcludedSongsResult {
     missing_count: number;
 }
 
+export interface AddVideoFolderResult {
+    videos: VideoMetadata[];
+    existing_folder: boolean;
+    archived_videos: VideoMetadata[];
+}
+
+export interface RestoreArchivedVideosResult {
+    videos: VideoMetadata[];
+    restored_count: number;
+    missing_count: number;
+}
+
 export const libraryService = {
     // ========== 文件夹管理 ==========
     getFolders: async (): Promise<LibraryFolder[]> => {
@@ -45,8 +57,12 @@ export const libraryService = {
         return invoke('add_library_folder', { folder });
     },
 
-    addVideoFolder: async (folder: string): Promise<VideoMetadata[]> => {
+    addVideoFolder: async (folder: string): Promise<AddVideoFolderResult> => {
         return invoke('add_video_folder', { folder });
+    },
+
+    restoreArchivedVideos: async (ids: number[]): Promise<RestoreArchivedVideosResult> => {
+        return invoke('restore_archived_videos', { ids });
     },
 
     removeFolder: async (folder: string): Promise<LibraryFolder[]> => {

@@ -10,6 +10,7 @@ use crate::modules::library::video_thumbnails;
 use crate::utils::path::normalize_folder_path;
 use rusqlite::params;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{
     Arc,
@@ -27,6 +28,20 @@ struct ScanProgressPayload {
 #[derive(Serialize, Clone)]
 struct ScanCompletePayload {
     folder_id: i64,
+}
+
+#[derive(Serialize)]
+pub struct AddVideoFolderResult {
+    videos: Vec<Video>,
+    existing_folder: bool,
+    archived_videos: Vec<Video>,
+}
+
+#[derive(Serialize)]
+pub struct RestoreArchivedVideosResult {
+    videos: Vec<Video>,
+    restored_count: usize,
+    missing_count: usize,
 }
 
 struct VideoWorkItem {
@@ -286,15 +301,17 @@ pub async fn add_video_folder(
     db: State<'_, DbState>,
     app_handle: tauri::AppHandle,
     folder: String,
-) -> Result<Vec<Video>, String> {
+) -> Result<AddVideoFolderResult, String> {
     let folder = normalize_folder_path(&folder);
 
-    {
+    let existing_folder_id = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         let existing = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
+        let mut exact_match = None;
         for f in &existing {
             if f.path == folder {
-                return VideoRepo::get_all(&conn).map_err(|e| e.to_string());
+                exact_match = Some(f.id);
+                break;
             }
             if is_subpath_of(&folder, &f.path) {
                 return Err(format!("该目录已被父目录覆盖：{}", f.path));
@@ -306,6 +323,40 @@ pub async fn add_video_folder(
                 ));
             }
         }
+        exact_match
+    };
+
+    if let Some(folder_id) = existing_folder_id {
+        let ignored_dirs = {
+            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            load_video_ignored_dirs(&conn)
+        };
+        let scan_folder = folder.clone();
+        let available_paths: HashSet<String> = tauri::async_runtime::spawn_blocking(move || {
+            video_scanner::scan_video_files_recursive(&scan_folder, &ignored_dirs)
+                .into_iter()
+                .collect()
+        })
+        .await
+        .map_err(|e| e.to_string())?;
+
+        let (videos, archived_videos) = {
+            let conn = db.0.lock().map_err(|e| e.to_string())?;
+            let videos = VideoRepo::get_all(&conn).map_err(|e| e.to_string())?;
+            let archived =
+                VideoRepo::get_archived_by_folder(&conn, folder_id).map_err(|e| e.to_string())?;
+            let archived_videos = archived
+                .into_iter()
+                .filter(|video| available_paths.contains(&video.path))
+                .collect();
+            (videos, archived_videos)
+        };
+
+        return Ok(AddVideoFolderResult {
+            videos,
+            existing_folder: true,
+            archived_videos,
+        });
     }
 
     let ignored_dirs = {
@@ -379,14 +430,13 @@ pub async fn add_video_folder(
     tauri::async_runtime::spawn_blocking(move || {
         let db_state = app_handle.state::<DbState>();
         // Re-use logic: scan_videos_internal will pick up placeholder items (duration=0) and process them
-        let result =
-            scan_videos_internal(
-                db_state,
-                app_handle.clone(),
-                true,
-                Some(added_folder_id),
-                VideoRefreshMode::Incremental,
-            );
+        let result = scan_videos_internal(
+            db_state,
+            app_handle.clone(),
+            true,
+            Some(added_folder_id),
+            VideoRefreshMode::Incremental,
+        );
         if result.is_ok() {
             let _ = app_handle.emit(
                 "video_scan_complete",
@@ -397,7 +447,51 @@ pub async fn add_video_folder(
         }
     });
 
-    Ok(videos)
+    Ok(AddVideoFolderResult {
+        videos,
+        existing_folder: false,
+        archived_videos: Vec::new(),
+    })
+}
+
+/// 恢复用户在重新选择视频文件夹后明确勾选的视频。
+#[tauri::command]
+pub fn restore_archived_videos(
+    db: State<'_, DbState>,
+    app_handle: tauri::AppHandle,
+    ids: Vec<i64>,
+) -> Result<RestoreArchivedVideosResult, String> {
+    let candidates = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        ids.iter()
+            .filter_map(|id| VideoRepo::get_by_id(&conn, *id).ok().flatten())
+            .filter(|video| video.status == "archived")
+            .collect::<Vec<_>>()
+    };
+
+    // 文件存在性检查必须在数据库锁外进行。
+    let restorable_ids = candidates
+        .iter()
+        .filter(|video| Path::new(&video.path).is_file())
+        .map(|video| video.id)
+        .collect::<Vec<_>>();
+    let missing_count = candidates.len().saturating_sub(restorable_ids.len());
+
+    let (restored_count, videos) = {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let restored_count =
+            VideoRepo::batch_restore_archived(&conn, &restorable_ids).map_err(|e| e.to_string())?;
+        let videos = VideoRepo::get_all(&conn).map_err(|e| e.to_string())?;
+        (restored_count, videos)
+    };
+
+    let _ = app_handle.emit("video_scan_complete", ScanCompletePayload { folder_id: 0 });
+
+    Ok(RestoreArchivedVideosResult {
+        videos,
+        restored_count,
+        missing_count,
+    })
 }
 
 /// 获取视频文件夹
