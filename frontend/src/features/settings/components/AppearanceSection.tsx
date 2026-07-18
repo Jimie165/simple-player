@@ -1,4 +1,4 @@
-import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdWeb } from 'react-icons/md';
+import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdGraphicEq, MdWeb } from 'react-icons/md';
 import clsx from 'clsx';
 
 import { useTheme } from '@/hooks/useTheme';
@@ -43,6 +43,8 @@ export default function AppearanceSection() {
         isCustomColor,
         playerEffectMode,
         setPlayerEffectMode,
+        reactiveBackgroundEnabled,
+        setReactiveBackgroundEnabled,
     } = useTheme();
 
     return (
@@ -94,6 +96,40 @@ export default function AppearanceSection() {
                         {playerEffectMode === 'animation' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setReactiveBackgroundEnabled(!reactiveBackgroundEnabled)}
+                    disabled={playerEffectMode !== 'animation'}
+                    className={clsx(
+                        "settings-card flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-opacity",
+                        playerEffectMode !== 'animation' && "cursor-not-allowed opacity-45",
+                    )}
+                >
+                    <span className="flex items-center gap-3">
+                        <MdGraphicEq className="text-xl text-primary" />
+                        <span>
+                            <span className="block text-sm font-medium text-on-surface">音乐律动背景</span>
+                            <span className="block text-xs text-on-surface-variant">根据低频和鼓点轻微推动背景</span>
+                        </span>
+                    </span>
+                    <span
+                        className={clsx(
+                            "relative h-6 w-11 rounded-full transition-colors",
+                            reactiveBackgroundEnabled && playerEffectMode === 'animation'
+                                ? "bg-primary"
+                                : "bg-outline-variant/50",
+                        )}
+                    >
+                        <span
+                            className={clsx(
+                                "absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                reactiveBackgroundEnabled && playerEffectMode === 'animation'
+                                    ? "translate-x-6"
+                                    : "translate-x-1",
+                            )}
+                        />
+                    </span>
+                </button>
             </div>
 
             {/* Color Selection */}

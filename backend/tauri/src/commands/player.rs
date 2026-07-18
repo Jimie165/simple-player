@@ -46,6 +46,11 @@ pub fn set_volume(state: State<'_, AudioState>, volume: f32) {
 }
 
 #[tauri::command]
+pub fn set_reactive_background_enabled(state: State<'_, AudioState>, enabled: bool) {
+    state.set_reactive_background_enabled(enabled);
+}
+
+#[tauri::command]
 pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
     state.get_position()
 }

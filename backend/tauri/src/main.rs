@@ -80,6 +80,7 @@ fn main() {
             commands::player::pause_audio,
             commands::player::resume_audio,
             commands::player::set_volume,
+            commands::player::set_reactive_background_enabled,
             commands::player::seek_audio,
             commands::player::get_audio_position,
             commands::player::get_lyrics,

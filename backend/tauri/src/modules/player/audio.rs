@@ -4,12 +4,15 @@
 #![allow(deprecated)]
 
 use cpal::traits::{DeviceTrait, HostTrait};
-use rodio::{Decoder, DeviceSinkBuilder, MixerDeviceSink, Player};
+use rodio::{
+    ChannelCount, Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, SampleRate, Source,
+    source::SeekError,
+};
 use serde::Serialize;
 use std::fs::File;
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, Ordering},
+    atomic::{AtomicBool, AtomicU32, Ordering},
 };
 use std::thread;
 use std::time::Duration;
@@ -19,6 +22,229 @@ use windows::Win32::Foundation::HWND;
 
 use super::smtc;
 use crate::modules::library::SongMetadata;
+
+#[derive(Clone, Copy, Serialize)]
+struct LowFrequencyFrame {
+    bass: f32,
+    beat: f32,
+}
+
+fn pack_low_frequency_frame(bass: f32, beat: f32) -> u32 {
+    let bass_value = (bass.clamp(0.0, 1.0) * u16::MAX as f32).round() as u32;
+    let beat_value = (beat.clamp(0.0, 1.0) * u16::MAX as f32).round() as u32;
+    bass_value | (beat_value << 16)
+}
+
+fn unpack_low_frequency_frame(value: u32) -> LowFrequencyFrame {
+    LowFrequencyFrame {
+        bass: (value & u16::MAX as u32) as f32 / u16::MAX as f32,
+        beat: (value >> 16) as f32 / u16::MAX as f32,
+    }
+}
+
+struct LowFrequencySource<S> {
+    input: S,
+    level: Arc<AtomicU32>,
+    channel_count: u16,
+    channel_index: u16,
+    frame_sum: f32,
+    low_pass: f32,
+    sub_pass: f32,
+    envelope: f32,
+    adaptive_peak: f32,
+    adaptive_floor: f32,
+    output: f32,
+    beat_output: f32,
+    energy_sum: f32,
+    energy_frames: u16,
+    energy_window: u16,
+    previous_energy: f32,
+    flux_mean: f32,
+    flux_deviation: f32,
+    flux_peak: f32,
+    cooldown_remaining: u8,
+    cooldown_blocks: u8,
+    low_alpha: f32,
+    sub_alpha: f32,
+    envelope_attack: f32,
+    envelope_release: f32,
+    peak_release: f32,
+    floor_rise: f32,
+    floor_release: f32,
+    output_attack: f32,
+    output_release: f32,
+    beat_release: f32,
+    analyzed_frames: u16,
+}
+
+impl<S: Source> LowFrequencySource<S> {
+    fn new(input: S, level: Arc<AtomicU32>) -> Self {
+        let sample_rate = input.sample_rate().get() as f32;
+        Self {
+            channel_count: input.channels().get(),
+            input,
+            level,
+            channel_index: 0,
+            frame_sum: 0.0,
+            low_pass: 0.0,
+            sub_pass: 0.0,
+            envelope: 0.0,
+            adaptive_peak: 0.02,
+            adaptive_floor: 0.002,
+            output: 0.0,
+            beat_output: 0.0,
+            energy_sum: 0.0,
+            energy_frames: 0,
+            energy_window: (sample_rate / 125.0).round().max(1.0) as u16,
+            previous_energy: 0.0,
+            flux_mean: 0.0,
+            flux_deviation: 0.0,
+            flux_peak: 0.001,
+            cooldown_remaining: 0,
+            cooldown_blocks: 6,
+            low_alpha: 1.0 - (-2.0 * std::f32::consts::PI * 120.0 / sample_rate).exp(),
+            sub_alpha: 1.0 - (-2.0 * std::f32::consts::PI * 50.0 / sample_rate).exp(),
+            envelope_attack: 1.0 - (-1.0 / (sample_rate * 0.018)).exp(),
+            envelope_release: 1.0 - (-1.0 / (sample_rate * 0.16)).exp(),
+            peak_release: 1.0 - (-1.0 / (sample_rate * 1.8)).exp(),
+            floor_rise: 1.0 - (-1.0 / (sample_rate * 0.55)).exp(),
+            floor_release: 1.0 - (-1.0 / (sample_rate * 0.12)).exp(),
+            output_attack: 1.0 - (-1.0 / (sample_rate * 0.08)).exp(),
+            output_release: 1.0 - (-1.0 / (sample_rate * 0.28)).exp(),
+            beat_release: 1.0 - (-1.0 / (sample_rate * 0.085)).exp(),
+            analyzed_frames: 0,
+        }
+    }
+
+    fn analyze_frame(&mut self, sample: f32) {
+        self.low_pass += (sample - self.low_pass) * self.low_alpha;
+        self.sub_pass += (sample - self.sub_pass) * self.sub_alpha;
+        let band_sample = self.low_pass - self.sub_pass;
+        let bass = band_sample.abs();
+        let envelope_coefficient = if bass > self.envelope {
+            self.envelope_attack
+        } else {
+            self.envelope_release
+        };
+        self.envelope += (bass - self.envelope) * envelope_coefficient;
+
+        if self.envelope >= self.adaptive_peak {
+            self.adaptive_peak = self.envelope;
+        } else {
+            self.adaptive_peak += (self.envelope - self.adaptive_peak) * self.peak_release;
+        }
+        let floor_coefficient = if self.envelope >= self.adaptive_floor {
+            self.floor_rise
+        } else {
+            self.floor_release
+        };
+        self.adaptive_floor += (self.envelope - self.adaptive_floor) * floor_coefficient;
+
+        let range = (self.adaptive_peak - self.adaptive_floor).max(0.004);
+        let pulse = ((self.envelope - self.adaptive_floor) / range).clamp(0.0, 1.0);
+        let body = (self.envelope / self.adaptive_peak.max(0.004)).clamp(0.0, 1.0);
+        let target = (pulse * 0.30 + body * 0.70).powf(0.9);
+        let output_coefficient = if target > self.output {
+            self.output_attack
+        } else {
+            self.output_release
+        };
+        self.output += (target - self.output) * output_coefficient;
+
+        self.energy_sum += band_sample * band_sample;
+        self.energy_frames += 1;
+        if self.energy_frames >= self.energy_window {
+            let energy = (self.energy_sum / self.energy_frames as f32).sqrt();
+            let flux = (energy - self.previous_energy).max(0.0);
+            let threshold = (self.flux_mean + self.flux_deviation * 1.35).max(0.00015);
+            if self.cooldown_remaining > 0 {
+                self.cooldown_remaining -= 1;
+            } else if flux > threshold && energy > self.adaptive_floor.max(0.001) {
+                let available_range = (self.flux_peak - threshold).max(0.0002);
+                let strength = ((flux - threshold) / available_range).clamp(0.0, 1.0);
+                self.beat_output = self.beat_output.max(0.35 + strength * 0.65);
+                self.cooldown_remaining = self.cooldown_blocks;
+            }
+
+            let deviation = (flux - self.flux_mean).abs();
+            self.flux_mean += (flux - self.flux_mean) * 0.04;
+            self.flux_deviation += (deviation - self.flux_deviation) * 0.04;
+            if flux >= self.flux_peak {
+                self.flux_peak = flux;
+            } else {
+                self.flux_peak += (flux - self.flux_peak) * 0.008;
+            }
+            self.previous_energy = energy;
+            self.energy_sum = 0.0;
+            self.energy_frames = 0;
+        }
+        self.beat_output += (0.0 - self.beat_output) * self.beat_release;
+
+        self.analyzed_frames = self.analyzed_frames.wrapping_add(1);
+        if self.analyzed_frames % 128 == 0 {
+            self.level.store(
+                pack_low_frequency_frame(self.output, self.beat_output),
+                Ordering::Relaxed,
+            );
+        }
+    }
+}
+
+impl<S: Source> Iterator for LowFrequencySource<S> {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let sample = self.input.next()?;
+        self.frame_sum += sample;
+        self.channel_index += 1;
+        if self.channel_index >= self.channel_count {
+            self.analyze_frame(self.frame_sum / self.channel_count as f32);
+            self.channel_index = 0;
+            self.frame_sum = 0.0;
+        }
+        Some(sample)
+    }
+}
+
+impl<S: Source> Source for LowFrequencySource<S> {
+    fn current_span_len(&self) -> Option<usize> {
+        self.input.current_span_len()
+    }
+
+    fn channels(&self) -> ChannelCount {
+        self.input.channels()
+    }
+
+    fn sample_rate(&self) -> SampleRate {
+        self.input.sample_rate()
+    }
+
+    fn total_duration(&self) -> Option<Duration> {
+        self.input.total_duration()
+    }
+
+    fn try_seek(&mut self, position: Duration) -> Result<(), SeekError> {
+        self.input.try_seek(position)?;
+        self.channel_index = 0;
+        self.frame_sum = 0.0;
+        self.low_pass = 0.0;
+        self.sub_pass = 0.0;
+        self.envelope = 0.0;
+        self.adaptive_peak = 0.02;
+        self.adaptive_floor = 0.002;
+        self.output = 0.0;
+        self.beat_output = 0.0;
+        self.energy_sum = 0.0;
+        self.energy_frames = 0;
+        self.previous_energy = 0.0;
+        self.flux_mean = 0.0;
+        self.flux_deviation = 0.0;
+        self.flux_peak = 0.001;
+        self.cooldown_remaining = 0;
+        self.level.store(0, Ordering::Relaxed);
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug)]
 pub enum OutputPreference {
@@ -54,6 +280,8 @@ pub struct AudioState {
     volume: Arc<Mutex<f32>>,
     output_preference: Arc<Mutex<OutputPreference>>,
     active_device_name: Arc<Mutex<Option<String>>>,
+    reactive_background_enabled: Arc<AtomicBool>,
+    low_frequency_level: Arc<AtomicU32>,
     #[allow(dead_code)]
     app_handle: Arc<Mutex<Option<AppHandle>>>,
 }
@@ -68,6 +296,8 @@ impl AudioState {
             volume: Arc::new(Mutex::new(1.0)),
             output_preference: Arc::new(Mutex::new(OutputPreference::SystemDefault)),
             active_device_name: Arc::new(Mutex::new(None)),
+            reactive_background_enabled: Arc::new(AtomicBool::new(false)),
+            low_frequency_level: Arc::new(AtomicU32::new(0.0_f32.to_bits())),
             app_handle: Arc::new(Mutex::new(None)),
         }
     }
@@ -98,6 +328,7 @@ impl AudioState {
             &self.volume,
             &self.output_preference,
             &self.active_device_name,
+            &self.low_frequency_level,
             path.clone(),
             metadata.clone(),
             autoplay,
@@ -125,7 +356,15 @@ impl AudioState {
                 self.volume.clone(),
                 self.output_preference.clone(),
                 self.active_device_name.clone(),
+                self.reactive_background_enabled.clone(),
+                self.low_frequency_level.clone(),
+                app_handle.clone(),
+                monitor_stop.clone(),
+            );
+            Self::start_reactive_monitor(
                 app_handle,
+                self.reactive_background_enabled.clone(),
+                self.low_frequency_level.clone(),
                 monitor_stop,
             );
         }
@@ -137,6 +376,7 @@ impl AudioState {
         volume: &Arc<Mutex<f32>>,
         preference: &Arc<Mutex<OutputPreference>>,
         active_device_name: &Arc<Mutex<Option<String>>>,
+        low_frequency_level: &Arc<AtomicU32>,
         path: String,
         metadata: Option<SongMetadata>,
         autoplay: bool,
@@ -164,7 +404,7 @@ impl AudioState {
 
         let player = Player::connect_new(stream.mixer());
         player.set_volume(*volume.lock().unwrap());
-        player.append(source);
+        player.append(LowFrequencySource::new(source, low_frequency_level.clone()));
 
         if start_position > 0.0 {
             let position = Duration::from_secs_f32(start_position.max(0.0));
@@ -313,79 +553,98 @@ impl AudioState {
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
+        reactive_background_enabled: Arc<AtomicBool>,
+        low_frequency_level: Arc<AtomicU32>,
         app_handle: AppHandle,
         monitor_stop: Arc<AtomicBool>,
     ) {
-        thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_millis(250));
-                if monitor_stop.load(Ordering::SeqCst) {
+        thread::spawn(move || loop {
+            thread::sleep(Duration::from_millis(250));
+            if monitor_stop.load(Ordering::SeqCst) {
+                break;
+            }
+
+            let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
+            let (ended, position) = {
+                let player_lock = player_arc.lock().unwrap();
+                let Some(handle) = player_lock.as_ref() else {
                     break;
-                }
-
-                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
-                let (ended, position) = {
-                    let player_lock = player_arc.lock().unwrap();
-                    let Some(handle) = player_lock.as_ref() else {
-                        break;
-                    };
-
-                    if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
-                        break;
-                    }
-
-                    let position = handle.player.get_pos().as_secs_f32();
-                    let stream_failed = handle.stream_error.load(Ordering::SeqCst);
-                    let follow_drift = !stream_failed
-                        && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
-                        && Self::system_default_drifted(&active_device_name);
-
-                    if stream_failed || follow_drift {
-                        recovery = Some((
-                            handle.path.clone(),
-                            handle.metadata.clone(),
-                            !handle.player.is_paused(),
-                            position,
-                        ));
-                        (false, position)
-                    } else {
-                        (handle.player.empty(), position)
-                    }
                 };
 
-                if let Some((path, metadata, should_play, position)) = recovery {
-                    if !monitor_stop.swap(true, Ordering::SeqCst) {
-                        match Self::recover_output_device(
-                            player_arc.clone(),
-                            volume_arc.clone(),
-                            preference.clone(),
-                            active_device_name.clone(),
-                            app_handle.clone(),
-                            monitor_stop.clone(),
-                            path,
-                            metadata,
-                            should_play,
-                            position,
-                        ) {
-                            Ok(()) => {}
-                            Err(err) => {
-                                eprintln!("Failed to recover audio output: {err}");
-                                smtc::set_playing(false);
-                                let _ = app_handle.emit("audio:output-error", err);
-                            }
-                        }
-                    }
+                if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
                     break;
                 }
 
-                smtc::set_position(position);
+                let position = handle.player.get_pos().as_secs_f32();
+                let stream_failed = handle.stream_error.load(Ordering::SeqCst);
+                let follow_drift = !stream_failed
+                    && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
+                    && Self::system_default_drifted(&active_device_name);
 
-                if ended {
-                    if !monitor_stop.swap(true, Ordering::SeqCst) {
-                        smtc::set_playing(false);
-                        let _ = app_handle.emit("audio:ended", ());
+                if stream_failed || follow_drift {
+                    recovery = Some((
+                        handle.path.clone(),
+                        handle.metadata.clone(),
+                        !handle.player.is_paused(),
+                        position,
+                    ));
+                    (false, position)
+                } else {
+                    (handle.player.empty(), position)
+                }
+            };
+
+            if let Some((path, metadata, should_play, position)) = recovery {
+                if !monitor_stop.swap(true, Ordering::SeqCst) {
+                    match Self::recover_output_device(
+                        player_arc.clone(),
+                        volume_arc.clone(),
+                        preference.clone(),
+                        active_device_name.clone(),
+                        reactive_background_enabled.clone(),
+                        low_frequency_level.clone(),
+                        app_handle.clone(),
+                        monitor_stop.clone(),
+                        path,
+                        metadata,
+                        should_play,
+                        position,
+                    ) {
+                        Ok(()) => {}
+                        Err(err) => {
+                            eprintln!("Failed to recover audio output: {err}");
+                            smtc::set_playing(false);
+                            let _ = app_handle.emit("audio:output-error", err);
+                        }
                     }
-                    break;
+                }
+                break;
+            }
+
+            smtc::set_position(position);
+
+            if ended {
+                if !monitor_stop.swap(true, Ordering::SeqCst) {
+                    smtc::set_playing(false);
+                    let _ = app_handle.emit("audio:ended", ());
+                }
+                break;
+            }
+        });
+    }
+
+    fn start_reactive_monitor(
+        app_handle: AppHandle,
+        enabled: Arc<AtomicBool>,
+        level: Arc<AtomicU32>,
+        monitor_stop: Arc<AtomicBool>,
+    ) {
+        thread::spawn(move || {
+            while !monitor_stop.load(Ordering::SeqCst) {
+                thread::sleep(Duration::from_millis(33));
+                if enabled.load(Ordering::Relaxed) {
+                    let frame = unpack_low_frequency_frame(level.load(Ordering::Relaxed));
+                    let _ = app_handle.emit("audio:low-frequency", frame);
                 }
             }
         });
@@ -404,6 +663,8 @@ impl AudioState {
         volume_arc: Arc<Mutex<f32>>,
         preference: Arc<Mutex<OutputPreference>>,
         active_device_name: Arc<Mutex<Option<String>>>,
+        reactive_background_enabled: Arc<AtomicBool>,
+        low_frequency_level: Arc<AtomicU32>,
         app_handle: AppHandle,
         expected_monitor: Arc<AtomicBool>,
         path: String,
@@ -415,6 +676,7 @@ impl AudioState {
             &volume_arc,
             &preference,
             &active_device_name,
+            &low_frequency_level,
             path,
             metadata.clone(),
             autoplay,
@@ -450,7 +712,15 @@ impl AudioState {
             volume_arc,
             preference,
             active_device_name,
+            reactive_background_enabled.clone(),
+            low_frequency_level.clone(),
+            app_handle.clone(),
+            new_monitor_stop.clone(),
+        );
+        Self::start_reactive_monitor(
             app_handle,
+            reactive_background_enabled,
+            low_frequency_level,
             new_monitor_stop,
         );
         Ok(())
@@ -475,6 +745,24 @@ impl AudioState {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             handle.player.play();
             smtc::set_playing(true);
+        }
+    }
+
+    pub fn set_reactive_background_enabled(&self, enabled: bool) {
+        self.reactive_background_enabled
+            .store(enabled, Ordering::Relaxed);
+        if !enabled {
+            self.low_frequency_level
+                .store(0.0_f32.to_bits(), Ordering::Relaxed);
+            if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+                let _ = app_handle.emit(
+                    "audio:low-frequency",
+                    LowFrequencyFrame {
+                        bass: 0.0,
+                        beat: 0.0,
+                    },
+                );
+            }
         }
     }
 
@@ -602,6 +890,8 @@ impl AudioState {
             self.volume.clone(),
             self.output_preference.clone(),
             self.active_device_name.clone(),
+            self.reactive_background_enabled.clone(),
+            self.low_frequency_level.clone(),
             app_handle,
             monitor_stop,
             path,
@@ -619,4 +909,65 @@ impl AudioState {
         }
         Ok(0.0)
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use core::num::NonZero;
+    use rodio::buffer::SamplesBuffer;
+
+    #[test]
+    fn low_frequency_source_forwards_seek_to_decoder() {
+        let source = SamplesBuffer::new(
+            NonZero::new(1).unwrap(),
+            NonZero::new(44_100).unwrap(),
+            vec![0.0; 44_100],
+        );
+        let level = Arc::new(AtomicU32::new(0));
+        let mut analyzed_source = LowFrequencySource::new(source, level);
+
+        assert!(analyzed_source.try_seek(Duration::from_millis(500)).is_ok());
+    }
+
+    #[test]
+    fn windowed_onset_detector_keeps_dense_hits_separate() {
+        const SAMPLE_RATE: usize = 44_100;
+        const HIT_INTERVAL: usize = SAMPLE_RATE / 8;
+        let source = SamplesBuffer::new(
+            NonZero::new(1).unwrap(),
+            NonZero::new(SAMPLE_RATE as u32).unwrap(),
+            vec![0.0; SAMPLE_RATE * 2],
+        );
+        let level = Arc::new(AtomicU32::new(0));
+        let mut analyzed_source = LowFrequencySource::new(source, level);
+        let mut peak = 0.0_f32;
+        let mut valley = 1.0_f32;
+        let mut pulses = Vec::new();
+
+        for sample_index in 0..SAMPLE_RATE * 2 {
+            let hit_position = sample_index % HIT_INTERVAL;
+            let time = sample_index as f32 / SAMPLE_RATE as f32;
+            let decay = (-(hit_position as f32) / (SAMPLE_RATE as f32 * 0.022)).exp();
+            let sample = (time * 80.0 * std::f32::consts::TAU).sin() * decay;
+            analyzed_source.analyze_frame(sample);
+            peak = peak.max(analyzed_source.beat_output);
+            valley = valley.min(analyzed_source.beat_output);
+
+            if hit_position == HIT_INTERVAL - 1 {
+                pulses.push((peak, valley));
+                peak = 0.0;
+                valley = 1.0;
+            }
+        }
+
+        assert!(
+            pulses
+                .iter()
+                .skip(4)
+                .all(|(peak, valley)| *peak > 0.35 && *valley < *peak * 0.75),
+            "dense hit pulses collapsed: {pulses:?}"
+        );
+    }
+
 }

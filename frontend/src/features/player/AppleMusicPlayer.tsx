@@ -18,6 +18,7 @@ import { useCoverBackground } from '@/features/player/apple/hooks/useCoverBackgr
 import { useImmersiveFullscreen } from '@/features/player/apple/hooks/useImmersiveFullscreen';
 import { useImmersivePlaybackControls } from '@/features/player/apple/hooks/useImmersivePlaybackControls';
 import { useNarrowPanelControls } from '@/features/player/apple/hooks/useNarrowPanelControls';
+import { useLowFrequencyLevel } from '@/features/player/apple/hooks/useLowFrequencyLevel';
 
 export default function AppleMusicPlayer({
     onClose,
@@ -51,7 +52,10 @@ export default function AppleMusicPlayer({
     const { toggleFavorite } = useLibraryStore();
     const { push } = useNavigationStore();
     const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
-    const { playerEffectMode } = useTheme();
+    const { playerEffectMode, reactiveBackgroundEnabled } = useTheme();
+    const lowFrequencyRef = useLowFrequencyLevel(
+        isOpen && isPlaying && playerEffectMode === 'animation' && reactiveBackgroundEnabled,
+    );
 
     const [marqueeResetToken, setMarqueeResetToken] = useState(0);
     const isNarrowPanelLayout = mainContentWidth < 560 && (isQueueOpen || isLyricsOpen);
@@ -222,7 +226,12 @@ export default function AppleMusicPlayer({
             onPointerDown={handleNarrowPointerMove}
             onPointerMove={handleNarrowPointerMove}
         >
-            <PlayerBackground src={bgImageSrc} active={isOpen} variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'} />
+            <PlayerBackground
+                src={bgImageSrc}
+                active={isOpen}
+                variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'}
+                lowFrequencyRef={lowFrequencyRef}
+            />
 
             <ApplePlayerTopBar
                 isFullscreen={isFullscreen}

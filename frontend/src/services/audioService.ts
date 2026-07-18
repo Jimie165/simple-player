@@ -132,6 +132,9 @@ export const audioService = {
 
     setAudioOutput: async (device: string | null): Promise<void> =>
         invoke('set_audio_output', { device }),
+
+    setReactiveBackgroundEnabled: async (enabled: boolean): Promise<void> =>
+        invoke('set_reactive_background_enabled', { enabled }),
 };
 
 export interface AudioOutputInfo {

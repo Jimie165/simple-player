@@ -19,6 +19,8 @@ export function useTheme() {
     const setPlayerEffectMode = useThemeStore((state) => state.setPlayerEffectMode);
     const fullScreenMode = useThemeStore((state) => state.fullScreenMode);
     const setFullScreenMode = useThemeStore((state) => state.setFullScreenMode);
+    const reactiveBackgroundEnabled = useThemeStore((state) => state.reactiveBackgroundEnabled);
+    const setReactiveBackgroundEnabled = useThemeStore((state) => state.setReactiveBackgroundEnabled);
 
     return {
         theme: themeMode,
@@ -37,6 +39,8 @@ export function useTheme() {
         setPlayerEffectMode,
         fullScreenMode,
         setFullScreenMode,
+        reactiveBackgroundEnabled,
+        setReactiveBackgroundEnabled,
 
         presetColors: PRESET_COLORS
     };

@@ -12,10 +12,12 @@ interface ThemeState {
     isDark: boolean; // Computed actual state
     playerEffectMode: PlayerEffectMode;
     fullScreenMode: PlayerEffectMode;
+    reactiveBackgroundEnabled: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
+    setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -32,6 +34,7 @@ export const useThemeStore = create<ThemeState>()(
             isDark: false,
             playerEffectMode: 'performance',
             fullScreenMode: 'performance',
+            reactiveBackgroundEnabled: false,
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
@@ -44,6 +47,10 @@ export const useThemeStore = create<ThemeState>()(
 
             setFullScreenMode: (mode) => {
                 set({ playerEffectMode: mode, fullScreenMode: mode });
+            },
+
+            setReactiveBackgroundEnabled: (enabled) => {
+                set({ reactiveBackgroundEnabled: enabled });
             },
 
             setSourceColor: (hex, isCustom = false) => {
@@ -108,7 +115,8 @@ export const useThemeStore = create<ThemeState>()(
                 sourceColor: state.sourceColor,
                 isCustomColor: state.isCustomColor,
                 playerEffectMode: state.playerEffectMode,
-                fullScreenMode: state.fullScreenMode
+                fullScreenMode: state.fullScreenMode,
+                reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -124,6 +132,7 @@ export const useThemeStore = create<ThemeState>()(
                     ...persistedState,
                     playerEffectMode,
                     fullScreenMode: playerEffectMode,
+                    reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                 };
             },
         }
