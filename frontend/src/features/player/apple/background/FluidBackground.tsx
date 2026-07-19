@@ -43,7 +43,7 @@ vec2 rotate2d(vec2 value, float angle) {
 
 void main() {
     float volume = clamp(u_volume, 0.0, 1.0);
-    vec2 centeredUV = v_uv - vec2(0.5);
+    vec2 centeredUV = v_uv - vec2(0.2);
     vec2 rotatedUV = rotate2d(centeredUV, u_time * 2.0);
     // 低频只推动围绕画面中心的纹理呼吸，不改变底层流动的时间轴。
     vec2 finalUV = rotatedUV * (1.0 - volume * 0.160) + vec2(0.5);
