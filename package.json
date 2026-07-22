@@ -15,9 +15,9 @@
   "author": "",
   "license": "GPL-3.0",
   "devDependencies": {
-    "@tauri-apps/cli": "^2.9.6"
+    "@tauri-apps/cli": "^2.11.4"
   },
   "dependencies": {
-    "react-router-dom": "^7.12.0"
+    "react-router-dom": "^7.18.1"
   }
 }
