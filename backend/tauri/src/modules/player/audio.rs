@@ -24,9 +24,8 @@ use super::smtc;
 use crate::modules::library::SongMetadata;
 
 #[derive(Clone, Copy, Serialize)]
-struct LowFrequencyFrame {
-    bass: f32,
-    beat: f32,
+struct LowFrequencyLevel {
+    volume: f32,
 }
 
 fn pack_low_frequency_frame(bass: f32, beat: f32) -> u32 {
@@ -35,11 +34,8 @@ fn pack_low_frequency_frame(bass: f32, beat: f32) -> u32 {
     bass_value | (beat_value << 16)
 }
 
-fn unpack_low_frequency_frame(value: u32) -> LowFrequencyFrame {
-    LowFrequencyFrame {
-        bass: (value & u16::MAX as u32) as f32 / u16::MAX as f32,
-        beat: (value >> 16) as f32 / u16::MAX as f32,
-    }
+fn unpack_low_frequency_volume(value: u32) -> f32 {
+    (value & u16::MAX as u32) as f32 / u16::MAX as f32
 }
 
 struct LowFrequencySource<S> {
@@ -643,8 +639,8 @@ impl AudioState {
             while !monitor_stop.load(Ordering::SeqCst) {
                 thread::sleep(Duration::from_millis(33));
                 if enabled.load(Ordering::Relaxed) {
-                    let frame = unpack_low_frequency_frame(level.load(Ordering::Relaxed));
-                    let _ = app_handle.emit("audio:low-frequency", frame);
+                    let volume = unpack_low_frequency_volume(level.load(Ordering::Relaxed));
+                    let _ = app_handle.emit("audio:low-frequency", LowFrequencyLevel { volume });
                 }
             }
         });
@@ -757,10 +753,7 @@ impl AudioState {
             if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
                 let _ = app_handle.emit(
                     "audio:low-frequency",
-                    LowFrequencyFrame {
-                        bass: 0.0,
-                        beat: 0.0,
-                    },
+                    LowFrequencyLevel { volume: 0.0 },
                 );
             }
         }

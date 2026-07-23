@@ -1,8 +1,5 @@
 import type { RefObject } from 'react';
 
-import type { LowFrequencyFrame } from '@/features/player/apple/hooks/useLowFrequencyLevel';
-
-import { AudioResponse } from '@/features/player/apple/background/audioResponse';
 import { preprocessArtwork } from '@/features/player/apple/background/artworkPreprocess';
 import { createMesh } from '@/features/player/apple/background/meshGradient';
 
@@ -45,19 +42,22 @@ vec2 rotate2d(vec2 value, float angle) {
 }
 
 void main() {
-    float volume = clamp(u_volume, 0.0, 1.0);
+    float volumeEffect = u_volume * 2.0;
+    float timeVolume = u_time + u_volume;
+
     vec2 centeredUV = v_uv - vec2(0.2);
-    vec2 rotatedUV = rotate2d(centeredUV, u_time * 2.0);
-    // 低频只推动围绕画面中心的纹理呼吸，不改变底层流动的时间轴。
-    vec2 finalUV = rotatedUV * (1.0 - volume * 0.160) + vec2(0.5);
+    vec2 rotatedUV = rotate2d(centeredUV, timeVolume * 2.0);
+    vec2 finalUV = rotatedUV * max(0.001, 1.0 - volumeEffect) + vec2(0.5);
     vec3 color = texture2D(u_texture, finalUV).rgb;
+
+    color *= max(0.5, 1.0 - u_volume * 0.5);
 
     float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
     color += vec3(dither);
 
     float distanceFromCenter = distance(v_uv, vec2(0.5));
-    float vignette = smoothstep(0.82, 0.28, distanceFromCenter);
-    color *= 0.82 + vignette * 0.18;
+    float vignette = smoothstep(0.8, 0.3, distanceFromCenter);
+    color *= 0.6 + vignette * 0.4;
     gl_FragColor = vec4(color, 1.0);
 }
 `;
@@ -134,7 +134,7 @@ function compileProgram(
 
 export class FluidRenderer {
     private readonly canvas: HTMLCanvasElement;
-    private readonly lowFrequencyRef?: RefObject<LowFrequencyFrame>;
+    private readonly lowFrequencyRef?: RefObject<number>;
     private readonly gl: WebGLRenderingContext;
     private readonly meshProgram: ProgramInfo;
     private readonly presentProgram: ProgramInfo;
@@ -147,14 +147,15 @@ export class FluidRenderer {
     private animationFrame = 0;
     private lastFrame = 0;
     private startTime = performance.now();
-    private breath = 0;
-    private readonly audioResponse = new AudioResponse();
+    private sampleVolume = 0;
+    private targetVolume = 0;
+    private sampleStartedAt = performance.now();
     private active = true;
     private visible = !document.hidden;
     private disposed = false;
     private resizeTimer: number | null = null;
 
-    constructor(canvas: HTMLCanvasElement, lowFrequencyRef?: RefObject<LowFrequencyFrame>) {
+    constructor(canvas: HTMLCanvasElement, lowFrequencyRef?: RefObject<number>) {
         this.canvas = canvas;
         this.lowFrequencyRef = lowFrequencyRef;
         const gl = canvas.getContext('webgl', {
@@ -296,6 +297,24 @@ export class FluidRenderer {
         gl.uniform1i(uniform, 0);
     }
 
+    private interpolateLowFrequencyVolume(time: number) {
+        const nextVolume = Math.min(1, Math.max(0, this.lowFrequencyRef?.current ?? 0));
+        if (nextVolume !== this.targetVolume) {
+            const progress = Math.min(1, Math.max(0, (time - this.sampleStartedAt) / 33));
+            this.sampleVolume += (this.targetVolume - this.sampleVolume) * progress;
+            this.targetVolume = nextVolume;
+            this.sampleStartedAt = time;
+        }
+        const progress = Math.min(1, Math.max(0, (time - this.sampleStartedAt) / 33));
+        return this.sampleVolume + (this.targetVolume - this.sampleVolume) * progress;
+    }
+
+    private resetLowFrequencyVolume() {
+        this.sampleVolume = 0;
+        this.targetVolume = 0;
+        this.sampleStartedAt = performance.now();
+    }
+
     private renderMesh(time: number) {
         if (!this.target) return;
         const gl = this.gl;
@@ -311,7 +330,8 @@ export class FluidRenderer {
         gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 16, 8);
         this.bindTexture(this.artworkTexture, program.uniforms.u_texture);
         gl.uniform1f(program.uniforms.u_time, (time - this.startTime) / 10000);
-        gl.uniform1f(program.uniforms.u_volume, this.breath);
+        // AMLL 的 renderer 将宿主传入的 0..1 低频值除以 10。
+        gl.uniform1f(program.uniforms.u_volume, this.interpolateLowFrequencyVolume(time) / 10);
         gl.uniform1f(program.uniforms.u_aspect, this.canvas.width / this.canvas.height);
         gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
     }
@@ -340,7 +360,6 @@ export class FluidRenderer {
             return;
         }
         this.lastFrame = time - elapsed % frameInterval;
-        this.breath = this.audioResponse.update(this.lowFrequencyRef?.current, elapsed);
         this.renderMesh(time);
         this.present();
         this.canvas.style.visibility = 'visible';
@@ -363,8 +382,7 @@ export class FluidRenderer {
         if (active) this.requestFrame();
         else {
             this.cancelFrame();
-            this.breath = 0;
-            this.audioResponse.reset();
+            this.resetLowFrequencyVolume();
         }
     }
 
