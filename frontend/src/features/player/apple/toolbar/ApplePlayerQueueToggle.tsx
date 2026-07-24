@@ -16,10 +16,10 @@ export default function ApplePlayerQueueToggle({ isQueueOpen, onToggle }: AppleP
                 borderRadius: 'clamp(0.5rem,0.95vw,0.72rem)'
             }}
             className={clsx(
-                'flex items-center justify-center transition-all backdrop-blur-md',
+                'flex items-center justify-center transition-colors',
                 isQueueOpen
-                    ? 'bg-white/10 border border-white/10 text-white shadow-lg'
-                    : 'hover:bg-white/10 hover:text-white text-white/50'
+                    ? 'bg-white/10 border border-white/10 text-white shadow-lg backdrop-blur-md'
+                    : 'text-white/50 hover:bg-white/10 hover:text-white'
             )}
         >
             <IoList className={clsx('text-[clamp(1.15rem,2.2vw,1.55rem)]', isQueueOpen ? 'text-primary' : '')} />

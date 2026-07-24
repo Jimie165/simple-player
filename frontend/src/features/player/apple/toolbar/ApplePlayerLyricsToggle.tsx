@@ -23,12 +23,12 @@ export default function ApplePlayerLyricsToggle({ isLyricsOpen, hasLyrics, onTog
                     borderRadius: 'clamp(0.5rem,0.95vw,0.72rem)'
                 }}
                 className={clsx(
-                    'flex items-center justify-center transition-all',
+                    'flex items-center justify-center transition-colors',
                     isDisabled
                         ? 'text-white/20 cursor-not-allowed'
                         : isLyricsOpen
                             ? 'bg-white/20 text-primary shadow-lg backdrop-blur-md'
-                            : 'hover:bg-white/10 hover:text-white text-white/50 backdrop-blur-md'
+                            : 'text-white/50 hover:bg-white/10 hover:text-white'
                 )}
             >
                 <svg
