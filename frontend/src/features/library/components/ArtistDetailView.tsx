@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion } from 'framer-motion';
 import CardPlayButton from '@/components/common/CardPlayButton';
@@ -105,12 +105,17 @@ export default function ArtistDetailView({
         return sortedAlbums.flatMap(album => album.songs);
     }, [sortedAlbums]);
 
-    const animatedAlbumIdsRef = useRef(new Set<string>());
+    const [animatedAlbumIds, setAnimatedAlbumIds] = useState(() => new Set<string>());
     const getAlbumAnimationClass = (album: AlbumData) => {
         const key = `${album.name}::${album.artist}`;
-        const already = animatedAlbumIdsRef.current.has(key);
-        if (!already) animatedAlbumIdsRef.current.add(key);
-        return already ? "" : "animate-in fade-in duration-500";
+        return animatedAlbumIds.has(key) ? "" : "animate-in fade-in duration-500";
+    };
+    const markAlbumAnimationComplete = (album: AlbumData) => {
+        const key = `${album.name}::${album.artist}`;
+        setAnimatedAlbumIds((current) => {
+            if (current.has(key)) return current;
+            return new Set(current).add(key);
+        });
     };
 
     return (
@@ -247,7 +252,12 @@ export default function ArtistDetailView({
                                             key={`${album.name}::${album.artist}`}
                                             className={index === sortedAlbums.length - 1 ? "" : "pb-12"}
                                         >
-                                            <div className={clsx("flex flex-col md:flex-row gap-6 md:gap-8", getAlbumAnimationClass(album))}>
+                                            <div
+                                                className={clsx("flex flex-col md:flex-row gap-6 md:gap-8", getAlbumAnimationClass(album))}
+                                                onAnimationEnd={(event) => {
+                                                    if (event.currentTarget === event.target) markAlbumAnimationComplete(album);
+                                                }}
+                                            >
                                                 <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
                                                     <div
                                                         className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
