@@ -27,7 +27,7 @@ export default function PlainLyricsPanel({ lyrics, status }: PlainLyricsPanelPro
     return (
         <div className="h-full w-full overflow-hidden rounded-[22px]">
             <div
-                className="h-full overflow-y-auto wrap-break-word pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] text-left font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide text-white [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                className="h-full overflow-y-auto wrap-break-word pl-[clamp(1.2rem,2.2vw,2rem)] pr-[clamp(1.7rem,3vw,2.9rem)] text-left font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide text-white scrollbar-none [&::-webkit-scrollbar]:hidden"
             >
                 <div className="py-16">
                     {displayLines.map((line, index) => (
