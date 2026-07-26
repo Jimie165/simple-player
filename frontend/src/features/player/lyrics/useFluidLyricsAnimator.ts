@@ -84,12 +84,12 @@ class FluidLyricsAnimator {
         }
         state.element = element;
         state.scaleElement = element.querySelector<HTMLElement>('[data-fluid-lyrics-scale]');
+        element.style.willChange = 'transform';
+        if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
         this.mountedRows.add(index);
         this.renderState(state);
         if (state.translateY.isAnimating() || (state.scaleElement && state.scale.isAnimating())) {
             this.animatingRows.add(index);
-            element.style.willChange = 'transform';
-            if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
             this.start();
         }
 
@@ -178,8 +178,6 @@ class FluidLyricsAnimator {
             if (state.scaleElement) state.scale.advance(deltaSeconds);
             this.renderState(state);
             if (!state.translateY.isAnimating() && (!state.scaleElement || !state.scale.isAnimating())) {
-                state.element.style.willChange = 'auto';
-                if (state.scaleElement) state.scaleElement.style.willChange = 'auto';
                 this.animatingRows.delete(index);
             }
         });
