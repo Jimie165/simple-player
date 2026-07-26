@@ -1,9 +1,14 @@
 import type { RefObject } from 'react';
 
+import {
+    AudioResponse,
+    type LowFrequencyFrame,
+} from '@/features/player/apple/background/audioResponse';
 import { preprocessArtwork } from '@/features/player/apple/background/artworkPreprocess';
 import { createMesh } from '@/features/player/apple/background/meshGradient';
 
 const RENDER_SCALE = 0.75;
+const FLOW_SPEED = 0.2;
 
 const MESH_VERTEX_SHADER = `
 precision highp float;
@@ -28,7 +33,8 @@ precision highp float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform float u_time;
-uniform float u_volume;
+uniform float u_motion;
+uniform float u_luminance;
 
 const float INV_255 = 1.0 / 255.0;
 const float HALF_INV_255 = 0.5 / 255.0;
@@ -44,15 +50,15 @@ vec2 rotate2d(vec2 value, float angle) {
 }
 
 void main() {
-    float volumeEffect = u_volume * 2.0;
-    float timeVolume = u_time + u_volume;
+    float volumeEffect = u_motion * 0.2;
+    float timeMotion = u_time + u_motion * 0.1;
 
     vec2 centeredUV = v_uv - vec2(0.2);
-    vec2 rotatedUV = rotate2d(centeredUV, timeVolume * 2.0);
+    vec2 rotatedUV = rotate2d(centeredUV, timeMotion * 2.0);
     vec2 finalUV = rotatedUV * max(0.001, 1.0 - volumeEffect) + vec2(0.5);
     vec3 color = texture2D(u_texture, finalUV).rgb;
 
-    color *= max(0.5, 1.0 - u_volume * 0.5);
+    color *= 1.0 - u_luminance * 0.04;
 
     float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
     color += vec3(dither);
@@ -136,7 +142,7 @@ function compileProgram(
 
 export class FluidRenderer {
     private readonly canvas: HTMLCanvasElement;
-    private readonly lowFrequencyRef?: RefObject<number>;
+    private readonly lowFrequencyRef?: RefObject<LowFrequencyFrame>;
     private readonly gl: WebGLRenderingContext;
     private readonly meshProgram: ProgramInfo;
     private readonly presentProgram: ProgramInfo;
@@ -149,22 +155,19 @@ export class FluidRenderer {
     private animationFrame = 0;
     private lastFrame = 0;
     private startTime = performance.now();
-    private sampleVolume = 0;
-    private targetVolume = 0;
-    private sampleStartedAt = performance.now();
+    private readonly audioResponse = new AudioResponse();
     private active = true;
     private visible = !document.hidden;
     private disposed = false;
     private resizeTimer: number | null = null;
 
-    constructor(canvas: HTMLCanvasElement, lowFrequencyRef?: RefObject<number>) {
+    constructor(canvas: HTMLCanvasElement, lowFrequencyRef?: RefObject<LowFrequencyFrame>) {
         this.canvas = canvas;
         this.lowFrequencyRef = lowFrequencyRef;
         const gl = canvas.getContext('webgl', {
             alpha: false,
             antialias: true,
             depth: false,
-            powerPreference: 'low-power',
         });
         if (!gl) throw new Error('当前环境不支持 WebGL 背景');
         this.gl = gl;
@@ -173,7 +176,7 @@ export class FluidRenderer {
             MESH_VERTEX_SHADER,
             MESH_FRAGMENT_SHADER,
             ['a_position', 'a_uv'],
-            ['u_texture', 'u_time', 'u_volume', 'u_aspect'],
+            ['u_texture', 'u_time', 'u_motion', 'u_luminance', 'u_aspect'],
         );
         this.presentProgram = compileProgram(
             gl,
@@ -299,24 +302,6 @@ export class FluidRenderer {
         gl.uniform1i(uniform, 0);
     }
 
-    private interpolateLowFrequencyVolume(time: number) {
-        const nextVolume = Math.min(1, Math.max(0, this.lowFrequencyRef?.current ?? 0));
-        if (nextVolume !== this.targetVolume) {
-            const progress = Math.min(1, Math.max(0, (time - this.sampleStartedAt) / 33));
-            this.sampleVolume += (this.targetVolume - this.sampleVolume) * progress;
-            this.targetVolume = nextVolume;
-            this.sampleStartedAt = time;
-        }
-        const progress = Math.min(1, Math.max(0, (time - this.sampleStartedAt) / 33));
-        return this.sampleVolume + (this.targetVolume - this.sampleVolume) * progress;
-    }
-
-    private resetLowFrequencyVolume() {
-        this.sampleVolume = 0;
-        this.targetVolume = 0;
-        this.sampleStartedAt = performance.now();
-    }
-
     private renderMesh(time: number) {
         if (!this.target) return;
         const gl = this.gl;
@@ -331,9 +316,9 @@ export class FluidRenderer {
         gl.enableVertexAttribArray(program.attributes.a_uv);
         gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 16, 8);
         this.bindTexture(this.artworkTexture, program.uniforms.u_texture);
-        gl.uniform1f(program.uniforms.u_time, (time - this.startTime) / 10000);
-        // AMLL 的 renderer 将宿主传入的 0..1 低频值除以 10。
-        gl.uniform1f(program.uniforms.u_volume, this.interpolateLowFrequencyVolume(time) / 10);
+        gl.uniform1f(program.uniforms.u_time, ((time - this.startTime) / 10000) * FLOW_SPEED);
+        gl.uniform1f(program.uniforms.u_motion, this.audioResponse.motion);
+        gl.uniform1f(program.uniforms.u_luminance, this.audioResponse.luminance);
         gl.uniform1f(program.uniforms.u_aspect, this.canvas.width / this.canvas.height);
         gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
     }
@@ -362,6 +347,7 @@ export class FluidRenderer {
             return;
         }
         this.lastFrame = time - elapsed % frameInterval;
+        this.audioResponse.update(this.lowFrequencyRef?.current, elapsed);
         this.renderMesh(time);
         this.present();
         this.canvas.style.visibility = 'visible';
@@ -384,7 +370,7 @@ export class FluidRenderer {
         if (active) this.requestFrame();
         else {
             this.cancelFrame();
-            this.resetLowFrequencyVolume();
+            this.audioResponse.reset();
         }
     }
 

@@ -24,8 +24,9 @@ use super::smtc;
 use crate::modules::library::SongMetadata;
 
 #[derive(Clone, Copy, Serialize)]
-struct LowFrequencyLevel {
-    volume: f32,
+struct LowFrequencyFrame {
+    bass: f32,
+    beat: f32,
 }
 
 fn pack_low_frequency_frame(bass: f32, beat: f32) -> u32 {
@@ -34,8 +35,11 @@ fn pack_low_frequency_frame(bass: f32, beat: f32) -> u32 {
     bass_value | (beat_value << 16)
 }
 
-fn unpack_low_frequency_volume(value: u32) -> f32 {
-    (value & u16::MAX as u32) as f32 / u16::MAX as f32
+fn unpack_low_frequency_frame(value: u32) -> LowFrequencyFrame {
+    LowFrequencyFrame {
+        bass: (value & u16::MAX as u32) as f32 / u16::MAX as f32,
+        beat: (value >> 16) as f32 / u16::MAX as f32,
+    }
 }
 
 struct LowFrequencySource<S> {
@@ -97,7 +101,7 @@ impl<S: Source> LowFrequencySource<S> {
             flux_deviation: 0.0,
             flux_peak: 0.001,
             cooldown_remaining: 0,
-            cooldown_blocks: 6,
+            cooldown_blocks: 12,
             low_alpha: 1.0 - (-2.0 * std::f32::consts::PI * 120.0 / sample_rate).exp(),
             sub_alpha: 1.0 - (-2.0 * std::f32::consts::PI * 50.0 / sample_rate).exp(),
             envelope_attack: 1.0 - (-1.0 / (sample_rate * 0.018)).exp(),
@@ -639,8 +643,8 @@ impl AudioState {
             while !monitor_stop.load(Ordering::SeqCst) {
                 thread::sleep(Duration::from_millis(33));
                 if enabled.load(Ordering::Relaxed) {
-                    let volume = unpack_low_frequency_volume(level.load(Ordering::Relaxed));
-                    let _ = app_handle.emit("audio:low-frequency", LowFrequencyLevel { volume });
+                    let frame = unpack_low_frequency_frame(level.load(Ordering::Relaxed));
+                    let _ = app_handle.emit("audio:low-frequency", frame);
                 }
             }
         });
@@ -753,7 +757,10 @@ impl AudioState {
             if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
                 let _ = app_handle.emit(
                     "audio:low-frequency",
-                    LowFrequencyLevel { volume: 0.0 },
+                    LowFrequencyFrame {
+                        bass: 0.0,
+                        beat: 0.0,
+                    },
                 );
             }
         }
@@ -911,6 +918,15 @@ mod tests {
     use rodio::buffer::SamplesBuffer;
 
     #[test]
+    fn low_frequency_frame_preserves_bass_and_beat_channels() {
+        let frame = unpack_low_frequency_frame(pack_low_frequency_frame(0.25, 0.75));
+        let tolerance = 1.0 / u16::MAX as f32;
+
+        assert!((frame.bass - 0.25).abs() <= tolerance);
+        assert!((frame.beat - 0.75).abs() <= tolerance);
+    }
+
+    #[test]
     fn low_frequency_source_forwards_seek_to_decoder() {
         let source = SamplesBuffer::new(
             NonZero::new(1).unwrap(),
@@ -962,5 +978,4 @@ mod tests {
             "dense hit pulses collapsed: {pulses:?}"
         );
     }
-
 }

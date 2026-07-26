@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
+import type { LowFrequencyFrame } from '@/features/player/apple/background/audioResponse';
 import { BlurredCoverBackground } from '@/features/player/apple/background/BlurredCoverBackground';
 import { FluidRenderer } from '@/features/player/apple/background/fluidRenderer';
 
@@ -12,7 +13,7 @@ function FluidCanvas({
 }: {
     src: string;
     active: boolean;
-    lowFrequencyRef?: RefObject<number>;
+    lowFrequencyRef?: RefObject<LowFrequencyFrame>;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const rendererRef = useRef<FluidRenderer | null>(null);
@@ -57,7 +58,7 @@ export const PlayerBackground = memo(({
     src: string | null;
     variant?: 'fluid' | 'blurred';
     active?: boolean;
-    lowFrequencyRef?: RefObject<number>;
+    lowFrequencyRef?: RefObject<LowFrequencyFrame>;
 }) => (
     <div className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden bg-[#777a7c]">
         {variant === 'fluid' ? (
