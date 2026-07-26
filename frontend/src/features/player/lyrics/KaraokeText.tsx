@@ -293,6 +293,7 @@ function KaraokeTextBase({
                                 : settledCharStyle;
                             const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
                             const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
+                            const hasGlowEffect = charItem.groupDurationMs > 800;
                             const exitStyle = isExitLayer ? {
                                 animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
                                 '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
@@ -320,7 +321,7 @@ function KaraokeTextBase({
                                         ...exitStyle,
                                     }}
                                 >
-                                    {keepRichLayer && (
+                                    {keepRichLayer && hasGlowEffect && (
                                         <span
                                             key="glow"
                                             aria-hidden="true"
