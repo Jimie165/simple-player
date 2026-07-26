@@ -28,4 +28,48 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('/node_modules/')) return
+
+          if (
+            id.includes('/node_modules/react/') ||
+            id.includes('/node_modules/react-dom/') ||
+            id.includes('/node_modules/scheduler/')
+          ) {
+            return 'react-vendor'
+          }
+
+          if (
+            id.includes('/node_modules/framer-motion/') ||
+            id.includes('/node_modules/motion-dom/') ||
+            id.includes('/node_modules/motion-utils/')
+          ) {
+            return 'motion-vendor'
+          }
+
+          if (id.includes('/node_modules/react-icons/')) {
+            return 'icons-vendor'
+          }
+
+          if (
+            id.includes('/node_modules/@dnd-kit/') ||
+            id.includes('/node_modules/@headlessui/') ||
+            id.includes('/node_modules/react-hot-toast/') ||
+            id.includes('/node_modules/react-virtuoso/')
+          ) {
+            return 'ui-vendor'
+          }
+
+          if (id.includes('/node_modules/@tauri-apps/')) {
+            return 'tauri-vendor'
+          }
+
+          return 'vendor'
+        },
+      },
+    },
+  },
 })
