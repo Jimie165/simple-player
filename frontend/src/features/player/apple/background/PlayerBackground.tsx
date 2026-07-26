@@ -29,7 +29,6 @@ function FluidCanvas({
             return;
         }
         rendererRef.current = renderer;
-        void renderer.setArtwork(src);
         const resizeObserver = new ResizeObserver(() => renderer.resize());
         resizeObserver.observe(canvas);
         const handleVisibility = () => renderer.setVisible(!document.hidden);
@@ -40,7 +39,11 @@ function FluidCanvas({
             renderer.dispose();
             rendererRef.current = null;
         };
-    }, [lowFrequencyRef, src]);
+    }, [lowFrequencyRef]);
+
+    useEffect(() => {
+        void rendererRef.current?.setArtwork(src);
+    }, [src]);
 
     useEffect(() => {
         rendererRef.current?.setActive(active);
@@ -65,7 +68,7 @@ export const PlayerBackground = memo(({
             <AnimatePresence mode="popLayout">
                 {src && (
                     <motion.div
-                        key={src}
+                        key="fluid-background"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}

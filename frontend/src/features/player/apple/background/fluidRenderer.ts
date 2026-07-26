@@ -9,6 +9,7 @@ import { createMesh } from '@/features/player/apple/background/meshGradient';
 
 const RENDER_SCALE = 0.75;
 const FLOW_SPEED = 0.2;
+const ARTWORK_TRANSITION_MS = 500;
 
 const MESH_VERTEX_SHADER = `
 precision highp float;
@@ -83,8 +84,10 @@ const PRESENT_FRAGMENT_SHADER = `
 precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
+uniform float u_alpha;
 void main() {
-    gl_FragColor = texture2D(u_texture, v_uv);
+    vec4 color = texture2D(u_texture, v_uv);
+    gl_FragColor = vec4(color.rgb, color.a * u_alpha);
 }
 `;
 
@@ -98,6 +101,16 @@ interface RenderTarget {
     framebuffer: WebGLFramebuffer;
     texture: WebGLTexture;
 }
+
+interface MeshState {
+    vertexBuffer: WebGLBuffer;
+    indexBuffer: WebGLBuffer;
+    texture: WebGLTexture;
+    indexCount: number;
+    alpha: number;
+}
+
+const easeInOutSine = (value: number) => -(Math.cos(Math.PI * value) - 1) / 2;
 
 function compileProgram(
     gl: WebGLRenderingContext,
@@ -146,15 +159,14 @@ export class FluidRenderer {
     private readonly gl: WebGLRenderingContext;
     private readonly meshProgram: ProgramInfo;
     private readonly presentProgram: ProgramInfo;
-    private readonly meshVertexBuffer: WebGLBuffer;
-    private readonly meshIndexBuffer: WebGLBuffer;
     private readonly quadBuffer: WebGLBuffer;
-    private readonly artworkTexture: WebGLTexture;
-    private indexCount = 0;
+    private meshStates: MeshState[] = [];
     private target: RenderTarget | null = null;
     private animationFrame = 0;
     private lastFrame = 0;
     private startTime = performance.now();
+    private artworkRequest = 0;
+    private hasArtwork = false;
     private readonly audioResponse = new AudioResponse();
     private active = true;
     private visible = !document.hidden;
@@ -183,37 +195,16 @@ export class FluidRenderer {
             QUAD_VERTEX_SHADER,
             PRESENT_FRAGMENT_SHADER,
             ['a_position'],
-            ['u_texture'],
+            ['u_texture', 'u_alpha'],
         );
 
-        const meshVertexBuffer = gl.createBuffer();
-        const meshIndexBuffer = gl.createBuffer();
         const quadBuffer = gl.createBuffer();
-        const artworkTexture = gl.createTexture();
-        if (!meshVertexBuffer || !meshIndexBuffer || !quadBuffer || !artworkTexture) {
-            throw new Error('无法创建网格背景缓冲区');
-        }
-        this.meshVertexBuffer = meshVertexBuffer;
-        this.meshIndexBuffer = meshIndexBuffer;
+        if (!quadBuffer) throw new Error('无法创建网格背景缓冲区');
         this.quadBuffer = quadBuffer;
-        this.artworkTexture = artworkTexture;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
-        gl.bindTexture(gl.TEXTURE_2D, artworkTexture);
-        gl.texImage2D(
-            gl.TEXTURE_2D,
-            0,
-            gl.RGBA,
-            1,
-            1,
-            0,
-            gl.RGBA,
-            gl.UNSIGNED_BYTE,
-            new Uint8Array([76, 82, 88, 255]),
-        );
-        this.configureArtworkTexture();
-        this.updateMesh();
+        this.meshStates.push(this.createMeshState());
         this.resizeNow();
         this.requestFrame();
     }
@@ -226,14 +217,61 @@ export class FluidRenderer {
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
     }
 
-    private updateMesh() {
+    private createMeshState(imageData?: ImageData): MeshState {
         const gl = this.gl;
-        const { vertices, indices } = createMesh();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVertexBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.meshIndexBuffer);
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
-        this.indexCount = indices.length;
+        const vertexBuffer = gl.createBuffer();
+        const indexBuffer = gl.createBuffer();
+        const texture = gl.createTexture();
+        if (!vertexBuffer || !indexBuffer || !texture) {
+            if (vertexBuffer) gl.deleteBuffer(vertexBuffer);
+            if (indexBuffer) gl.deleteBuffer(indexBuffer);
+            if (texture) gl.deleteTexture(texture);
+            throw new Error('无法创建网格背景状态');
+        }
+        try {
+            gl.bindTexture(gl.TEXTURE_2D, texture);
+            gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
+            if (imageData) {
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageData);
+            } else {
+                gl.texImage2D(
+                    gl.TEXTURE_2D,
+                    0,
+                    gl.RGBA,
+                    1,
+                    1,
+                    0,
+                    gl.RGBA,
+                    gl.UNSIGNED_BYTE,
+                    new Uint8Array([76, 82, 88, 255]),
+                );
+            }
+            this.configureArtworkTexture();
+
+            const { vertices, indices } = createMesh();
+            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
+            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+            return {
+                vertexBuffer,
+                indexBuffer,
+                texture,
+                indexCount: indices.length,
+                alpha: 1,
+            };
+        } catch (error) {
+            gl.deleteBuffer(vertexBuffer);
+            gl.deleteBuffer(indexBuffer);
+            gl.deleteTexture(texture);
+            throw error;
+        }
+    }
+
+    private deleteMeshState(state: MeshState) {
+        this.gl.deleteBuffer(state.vertexBuffer);
+        this.gl.deleteBuffer(state.indexBuffer);
+        this.gl.deleteTexture(state.texture);
     }
 
     private createTarget(width: number, height: number): RenderTarget {
@@ -285,8 +323,7 @@ export class FluidRenderer {
         // 修改 canvas backing store 会立即清空默认 framebuffer。必须在同一任务中
         // 完成新 FBO 的首帧呈现，避免全屏切换时把清空后的黑帧交给合成器。
         const now = performance.now();
-        this.renderMesh(now);
-        this.present();
+        this.renderFrame(now);
         this.canvas.style.visibility = 'visible';
         if (previous) {
             this.gl.deleteFramebuffer(previous.framebuffer);
@@ -302,39 +339,74 @@ export class FluidRenderer {
         gl.uniform1i(uniform, 0);
     }
 
-    private renderMesh(time: number) {
+    private renderMesh(time: number, state: MeshState) {
         if (!this.target) return;
         const gl = this.gl;
         const program = this.meshProgram;
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
         gl.useProgram(program.program);
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.meshVertexBuffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.meshIndexBuffer);
+        gl.bindBuffer(gl.ARRAY_BUFFER, state.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 16, 0);
         gl.enableVertexAttribArray(program.attributes.a_uv);
         gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 16, 8);
-        this.bindTexture(this.artworkTexture, program.uniforms.u_texture);
+        this.bindTexture(state.texture, program.uniforms.u_texture);
         gl.uniform1f(program.uniforms.u_time, ((time - this.startTime) / 10000) * FLOW_SPEED);
         gl.uniform1f(program.uniforms.u_motion, this.audioResponse.motion);
         gl.uniform1f(program.uniforms.u_luminance, this.audioResponse.luminance);
         gl.uniform1f(program.uniforms.u_aspect, this.canvas.width / this.canvas.height);
-        gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
     }
 
-    private present() {
+    private present(alpha: number) {
         if (!this.target) return;
         const gl = this.gl;
         const program = this.presentProgram;
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.enable(gl.BLEND);
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         gl.useProgram(program.program);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 0, 0);
         this.bindTexture(this.target.texture, program.uniforms.u_texture);
+        gl.uniform1f(program.uniforms.u_alpha, alpha);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
+
+    private renderFrame(time: number) {
+        if (!this.target) return;
+        const gl = this.gl;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
+        gl.disable(gl.BLEND);
+        gl.clearColor(0, 0, 0, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+        for (const state of this.meshStates) {
+            this.renderMesh(time, state);
+            this.present(easeInOutSine(state.alpha));
+        }
+    }
+
+    private advanceArtworkTransition(elapsed: number) {
+        for (let index = 1; index < this.meshStates.length; index += 1) {
+            const state = this.meshStates[index];
+            state.alpha = Math.min(1, state.alpha + elapsed / ARTWORK_TRANSITION_MS);
+        }
+
+        let latestOpaqueIndex = -1;
+        for (let index = 1; index < this.meshStates.length; index += 1) {
+            if (this.meshStates[index].alpha >= 1) latestOpaqueIndex = index;
+        }
+        if (latestOpaqueIndex <= 0) return;
+        const obsoleteStates = this.meshStates.splice(0, latestOpaqueIndex);
+        for (const state of obsoleteStates) this.deleteMeshState(state);
     }
 
     private draw = (time: number) => {
@@ -348,8 +420,8 @@ export class FluidRenderer {
         }
         this.lastFrame = time - elapsed % frameInterval;
         this.audioResponse.update(this.lowFrequencyRef?.current, elapsed);
-        this.renderMesh(time);
-        this.present();
+        this.advanceArtworkTransition(elapsed);
+        this.renderFrame(time);
         this.canvas.style.visibility = 'visible';
         this.requestFrame();
     };
@@ -380,15 +452,22 @@ export class FluidRenderer {
         else this.cancelFrame();
     }
 
-    private uploadArtwork(imageData: ImageData) {
-        const gl = this.gl;
-        gl.bindTexture(gl.TEXTURE_2D, this.artworkTexture);
-        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 0);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, imageData);
-        this.configureArtworkTexture();
+    private addArtworkState(imageData: ImageData) {
+        const nextState = this.createMeshState(imageData);
+        if (!this.hasArtwork || !this.active || !this.visible) {
+            for (const state of this.meshStates) this.deleteMeshState(state);
+            nextState.alpha = 1;
+            this.meshStates = [nextState];
+            this.hasArtwork = true;
+        } else {
+            nextState.alpha = 0;
+            this.meshStates.push(nextState);
+        }
+        this.requestFrame();
     }
 
     async setArtwork(src: string) {
+        const request = ++this.artworkRequest;
         try {
             const response = await fetch(src);
             if (!response.ok) throw new Error(`封面读取失败：${response.status}`);
@@ -397,14 +476,18 @@ export class FluidRenderer {
                 resizeHeight: 32,
                 resizeQuality: 'low',
             });
-            if (this.disposed) {
+            if (this.disposed || request !== this.artworkRequest) {
                 bitmap.close();
                 return;
             }
-            this.uploadArtwork(preprocessArtwork(bitmap));
-            bitmap.close();
-            this.updateMesh();
-            this.requestFrame();
+            let imageData: ImageData;
+            try {
+                imageData = preprocessArtwork(bitmap);
+            } finally {
+                bitmap.close();
+            }
+            if (this.disposed || request !== this.artworkRequest) return;
+            this.addArtworkState(imageData);
         } catch (error) {
             try {
                 const image = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -414,11 +497,10 @@ export class FluidRenderer {
                     element.onerror = () => reject(new Error('封面图片解码失败'));
                     element.src = src;
                 });
-                if (this.disposed) return;
-                this.uploadArtwork(preprocessArtwork(image));
-                this.updateMesh();
-                this.requestFrame();
+                if (this.disposed || request !== this.artworkRequest) return;
+                this.addArtworkState(preprocessArtwork(image));
             } catch (fallbackError) {
+                if (request !== this.artworkRequest) return;
                 console.error('网格背景封面加载失败', error, fallbackError);
             }
         }
@@ -426,15 +508,15 @@ export class FluidRenderer {
 
     dispose() {
         this.disposed = true;
+        this.artworkRequest += 1;
         this.cancelFrame();
         if (this.resizeTimer !== null) window.clearTimeout(this.resizeTimer);
         if (this.target) {
             this.gl.deleteFramebuffer(this.target.framebuffer);
             this.gl.deleteTexture(this.target.texture);
         }
-        this.gl.deleteTexture(this.artworkTexture);
-        this.gl.deleteBuffer(this.meshVertexBuffer);
-        this.gl.deleteBuffer(this.meshIndexBuffer);
+        for (const state of this.meshStates) this.deleteMeshState(state);
+        this.meshStates = [];
         this.gl.deleteBuffer(this.quadBuffer);
         this.gl.deleteProgram(this.meshProgram.program);
         this.gl.deleteProgram(this.presentProgram.program);
