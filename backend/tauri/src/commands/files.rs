@@ -1,9 +1,9 @@
+use crate::DbState;
 use crate::modules::database::SongRepo;
 use crate::modules::library::video_scanner;
 use crate::modules::library::video_thumbnails;
 use crate::modules::library::{self, SongMetadata};
 use crate::utils::path::normalize_db_path;
-use crate::DbState;
 use std::path::Path;
 use tauri::{Manager, State};
 
@@ -102,10 +102,7 @@ pub fn get_metadata(
 }
 
 #[tauri::command]
-pub fn get_original_metadata(
-    app: tauri::AppHandle,
-    path: String,
-) -> Result<SongMetadata, String> {
+pub fn get_original_metadata(app: tauri::AppHandle, path: String) -> Result<SongMetadata, String> {
     let app_cache_dir = app.path().app_cache_dir().ok();
     library::get_metadata(&path, app_cache_dir.as_deref())
 }
@@ -189,7 +186,7 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 duration: 0,
                 cover: None,
                 cover_path: None,
-                path: Some(normalize_db_path(&std::path::Path::new(&path))),
+                path: Some(normalize_db_path(std::path::Path::new(&path))),
                 size: None,
                 sample_rate: None,
                 bitrate: None,

@@ -1,7 +1,7 @@
+use crate::DbState;
 use crate::modules::database::{Playlist, PlaylistRepo};
 use crate::modules::library::SongMetadata;
 use crate::utils::paths::resolve_app_path;
-use crate::DbState;
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::fs::File;

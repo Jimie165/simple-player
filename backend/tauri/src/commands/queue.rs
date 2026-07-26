@@ -1,6 +1,6 @@
+use crate::DbState;
 use crate::modules::database::PlayQueueRepo;
 use crate::modules::library::SongMetadata;
-use crate::DbState;
 use tauri::State;
 
 /// 保存播放队列

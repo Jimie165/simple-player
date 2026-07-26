@@ -1,5 +1,8 @@
 use std::process::Stdio;
-use std::sync::{OnceLock, atomic::{AtomicBool, Ordering}};
+use std::sync::{
+    OnceLock,
+    atomic::{AtomicBool, Ordering},
+};
 use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,9 +40,7 @@ pub fn cached_hardware_encoder() -> Option<HwAccelType> {
 
 /// 在后台预热检测。设置页调用它后可以立即渲染，避免等待 FFmpeg 启动和编码器探测。
 pub fn start_hardware_encoder_detection(app_handle: AppHandle, ffmpeg: String) {
-    if DETECTED_HWACCEL.get().is_some()
-        || DETECTION_STARTED.swap(true, Ordering::AcqRel)
-    {
+    if DETECTED_HWACCEL.get().is_some() || DETECTION_STARTED.swap(true, Ordering::AcqRel) {
         return;
     }
 
@@ -53,25 +54,25 @@ pub fn start_hardware_encoder_detection(app_handle: AppHandle, ffmpeg: String) {
 pub fn detect_hardware_encoder(ffmpeg: &str) -> HwAccelType {
     *DETECTED_HWACCEL.get_or_init(|| {
         // 优先级：NVENC > QSV > VideoToolbox > VAAPI > Software
-        
+
         if test_encoder(ffmpeg, "h264_nvenc") {
             return HwAccelType::Nvenc;
         }
-        
+
         if test_encoder(ffmpeg, "h264_qsv") {
             return HwAccelType::Qsv;
         }
-        
+
         #[cfg(target_os = "macos")]
         if test_encoder(ffmpeg, "h264_videotoolbox") {
             return HwAccelType::VideoToolbox;
         }
-        
+
         #[cfg(target_os = "linux")]
         if test_encoder(ffmpeg, "h264_vaapi") {
             return HwAccelType::Vaapi;
         }
-        
+
         HwAccelType::None
     })
 }
@@ -83,21 +84,56 @@ fn test_encoder(ffmpeg: &str, encoder_name: &str) -> bool {
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
-    cmd.args(["-f", "lavfi", "-i", "testsrc", "-t", "1", "-c:v", encoder_name, "-f", "null", "-"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+    cmd.args([
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc",
+        "-t",
+        "1",
+        "-c:v",
+        encoder_name,
+        "-f",
+        "null",
+        "-",
+    ])
+    .stdout(Stdio::null())
+    .stderr(Stdio::null())
+    .status()
+    .map(|s| s.success())
+    .unwrap_or(false)
 }
 
 /// 生成硬件加速编码参数
 pub fn get_encode_args(hw_type: HwAccelType) -> Vec<String> {
     match hw_type {
-        HwAccelType::Nvenc => vec!["-c:v", "h264_nvenc", "-preset", "p1", "-rc", "constqp", "-qp", "23"],
-        HwAccelType::Qsv => vec!["-c:v", "h264_qsv", "-preset", "fast", "-global_quality", "20"],
+        HwAccelType::Nvenc => vec![
+            "-c:v",
+            "h264_nvenc",
+            "-preset",
+            "p1",
+            "-rc",
+            "constqp",
+            "-qp",
+            "23",
+        ],
+        HwAccelType::Qsv => vec![
+            "-c:v",
+            "h264_qsv",
+            "-preset",
+            "fast",
+            "-global_quality",
+            "20",
+        ],
         HwAccelType::VideoToolbox => vec!["-c:v", "h264_videotoolbox", "-b:v", "5M"],
-        HwAccelType::Vaapi => vec!["-vaapi_device", "/dev/dri/renderD128", "-c:v", "h264_vaapi", "-b:v", "5M"],
+        HwAccelType::Vaapi => vec![
+            "-vaapi_device",
+            "/dev/dri/renderD128",
+            "-c:v",
+            "h264_vaapi",
+            "-b:v",
+            "5M",
+        ],
         HwAccelType::None => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"],
         HwAccelType::Detecting => vec!["-c:v", "libx264", "-preset", "veryfast", "-crf", "20"],
     }

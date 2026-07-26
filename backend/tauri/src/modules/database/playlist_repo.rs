@@ -3,7 +3,7 @@
 
 use super::models::{Playlist, Song};
 use super::song_repo::SongRepo;
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 
 pub struct PlaylistRepo;
 
@@ -194,8 +194,7 @@ impl PlaylistRepo {
 
     /// 获取播放列表中的所有歌曲 (带 unique_id / playlist_song.id)
     pub fn get_songs(conn: &Connection, playlist_id: i64) -> Result<Vec<Song>> {
-        let sql = format!(
-            "SELECT s.id, s.path, s.title, s.artist, s.album, s.duration, s.cover, s.cover_path, s.folder_id,
+        let sql = "SELECT s.id, s.path, s.title, s.artist, s.album, s.duration, s.cover, s.cover_path, s.folder_id,
                     s.album_artist, s.year, s.genre, s.track_number, s.track_total, s.disc_number, s.disc_total,
                     s.play_count, s.last_played_at, s.is_favorite, s.rating, s.lyrics_text, s.lyrics_source_path, s.lyrics_offset_ms,
                     s.status, s.created_at, s.updated_at,
@@ -203,8 +202,7 @@ impl PlaylistRepo {
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1 AND s.status = 'active'
-             ORDER BY ps.position"
-        );
+             ORDER BY ps.position".to_string();
         let mut stmt = conn.prepare(&sql)?;
         let songs = stmt
             .query_map(params![playlist_id], |row| {

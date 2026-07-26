@@ -99,12 +99,12 @@ fn is_subpath_of(child: &str, parent: &str) -> bool {
         return false;
     };
     let p_head = parent;
-    let head_match = if cfg!(windows) {
+
+    if cfg!(windows) {
         c_head.eq_ignore_ascii_case(p_head)
     } else {
         c_head == p_head
-    };
-    head_match
+    }
 }
 
 fn compute_worker_count(total: usize) -> usize {
@@ -152,7 +152,7 @@ fn process_song_metadata_parallel(
                     let meta = library::get_metadata(&item.path, Some(&app_cache_dir)).ok();
                     out.push(SongWorkResult { item, meta });
                     let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
-                    if count % 50 == 0 || count == total {
+                    if count.is_multiple_of(50) || count == total {
                         let _ = app_handle.emit(
                             "library_scan_progress",
                             ScanProgressPayload {
@@ -266,12 +266,13 @@ async fn scan_library_internal(
                 if let Ok(Some(existing)) = SongRepo::get_by_path_any_status(&conn, &file) {
                     // 检查是否需要迁移旧封面路径
                     // 如果封面路径存在，但既不是新的相对路径（cache/），也不是用户绝对路径，则认为是旧格式
-                    let needs_migration = existing.cover_path.as_ref().map_or(false, |cp| {
-                        !is_app_relative_path(cp) && !is_user_file_path(cp)
-                    });
+                    let needs_migration = existing
+                        .cover_path
+                        .as_ref()
+                        .is_some_and(|cp| !is_app_relative_path(cp) && !is_user_file_path(cp));
 
                     // 检查封面文件是否物理存在（解决用户仅迁移数据库未迁移缓存的问题）
-                    let cover_missing = existing.cover_path.as_ref().map_or(false, |cp| {
+                    let cover_missing = existing.cover_path.as_ref().is_some_and(|cp| {
                         if is_app_relative_path(cp) {
                             !app_cache_dir.join(cp).exists()
                         } else {
@@ -431,10 +432,10 @@ async fn scan_library_internal(
                     if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &result.item.path) {
                         all_songs.push(SongMetadata::from_db_song(&inserted));
                     }
-                } else if let Some(existing_id) = result.item.existing_id {
-                    if result.item.should_restore {
-                        let _ = SongRepo::restore(&conn, existing_id);
-                    }
+                } else if let Some(existing_id) = result.item.existing_id
+                    && result.item.should_restore
+                {
+                    let _ = SongRepo::restore(&conn, existing_id);
                 }
             }
         }

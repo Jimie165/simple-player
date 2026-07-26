@@ -193,7 +193,7 @@ fn migrate_old_config(app: &tauri::App, conn: &Connection) {
     // 删除旧配置文件
     let _ = fs::remove_file(&config_path);
 
-    println!("Migrated {} folders from old config", &count);
+    println!("Migrated {} folders from old config", count);
 }
 
 /// 迁移 Roaming/cache 到 Local/cache

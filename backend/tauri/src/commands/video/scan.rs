@@ -77,12 +77,12 @@ fn is_subpath_of(child: &str, parent: &str) -> bool {
         return false;
     };
     let p_head = parent;
-    let head_match = if cfg!(windows) {
+
+    if cfg!(windows) {
         c_head.eq_ignore_ascii_case(p_head)
     } else {
         c_head == p_head
-    };
-    head_match
+    }
 }
 
 fn compute_worker_count(total: usize) -> usize {
@@ -138,7 +138,7 @@ fn process_video_metadata_parallel(
                     });
 
                     let count = processed.fetch_add(1, Ordering::Relaxed) + 1;
-                    if count % 10 == 0 || count == total {
+                    if count.is_multiple_of(10) || count == total {
                         let _ = app_handle.emit(
                             "video_scan_progress",
                             ScanProgressPayload {
@@ -264,10 +264,10 @@ fn scan_videos_internal(
                     Some(result.item.folder_id),
                 );
 
-                if result.item.should_restore {
-                    if let Some(existing_id) = result.item.existing_id {
-                        let _ = VideoRepo::restore(&conn, existing_id);
-                    }
+                if result.item.should_restore
+                    && let Some(existing_id) = result.item.existing_id
+                {
+                    let _ = VideoRepo::restore(&conn, existing_id);
                 }
             }
         }

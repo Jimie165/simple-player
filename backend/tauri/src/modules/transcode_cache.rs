@@ -10,20 +10,22 @@ use std::time::SystemTime;
 pub fn compute_source_hash(path: &str) -> Result<String, String> {
     // 1. 规范化路径（统一为正斜杠、小写）
     let normalized = normalize_db_path(Path::new(path)).to_lowercase();
-    
+
     // 2. 获取文件元数据
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
     let size = metadata.len();
     let modified = metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH);
-    let modified_secs = modified.duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap_or_default().as_secs();
-    
+    let modified_secs = modified
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
     // 3. 计算哈希
     let mut hasher = Sha256::new();
     hasher.update(normalized.as_bytes());
     hasher.update(size.to_le_bytes());
     hasher.update(modified_secs.to_le_bytes());
-    
+
     Ok(format!("{:x}", hasher.finalize())[..32].to_string())
 }
 
@@ -42,14 +44,12 @@ pub fn ensure_cache_space(
     max_cache_mb: i64,
 ) -> Result<(), String> {
     let max_bytes = max_cache_mb * 1024 * 1024;
-    let mut current_size = TranscodeCacheRepo::get_total_size(conn)
-        .map_err(|e| e.to_string())?;
-    
+    let mut current_size = TranscodeCacheRepo::get_total_size(conn).map_err(|e| e.to_string())?;
+
     // 先清理，再转码
     while current_size + required_bytes > max_bytes {
-        let oldest = TranscodeCacheRepo::get_oldest_records(conn, 1)
-            .map_err(|e| e.to_string())?;
-        
+        let oldest = TranscodeCacheRepo::get_oldest_records(conn, 1).map_err(|e| e.to_string())?;
+
         if oldest.is_empty() {
             // 无可清理的记录但空间仍不足
             return Err(format!(
@@ -58,19 +58,19 @@ pub fn ensure_cache_space(
                 max_cache_mb
             ));
         }
-        
+
         let record = &oldest[0];
-        
+
         // 删除物理文件
         let full_path = resolve_cache_file_path(cache_dir, &record.cache_path);
         let _ = fs::remove_file(&full_path);
-        
+
         // 删除数据库记录
         TranscodeCacheRepo::delete(conn, record.id).map_err(|e| e.to_string())?;
-        
+
         current_size -= record.file_size;
     }
-    
+
     Ok(())
 }
 
@@ -80,9 +80,9 @@ pub fn get_cached_video(
     cache_dir: &Path,
     source_hash: &str,
 ) -> Result<Option<String>, String> {
-    if let Some(cache_path) = TranscodeCacheRepo::find_and_touch(conn, source_hash)
-        .map_err(|e| e.to_string())? {
-        
+    if let Some(cache_path) =
+        TranscodeCacheRepo::find_and_touch(conn, source_hash).map_err(|e| e.to_string())?
+    {
         if cache_path.is_empty() {
             // 忽略空路径（占位符）
             return Ok(None);
@@ -94,8 +94,7 @@ pub fn get_cached_video(
             return Ok(Some(full_path.to_string_lossy().to_string()));
         } else {
             // 文件被手动删除，清理数据库记录
-            TranscodeCacheRepo::delete_by_hash(conn, source_hash)
-                .map_err(|e| e.to_string())?;
+            TranscodeCacheRepo::delete_by_hash(conn, source_hash).map_err(|e| e.to_string())?;
         }
     }
     Ok(None)

@@ -1,9 +1,9 @@
+use crate::DbState;
 use crate::modules::database::SongRepo;
 use crate::modules::library::LyricsData;
 use crate::modules::library::SongMetadata;
 use crate::modules::player::{AudioOutputInfo, AudioOutputState, AudioState};
 use crate::utils::path::normalize_db_path;
-use crate::DbState;
 use std::path::Path;
 use tauri::State;
 
@@ -67,12 +67,12 @@ pub fn get_lyrics(db: State<'_, DbState>, path: String) -> Result<LyricsData, St
         };
         if let Ok(Some(song)) = db_song {
             offset_ms = song.lyrics_offset_ms;
-            if let Some(lyrics_text) = song.lyrics_text.as_deref() {
-                if !lyrics_text.trim().is_empty() {
-                    let mut lyrics = crate::modules::library::lyrics_from_text(lyrics_text);
-                    lyrics.offset_ms = offset_ms;
-                    return Ok(lyrics);
-                }
+            if let Some(lyrics_text) = song.lyrics_text.as_deref()
+                && !lyrics_text.trim().is_empty()
+            {
+                let mut lyrics = crate::modules::library::lyrics_from_text(lyrics_text);
+                lyrics.offset_ms = offset_ms;
+                return Ok(lyrics);
             }
         }
     }
@@ -91,12 +91,11 @@ pub fn get_raw_lyrics(db: State<'_, DbState>, path: String) -> Result<Option<Str
             Ok(None) => SongRepo::get_by_path(&conn, &normalized_path),
             Err(error) => Err(error),
         };
-        if let Ok(Some(song)) = db_song {
-            if let Some(lyrics_text) = song.lyrics_text.as_deref() {
-                if !lyrics_text.trim().is_empty() {
-                    return Ok(Some(lyrics_text.to_string()));
-                }
-            }
+        if let Ok(Some(song)) = db_song
+            && let Some(lyrics_text) = song.lyrics_text.as_deref()
+            && !lyrics_text.trim().is_empty()
+        {
+            return Ok(Some(lyrics_text.to_string()));
         }
     }
 

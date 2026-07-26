@@ -170,19 +170,18 @@ pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
             return Ok(lyrics);
         }
 
-        if let Some(frame) = id3v2_tag.unsync_text().next() {
-            if let Some(lyrics) = build_unsynced_lyrics(&frame.content) {
-                return Ok(lyrics);
-            }
+        if let Some(frame) = id3v2_tag.unsync_text().next()
+            && let Some(lyrics) = build_unsynced_lyrics(&frame.content)
+        {
+            return Ok(lyrics);
         }
     }
 
-    if let Some(tag) = tagged_file.primary_tag() {
-        if let Some(content) = tag.get_string(&ItemKey::Lyrics) {
-            if let Some(lyrics) = build_unsynced_lyrics(content) {
-                return Ok(lyrics);
-            }
-        }
+    if let Some(tag) = tagged_file.primary_tag()
+        && let Some(content) = tag.get_string(&ItemKey::Lyrics)
+        && let Some(lyrics) = build_unsynced_lyrics(content)
+    {
+        return Ok(lyrics);
     }
 
     Ok(LyricsData {
@@ -216,7 +215,10 @@ pub fn get_raw_lyrics(path: &str) -> Result<Option<String>, String> {
                         let minutes = ms / 60000;
                         let seconds = (ms % 60000) / 1000;
                         let hundredths = (ms % 1000) / 10;
-                        format!("[{:02}:{:02}.{:02}]{}", minutes, seconds, hundredths, line.text)
+                        format!(
+                            "[{:02}:{:02}.{:02}]{}",
+                            minutes, seconds, hundredths, line.text
+                        )
                     }
                     None => line.text.clone(),
                 })
@@ -228,12 +230,12 @@ pub fn get_raw_lyrics(path: &str) -> Result<Option<String>, String> {
         }
     }
 
-    if let Some(tag) = tagged_file.primary_tag() {
-        if let Some(content) = tag.get_string(&ItemKey::Lyrics) {
-            let trimmed = content.trim();
-            if !trimmed.is_empty() {
-                return Ok(Some(trimmed.to_string()));
-            }
+    if let Some(tag) = tagged_file.primary_tag()
+        && let Some(content) = tag.get_string(&ItemKey::Lyrics)
+    {
+        let trimmed = content.trim();
+        if !trimmed.is_empty() {
+            return Ok(Some(trimmed.to_string()));
         }
     }
 
@@ -346,23 +348,21 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
     // 获取封面图片
     let mut resolved_cover_path = None;
 
-    if let Some(t) = tag {
-        if let Some(picture) = t.pictures().first() {
-            let mime_type = picture
-                .mime_type()
-                .map(|m| m.as_str())
-                .unwrap_or("image/jpeg");
+    if let Some(t) = tag
+        && let Some(picture) = t.pictures().first()
+    {
+        let mime_type = picture
+            .mime_type()
+            .map(|m| m.as_str())
+            .unwrap_or("image/jpeg");
 
-            if let Some(dir) = app_cache_dir {
-                // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
-                // 使用 crate 绝对路径引用 covers
-                if let Some(path) = crate::modules::library::covers::save_cover_bytes(
-                    dir,
-                    picture.data(),
-                    mime_type,
-                ) {
-                    resolved_cover_path = Some(path);
-                }
+        if let Some(dir) = app_cache_dir {
+            // 如果提供了 app_cache_dir，则缓存封面到磁盘，并清除 cover 字段以减少传输量
+            // 使用 crate 绝对路径引用 covers
+            if let Some(path) =
+                crate::modules::library::covers::save_cover_bytes(dir, picture.data(), mime_type)
+            {
+                resolved_cover_path = Some(path);
             }
         }
     }
@@ -375,7 +375,7 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         duration,
         cover: None,
         cover_path: resolved_cover_path,
-        path: Some(normalize_db_path(&path_obj)),
+        path: Some(normalize_db_path(path_obj)),
         size,
         sample_rate,
         bitrate,
@@ -397,6 +397,6 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         width: None,
         height: None,
         frame_rate: None,
-        channels: channels,
+        channels,
     })
 }

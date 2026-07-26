@@ -1,15 +1,19 @@
+use crate::utils::paths::COVERS_DIR;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use crate::utils::paths::COVERS_DIR;
 
 const COVER_THUMBNAIL_SIZES: [u32; 2] = [128, 512];
 
 fn ensure_cover_thumbnail(covers_dir: &Path, hash: &str, cover_bytes: &[u8], max_size: u32) {
     let thumbnail_path = covers_dir.join(format!("{}.thumb-{}.jpg", hash, max_size));
-    if thumbnail_path.exists() { return; }
-    let Ok(image) = image::load_from_memory(cover_bytes) else { return; };
+    if thumbnail_path.exists() {
+        return;
+    }
+    let Ok(image) = image::load_from_memory(cover_bytes) else {
+        return;
+    };
 
     // 小于目标档位的原图保持其原始像素尺寸，绝不为了凑 128/512 而放大。
     let thumbnail = if image.width() <= max_size && image.height() <= max_size {
@@ -17,7 +21,9 @@ fn ensure_cover_thumbnail(covers_dir: &Path, hash: &str, cover_bytes: &[u8], max
     } else {
         image.thumbnail(max_size, max_size).to_rgb8()
     };
-    let Ok(file) = fs::File::create(&thumbnail_path) else { return; };
+    let Ok(file) = fs::File::create(&thumbnail_path) else {
+        return;
+    };
     let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(file, 86);
     if encoder.encode_image(&thumbnail).is_err() {
         let _ = fs::remove_file(thumbnail_path);
@@ -32,18 +38,34 @@ fn ensure_cover_thumbnail_set(covers_dir: &Path, hash: &str, cover_bytes: &[u8])
 /// 为旧版本已经缓存的原始封面补齐列表缩略图。
 pub fn ensure_cached_cover_thumbnails(app_cache_dir: &Path) {
     let covers_dir = get_covers_dir(app_cache_dir);
-    let Ok(entries) = fs::read_dir(&covers_dir) else { return; };
+    let Ok(entries) = fs::read_dir(&covers_dir) else {
+        return;
+    };
 
     for entry in entries.flatten() {
         let path = entry.path();
-        if !path.is_file() { continue; }
-        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else { continue; };
-        if stem.contains(".thumb") { continue; }
-        let extension = path.extension().and_then(|value| value.to_str()).unwrap_or_default();
-        if !matches!(extension.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp") {
+        if !path.is_file() {
             continue;
         }
-        let Ok(bytes) = fs::read(&path) else { continue; };
+        let Some(stem) = path.file_stem().and_then(|value| value.to_str()) else {
+            continue;
+        };
+        if stem.contains(".thumb") {
+            continue;
+        }
+        let extension = path
+            .extension()
+            .and_then(|value| value.to_str())
+            .unwrap_or_default();
+        if !matches!(
+            extension.to_ascii_lowercase().as_str(),
+            "jpg" | "jpeg" | "png" | "gif" | "webp"
+        ) {
+            continue;
+        }
+        let Ok(bytes) = fs::read(&path) else {
+            continue;
+        };
         ensure_cover_thumbnail_set(&covers_dir, stem, &bytes);
     }
 }
@@ -107,7 +129,7 @@ pub fn save_cover_bytes(
     // 写入文件
     let filename = format!("{}.{}", hash, ext);
     let file_path = covers_dir.join(&filename);
-    
+
     let mut file = fs::File::create(&file_path).ok()?;
     file.write_all(cover_bytes).ok()?;
 
@@ -116,8 +138,8 @@ pub fn save_cover_bytes(
     Some(format!("{}/{}", COVERS_DIR, filename))
 }
 
-use tauri::AppHandle;
 use crate::utils::paths::resolve_app_path;
+use tauri::AppHandle;
 
 /// 获取封面的完整路径
 #[allow(dead_code)]
@@ -128,16 +150,18 @@ pub fn get_cover_full_path(app: &AppHandle, cover_path: &str) -> Option<PathBuf>
 /// 检查封面文件是否存在
 #[allow(dead_code)]
 pub fn cover_exists(app: &AppHandle, cover_path: &str) -> bool {
-    get_cover_full_path(app, cover_path).map(|p| p.exists()).unwrap_or(false)
+    get_cover_full_path(app, cover_path)
+        .map(|p| p.exists())
+        .unwrap_or(false)
 }
 
 /// 删除封面文件
 #[allow(dead_code)]
 pub fn delete_cover(app: &AppHandle, cover_path: &str) -> std::io::Result<()> {
-    if let Some(full_path) = get_cover_full_path(app, cover_path) {
-        if full_path.exists() {
-            fs::remove_file(full_path)?;
-        }
+    if let Some(full_path) = get_cover_full_path(app, cover_path)
+        && full_path.exists()
+    {
+        fs::remove_file(full_path)?;
     }
     Ok(())
 }

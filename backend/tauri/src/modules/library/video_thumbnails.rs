@@ -3,14 +3,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
 use tauri::Manager;
-use windows::core::Interface;
-use windows::core::HSTRING;
 use windows::Storage::FileProperties::{ThumbnailMode, ThumbnailOptions};
 use windows::Storage::StorageFile;
 use windows::Storage::Streams::{DataReader, IInputStream};
+use windows::core::HSTRING;
+use windows::core::Interface;
 
-use crate::utils::path::normalize_windows_path;
 use crate::utils::ffmpeg::resolve_ffmpeg_binary;
+use crate::utils::path::normalize_windows_path;
 use crate::utils::paths::VIDEO_THUMBNAILS_DIR;
 
 /// 获取视频缩略图缓存目录
@@ -35,7 +35,11 @@ fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>
         .map_err(|e| format!("GetFileFromPathAsync get failed: {e}"))?;
 
     let thumb = file
-        .GetThumbnailAsync(ThumbnailMode::VideosView, requested_size, ThumbnailOptions::None)
+        .GetThumbnailAsync(
+            ThumbnailMode::VideosView,
+            requested_size,
+            ThumbnailOptions::None,
+        )
         .map_err(|e| format!("GetThumbnailAsync failed: {e}"))?
         .get()
         .map_err(|e| format!("GetThumbnailAsync get failed: {e}"))?;
@@ -72,10 +76,10 @@ fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>
 }
 
 /// 为视频文件生成缩略图
-/// 
+///
 /// 首先尝试使用 Windows API（如果在 Windows 上），
 /// 如果失败则回退到 FFmpeg。
-/// 
+///
 /// 返回相对路径（如 `cache/video_thumbnails/{hash}.jpg`）
 pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Option<String>, String> {
     let cache_dir = app
@@ -94,7 +98,7 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
     for ext in common_exts {
         let cached_path = thumbs_dir.join(format!("{}.{}", hash, ext));
         if cached_path.exists() {
-             return Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)));
+            return Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)));
         }
     }
 
@@ -111,11 +115,11 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
                     if let Some(ffmpeg_path) = resolve_ffmpeg_binary(app, "ffmpeg") {
                         let out_path_jpg = thumbs_dir.join(format!("{hash}.jpg"));
                         if generate_thumbnail_with_ffmpeg(&ffmpeg_path, &file_path, &out_path_jpg) {
-                             return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
+                            return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
                         }
                     }
                     return Ok(None);
-                },
+                }
             },
         },
     };
@@ -137,7 +141,8 @@ fn generate_thumbnail_with_ffmpeg(ffmpeg_path: &str, input_path: &str, output_pa
         use std::os::windows::process::CommandExt;
         cmd.creation_flags(0x08000000);
     }
-    let status = cmd.args([
+    let status = cmd
+        .args([
             "-y",
             "-i",
             input_path,

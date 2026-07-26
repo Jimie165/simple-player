@@ -481,7 +481,7 @@ fn migrate_v9(conn: &Connection) -> Result<()> {
          ON transcoded_cache(last_accessed_at)",
         [],
     )?;
-    
+
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_transcoded_cache_in_use 
          ON transcoded_cache(is_in_use)",

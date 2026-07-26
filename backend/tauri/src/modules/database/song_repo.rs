@@ -2,7 +2,7 @@
 // ============================================================================
 
 use super::models::Song;
-use rusqlite::{params, Connection, Result};
+use rusqlite::{Connection, Result, params};
 
 pub struct SongRepo;
 
@@ -585,8 +585,8 @@ mod tests {
         )
         .expect("create songs");
 
-        let restored = SongRepo::batch_restore_excluded(&conn, &[1, 2])
-            .expect("restore excluded songs");
+        let restored =
+            SongRepo::batch_restore_excluded(&conn, &[1, 2]).expect("restore excluded songs");
         let statuses: Vec<String> = conn
             .prepare("SELECT status FROM songs ORDER BY id")
             .expect("prepare status query")

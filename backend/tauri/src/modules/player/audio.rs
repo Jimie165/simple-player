@@ -181,7 +181,7 @@ impl<S: Source> LowFrequencySource<S> {
         self.beat_output += (0.0 - self.beat_output) * self.beat_release;
 
         self.analyzed_frames = self.analyzed_frames.wrapping_add(1);
-        if self.analyzed_frames % 128 == 0 {
+        if self.analyzed_frames.is_multiple_of(128) {
             self.level.store(
                 pack_low_frequency_frame(self.output, self.beat_output),
                 Ordering::Relaxed,
@@ -372,6 +372,8 @@ impl AudioState {
         Ok(())
     }
 
+    // Playback construction needs these synchronized state handles as one atomic setup step.
+    #[allow(clippy::too_many_arguments)]
     fn build_playback_handle(
         volume: &Arc<Mutex<f32>>,
         preference: &Arc<Mutex<OutputPreference>>,
@@ -548,6 +550,8 @@ impl AudioState {
         }
     }
 
+    // The monitor owns clones of each playback state handle for its worker lifetime.
+    #[allow(clippy::too_many_arguments)]
     fn start_monitor(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
         volume_arc: Arc<Mutex<f32>>,
@@ -558,77 +562,79 @@ impl AudioState {
         app_handle: AppHandle,
         monitor_stop: Arc<AtomicBool>,
     ) {
-        thread::spawn(move || loop {
-            thread::sleep(Duration::from_millis(250));
-            if monitor_stop.load(Ordering::SeqCst) {
-                break;
-            }
-
-            let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
-            let (ended, position) = {
-                let player_lock = player_arc.lock().unwrap();
-                let Some(handle) = player_lock.as_ref() else {
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_millis(250));
+                if monitor_stop.load(Ordering::SeqCst) {
                     break;
+                }
+
+                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
+                let (ended, position) = {
+                    let player_lock = player_arc.lock().unwrap();
+                    let Some(handle) = player_lock.as_ref() else {
+                        break;
+                    };
+
+                    if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
+                        break;
+                    }
+
+                    let position = handle.player.get_pos().as_secs_f32();
+                    let stream_failed = handle.stream_error.load(Ordering::SeqCst);
+                    let follow_drift = !stream_failed
+                        && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
+                        && Self::system_default_drifted(&active_device_name);
+
+                    if stream_failed || follow_drift {
+                        recovery = Some((
+                            handle.path.clone(),
+                            handle.metadata.clone(),
+                            !handle.player.is_paused(),
+                            position,
+                        ));
+                        (false, position)
+                    } else {
+                        (handle.player.empty(), position)
+                    }
                 };
 
-                if !Arc::ptr_eq(&handle.monitor_stop, &monitor_stop) {
+                if let Some((path, metadata, should_play, position)) = recovery {
+                    if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        match Self::recover_output_device(
+                            player_arc.clone(),
+                            volume_arc.clone(),
+                            preference.clone(),
+                            active_device_name.clone(),
+                            reactive_background_enabled.clone(),
+                            low_frequency_level.clone(),
+                            app_handle.clone(),
+                            monitor_stop.clone(),
+                            path,
+                            metadata,
+                            should_play,
+                            position,
+                        ) {
+                            Ok(()) => {}
+                            Err(err) => {
+                                eprintln!("Failed to recover audio output: {err}");
+                                smtc::set_playing(false);
+                                let _ = app_handle.emit("audio:output-error", err);
+                            }
+                        }
+                    }
                     break;
                 }
 
-                let position = handle.player.get_pos().as_secs_f32();
-                let stream_failed = handle.stream_error.load(Ordering::SeqCst);
-                let follow_drift = !stream_failed
-                    && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
-                    && Self::system_default_drifted(&active_device_name);
+                smtc::set_position(position);
 
-                if stream_failed || follow_drift {
-                    recovery = Some((
-                        handle.path.clone(),
-                        handle.metadata.clone(),
-                        !handle.player.is_paused(),
-                        position,
-                    ));
-                    (false, position)
-                } else {
-                    (handle.player.empty(), position)
-                }
-            };
-
-            if let Some((path, metadata, should_play, position)) = recovery {
-                if !monitor_stop.swap(true, Ordering::SeqCst) {
-                    match Self::recover_output_device(
-                        player_arc.clone(),
-                        volume_arc.clone(),
-                        preference.clone(),
-                        active_device_name.clone(),
-                        reactive_background_enabled.clone(),
-                        low_frequency_level.clone(),
-                        app_handle.clone(),
-                        monitor_stop.clone(),
-                        path,
-                        metadata,
-                        should_play,
-                        position,
-                    ) {
-                        Ok(()) => {}
-                        Err(err) => {
-                            eprintln!("Failed to recover audio output: {err}");
-                            smtc::set_playing(false);
-                            let _ = app_handle.emit("audio:output-error", err);
-                        }
+                if ended {
+                    if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        smtc::set_playing(false);
+                        let _ = app_handle.emit("audio:ended", ());
                     }
+                    break;
                 }
-                break;
-            }
-
-            smtc::set_position(position);
-
-            if ended {
-                if !monitor_stop.swap(true, Ordering::SeqCst) {
-                    smtc::set_playing(false);
-                    let _ = app_handle.emit("audio:ended", ());
-                }
-                break;
             }
         });
     }
@@ -658,6 +664,8 @@ impl AudioState {
         active.as_deref() != Some(default_name.as_str())
     }
 
+    // Recovery must transfer both shared playback state and the current track snapshot.
+    #[allow(clippy::too_many_arguments)]
     fn recover_output_device(
         player_arc: Arc<Mutex<Option<PlaybackHandle>>>,
         volume_arc: Arc<Mutex<f32>>,

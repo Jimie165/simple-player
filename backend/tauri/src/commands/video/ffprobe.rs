@@ -1,8 +1,8 @@
 // FFprobe 工具函数
 // ============================================================================
 
-use std::process::Stdio;
 use crate::utils::path::normalize_windows_path;
+use std::process::Stdio;
 
 /// 获取视频时长
 pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f64>, String> {
@@ -70,7 +70,9 @@ pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option
         return Ok(None);
     }
 
-    let s = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+    let s = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_lowercase();
     if s.is_empty() {
         return Ok(None);
     }
@@ -107,7 +109,9 @@ pub fn run_ffprobe_audio_codec(ffprobe: &str, input_path: &str) -> Result<Option
         return Ok(None);
     }
 
-    let s = String::from_utf8_lossy(&output.stdout).trim().to_lowercase();
+    let s = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .to_lowercase();
     if s.is_empty() {
         return Ok(None);
     }
@@ -134,7 +138,7 @@ pub fn try_remux(
     input_path: &str,
     output_path: &str,
     audio_codec: Option<String>,
-    supported_audio_codecs: &Vec<String>,
+    supported_audio_codecs: &[String],
 ) -> Result<bool, String> {
     let input_os = normalize_windows_path(input_path);
     let is_mkv = input_path.to_lowercase().ends_with(".mkv");
@@ -155,10 +159,12 @@ pub fn try_remux(
         "copy".to_string(), // 视频流直接复制（假设已通过兼容性检查）
     ]);
 
-
     // Override logic: explicit check
     let should_copy_audio = matches!(audio_codec.as_deref(), Some("aac") | None)
-        || (audio_codec.is_some() && supported_audio_codecs.iter().any(|c| c == audio_codec.as_ref().unwrap()));
+        || (audio_codec.is_some()
+            && supported_audio_codecs
+                .iter()
+                .any(|c| c == audio_codec.as_ref().unwrap()));
 
     if should_copy_audio {
         args.extend(vec!["-c:a".to_string(), "copy".to_string()]);
@@ -167,7 +173,7 @@ pub fn try_remux(
             "-c:a".to_string(),
             "aac".to_string(), // 音频流转为 AAC（保证兼容性）
             "-ac".to_string(),
-            "2".to_string(),   // 强制双声道，减少编码开销
+            "2".to_string(), // 强制双声道，减少编码开销
             "-b:a".to_string(),
             "128k".to_string(), // 降低一点码率以提升速度
         ]);

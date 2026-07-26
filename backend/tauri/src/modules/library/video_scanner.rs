@@ -62,14 +62,14 @@ pub fn scan_video_files_recursive(dir_path: &str, ignored_dir_names: &[String]) 
         if entry.depth() == 0 {
             return true;
         }
-        if entry.file_type().is_dir() {
-            if let Some(name) = entry.file_name().to_str() {
-                let hit = ignored_dir_names
-                    .iter()
-                    .any(|ig| ig.eq_ignore_ascii_case(name));
-                if hit {
-                    return false;
-                }
+        if entry.file_type().is_dir()
+            && let Some(name) = entry.file_name().to_str()
+        {
+            let hit = ignored_dir_names
+                .iter()
+                .any(|ig| ig.eq_ignore_ascii_case(name));
+            if hit {
+                return false;
             }
         }
         true
@@ -103,6 +103,8 @@ fn parse_frame_rate(fr_str: &str) -> Option<f64> {
     None
 }
 
+// The tuple directly represents the five optional values extracted from one ffprobe response.
+#[allow(clippy::type_complexity)]
 fn get_video_details_ffprobe(
     path: &str,
 ) -> Result<(i64, Option<u32>, Option<u32>, Option<f64>, Option<u8>), String> {
@@ -157,10 +159,8 @@ fn get_video_details_ffprobe(
                     frame_rate = parse_frame_rate(&fr);
                 }
             }
-        } else if stream.codec_type == "audio" {
-            if channels.is_none() {
-                channels = stream.channels;
-            }
+        } else if stream.codec_type == "audio" && channels.is_none() {
+            channels = stream.channels;
         }
     }
 

@@ -176,13 +176,12 @@ pub fn apply_metadata(
             Some(PathBuf::from(path))
         };
 
-        if let Some(full_path) = resolved {
-            if let Ok(bytes) = std::fs::read(full_path) {
-                if let Some(stream_ref) = bytes_to_stream_ref(&bytes) {
-                    updater.SetThumbnail(&stream_ref)?;
-                    thumbnail_set = true;
-                }
-            }
+        if let Some(full_path) = resolved
+            && let Ok(bytes) = std::fs::read(full_path)
+            && let Some(stream_ref) = bytes_to_stream_ref(&bytes)
+        {
+            updater.SetThumbnail(&stream_ref)?;
+            thumbnail_set = true;
         }
     }
 

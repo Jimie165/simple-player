@@ -19,17 +19,17 @@ fn windows_target_triple() -> &'static str {
 }
 
 /// 解析 ffmpeg 系列二进制文件路径
-/// 
+///
 /// 按优先级顺序查找：
 /// 1. 可执行文件所在目录
 /// 2. CARGO_MANIFEST_DIR/binaries (开发环境)
 /// 3. 当前工作目录/binaries
 /// 4. Tauri resource_dir
-/// 
+///
 /// # 参数
 /// - `app`: Tauri AppHandle
 /// - `base_name`: 二进制文件基础名称（如 "ffmpeg" 或 "ffprobe"）
-/// 
+///
 /// # 返回
 /// 找到的二进制文件完整路径，如果未找到则返回 None
 pub fn resolve_ffmpeg_binary(app: &AppHandle, base_name: &str) -> Option<String> {

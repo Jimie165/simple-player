@@ -1,12 +1,12 @@
 // 视频查询相关命令
 // ============================================================================
 
-use std::path::Path;
 use crate::DbState;
-use crate::modules::database::{VideoRepo, Video};
+use crate::modules::database::{Video, VideoRepo};
 use crate::modules::library::video_thumbnails;
 use crate::utils::path::normalize_windows_path;
 use serde::Serialize;
+use std::path::Path;
 use tauri::{Emitter, Manager, State};
 
 #[derive(Serialize, Clone)]

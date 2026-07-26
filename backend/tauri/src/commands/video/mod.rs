@@ -4,13 +4,12 @@
 // ============================================================================
 
 // 子模块声明
-pub mod ffprobe;
-pub mod scan;
-pub mod query;
-pub mod prepare;
 pub mod cache;
+pub mod ffprobe;
+pub mod prepare;
+pub mod query;
+pub mod scan;
 pub mod transcode;
 
 // 注意：Tauri 命令需要从各自的子模块直接引用
 // 在 main.rs 中使用 commands::video::scan::scan_videos 等路径
-

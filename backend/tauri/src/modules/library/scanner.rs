@@ -22,22 +22,22 @@ pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
     let mut audio_files = Vec::new();
     let path = Path::new(dir_path);
 
-    if path.is_dir() {
-        if let Ok(entries) = fs::read_dir(path) {
-            for entry in entries.flatten() {
-                let file_type = match entry.file_type() {
-                    Ok(file_type) => file_type,
-                    Err(_) => continue,
-                };
-                if !file_type.is_file() {
-                    continue;
-                }
-                if !file_name_has_audio_extension(&entry.file_name()) {
-                    continue;
-                }
-                let entry_path = entry.path();
-                audio_files.push(normalize_db_path(&entry_path));
+    if path.is_dir()
+        && let Ok(entries) = fs::read_dir(path)
+    {
+        for entry in entries.flatten() {
+            let file_type = match entry.file_type() {
+                Ok(file_type) => file_type,
+                Err(_) => continue,
+            };
+            if !file_type.is_file() {
+                continue;
             }
+            if !file_name_has_audio_extension(&entry.file_name()) {
+                continue;
+            }
+            let entry_path = entry.path();
+            audio_files.push(normalize_db_path(&entry_path));
         }
     }
 
@@ -56,14 +56,14 @@ pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) 
         if entry.depth() == 0 {
             return true;
         }
-        if entry.file_type().is_dir() {
-            if let Some(name) = entry.file_name().to_str() {
-                let hit = ignored_dir_names
-                    .iter()
-                    .any(|ig| ig.eq_ignore_ascii_case(name));
-                if hit {
-                    return false;
-                }
+        if entry.file_type().is_dir()
+            && let Some(name) = entry.file_name().to_str()
+        {
+            let hit = ignored_dir_names
+                .iter()
+                .any(|ig| ig.eq_ignore_ascii_case(name));
+            if hit {
+                return false;
             }
         }
         true

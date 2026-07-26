@@ -1,6 +1,6 @@
+use crate::utils::path::normalize_db_path;
 use rusqlite::{Connection, OptionalExtension, Result};
 use serde::{Deserialize, Serialize};
-use crate::utils::path::normalize_db_path;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Video {
@@ -149,6 +149,8 @@ impl VideoRepo {
         .collect()
     }
 
+    // Keep the persisted video columns explicit at this repository boundary.
+    #[allow(clippy::too_many_arguments)]
     pub fn upsert(
         conn: &Connection,
         path: &str,
@@ -322,7 +324,10 @@ impl VideoRepo {
         for v in videos {
             let v = v?;
             let v_norm = normalize_db_path(std::path::Path::new(&v.path));
-            if !active_paths.iter().any(|p| normalize_db_path(std::path::Path::new(p)) == v_norm) {
+            if !active_paths
+                .iter()
+                .any(|p| normalize_db_path(std::path::Path::new(p)) == v_norm)
+            {
                 stale.push(v);
             }
         }
