@@ -30,19 +30,12 @@ type KaraokeCharStyle = {
     glowShadow: string;
 };
 
+type WordPhase = 'future' | 'motion' | 'settled';
+
 const karaokeExitDurationMs = 500;
 const completedFillBackground =
     'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
-const settledCharStyle: KaraokeCharStyle = {
-    transform: 'none',
-    translateYEm: 0,
-    scaleValue: 1,
-    willChange: 'auto',
-    fillBackgroundImage: completedFillBackground,
-    glowMask: 'linear-gradient(to right, transparent, transparent)',
-    glowOpacity: 0,
-    glowShadow: 'none',
-};
+const settledWordTransform = 'translate3d(0, -0.078em, 0)';
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
@@ -138,6 +131,49 @@ function getKaraokeCharStyle(
     };
 }
 
+function getWordMotionWindow(group: IndexedCharItem[]) {
+    let startMs = Number.POSITIVE_INFINITY;
+    let endMs = Number.NEGATIVE_INFINITY;
+
+    group.forEach(({ item }) => {
+        const charCount = Math.max(1, item.activeCharCountInWord);
+        const charIndex = Math.max(0, item.activeCharIndexInWord);
+        const charDelayMs = (item.groupDurationMs / 2.5 / charCount) * charIndex;
+        const emphasisDurationMs = Math.max(800, item.groupDurationMs);
+        const emphasisStartMs = item.groupStartMs + charDelayMs - 400;
+        const emphasisEndMs = emphasisStartMs + emphasisDurationMs * 1.4;
+        const liftEndMs = item.time_ms + Math.max(800, item.durationMs);
+        const hasLongToneMotion = item.groupDurationMs > 800;
+
+        startMs = Math.min(startMs, item.time_ms, hasLongToneMotion ? emphasisStartMs : item.time_ms);
+        endMs = Math.max(
+            endMs,
+            item.time_ms + item.durationMs,
+            liftEndMs,
+            hasLongToneMotion
+                ? item.groupStartMs + charDelayMs + emphasisDurationMs
+                : liftEndMs,
+            hasLongToneMotion ? emphasisEndMs : liftEndMs,
+        );
+    });
+
+    return { startMs, endMs };
+}
+
+function getWordPhases(wordGroups: IndexedCharItem[][], timeMs: number): WordPhase[] {
+    return wordGroups.map(group => {
+        if (!group?.length) return 'settled';
+        const { startMs, endMs } = getWordMotionWindow(group);
+        if (timeMs < startMs) return 'future';
+        if (timeMs < endMs) return 'motion';
+        return 'settled';
+    });
+}
+
+const getWordPhaseKey = (phases: WordPhase[]) => phases
+    .map(phase => phase === 'future' ? 'f' : phase === 'motion' ? 'm' : 's')
+    .join('');
+
 function KaraokeTextBase({
     words,
     lineEndMs,
@@ -148,9 +184,11 @@ function KaraokeTextBase({
     isActive,
     isFocused,
 }: KaraokeTextProps) {
-    const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const baseWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const wordPhaseKeyRef = useRef('');
     const [richLayerState, setRichLayerState] = useState({
         focused: isFocused,
         visible: isFocused,
@@ -183,40 +221,59 @@ function KaraokeTextBase({
         });
         return groups;
     }, [flatChars]);
+    const [wordPhaseSnapshot, setWordPhaseSnapshot] = useState(() => ({
+        phases: getWordPhases(wordGroups, baseCurrentMs),
+        timeMs: baseCurrentMs,
+    }));
+    const renderWordPhases = wordPhaseSnapshot.phases.length === wordGroups.length
+        ? wordPhaseSnapshot.phases
+        : getWordPhases(wordGroups, baseCurrentMs);
+    const renderTimeMs = wordPhaseSnapshot.timeMs;
 
     useLayoutEffect(() => {
         if (!isActive || !isFocused) return;
 
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
         const updateWordStyles = (timeMs: number) => {
-            flatChars.forEach((charItem, index) => {
-                const el = wordRefs.current[index];
-                const fillEl = fillRefs.current[index];
-                const glowEl = glowRefs.current[index];
-                if (!el || !fillEl) return;
+            const nextPhases = getWordPhases(wordGroups, timeMs);
+            const nextPhaseKey = getWordPhaseKey(nextPhases);
+            if (nextPhaseKey !== wordPhaseKeyRef.current) {
+                wordPhaseKeyRef.current = nextPhaseKey;
+                setWordPhaseSnapshot({ phases: nextPhases, timeMs });
+            }
 
-                const style = getKaraokeCharStyle(charItem, timeMs, true);
-                const previousStyle = previousStyles[index];
-                if (style.transform !== previousStyle?.transform) {
-                    el.style.transform = style.transform;
-                }
-                if (style.willChange !== previousStyle?.willChange) {
-                    el.style.willChange = style.willChange;
-                }
-                if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
-                    fillEl.style.backgroundImage = style.fillBackgroundImage;
-                }
-                if (glowEl && style.glowMask !== previousStyle?.glowMask) {
-                    glowEl.style.maskImage = style.glowMask;
-                    glowEl.style.webkitMaskImage = style.glowMask;
-                }
-                if (glowEl && style.glowOpacity !== previousStyle?.glowOpacity) {
-                    glowEl.style.opacity = String(style.glowOpacity);
-                }
-                if (glowEl && style.glowShadow !== previousStyle?.glowShadow) {
-                    glowEl.style.textShadow = style.glowShadow;
-                }
-                previousStyles[index] = style;
+            nextPhases.forEach((phase, wordIndex) => {
+                if (phase !== 'motion') return;
+                const group = wordGroups[wordIndex];
+                group?.forEach(({ item: charItem, flatIndex }) => {
+                    const el = charRefs.current[flatIndex];
+                    const fillEl = fillRefs.current[flatIndex];
+                    const glowEl = glowRefs.current[flatIndex];
+                    if (!el || !fillEl) return;
+
+                    const style = getKaraokeCharStyle(charItem, timeMs, true);
+                    const previousStyle = previousStyles[flatIndex];
+                    if (style.transform !== previousStyle?.transform) {
+                        el.style.transform = style.transform;
+                    }
+                    if (style.willChange !== previousStyle?.willChange) {
+                        el.style.willChange = style.willChange;
+                    }
+                    if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
+                        fillEl.style.backgroundImage = style.fillBackgroundImage;
+                    }
+                    if (glowEl && style.glowMask !== previousStyle?.glowMask) {
+                        glowEl.style.maskImage = style.glowMask;
+                        glowEl.style.webkitMaskImage = style.glowMask;
+                    }
+                    if (glowEl && style.glowOpacity !== previousStyle?.glowOpacity) {
+                        glowEl.style.opacity = String(style.glowOpacity);
+                    }
+                    if (glowEl && style.glowShadow !== previousStyle?.glowShadow) {
+                        glowEl.style.textShadow = style.glowShadow;
+                    }
+                    previousStyles[flatIndex] = style;
+                });
             });
         };
 
@@ -232,11 +289,62 @@ function KaraokeTextBase({
             frame = requestAnimationFrame(tick);
         };
 
+        const initialTimeMs = preciseMsRef.current;
+        const initialPhases = getWordPhases(wordGroups, initialTimeMs);
+        wordPhaseKeyRef.current = getWordPhaseKey(initialPhases);
+        setWordPhaseSnapshot(previous =>
+            getWordPhaseKey(previous.phases) === wordPhaseKeyRef.current
+                ? previous
+                : { phases: initialPhases, timeMs: initialTimeMs }
+        );
         frame = requestAnimationFrame(tick);
         // 在焦点切换的提交阶段、浏览器绘制退出态之前同步停掉逐帧写入。
         // 否则旧 rAF 可能把少数尾字重新写成未完成渐变并留在退出层中。
         return () => cancelAnimationFrame(frame);
-    }, [flatChars, isActive, isFocused, preciseMsRef]);
+    }, [isActive, isFocused, preciseMsRef, wordGroups]);
+
+    useLayoutEffect(() => {
+        if (!keepRichLayer) return;
+
+        const range = document.createRange();
+        wordGroups.forEach((group, wordIndex) => {
+            const baseWord = baseWordRefs.current[wordIndex];
+            const textNode = baseWord?.firstChild;
+            if (!baseWord || !textNode || textNode.nodeType !== Node.TEXT_NODE || !group?.length) return;
+
+            const baseRect = baseWord.getBoundingClientRect();
+            if (baseRect.width <= 0 || baseRect.height <= 0) return;
+            let textOffset = 0;
+            group.forEach(({ item, flatIndex }) => {
+                const charElement = charRefs.current[flatIndex];
+                const nextOffset = textOffset + item.char.length;
+                if (charElement) {
+                    range.setStart(textNode, textOffset);
+                    range.setEnd(textNode, nextOffset);
+                    const charRect = range.getBoundingClientRect();
+                    charElement.style.left =
+                        `${((charRect.left - baseRect.left) / baseRect.width) * 100}%`;
+                    charElement.style.top = '0';
+                    charElement.style.width = `${(charRect.width / baseRect.width) * 100}%`;
+                }
+                textOffset = nextOffset;
+            });
+        });
+        range.detach();
+    }, [keepRichLayer, wordGroups]);
+
+    useLayoutEffect(() => {
+        if (isFocused || !keepRichLayer) return;
+
+        const timeMs = preciseMsRef.current;
+        const phases = getWordPhases(wordGroups, timeMs);
+        wordPhaseKeyRef.current = getWordPhaseKey(phases);
+        setWordPhaseSnapshot(previous =>
+            previous.timeMs === timeMs
+                ? previous
+                : { phases, timeMs }
+        );
+    }, [isFocused, keepRichLayer, preciseMsRef, wordGroups]);
 
     useEffect(() => {
         if (!keepRichLayer) return;
@@ -265,21 +373,36 @@ function KaraokeTextBase({
         };
     }, [isFocused, keepRichLayer]);
 
-    const richStyles = useMemo(
-        () => keepRichLayer
-            ? flatChars.map(charItem => getKaraokeCharStyle(charItem, baseCurrentMs, true))
-            : [],
-        [baseCurrentMs, flatChars, keepRichLayer]
-    );
     const renderWordGroups = () => wordGroups.map((group, wordIndex) => {
                 if (!group || group.length === 0) return null;
+
+                const phase = keepRichLayer
+                    ? renderWordPhases[wordIndex] ?? 'settled'
+                    : 'settled';
+                const shouldRenderCharLayer = keepRichLayer;
+                const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
+                const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
+                const wordText = group.map(({ item }) => item.char).join('');
+                const baseWordFillBackground = isFocused && phase === 'future'
+                    ? 'linear-gradient(to right, rgba(255,255,255,0.30), rgba(255,255,255,0.30))'
+                    : completedFillBackground;
+                const baseWordExitStyle = isExitLayer && phase === 'settled'
+                    ? {
+                        animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
+                        '--karaoke-char-exit-y': '-0.078em',
+                        '--karaoke-char-exit-scale': '1',
+                    }
+                    : undefined;
 
                 return (
                     <span
                         key={wordIndex}
                         style={{
+                            position: 'relative',
                             display: 'inline-block',
                             whiteSpace: 'nowrap',
+                            fontKerning: 'none',
+                            fontVariantLigatures: 'none',
                             transform: 'none',
                             willChange: 'auto',
                             transition: 'none',
@@ -287,101 +410,140 @@ function KaraokeTextBase({
                             overflow: 'visible',
                         }}
                     >
-                        {group.map(({ item: charItem, flatIndex }) => {
-                            const style = keepRichLayer
-                                ? richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true)
-                                : settledCharStyle;
-                            const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
-                            const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
-                            const hasGlowEffect = charItem.groupDurationMs > 800;
-                            const exitStyle = isExitLayer ? {
-                                animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
-                                '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
-                                '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
-                            } : isSettlingLayer ? {
-                                animation: 'none',
-                                transform: 'none',
-                            } : undefined;
+                        <span
+                            ref={(el) => {
+                                baseWordRefs.current[wordIndex] = el;
+                            }}
+                            style={{
+                                display: 'inline-block',
+                                whiteSpace: 'pre-wrap',
+                                visibility: shouldRenderCharLayer ? 'hidden' : 'visible',
+                                backgroundImage: baseWordFillBackground,
+                                WebkitBackgroundClip: 'text',
+                                backgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                color: 'transparent',
+                                transform: isFocused && phase === 'settled'
+                                    ? settledWordTransform
+                                    : 'none',
+                                transformOrigin: 'center',
+                                backfaceVisibility: 'hidden',
+                                ...baseWordExitStyle,
+                            }}
+                        >
+                            {wordText}
+                        </span>
+                        {shouldRenderCharLayer && (
+                            <span
+                                aria-hidden="true"
+                                style={{
+                                    position: 'absolute',
+                                    inset: 0,
+                                    pointerEvents: 'none',
+                                    overflow: 'visible',
+                                }}
+                            >
+                                {group.map(({ item: charItem, flatIndex }) => {
+                                    const style = getKaraokeCharStyle(
+                                        charItem,
+                                        renderTimeMs,
+                                        true
+                                    );
+                                    const hasGlowEffect = charItem.groupDurationMs > 800;
+                                    const exitStyle = isExitLayer ? {
+                                        animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
+                                        '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
+                                        '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
+                                    } : isSettlingLayer ? {
+                                        animation: 'none',
+                                        transform: 'none',
+                                    } : undefined;
 
-                            return (
-                                <span
-                                    key={charItem.charIndexInWord}
-                                    ref={(el) => {
-                                        wordRefs.current[flatIndex] = el;
-                                    }}
-                                    style={{
-                                        position: 'relative',
-                                        display: 'inline-block',
-                                        whiteSpace: 'pre-wrap',
-                                        transform: style.transform,
-                                        willChange: isSettlingLayer ? 'auto' : style.willChange,
-                                        transition: 'none',
-                                        backfaceVisibility: 'hidden',
-                                        overflow: 'visible',
-                                        ...exitStyle,
-                                    }}
-                                >
-                                    {keepRichLayer && hasGlowEffect && (
+                                    return (
                                         <span
-                                            key="glow"
-                                            aria-hidden="true"
+                                            key={charItem.charIndexInWord}
                                             ref={(el) => {
-                                                glowRefs.current[flatIndex] = el;
+                                                charRefs.current[flatIndex] = el;
                                             }}
                                             style={{
                                                 position: 'absolute',
-                                                inset: '-0.45em',
-                                                padding: '0.45em',
-                                                pointerEvents: 'none',
+                                                display: 'inline-block',
                                                 whiteSpace: 'pre-wrap',
-                                                color: 'rgba(255,255,255,0.95)',
-                                                WebkitTextFillColor: 'rgba(255,255,255,0.95)',
-                                                clipPath: 'none',
-                                                maskImage: style.glowMask,
-                                                WebkitMaskImage: style.glowMask,
-                                                opacity: style.glowOpacity,
-                                                textShadow: style.glowShadow,
-                                                willChange: isSettlingLayer
-                                                    ? 'auto'
-                                                    : 'opacity, text-shadow, mask-image',
-                                                transform: 'translateZ(0)',
+                                                transform: style.transform,
+                                                willChange: isSettlingLayer ? 'auto' : style.willChange,
+                                                transition: 'none',
+                                                backfaceVisibility: 'hidden',
                                                 overflow: 'visible',
-                                                animation: isExitLayer
-                                                    ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
-                                                    : undefined,
-                                                ...(isSettlingLayer ? {
-                                                    opacity: 0,
-                                                    textShadow: 'none',
-                                                } : undefined),
+                                                ...exitStyle,
                                             }}
                                         >
-                                            {charItem.char}
+                                            {hasGlowEffect && (
+                                                <span
+                                                    key="glow"
+                                                    aria-hidden="true"
+                                                    ref={(el) => {
+                                                        glowRefs.current[flatIndex] = el;
+                                                    }}
+                                                    style={{
+                                                        position: 'absolute',
+                                                        inset: '-0.45em',
+                                                        padding: '0.45em',
+                                                        pointerEvents: 'none',
+                                                        whiteSpace: 'pre-wrap',
+                                                        color: 'rgba(255,255,255,0.95)',
+                                                        WebkitTextFillColor: 'rgba(255,255,255,0.95)',
+                                                        clipPath: 'none',
+                                                        maskImage: style.glowMask,
+                                                        WebkitMaskImage: style.glowMask,
+                                                        opacity: style.glowOpacity,
+                                                        textShadow: style.glowShadow,
+                                                        willChange: isSettlingLayer
+                                                            ? 'auto'
+                                                            : 'opacity, text-shadow, mask-image',
+                                                        transform: 'translateZ(0)',
+                                                        overflow: 'visible',
+                                                        animation: isExitLayer
+                                                            ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
+                                                            : undefined,
+                                                        ...(isExitLayer ? {
+                                                            '--karaoke-glow-exit-opacity': String(style.glowOpacity),
+                                                            '--karaoke-glow-exit-shadow': style.glowShadow,
+                                                        } : undefined),
+                                                        ...(isSettlingLayer ? {
+                                                            opacity: 0,
+                                                            textShadow: 'none',
+                                                        } : undefined),
+                                                    }}
+                                                >
+                                                    {charItem.char}
+                                                </span>
+                                            )}
+                                            <span
+                                                key="fill"
+                                                ref={(el) => {
+                                                    fillRefs.current[flatIndex] = el;
+                                                }}
+                                                style={{
+                                                    position: 'relative',
+                                                    zIndex: 1,
+                                                    // 退出层必须使用完成态填充，避免低频 currentTime
+                                                    // 覆盖高精度时钟已经推进完成的尾字颜色。
+                                                    backgroundImage: isFocused
+                                                        ? style.fillBackgroundImage
+                                                        : completedFillBackground,
+                                                    WebkitBackgroundClip: 'text',
+                                                    backgroundClip: 'text',
+                                                    WebkitTextFillColor: 'transparent',
+                                                    color: 'transparent',
+                                                }}
+                                            >
+                                                {charItem.char}
+                                            </span>
                                         </span>
-                                    )}
-                                    <span
-                                        key="fill"
-                                        ref={(el) => {
-                                            fillRefs.current[flatIndex] = el;
-                                        }}
-                                        style={{
-                                            position: 'relative',
-                                            zIndex: 1,
-                                            // 退出层必须使用完成态填充，避免低频 currentTime
-                                            // 覆盖高精度时钟已经推进完成的尾字颜色。
-                                            backgroundImage: isFocused
-                                                ? style.fillBackgroundImage
-                                                : completedFillBackground,
-                                            WebkitBackgroundClip: 'text',
-                                            backgroundClip: 'text',
-                                            WebkitTextFillColor: 'transparent',
-                                            color: 'transparent',
-                                        }}
-                                    >
-                                        {charItem.char}
-                                    </span>
-                                </span>
-                            );
-                        })}
+                                    );
+                                })}
+                            </span>
+                        )}
                     </span>
                 );
             });

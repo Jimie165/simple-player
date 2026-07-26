@@ -417,6 +417,11 @@ body {
 }
 
 @keyframes karaoke-glow-exit {
+  from {
+    opacity: var(--karaoke-glow-exit-opacity, 0);
+    text-shadow: var(--karaoke-glow-exit-shadow, none);
+  }
+
   to {
     opacity: 0;
     text-shadow: none;
