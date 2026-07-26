@@ -3,6 +3,8 @@ import type { RefObject } from 'react';
 import { preprocessArtwork } from '@/features/player/apple/background/artworkPreprocess';
 import { createMesh } from '@/features/player/apple/background/meshGradient';
 
+const RENDER_SCALE = 0.75;
+
 const MESH_VERTEX_SHADER = `
 precision highp float;
 attribute vec2 a_position;
@@ -160,7 +162,7 @@ export class FluidRenderer {
         this.lowFrequencyRef = lowFrequencyRef;
         const gl = canvas.getContext('webgl', {
             alpha: false,
-            antialias: false,
+            antialias: true,
             depth: false,
             powerPreference: 'low-power',
         });
@@ -262,9 +264,9 @@ export class FluidRenderer {
 
     private resizeNow() {
         if (this.disposed) return;
-        const scale = 0.55;
-        const width = Math.max(2, Math.round(this.canvas.clientWidth * scale));
-        const height = Math.max(2, Math.round(this.canvas.clientHeight * scale));
+        const pixelScale = window.devicePixelRatio * RENDER_SCALE;
+        const width = Math.max(2, Math.ceil(this.canvas.clientWidth * pixelScale));
+        const height = Math.max(2, Math.ceil(this.canvas.clientHeight * pixelScale));
         if (this.canvas.width === width && this.canvas.height === height && this.target) return;
         let nextTarget: RenderTarget;
         try {

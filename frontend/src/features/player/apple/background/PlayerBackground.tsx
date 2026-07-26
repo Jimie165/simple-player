@@ -82,7 +82,11 @@ export const PlayerBackground = memo(({
         ) : (
             <BlurredCoverBackground src={src} />
         )}
-        <div className="absolute inset-0 z-10 bg-white/0.06" />
-        <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_center,transparent_48%,rgba(12,15,18,0.12)_100%)]" />
+        {variant === 'blurred' && (
+            <>
+                <div className="absolute inset-0 z-10 bg-white/0.06" />
+                <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_center,transparent_48%,rgba(12,15,18,0.12)_100%)]" />
+            </>
+        )}
     </div>
 ));
