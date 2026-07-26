@@ -33,6 +33,16 @@ type KaraokeCharStyle = {
 const karaokeExitDurationMs = 500;
 const completedFillBackground =
     'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
+const settledCharStyle: KaraokeCharStyle = {
+    transform: 'none',
+    translateYEm: 0,
+    scaleValue: 1,
+    willChange: 'auto',
+    fillBackgroundImage: completedFillBackground,
+    glowMask: 'linear-gradient(to right, transparent, transparent)',
+    glowOpacity: 0,
+    glowShadow: 'none',
+};
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
@@ -183,7 +193,7 @@ function KaraokeTextBase({
                 const el = wordRefs.current[index];
                 const fillEl = fillRefs.current[index];
                 const glowEl = glowRefs.current[index];
-                if (!el || !fillEl || !glowEl) return;
+                if (!el || !fillEl) return;
 
                 const style = getKaraokeCharStyle(charItem, timeMs, true);
                 const previousStyle = previousStyles[index];
@@ -196,14 +206,14 @@ function KaraokeTextBase({
                 if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
                     fillEl.style.backgroundImage = style.fillBackgroundImage;
                 }
-                if (style.glowMask !== previousStyle?.glowMask) {
+                if (glowEl && style.glowMask !== previousStyle?.glowMask) {
                     glowEl.style.maskImage = style.glowMask;
                     glowEl.style.webkitMaskImage = style.glowMask;
                 }
-                if (style.glowOpacity !== previousStyle?.glowOpacity) {
+                if (glowEl && style.glowOpacity !== previousStyle?.glowOpacity) {
                     glowEl.style.opacity = String(style.glowOpacity);
                 }
-                if (style.glowShadow !== previousStyle?.glowShadow) {
+                if (glowEl && style.glowShadow !== previousStyle?.glowShadow) {
                     glowEl.style.textShadow = style.glowShadow;
                 }
                 previousStyles[index] = style;
@@ -237,9 +247,8 @@ function KaraokeTextBase({
         const timer = window.setTimeout(() => {
             setRichLayerState(state => state.focused ? state : { ...state, settling: true });
 
-            // Let the same glyphs paint without their character transforms before
-            // replacing the rich layer, so Chromium does not swap rasterization
-            // modes on the same frame as the visible exit animation.
+            // Let the stable glyph nodes paint without transforms before removing
+            // only their expensive glow effects.
             settleFrame = requestAnimationFrame(() => {
                 releaseFrame = requestAnimationFrame(() => {
                     setRichLayerState(state => state.focused
@@ -262,7 +271,7 @@ function KaraokeTextBase({
             : [],
         [baseCurrentMs, flatChars, keepRichLayer]
     );
-    const renderWordGroups = (rich: boolean) => wordGroups.map((group, wordIndex) => {
+    const renderWordGroups = () => wordGroups.map((group, wordIndex) => {
                 if (!group || group.length === 0) return null;
 
                 return (
@@ -279,39 +288,9 @@ function KaraokeTextBase({
                         }}
                     >
                         {group.map(({ item: charItem, flatIndex }) => {
-                            if (!rich) {
-                                return (
-                                    <span
-                                        key={charItem.charIndexInWord}
-                                        style={{
-                                            position: 'relative',
-                                            display: 'inline-block',
-                                            whiteSpace: 'pre-wrap',
-                                            transform: 'none',
-                                            willChange: 'auto',
-                                            transition: 'none',
-                                            backfaceVisibility: 'hidden',
-                                            overflow: 'visible',
-                                        }}
-                                    >
-                                        <span
-                                            style={{
-                                                position: 'relative',
-                                                zIndex: 1,
-                                                backgroundImage: 'linear-gradient(to right, currentColor, currentColor)',
-                                                WebkitBackgroundClip: 'text',
-                                                backgroundClip: 'text',
-                                                WebkitTextFillColor: 'transparent',
-                                                color: 'currentColor',
-                                            }}
-                                        >
-                                            {charItem.char}
-                                        </span>
-                                    </span>
-                                );
-                            }
-
-                            const style = richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true);
+                            const style = keepRichLayer
+                                ? richStyles[flatIndex] ?? getKaraokeCharStyle(charItem, baseCurrentMs, true)
+                                : settledCharStyle;
                             const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
                             const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
                             const exitStyle = isExitLayer ? {
@@ -341,41 +320,45 @@ function KaraokeTextBase({
                                         ...exitStyle,
                                     }}
                                 >
+                                    {keepRichLayer && (
+                                        <span
+                                            key="glow"
+                                            aria-hidden="true"
+                                            ref={(el) => {
+                                                glowRefs.current[flatIndex] = el;
+                                            }}
+                                            style={{
+                                                position: 'absolute',
+                                                inset: '-0.45em',
+                                                padding: '0.45em',
+                                                pointerEvents: 'none',
+                                                whiteSpace: 'pre-wrap',
+                                                color: 'rgba(255,255,255,0.95)',
+                                                WebkitTextFillColor: 'rgba(255,255,255,0.95)',
+                                                clipPath: 'none',
+                                                maskImage: style.glowMask,
+                                                WebkitMaskImage: style.glowMask,
+                                                opacity: style.glowOpacity,
+                                                textShadow: style.glowShadow,
+                                                willChange: isSettlingLayer
+                                                    ? 'auto'
+                                                    : 'opacity, text-shadow, mask-image',
+                                                transform: 'translateZ(0)',
+                                                overflow: 'visible',
+                                                animation: isExitLayer
+                                                    ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
+                                                    : undefined,
+                                                ...(isSettlingLayer ? {
+                                                    opacity: 0,
+                                                    textShadow: 'none',
+                                                } : undefined),
+                                            }}
+                                        >
+                                            {charItem.char}
+                                        </span>
+                                    )}
                                     <span
-                                        aria-hidden="true"
-                                        ref={(el) => {
-                                            glowRefs.current[flatIndex] = el;
-                                        }}
-                                        style={{
-                                            position: 'absolute',
-                                            inset: '-0.45em',
-                                            padding: '0.45em',
-                                            pointerEvents: 'none',
-                                            whiteSpace: 'pre-wrap',
-                                            color: 'rgba(255,255,255,0.95)',
-                                            WebkitTextFillColor: 'rgba(255,255,255,0.95)',
-                                            clipPath: 'none',
-                                            maskImage: style.glowMask,
-                                            WebkitMaskImage: style.glowMask,
-                                            opacity: style.glowOpacity,
-                                            textShadow: style.glowShadow,
-                                            willChange: isSettlingLayer
-                                                ? 'auto'
-                                                : 'opacity, text-shadow, mask-image',
-                                            transform: 'translateZ(0)',
-                                            overflow: 'visible',
-                                            animation: isExitLayer
-                                                ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
-                                                : undefined,
-                                            ...(isSettlingLayer ? {
-                                                opacity: 0,
-                                                textShadow: 'none',
-                                            } : undefined),
-                                        }}
-                                    >
-                                        {charItem.char}
-                                    </span>
-                                    <span
+                                        key="fill"
                                         ref={(el) => {
                                             fillRefs.current[flatIndex] = el;
                                         }}
@@ -404,20 +387,9 @@ function KaraokeTextBase({
 
     return (
         <span style={{ display: 'block' }}>
-            {!keepRichLayer && (
-                <span style={{ display: 'block' }}>
-                    {renderWordGroups(false)}
-                </span>
-            )}
-
-            {keepRichLayer && (
-                <span
-                    aria-hidden={!isFocused || undefined}
-                    style={{ display: 'block' }}
-                >
-                    {renderWordGroups(true)}
-                </span>
-            )}
+            <span style={{ display: 'block' }}>
+                {renderWordGroups()}
+            </span>
         </span>
     );
 }
