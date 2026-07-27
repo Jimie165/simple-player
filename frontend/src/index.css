@@ -413,22 +413,15 @@ body {
         0
       )
       scale(var(--karaoke-char-exit-scale, 1));
+    text-shadow: var(
+      --karaoke-char-exit-shadow,
+      0 0 5px rgba(255,255,255,0)
+    );
   }
 
   to {
     transform: none;
-  }
-}
-
-@keyframes karaoke-glow-exit {
-  from {
-    opacity: var(--karaoke-glow-exit-opacity, 0);
-    text-shadow: var(--karaoke-glow-exit-shadow, none);
-  }
-
-  to {
-    opacity: 0;
-    text-shadow: none;
+    text-shadow: 0 0 5px rgba(255,255,255,0);
   }
 }
 

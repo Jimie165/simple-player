@@ -26,8 +26,6 @@ type KaraokeCharStyle = {
     scaleValue: number;
     willChange: string;
     fillBackgroundImage: string;
-    glowMask: string;
-    glowOpacity: number;
     glowShadow: string;
 };
 
@@ -38,7 +36,8 @@ const animationHeadstartMs = 100;
 const syllableLiftEm = 0.078;
 const completedFillBackground =
     'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
-const completedGlowMask = 'linear-gradient(to right, #fff, #fff)';
+const transparentGlowShadow =
+    '0 0 5px rgba(255,255,255,0)';
 const settledWordTransform =
     `translate3d(0, -${syllableLiftEm}em, 0)`;
 
@@ -183,15 +182,13 @@ function getKaraokeCharStyle(
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
     const translateY = regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
-    const glowOpacity = glowPulse;
-    const glowShadow = glowOpacity > 0.01
-        ? '0 0 5px rgba(255,255,255,0.75)'
-        : 'none';
-    const glowMask = isFillComplete
-        ? completedGlowMask
-        : hasFillProgress
-            ? `linear-gradient(to right, #fff 0%, #fff ${fillEdgeStart}%, rgba(255,255,255,0.72) ${fillStop}%, transparent ${fillEdgeEnd}%, transparent 100%)`
-            : 'linear-gradient(to right, transparent, transparent)';
+    const glowReveal = isFillComplete
+        ? 1
+        : smoothstep(fillProgress);
+    const glowShadowAlpha =
+        glowPulse * glowReveal * 0.75;
+    const glowShadow =
+        `0 0 5px rgba(255,255,255,${glowShadowAlpha.toFixed(4)})`;
     const fillBackgroundImage = isFillComplete
         ? completedFillBackground
         : hasFillProgress
@@ -203,10 +200,8 @@ function getKaraokeCharStyle(
         translateXEm: translateX,
         translateYEm: translateY,
         scaleValue: scale,
-        willChange: 'transform',
+        willChange: 'transform, text-shadow',
         fillBackgroundImage,
-        glowMask,
-        glowOpacity: glowOpacity > 0.01 ? glowOpacity : 0,
         glowShadow,
     };
 }
@@ -289,8 +284,6 @@ function KaraokeTextBase({
 }: KaraokeTextProps) {
     const baseWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
-    const fillRefs = useRef<Array<HTMLSpanElement | null>>([]);
-    const glowRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const wordPhaseKeyRef = useRef('');
     const [richLayerState, setRichLayerState] = useState({
         focused: isFocused,
@@ -361,9 +354,7 @@ function KaraokeTextBase({
                 const group = wordGroups[wordIndex];
                 group?.forEach(({ item: charItem, flatIndex }) => {
                     const el = charRefs.current[flatIndex];
-                    const fillEl = fillRefs.current[flatIndex];
-                    const glowEl = glowRefs.current[flatIndex];
-                    if (!el || !fillEl) return;
+                    if (!el) return;
 
                     const style = getKaraokeCharStyle(
                         charItem,
@@ -379,17 +370,10 @@ function KaraokeTextBase({
                         el.style.willChange = style.willChange;
                     }
                     if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
-                        fillEl.style.backgroundImage = style.fillBackgroundImage;
+                        el.style.backgroundImage = style.fillBackgroundImage;
                     }
-                    if (glowEl && style.glowMask !== previousStyle?.glowMask) {
-                        glowEl.style.maskImage = style.glowMask;
-                        glowEl.style.webkitMaskImage = style.glowMask;
-                    }
-                    if (glowEl && style.glowOpacity !== previousStyle?.glowOpacity) {
-                        glowEl.style.opacity = String(style.glowOpacity);
-                    }
-                    if (glowEl && style.glowShadow !== previousStyle?.glowShadow) {
-                        glowEl.style.textShadow = style.glowShadow;
+                    if (style.glowShadow !== previousStyle?.glowShadow) {
+                        el.style.textShadow = style.glowShadow;
                     }
                     previousStyles[flatIndex] = style;
                 });
@@ -587,16 +571,16 @@ function KaraokeTextBase({
                                         true,
                                         wordIndex === wordGroups.length - 1
                                     );
-                                    const hasGlowEffect =
-                                        charItem.groupDurationMs > 800;
                                     const exitStyle = isExitLayer ? {
                                         animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
                                         '--karaoke-char-exit-x': `${style.translateXEm.toFixed(4)}em`,
                                         '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
                                         '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
+                                        '--karaoke-char-exit-shadow': style.glowShadow,
                                     } : isSettlingLayer ? {
                                         animation: 'none',
                                         transform: 'none',
+                                        textShadow: transparentGlowShadow,
                                     } : undefined;
 
                                     return (
@@ -610,75 +594,24 @@ function KaraokeTextBase({
                                                 display: 'inline-block',
                                                 whiteSpace: 'pre-wrap',
                                                 transform: style.transform,
-                                                willChange: isSettlingLayer ? 'auto' : style.willChange,
+                                                willChange: style.willChange,
                                                 transition: 'none',
                                                 backfaceVisibility: 'hidden',
                                                 overflow: 'visible',
+                                                // 退出层必须使用完成态填充，避免低频 currentTime
+                                                // 覆盖高精度时钟已经推进完成的尾字颜色。
+                                                backgroundImage: isFocused
+                                                    ? style.fillBackgroundImage
+                                                    : completedFillBackground,
+                                                WebkitBackgroundClip: 'text',
+                                                backgroundClip: 'text',
+                                                WebkitTextFillColor: 'transparent',
+                                                color: 'transparent',
+                                                textShadow: style.glowShadow,
                                                 ...exitStyle,
                                             }}
                                         >
-                                            {hasGlowEffect && (
-                                                <span
-                                                    key="glow"
-                                                    aria-hidden="true"
-                                                    ref={(el) => {
-                                                        glowRefs.current[flatIndex] = el;
-                                                    }}
-                                                    style={{
-                                                        position: 'absolute',
-                                                        inset: '-0.45em',
-                                                        padding: '0.45em',
-                                                        pointerEvents: 'none',
-                                                        whiteSpace: 'pre-wrap',
-                                                        color: 'rgba(255,255,255,0.95)',
-                                                        WebkitTextFillColor: 'rgba(255,255,255,0.95)',
-                                                        clipPath: 'none',
-                                                        maskImage: style.glowMask,
-                                                        WebkitMaskImage: style.glowMask,
-                                                        opacity: style.glowOpacity,
-                                                        textShadow: style.glowShadow,
-                                                        willChange: isSettlingLayer
-                                                            ? 'auto'
-                                                            : 'opacity, text-shadow, mask-image',
-                                                        transform: 'translateZ(0)',
-                                                        overflow: 'visible',
-                                                        animation: isExitLayer
-                                                            ? `karaoke-glow-exit ${karaokeExitDurationMs}ms ease-in-out both`
-                                                            : undefined,
-                                                        ...(isExitLayer ? {
-                                                            '--karaoke-glow-exit-opacity': String(style.glowOpacity),
-                                                            '--karaoke-glow-exit-shadow': style.glowShadow,
-                                                        } : undefined),
-                                                        ...(isSettlingLayer ? {
-                                                            opacity: 0,
-                                                            textShadow: 'none',
-                                                        } : undefined),
-                                                    }}
-                                                >
-                                                    {charItem.char}
-                                                </span>
-                                            )}
-                                            <span
-                                                key="fill"
-                                                ref={(el) => {
-                                                    fillRefs.current[flatIndex] = el;
-                                                }}
-                                                style={{
-                                                    position: 'relative',
-                                                    zIndex: 1,
-                                                    // 退出层必须使用完成态填充，避免低频 currentTime
-                                                    // 覆盖高精度时钟已经推进完成的尾字颜色。
-                                                    backgroundImage: isFocused
-                                                        ? style.fillBackgroundImage
-                                                        : completedFillBackground,
-                                                    WebkitBackgroundClip: 'text',
-                                                    backgroundClip: 'text',
-                                                    WebkitTextFillColor: 'transparent',
-                                                    color: 'transparent',
-                                                }}
-                                            >
-                                                {charItem.char}
-                                            </span>
+                                            {charItem.char}
                                         </span>
                                     );
                                 })}
