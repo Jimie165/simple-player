@@ -135,7 +135,13 @@ function LyricsLineItem({
                     shouldRenderKaraoke
                         ? (isActive ? 'transition-none' : 'transition-opacity duration-500 ease-in-out')
                         : 'transition-all duration-500 ease-in-out',
-                    isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75'
+                    shouldRenderKaraoke
+                        ? isActive
+                            ? 'opacity-100'
+                            : 'opacity-30 hover:opacity-75'
+                        : isActive
+                            ? 'opacity-100'
+                            : 'opacity-30 hover:opacity-75'
                 )}
             >
                 {shouldRenderKaraoke ? (

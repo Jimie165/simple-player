@@ -21,6 +21,7 @@ type IndexedCharItem = {
 
 type KaraokeCharStyle = {
     transform: string;
+    translateXEm: number;
     translateYEm: number;
     scaleValue: number;
     willChange: string;
@@ -32,28 +33,91 @@ type KaraokeCharStyle = {
 
 type WordPhase = 'future' | 'motion' | 'settled';
 
-const karaokeExitDurationMs = 500;
+const karaokeExitDurationMs = 250;
+const animationHeadstartMs = 100;
+const syllableLiftEm = 0.078;
 const completedFillBackground =
     'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
-const settledWordTransform = 'translate3d(0, -0.078em, 0)';
+const completedGlowMask = 'linear-gradient(to right, #fff, #fff)';
+const settledWordTransform =
+    `translate3d(0, -${syllableLiftEm}em, 0)`;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
     const x = clamp01(value);
     return x * x * (3 - 2 * x);
 };
-const scaleEmphasisEase = (value: number) => {
+const evaluateCubicBezier = (
+    value: number,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number
+) => {
     const x = clamp01(value);
-    if (x >= 0.5) return smoothstep((1 - x) / 0.5);
+    let parameter = x;
 
-    const attack = smoothstep(x / 0.5);
-    return 1 - Math.pow(1 - attack, 1.35);
+    for (let iteration = 0; iteration < 5; iteration++) {
+        const inverse = 1 - parameter;
+        const sampledX =
+            3 * inverse * inverse * parameter * x1 +
+            3 * inverse * parameter * parameter * x2 +
+            parameter * parameter * parameter;
+        const derivative =
+            3 * inverse * inverse * x1 +
+            6 * inverse * parameter * (x2 - x1) +
+            3 * parameter * parameter * (1 - x2);
+        if (Math.abs(derivative) < 0.0001) break;
+        parameter = clamp01(
+            parameter - (sampledX - x) / derivative
+        );
+    }
+
+    const inverse = 1 - parameter;
+    return (
+        3 * inverse * inverse * parameter * y1 +
+        3 * inverse * parameter * parameter * y2 +
+        parameter * parameter * parameter
+    );
+};
+const getDurationEmphasisAmount = (
+    durationMs: number,
+    divisorMs: number
+) => {
+    const ratio = durationMs / divisorMs;
+    return ratio > 1 ? Math.sqrt(ratio) : Math.pow(ratio, 3);
+};
+const getEmphasisDurationMs = (
+    groupDurationMs: number,
+    isLastWord: boolean
+) => (
+    Math.max(1000, groupDurationMs) *
+    (isLastWord ? 1.2 : 1)
+);
+const getEmphasisPulse = (value: number) => {
+    const x = clamp01(value);
+    return x < 0.5
+        ? evaluateCubicBezier(
+            x / 0.5,
+            0.2,
+            0.4,
+            0.58,
+            1
+        )
+        : 1 - evaluateCubicBezier(
+            (x - 0.5) / 0.5,
+            0.3,
+            0,
+            0.58,
+            1
+        );
 };
 
 function getKaraokeCharStyle(
     charItem: FlatCharItem,
     timeMs: number,
-    isActive: boolean = true
+    isActive: boolean = true,
+    isLastWord: boolean = false
 ): KaraokeCharStyle {
     const {
         time_ms,
@@ -64,63 +128,79 @@ function getKaraokeCharStyle(
         activeCharCountInWord,
     } = charItem;
     const baseAlpha = isActive ? 0.30 : 1.0;
-    const rawProgress = (timeMs - time_ms) / durationMs;
-    const progress = clamp01(rawProgress);
-    const isComplete = rawProgress >= 1;
-    const stopVal = progress * 100;
-    const hasProgress = progress > 0;
+    const fillRawProgress = (timeMs - time_ms) / durationMs;
+    const fillProgress = clamp01(fillRawProgress);
+    const isFillComplete = fillRawProgress >= 1;
+    const hasFillProgress = fillProgress > 0;
 
     const longToneRaw = clamp01((groupDurationMs - 800) / 760);
     const longToneAmount = smoothstep(longToneRaw);
-    const edgeWidth = 26 + longToneAmount * 18;
-    const edgeAlpha = 0.72 + longToneAmount * 0.2;
-    const softEdgeStart = hasProgress ? Math.max(0, stopVal - edgeWidth) : 0;
-    const softEdgeEnd = hasProgress ? Math.min(125, stopVal + edgeWidth) : 0;
-
+    const glowToneAmount = groupDurationMs > 800
+        ? 0.3 + smoothstep(longToneRaw) * 0.6
+        : 0;
+    const fillStop = fillProgress * 100;
+    const fillEdgeWidth = 26 + longToneAmount * 18;
+    const fillEdgeAlpha = 0.72 + longToneAmount * 0.2;
+    const fillEdgeStart = hasFillProgress
+        ? Math.max(0, fillStop - fillEdgeWidth)
+        : 0;
+    const fillEdgeEnd = hasFillProgress
+        ? Math.min(125, fillStop + fillEdgeWidth)
+        : 0;
     const elapsedMs = timeMs - time_ms;
     const hasStarted = elapsedMs > 0;
     const attackMs = Math.max(800, durationMs);
-    const lift = hasStarted ? Math.sin((clamp01(elapsedMs / attackMs) * Math.PI) / 2) : 0;
+    const regularLift = hasStarted
+        ? Math.sin(
+            (clamp01(elapsedMs / attackMs) * Math.PI) / 2
+        )
+        : 0;
 
     const charCount = Math.max(1, activeCharCountInWord);
     const charIndex = Math.max(0, activeCharIndexInWord);
-    const charDelayMs = (groupDurationMs / 2.5 / charCount) * charIndex;
-    const emphasisDurationMs = Math.max(800, groupDurationMs);
-    const emphasisProgress = (timeMs - groupStartMs - charDelayMs) / emphasisDurationMs;
-
-    // Scaling follows each character's complete staggered wave. Its slightly
-    // broader visible attack keeps trailing characters growing before the short
-    // acceleration phase, while the word-level release cannot truncate them.
-    const scaleEffect = longToneAmount * scaleEmphasisEase(emphasisProgress);
-    const lastCharDelayMs = (groupDurationMs / 2.5 / charCount) * (charCount - 1);
-    const glowEndMs = groupStartMs + lastCharDelayMs + emphasisDurationMs;
-    const glowReleaseMs = Math.min(720, Math.max(480, groupDurationMs * 0.22));
-    const glowRelease = smoothstep((glowEndMs - timeMs) / glowReleaseMs);
-    const glowBuild = hasProgress ? 1 - Math.pow(1 - progress, 2) : 0;
-    const glowEffect = longToneAmount * glowBuild * glowRelease;
-
-    const emphasisFloatProgress = clamp01((timeMs - (groupStartMs + charDelayMs - 400)) / (emphasisDurationMs * 1.4));
-    const emphasisLift = Math.sin(emphasisFloatProgress * Math.PI) * longToneAmount;
-    const translateY = lift * -0.078 + emphasisLift * -0.07;
-    const scale = 1 + scaleEffect * 0.1;
-    const glowOpacity = glowEffect * (0.5 + progress * 0.35);
-    const glowRadius = 2.5 + glowEffect * 9;
-    const glowShadow = glowEffect > 0.01
-        ? `0 0 ${Math.min(5, glowRadius * 0.45)}px rgba(255,255,255,${0.34 + glowEffect * 0.2}), 0 0 ${glowRadius}px rgba(255,255,255,${0.18 + glowEffect * 0.24})`
+    const emphasisDurationMs = getEmphasisDurationMs(
+        groupDurationMs,
+        isLastWord
+    );
+    const charDelayMs =
+        (emphasisDurationMs / 2.5 / charCount) * charIndex;
+    const emphasisProgress = clamp01(
+        (timeMs - groupStartMs - charDelayMs) /
+        emphasisDurationMs
+    );
+    const emphasisPulse =
+        getEmphasisPulse(emphasisProgress) *
+        longToneAmount;
+    const motionAmount = Math.min(
+        1.2,
+        getDurationEmphasisAmount(emphasisDurationMs, 2000) * 0.6
+    );
+    const glowPulse =
+        getEmphasisPulse(emphasisProgress) *
+        glowToneAmount;
+    const centerOffset = charCount / 2 - charIndex;
+    const translateX =
+        -emphasisPulse * 0.03 * motionAmount * centerOffset;
+    const translateY = regularLift * -syllableLiftEm;
+    const scale = 1 + emphasisPulse * 0.1 * motionAmount;
+    const glowOpacity = glowPulse;
+    const glowShadow = glowOpacity > 0.01
+        ? '0 0 5px rgba(255,255,255,0.75)'
         : 'none';
-    const glowMask = isComplete
-        ? 'linear-gradient(to right, #fff, #fff)'
-        : hasProgress
-            ? `linear-gradient(to right, #fff 0%, #fff ${softEdgeStart}%, rgba(255,255,255,0.72) ${stopVal}%, transparent ${softEdgeEnd}%, transparent 100%)`
+    const glowMask = isFillComplete
+        ? completedGlowMask
+        : hasFillProgress
+            ? `linear-gradient(to right, #fff 0%, #fff ${fillEdgeStart}%, rgba(255,255,255,0.72) ${fillStop}%, transparent ${fillEdgeEnd}%, transparent 100%)`
             : 'linear-gradient(to right, transparent, transparent)';
-    const fillBackgroundImage = isComplete
+    const fillBackgroundImage = isFillComplete
         ? completedFillBackground
-        : hasProgress
-            ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${softEdgeStart}%, rgba(255,255,255,${edgeAlpha}) ${stopVal}%, rgba(255,255,255,${baseAlpha}) ${softEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
+        : hasFillProgress
+            ? `linear-gradient(to right, rgba(255,255,255,1) 0%, rgba(255,255,255,1) ${fillEdgeStart}%, rgba(255,255,255,${fillEdgeAlpha}) ${fillStop}%, rgba(255,255,255,${baseAlpha}) ${fillEdgeEnd}%, rgba(255,255,255,${baseAlpha}) 100%)`
             : `linear-gradient(to right, rgba(255,255,255,${baseAlpha}), rgba(255,255,255,${baseAlpha}))`;
 
     return {
-        transform: `translate3d(0, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
+        transform: `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
+        translateXEm: translateX,
         translateYEm: translateY,
         scaleValue: scale,
         willChange: 'transform',
@@ -131,29 +211,49 @@ function getKaraokeCharStyle(
     };
 }
 
-function getWordMotionWindow(group: IndexedCharItem[]) {
+function getWordMotionWindow(
+    group: IndexedCharItem[],
+    isLastWord: boolean
+) {
     let startMs = Number.POSITIVE_INFINITY;
     let endMs = Number.NEGATIVE_INFINITY;
 
     group.forEach(({ item }) => {
-        const charCount = Math.max(1, item.activeCharCountInWord);
-        const charIndex = Math.max(0, item.activeCharIndexInWord);
-        const charDelayMs = (item.groupDurationMs / 2.5 / charCount) * charIndex;
-        const emphasisDurationMs = Math.max(800, item.groupDurationMs);
-        const emphasisStartMs = item.groupStartMs + charDelayMs - 400;
-        const emphasisEndMs = emphasisStartMs + emphasisDurationMs * 1.4;
         const liftEndMs = item.time_ms + Math.max(800, item.durationMs);
+        const progressionStartMs =
+            item.groupStartMs - animationHeadstartMs;
+        const progressionEndMs =
+            item.groupStartMs + item.groupDurationMs;
         const hasLongToneMotion = item.groupDurationMs > 800;
-
-        startMs = Math.min(startMs, item.time_ms, hasLongToneMotion ? emphasisStartMs : item.time_ms);
+        const emphasisDurationMs = getEmphasisDurationMs(
+            item.groupDurationMs,
+            isLastWord
+        );
+        const charCount = Math.max(
+            1,
+            item.activeCharCountInWord
+        );
+        const charIndex = Math.max(
+            0,
+            item.activeCharIndexInWord
+        );
+        const charDelayMs =
+            (emphasisDurationMs / 2.5 / charCount) * charIndex;
+        const emphasisStartMs =
+            item.groupStartMs + charDelayMs;
+        const emphasisEndMs =
+            emphasisStartMs + emphasisDurationMs;
+        startMs = Math.min(
+            startMs,
+            progressionStartMs,
+            item.time_ms
+        );
         endMs = Math.max(
             endMs,
             item.time_ms + item.durationMs,
             liftEndMs,
-            hasLongToneMotion
-                ? item.groupStartMs + charDelayMs + emphasisDurationMs
-                : liftEndMs,
-            hasLongToneMotion ? emphasisEndMs : liftEndMs,
+            progressionEndMs,
+            hasLongToneMotion ? emphasisEndMs : liftEndMs
         );
     });
 
@@ -161,9 +261,12 @@ function getWordMotionWindow(group: IndexedCharItem[]) {
 }
 
 function getWordPhases(wordGroups: IndexedCharItem[][], timeMs: number): WordPhase[] {
-    return wordGroups.map(group => {
+    return wordGroups.map((group, wordIndex) => {
         if (!group?.length) return 'settled';
-        const { startMs, endMs } = getWordMotionWindow(group);
+        const { startMs, endMs } = getWordMotionWindow(
+            group,
+            wordIndex === wordGroups.length - 1
+        );
         if (timeMs < startMs) return 'future';
         if (timeMs < endMs) return 'motion';
         return 'settled';
@@ -234,16 +337,27 @@ function KaraokeTextBase({
         if (!isActive || !isFocused) return;
 
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
-        const updateWordStyles = (timeMs: number) => {
+        const updateWordStyles = (
+            timeMs: number,
+            forceAll: boolean = false
+        ) => {
             const nextPhases = getWordPhases(wordGroups, timeMs);
             const nextPhaseKey = getWordPhaseKey(nextPhases);
-            if (nextPhaseKey !== wordPhaseKeyRef.current) {
+            const phaseChanged =
+                nextPhaseKey !== wordPhaseKeyRef.current;
+            if (phaseChanged) {
                 wordPhaseKeyRef.current = nextPhaseKey;
                 setWordPhaseSnapshot({ phases: nextPhases, timeMs });
             }
 
             nextPhases.forEach((phase, wordIndex) => {
-                if (phase !== 'motion') return;
+                if (
+                    !forceAll &&
+                    !phaseChanged &&
+                    phase !== 'motion'
+                ) {
+                    return;
+                }
                 const group = wordGroups[wordIndex];
                 group?.forEach(({ item: charItem, flatIndex }) => {
                     const el = charRefs.current[flatIndex];
@@ -251,7 +365,12 @@ function KaraokeTextBase({
                     const glowEl = glowRefs.current[flatIndex];
                     if (!el || !fillEl) return;
 
-                    const style = getKaraokeCharStyle(charItem, timeMs, true);
+                    const style = getKaraokeCharStyle(
+                        charItem,
+                        timeMs,
+                        true,
+                        wordIndex === wordGroups.length - 1
+                    );
                     const previousStyle = previousStyles[flatIndex];
                     if (style.transform !== previousStyle?.transform) {
                         el.style.transform = style.transform;
@@ -283,7 +402,15 @@ function KaraokeTextBase({
         const tick = () => {
             const timeMs = preciseMsRef.current;
             if (timeMs !== lastTimeMs) {
-                updateWordStyles(timeMs);
+                const hasPreviousTime =
+                    Number.isFinite(lastTimeMs);
+                const hasTimelineJump =
+                    hasPreviousTime &&
+                    (
+                        timeMs < lastTimeMs ||
+                        timeMs - lastTimeMs > 200
+                    );
+                updateWordStyles(timeMs, hasTimelineJump);
                 lastTimeMs = timeMs;
             }
             frame = requestAnimationFrame(tick);
@@ -297,6 +424,8 @@ function KaraokeTextBase({
                 ? previous
                 : { phases: initialPhases, timeMs: initialTimeMs }
         );
+        updateWordStyles(initialTimeMs, true);
+        lastTimeMs = initialTimeMs;
         frame = requestAnimationFrame(tick);
         // 在焦点切换的提交阶段、浏览器绘制退出态之前同步停掉逐帧写入。
         // 否则旧 rAF 可能把少数尾字重新写成未完成渐变并留在退出层中。
@@ -344,6 +473,13 @@ function KaraokeTextBase({
                 ? previous
                 : { phases, timeMs }
         );
+        if (phases.every(phase => phase === 'future')) {
+            setRichLayerState({
+                focused: false,
+                visible: false,
+                settling: false,
+            });
+        }
     }, [isFocused, keepRichLayer, preciseMsRef, wordGroups]);
 
     useEffect(() => {
@@ -389,6 +525,7 @@ function KaraokeTextBase({
                 const baseWordExitStyle = isExitLayer && phase === 'settled'
                     ? {
                         animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
+                        '--karaoke-char-exit-x': '0',
                         '--karaoke-char-exit-y': '-0.078em',
                         '--karaoke-char-exit-scale': '1',
                     }
@@ -447,11 +584,14 @@ function KaraokeTextBase({
                                     const style = getKaraokeCharStyle(
                                         charItem,
                                         renderTimeMs,
-                                        true
+                                        true,
+                                        wordIndex === wordGroups.length - 1
                                     );
-                                    const hasGlowEffect = charItem.groupDurationMs > 800;
+                                    const hasGlowEffect =
+                                        charItem.groupDurationMs > 800;
                                     const exitStyle = isExitLayer ? {
                                         animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
+                                        '--karaoke-char-exit-x': `${style.translateXEm.toFixed(4)}em`,
                                         '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
                                         '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
                                     } : isSettlingLayer ? {

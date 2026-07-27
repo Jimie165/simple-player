@@ -407,7 +407,11 @@ body {
 @keyframes karaoke-char-exit {
   from {
     transform:
-      translate3d(0, var(--karaoke-char-exit-y, 0), 0)
+      translate3d(
+        var(--karaoke-char-exit-x, 0),
+        var(--karaoke-char-exit-y, 0),
+        0
+      )
       scale(var(--karaoke-char-exit-scale, 1));
   }
 
