@@ -35,6 +35,8 @@ const narrowScrollMaskStyle = {
     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
 
+const lineSeekSyncToleranceMs = 1000;
+
 function FluidLyricsPanel({
     isOpen,
     lyrics,
@@ -52,6 +54,10 @@ function FluidLyricsPanel({
     const previousTargetYRef = useRef(0);
     const pausedScrollRef = useRef(false);
     const firstPositionDoneRef = useRef(false);
+    const pendingLineSeekRef = useRef<{
+        syncRevision: number;
+        targetMs: number;
+    } | null>(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
 
@@ -148,6 +154,7 @@ function FluidLyricsPanel({
         firstPositionDoneRef.current = false;
         pausedScrollRef.current = false;
         previousTargetYRef.current = 0;
+        pendingLineSeekRef.current = null;
         const frame = requestAnimationFrame(() => {
             setPausedScroll(false);
             setIsUserScrolling(false);
@@ -187,6 +194,7 @@ function FluidLyricsPanel({
     }, [activeTargetScrollY, isPlaying, updateTargetScrollY]);
 
     const handleManualDelta = useCallback((deltaY: number) => {
+        pendingLineSeekRef.current = null;
         if (deltaY !== 0) onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
         setIsUserScrolling(true);
         if (!isPlaying) {
@@ -203,9 +211,33 @@ function FluidLyricsPanel({
 
     const handleLineSeek = useCallback((time: number) => {
         keepCurrentInterludeForExit();
-        setIsUserScrolling(false);
+        if (resumeTimeoutRef.current) {
+            clearTimeout(resumeTimeoutRef.current);
+            resumeTimeoutRef.current = null;
+        }
+        if (isUserScrolling) {
+            pendingLineSeekRef.current = {
+                syncRevision,
+                targetMs: time * 1000,
+            };
+        }
         onSeek(time);
-    }, [keepCurrentInterludeForExit, onSeek]);
+    }, [isUserScrolling, keepCurrentInterludeForExit, onSeek, syncRevision]);
+
+    useEffect(() => {
+        const pendingSeek = pendingLineSeekRef.current;
+        if (!pendingSeek || pendingSeek.syncRevision === syncRevision) return;
+        if (Math.abs(renderCurrentMs - pendingSeek.targetMs) > lineSeekSyncToleranceMs) return;
+
+        const frame = requestAnimationFrame(() => {
+            if (pendingLineSeekRef.current !== pendingSeek) return;
+            pendingLineSeekRef.current = null;
+            // seek 已同步到新歌词行后再恢复跟随，避免旧播放位置先进入一次弹簧目标。
+            firstPositionDoneRef.current = false;
+            setIsUserScrolling(false);
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [renderCurrentMs, syncRevision]);
     const dynamicSpringParams = useMemo(
         () => getFluidLyricsSpringParams({
             activeDisplayIndex,

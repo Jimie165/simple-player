@@ -132,6 +132,25 @@ export function usePrecisePlaybackTime(
     }, [currentTime]);
 
     useEffect(() => {
+        const handleSeeked = (event: Event) => {
+            const detail = (event as CustomEvent<{ time?: unknown }>).detail;
+            if (!detail || typeof detail.time !== 'number' || !Number.isFinite(detail.time)) return;
+
+            const seekMs = Math.max(0, detail.time * 1000);
+            if (externalSyncFrameRef.current !== null) {
+                cancelAnimationFrame(externalSyncFrameRef.current);
+                externalSyncFrameRef.current = null;
+            }
+            currentTimeRef.current = seekMs / 1000;
+            lastExternalMs.current = seekMs;
+            hardSync(seekMs);
+        };
+
+        window.addEventListener('playback:seeked', handleSeeked);
+        return () => window.removeEventListener('playback:seeked', handleSeeked);
+    }, [hardSync]);
+
+    useEffect(() => {
         if (!subscribeToPlayerTime) return;
 
         const unsubscribe = usePlayerStore.subscribe((state, previousState) => {
