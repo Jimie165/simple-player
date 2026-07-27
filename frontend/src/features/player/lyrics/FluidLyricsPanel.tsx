@@ -12,7 +12,11 @@ import {
     manualResumeFollowDelayMs,
 } from '@/features/player/lyrics/constants';
 import { getFluidLyricsMotionDelay, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
-import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
+import {
+    getInterludeFocusOffsetPx,
+    getInterludeNeighborShiftPx,
+    getInterludeRowHeightPx,
+} from '@/features/player/lyrics/layoutMetrics';
 import {
     buildDisplayItems,
     buildFluidLyricsRenderBoundaries,
@@ -113,15 +117,26 @@ function FluidLyricsPanel({
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
         const rowHeight = getInterludeRowHeightPx();
+        const neighborShift = getInterludeNeighborShiftPx();
+        const openInterludeIndices = new Set(
+            [exitingInterludeIndex, openInterludeIndex].filter(
+                (displayIndex): displayIndex is number =>
+                    displayIndex !== null && displayIndex >= 0
+            )
+        );
         let shift = 0;
 
         displayItems.forEach((item, displayIndex) => {
             shifts[displayIndex] = shift;
             if (item.type !== 'interlude') return;
-            const isOpenInterlude =
-                displayIndex === exitingInterludeIndex ||
-                displayIndex === openInterludeIndex;
-            if (!isOpenInterlude) shift -= rowHeight;
+            if (!openInterludeIndices.has(displayIndex)) shift -= rowHeight;
+        });
+
+        openInterludeIndices.forEach(interludeIndex => {
+            for (let displayIndex = 0; displayIndex < displayItems.length; displayIndex++) {
+                if (displayIndex < interludeIndex) shifts[displayIndex] -= neighborShift;
+                else if (displayIndex > interludeIndex) shifts[displayIndex] += neighborShift;
+            }
         });
         return shifts;
     }, [displayItems, exitingInterludeIndex, openInterludeIndex]);
@@ -137,7 +152,7 @@ function FluidLyricsPanel({
         visibleIndices,
     } = useFluidLyricsLayout({
         activeDisplayIndex,
-        activeFocusOffset: activeItem?.type === 'interlude' ? getInterludeFocusOffsetPx() : 0,
+        activeFocusOffset: activeItem?.type === 'interlude' ? -getInterludeFocusOffsetPx() : 0,
         displayItems,
         includeActiveWindow: !isUserScrolling,
         interludeRowHeight: getInterludeRowHeightPx(),

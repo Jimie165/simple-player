@@ -11,3 +11,10 @@ export const getInterludeRowHeightPx = () => {
     const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
     return Math.min(Math.max(2.5 * rootFontSize, 6 * vmin), 4 * rootFontSize);
 };
+
+export const getInterludeNeighborShiftPx = () => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return 5;
+    const rootFontSize = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    const vmin = Math.min(window.innerWidth, window.innerHeight) / 100;
+    return Math.min(Math.max(0.25 * rootFontSize, 0.7 * vmin), 0.5 * rootFontSize);
+};
