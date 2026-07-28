@@ -39,6 +39,7 @@ const narrowScrollMaskStyle = {
     WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 40px), transparent 100%)',
 };
 
+const INTERLUDE_FOCUS_OFFSET_RATIO = 0.9;
 const lineSeekSyncToleranceMs = 1000;
 
 function FluidLyricsPanel({
@@ -152,7 +153,9 @@ function FluidLyricsPanel({
         visibleIndices,
     } = useFluidLyricsLayout({
         activeDisplayIndex,
-        activeFocusOffset: activeItem?.type === 'interlude' ? -getInterludeFocusOffsetPx() : 0,
+        activeFocusOffset: activeItem?.type === 'interlude'
+            ? -getInterludeFocusOffsetPx() * INTERLUDE_FOCUS_OFFSET_RATIO
+            : 0,
         displayItems,
         includeActiveWindow: !isUserScrolling,
         interludeRowHeight: getInterludeRowHeightPx(),
