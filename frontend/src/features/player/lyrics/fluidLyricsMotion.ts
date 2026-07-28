@@ -21,7 +21,7 @@ interface FluidLyricsMotionArgs {
     variant: 'side' | 'narrow';
 }
 
-/** 计算动画优先歌词原有的动态滚动弹簧参数。 */
+/** 计算动画优先歌词的纵向滚动弹簧参数。 */
 export function getFluidLyricsSpringParams({
     activeDisplayIndex,
     displayItems,
@@ -34,25 +34,22 @@ export function getFluidLyricsSpringParams({
 
     const currentItem = displayItems[activeDisplayIndex];
     const previousItem = displayItems[activeDisplayIndex - 1];
-    const currentStartMs = currentItem.type === 'line'
-        ? (currentItem.line.time_ms ?? 0)
-        : currentItem.startMs;
-    const previousStartMs = previousItem.type === 'line'
-        ? (previousItem.line.time_ms ?? 0)
-        : previousItem.startMs;
-
     if (currentItem.type === 'interlude' || previousItem.type === 'interlude') {
         return { stiffness: 90, damping: 15, mass: 1 };
     }
 
+    const currentStartMs = currentItem.line.time_ms ?? 0;
+    const previousStartMs = previousItem.line.time_ms ?? 0;
     const clampedInterval = clamp(currentStartMs - previousStartMs, 100, 800);
-    let ratio = 1 - (clampedInterval - 100) / 700;
-    ratio = Math.pow(ratio, 0.2);
+    let speedRatio = 1 - (clampedInterval - 100) / 700;
+    speedRatio = Math.pow(speedRatio, 0.2);
 
-    const stiffness = 170 + ratio * 50;
+    // 以 100/18/1 为慢速基准；快速切行只小幅提高刚度，
+    // 阻尼比固定为 0.9，使不同速度下都保留一致的细微自然超调。
+    const stiffness = 100 + speedRatio * 30;
     return {
         stiffness,
-        damping: Math.sqrt(stiffness) * 2.2,
+        damping: Math.sqrt(stiffness) * 1.8,
         mass: 1,
     };
 }
