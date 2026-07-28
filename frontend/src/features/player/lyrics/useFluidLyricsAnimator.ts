@@ -10,6 +10,9 @@ const SCALE_SPRING: FluidSpringParams = {
     restSpeed: 0.001,
 };
 
+const ACTIVE_SCALE = 1;
+const INACTIVE_SCALE = 0.98;
+
 interface RowAnimationState {
     detachedAt: number | null;
     element: HTMLDivElement | null;
@@ -58,7 +61,7 @@ class FluidLyricsAnimator {
         }
 
         for (let index = 0; index < rowCount; index++) {
-            this.ensureModel(index, getTargetY(index), index === activeDisplayIndex ? 1.05 : 1);
+            this.ensureModel(index, getTargetY(index), index === activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE);
         }
         this.rows.forEach((_state, index) => {
             if (index < rowCount) return;
@@ -114,7 +117,7 @@ class FluidLyricsAnimator {
             this.setTarget(
                 index,
                 getTargetY(index),
-                index === activeDisplayIndex ? 1.05 : 1,
+                index === activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
                 springParams,
                 getDelay(index),
             );
@@ -261,7 +264,7 @@ export function useFluidLyricsAnimator({
             index,
             element,
             (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
-            index === targets.activeDisplayIndex ? 1.05 : 1,
+            index === targets.activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
         );
     }, [animator]);
 

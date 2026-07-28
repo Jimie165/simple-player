@@ -385,7 +385,7 @@ export default function LyricsPanel({
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
-                        className="h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                        className="h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-none]"
                         data={displayItems}
                         components={{ Header, Footer }}
                         initialTopMostItemIndex={{

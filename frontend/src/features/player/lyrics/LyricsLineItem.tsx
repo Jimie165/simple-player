@@ -111,7 +111,7 @@ function LyricsLineItem({
             containIntrinsicSize: 'auto 90px',
             backfaceVisibility: 'hidden',
         } as const;
-    const targetScale = isActive ? 1.05 : 1;
+    const targetScale = isActive ? 1 : 0.98;
     const content = (
         <div
             data-fluid-lyrics-scale={fluidMotion ? '' : undefined}
@@ -131,7 +131,7 @@ function LyricsLineItem({
                     transitionDelay: `${motionDelay}s`,
                 } : undefined}
                 className={clsx(
-                    'block font-bold text-[clamp(1.68rem,4.5vmin,3.10rem)] leading-[1.38] tracking-wide relative',
+                    'block font-bold text-[clamp(1.76rem,4.73vmin,3.26rem)] leading-[1.38] tracking-wide relative',
                     shouldRenderKaraoke
                         ? (isActive ? 'transition-none' : 'transition-opacity duration-500 ease-in-out')
                         : 'transition-all duration-500 ease-in-out',
@@ -165,7 +165,7 @@ function LyricsLineItem({
                         transitionDelay: `${motionDelay}s`,
                     } : undefined}
                     className={clsx(
-                        'block font-medium text-[clamp(1.08rem,2.8vmin,1.92rem)] leading-[1.34] tracking-wide mt-1 transition-all duration-300',
+                        'block font-medium text-[clamp(1.13rem,2.94vmin,2.02rem)] leading-[1.34] tracking-wide mt-1 transition-all duration-300',
                         isActive
                             ? 'text-white/65 opacity-95 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'
                             : 'text-white/32 opacity-80'
