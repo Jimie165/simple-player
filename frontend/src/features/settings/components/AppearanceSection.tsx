@@ -109,7 +109,7 @@ export default function AppearanceSection() {
                         <MdGraphicEq className="text-xl text-primary" />
                         <span>
                             <span className="block text-sm font-medium text-on-surface">音乐律动背景</span>
-                            <span className="block text-xs text-on-surface-variant">根据低频和鼓点轻微推动背景</span>
+                            <span className="block text-xs text-on-surface-variant">背景会随低频和鼓点轻微律动</span>
                         </span>
                     </span>
                     <span

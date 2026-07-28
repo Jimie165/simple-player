@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MdLibraryMusic, MdRefresh } from 'react-icons/md';
+import { MdRefresh, MdTune } from 'react-icons/md';
 import clsx from 'clsx';
 import { toast } from 'react-hot-toast';
 
@@ -54,7 +54,7 @@ export default function GeneralSettingsSection() {
     return (
         <section className="space-y-4">
             <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
-                <MdLibraryMusic className="text-lg" />
+                <MdTune className="text-lg" />
                 <span>常规设置</span>
             </div>
 
