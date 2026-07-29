@@ -96,13 +96,10 @@ export default function AppearanceSection() {
                         {playerEffectMode === 'animation' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
                     </button>
                 </div>
-                <button
-                    type="button"
-                    onClick={() => setReactiveBackgroundEnabled(!reactiveBackgroundEnabled)}
-                    disabled={playerEffectMode !== 'animation'}
+                <div
                     className={clsx(
                         "settings-card flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-opacity",
-                        playerEffectMode !== 'animation' && "cursor-not-allowed opacity-45",
+                        playerEffectMode !== 'animation' && "opacity-45",
                     )}
                 >
                     <span className="flex items-center gap-3">
@@ -112,24 +109,34 @@ export default function AppearanceSection() {
                             <span className="block text-xs text-on-surface-variant">背景会随低频和鼓点轻微律动</span>
                         </span>
                     </span>
-                    <span
-                        className={clsx(
-                            "relative h-6 w-11 rounded-full transition-colors",
-                            reactiveBackgroundEnabled && playerEffectMode === 'animation'
-                                ? "bg-primary"
-                                : "bg-outline-variant/50",
-                        )}
+                    <button
+                        type="button"
+                        role="switch"
+                        aria-label="音乐律动背景"
+                        aria-checked={reactiveBackgroundEnabled}
+                        onClick={() => setReactiveBackgroundEnabled(!reactiveBackgroundEnabled)}
+                        disabled={playerEffectMode !== 'animation'}
+                        className="flex shrink-0 items-center justify-center rounded-full p-2 -mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed"
                     >
                         <span
                             className={clsx(
-                                "absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                "relative block h-6 w-11 rounded-full transition-colors",
                                 reactiveBackgroundEnabled && playerEffectMode === 'animation'
-                                    ? "translate-x-6"
-                                    : "translate-x-1",
+                                    ? "bg-primary"
+                                    : "bg-outline-variant/50",
                             )}
-                        />
-                    </span>
-                </button>
+                        >
+                            <span
+                                className={clsx(
+                                    "absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                    reactiveBackgroundEnabled && playerEffectMode === 'animation'
+                                        ? "translate-x-5"
+                                        : "translate-x-0",
+                                )}
+                            />
+                        </span>
+                    </button>
+                </div>
             </div>
 
             {/* Color Selection */}
