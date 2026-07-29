@@ -437,7 +437,8 @@ function KaraokeTextBase({
                     const charRect = range.getBoundingClientRect();
                     charElement.style.left =
                         `${((charRect.left - baseRect.left) / baseRect.width) * 100}%`;
-                    charElement.style.top = '0';
+                    charElement.style.top =
+                        `${((charRect.top - baseRect.top) / baseRect.height) * 100}%`;
                     charElement.style.width = `${(charRect.width / baseRect.width) * 100}%`;
                 }
                 textOffset = nextOffset;
