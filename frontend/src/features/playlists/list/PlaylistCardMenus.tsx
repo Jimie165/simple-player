@@ -60,6 +60,7 @@ export function FavoritesCardMenu({
         <MusicContextMenu
             className="absolute bottom-3 right-3"
             buttonClassName="w-10 h-10"
+            tooltipText="更多"
             groups={menuItems}
             onOpen={() => {
                 setFavoritesContextMenu(null);
@@ -114,6 +115,7 @@ export function PlaylistCardMenu({
         <MusicContextMenu
             className="absolute bottom-3 right-3"
             buttonClassName="w-10 h-10"
+            tooltipText="更多"
             groups={menuItems}
             onOpen={() => {
                 setContextMenu(null);

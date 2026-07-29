@@ -209,6 +209,7 @@ export default function MusicGrid() {
                                                 <SmartMusicContextMenu
                                                     className="absolute bottom-3 right-3"
                                                     buttonClassName="w-10 h-10"
+                                                    tooltipText="更多"
                                                     items={item}
                                                     context="recent"
                                                     onPlay={() => handleItemClick(item)}

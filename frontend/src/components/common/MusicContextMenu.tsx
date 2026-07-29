@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
+import CustomTooltip from '@/components/common/CustomTooltip';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
 import {
     MdPlayArrow,
@@ -47,6 +48,7 @@ export interface MusicContextMenuProps extends Partial<MusicMenuOptions> {
     variant?: 'glass' | 'clean'; // Visual variant
     onOpen?: () => void; // Callback when menu is opened
     suppressCloseEvent?: boolean; // Prevent dispatching global close event on open
+    tooltipText?: string; // Optional trigger tooltip
     children?: React.ReactNode; // Custom trigger content
 }
 
@@ -292,7 +294,7 @@ function MenuLifecycleEffects({
 }
 
 export default function MusicContextMenu(props: MusicContextMenuProps) {
-    const { groups, className, buttonClassName, variant = 'glass', onOpen, suppressCloseEvent } = props;
+    const { groups, className, buttonClassName, variant = 'glass', onOpen, suppressCloseEvent, tooltipText } = props;
     const resolvedGroups = groups ?? (props.type ? getMusicMenuGroups(props as MusicMenuOptions) : []);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement | null>(null);
@@ -348,15 +350,11 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
             className={className}
         >
             <Menu as="div" className="relative">
-                {({ open, close }) => (
-                    <>
-                        <MenuLifecycleEffects
-                            open={open}
-                            buttonRef={buttonRef}
-                            menuRef={menuRef}
-                        />
+                {({ open, close }) => {
+                    const trigger = (
                         <MenuButton
                             ref={buttonRef}
+                            aria-label={tooltipText}
                             className={getButtonClass()}
                             onClick={(e) => {
                                 // Stop propagation first to prevent event from triggering row click
@@ -381,16 +379,29 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                         >
                             {props.children || <MdMoreHoriz />}
                         </MenuButton>
-                        <MenuContent
-                            open={open}
-                            close={close}
-                            resolvedGroups={resolvedGroups}
-                            menuRef={menuRef}
-                            menuPosition={menuPosition}
-                            updateMenuPosition={updateMenuPosition}
-                        />
-                    </>
-                )}
+                    );
+
+                    return (
+                        <>
+                            <MenuLifecycleEffects
+                                open={open}
+                                buttonRef={buttonRef}
+                                menuRef={menuRef}
+                            />
+                            {tooltipText
+                                ? <CustomTooltip text={tooltipText}>{trigger}</CustomTooltip>
+                                : trigger}
+                            <MenuContent
+                                open={open}
+                                close={close}
+                                resolvedGroups={resolvedGroups}
+                                menuRef={menuRef}
+                                menuPosition={menuPosition}
+                                updateMenuPosition={updateMenuPosition}
+                            />
+                        </>
+                    );
+                }}
             </Menu>
         </div >
     );

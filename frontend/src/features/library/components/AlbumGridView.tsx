@@ -150,6 +150,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                         <SmartMusicContextMenu
                                             className="absolute bottom-3 right-3"
                                             buttonClassName="w-10 h-10"
+                                            tooltipText="更多"
                                             items={album}
                                             context={hideArtist ? 'artist_detail' : 'library'}
                                             onPlay={() => onPlayAlbum(album)}

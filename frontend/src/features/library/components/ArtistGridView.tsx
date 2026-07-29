@@ -158,6 +158,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                             <SmartMusicContextMenu
                                 className="absolute bottom-1 right-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity"
                                 buttonClassName="w-10 h-10"
+                                tooltipText="更多"
                                 items={artist}
                                 context="library"
                                 onPlay={() => onPlayArtist(artist)}

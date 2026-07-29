@@ -10,6 +10,7 @@ interface SmartMusicContextMenuProps {
     className?: string;
     buttonClassName?: string;
     variant?: 'glass' | 'clean';
+    tooltipText?: string;
     onOpen?: () => void;
     suppressCloseEvent?: boolean;
     onNavigate?: () => void;
@@ -31,7 +32,7 @@ interface SmartMusicContextMenuProps {
 export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps) {
     const {
         items, context, playlistId,
-        className, buttonClassName, variant, onOpen, suppressCloseEvent,
+        className, buttonClassName, variant, tooltipText, onOpen, suppressCloseEvent,
         onPlay, onDelete, onShuffle, onSelect, onShowProperties, hideSelect, selectText, isSelected, onNavigate
     } = props;
 
@@ -58,6 +59,7 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
             className={className}
             buttonClassName={buttonClassName}
             variant={variant}
+            tooltipText={tooltipText}
             onOpen={onOpen}
             suppressCloseEvent={suppressCloseEvent}
         />

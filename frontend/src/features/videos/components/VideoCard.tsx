@@ -81,6 +81,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                         <SmartMusicContextMenu
                             className="absolute bottom-3 right-3"
                             buttonClassName="w-10 h-10"
+                            tooltipText="更多"
                             items={video}
                             context="video"
                             onPlay={() => onPlay(video)}
