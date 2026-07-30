@@ -33,9 +33,8 @@ const MESH_FRAGMENT_SHADER = `
 precision highp float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
-uniform float u_time;
-uniform float u_motion;
-uniform float u_luminance;
+uniform vec4 u_uvTransform;
+uniform float u_colorScale;
 
 const float INV_255 = 1.0 / 255.0;
 const float HALF_INV_255 = 0.5 / 255.0;
@@ -44,22 +43,14 @@ float gradientNoise(vec2 coordinate) {
     return fract(52.9829189 * fract(dot(coordinate, vec2(0.06711056, 0.00583715))));
 }
 
-vec2 rotate2d(vec2 value, float angle) {
-    float sine = sin(angle);
-    float cosine = cos(angle);
-    return vec2(cosine * value.x - sine * value.y, sine * value.x + cosine * value.y);
-}
-
 void main() {
-    float volumeEffect = u_motion * 0.2;
-    float timeMotion = u_time + u_motion * 0.1;
-
-    vec2 centeredUV = v_uv - vec2(0.2);
-    vec2 rotatedUV = rotate2d(centeredUV, timeMotion * 2.0);
-    vec2 finalUV = rotatedUV * max(0.001, 1.0 - volumeEffect) + vec2(0.5);
+    vec2 finalUV = vec2(
+        u_uvTransform.x * v_uv.x - u_uvTransform.y * v_uv.y + u_uvTransform.z,
+        u_uvTransform.y * v_uv.x + u_uvTransform.x * v_uv.y + u_uvTransform.w
+    );
     vec3 color = texture2D(u_texture, finalUV).rgb;
 
-    color *= 1.0 - u_luminance * 0.04;
+    color *= u_colorScale;
 
     float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
     color += vec3(dither);
@@ -188,7 +179,7 @@ export class FluidRenderer {
             MESH_VERTEX_SHADER,
             MESH_FRAGMENT_SHADER,
             ['a_position', 'a_uv'],
-            ['u_texture', 'u_time', 'u_motion', 'u_luminance', 'u_aspect'],
+            ['u_texture', 'u_uvTransform', 'u_colorScale', 'u_aspect'],
         );
         this.presentProgram = compileProgram(
             gl,
@@ -197,6 +188,12 @@ export class FluidRenderer {
             ['a_position'],
             ['u_texture', 'u_alpha'],
         );
+
+        gl.activeTexture(gl.TEXTURE0);
+        gl.useProgram(this.meshProgram.program);
+        gl.uniform1i(this.meshProgram.uniforms.u_texture, 0);
+        gl.useProgram(this.presentProgram.program);
+        gl.uniform1i(this.presentProgram.uniforms.u_texture, 0);
 
         const quadBuffer = gl.createBuffer();
         if (!quadBuffer) throw new Error('无法创建网格背景缓冲区');
@@ -320,6 +317,8 @@ export class FluidRenderer {
         this.target = nextTarget;
         this.canvas.width = width;
         this.canvas.height = height;
+        this.gl.useProgram(this.meshProgram.program);
+        this.gl.uniform1f(this.meshProgram.uniforms.u_aspect, width / height);
         // 修改 canvas backing store 会立即清空默认 framebuffer。必须在同一任务中
         // 完成新 FBO 的首帧呈现，避免全屏切换时把清空后的黑帧交给合成器。
         const now = performance.now();
@@ -332,14 +331,37 @@ export class FluidRenderer {
         this.requestFrame();
     }
 
-    private bindTexture(texture: WebGLTexture, uniform: WebGLUniformLocation | null) {
-        const gl = this.gl;
-        gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, texture);
-        gl.uniform1i(uniform, 0);
+    private bindTexture(texture: WebGLTexture) {
+        this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
     }
 
-    private renderMesh(time: number, state: MeshState) {
+    private prepareMeshFrame(time: number) {
+        const motion = this.audioResponse.motion;
+        const angle = (
+            ((time - this.startTime) / 10000) * FLOW_SPEED
+            + motion * 0.1
+        ) * 2;
+        const scale = Math.max(0.001, 1 - motion * 0.2);
+        const cosine = Math.cos(angle) * scale;
+        const sine = Math.sin(angle) * scale;
+
+        const gl = this.gl;
+        const program = this.meshProgram;
+        gl.useProgram(program.program);
+        gl.uniform4f(
+            program.uniforms.u_uvTransform,
+            cosine,
+            sine,
+            0.5 - 0.2 * cosine + 0.2 * sine,
+            0.5 - 0.2 * sine - 0.2 * cosine,
+        );
+        gl.uniform1f(
+            program.uniforms.u_colorScale,
+            1 - this.audioResponse.luminance * 0.04,
+        );
+    }
+
+    private renderMesh(state: MeshState) {
         if (!this.target) return;
         const gl = this.gl;
         const program = this.meshProgram;
@@ -348,18 +370,13 @@ export class FluidRenderer {
         gl.disable(gl.BLEND);
         gl.clearColor(0, 0, 0, 0);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.useProgram(program.program);
         gl.bindBuffer(gl.ARRAY_BUFFER, state.vertexBuffer);
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 16, 0);
         gl.enableVertexAttribArray(program.attributes.a_uv);
         gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 16, 8);
-        this.bindTexture(state.texture, program.uniforms.u_texture);
-        gl.uniform1f(program.uniforms.u_time, ((time - this.startTime) / 10000) * FLOW_SPEED);
-        gl.uniform1f(program.uniforms.u_motion, this.audioResponse.motion);
-        gl.uniform1f(program.uniforms.u_luminance, this.audioResponse.luminance);
-        gl.uniform1f(program.uniforms.u_aspect, this.canvas.width / this.canvas.height);
+        this.bindTexture(state.texture);
         gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
     }
 
@@ -375,7 +392,7 @@ export class FluidRenderer {
         gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 0, 0);
-        this.bindTexture(this.target.texture, program.uniforms.u_texture);
+        this.bindTexture(this.target.texture);
         gl.uniform1f(program.uniforms.u_alpha, alpha);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
@@ -388,8 +405,11 @@ export class FluidRenderer {
         gl.disable(gl.BLEND);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        for (const state of this.meshStates) {
-            this.renderMesh(time, state);
+        this.prepareMeshFrame(time);
+        for (let index = 0; index < this.meshStates.length; index += 1) {
+            if (index > 0) gl.useProgram(this.meshProgram.program);
+            const state = this.meshStates[index];
+            this.renderMesh(state);
             this.present(easeInOutSine(state.alpha));
         }
     }
