@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, memo, type RefObject } from 'react';
+import { useLayoutEffect, useMemo, useRef, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
@@ -24,12 +24,15 @@ type KaraokeCharStyle = {
     translateXEm: number;
     translateYEm: number;
     scaleValue: number;
-    willChange: string;
     fillBackgroundImage: string;
     glowShadow: string;
 };
 
 type WordPhase = 'future' | 'motion' | 'settled';
+type WordMotionWindow = {
+    startMs: number;
+    endMs: number;
+};
 
 const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
@@ -38,8 +41,8 @@ const completedFillBackground =
     'linear-gradient(to right, rgba(255,255,255,1), rgba(255,255,255,1))';
 const transparentGlowShadow =
     '0 0 5px rgba(255,255,255,0)';
-const settledWordTransform =
-    `translate3d(0, -${syllableLiftEm}em, 0)`;
+const restingCharTransform =
+    'translate(0, 0) scale(1)';
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
@@ -200,7 +203,6 @@ function getKaraokeCharStyle(
         translateXEm: translateX,
         translateYEm: translateY,
         scaleValue: scale,
-        willChange: 'transform, text-shadow',
         fillBackgroundImage,
         glowShadow,
     };
@@ -255,13 +257,11 @@ function getWordMotionWindow(
     return { startMs, endMs };
 }
 
-function getWordPhases(wordGroups: IndexedCharItem[][], timeMs: number): WordPhase[] {
-    return wordGroups.map((group, wordIndex) => {
-        if (!group?.length) return 'settled';
-        const { startMs, endMs } = getWordMotionWindow(
-            group,
-            wordIndex === wordGroups.length - 1
-        );
+function getWordPhases(
+    wordMotionWindows: WordMotionWindow[],
+    timeMs: number
+): WordPhase[] {
+    return wordMotionWindows.map(({ startMs, endMs }) => {
         if (timeMs < startMs) return 'future';
         if (timeMs < endMs) return 'motion';
         return 'settled';
@@ -282,22 +282,11 @@ function KaraokeTextBase({
     isActive,
     isFocused,
 }: KaraokeTextProps) {
-    const baseWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const currentStylesRef =
+        useRef<Array<KaraokeCharStyle | undefined>>([]);
     const wordPhaseKeyRef = useRef('');
-    const [richLayerState, setRichLayerState] = useState({
-        focused: isFocused,
-        visible: isFocused,
-        settling: false,
-    });
-    if (richLayerState.focused !== isFocused) {
-        setRichLayerState({
-            focused: isFocused,
-            visible: isFocused || richLayerState.visible,
-            settling: false,
-        });
-    }
-    const keepRichLayer = richLayerState.visible;
+    const wasFocusedRef = useRef(isFocused);
 
     const flatChars = useMemo(
         () => parseLyricsWordsToChars(words, lineEndMs, {
@@ -317,30 +306,41 @@ function KaraokeTextBase({
         });
         return groups;
     }, [flatChars]);
-    const [wordPhaseSnapshot, setWordPhaseSnapshot] = useState(() => ({
-        phases: getWordPhases(wordGroups, baseCurrentMs),
-        timeMs: baseCurrentMs,
-    }));
-    const renderWordPhases = wordPhaseSnapshot.phases.length === wordGroups.length
-        ? wordPhaseSnapshot.phases
-        : getWordPhases(wordGroups, baseCurrentMs);
-    const renderTimeMs = wordPhaseSnapshot.timeMs;
+    const wordMotionWindows = useMemo(
+        () => wordGroups.map((group, wordIndex) =>
+            getWordMotionWindow(
+                group,
+                wordIndex === wordGroups.length - 1
+            )
+        ),
+        [wordGroups]
+    );
 
     useLayoutEffect(() => {
         if (!isActive || !isFocused) return;
 
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
+        currentStylesRef.current = previousStyles;
+        charRefs.current.forEach((element) => {
+            if (!element) return;
+            element.style.animation = 'none';
+            element.style.willChange = 'transform';
+            element.style.backfaceVisibility = 'hidden';
+        });
+
         const updateWordStyles = (
             timeMs: number,
             forceAll: boolean = false
         ) => {
-            const nextPhases = getWordPhases(wordGroups, timeMs);
+            const nextPhases = getWordPhases(
+                wordMotionWindows,
+                timeMs
+            );
             const nextPhaseKey = getWordPhaseKey(nextPhases);
             const phaseChanged =
                 nextPhaseKey !== wordPhaseKeyRef.current;
             if (phaseChanged) {
                 wordPhaseKeyRef.current = nextPhaseKey;
-                setWordPhaseSnapshot({ phases: nextPhases, timeMs });
             }
 
             nextPhases.forEach((phase, wordIndex) => {
@@ -365,9 +365,6 @@ function KaraokeTextBase({
                     const previousStyle = previousStyles[flatIndex];
                     if (style.transform !== previousStyle?.transform) {
                         el.style.transform = style.transform;
-                    }
-                    if (style.willChange !== previousStyle?.willChange) {
-                        el.style.willChange = style.willChange;
                     }
                     if (style.fillBackgroundImage !== previousStyle?.fillBackgroundImage) {
                         el.style.backgroundImage = style.fillBackgroundImage;
@@ -401,231 +398,171 @@ function KaraokeTextBase({
         };
 
         const initialTimeMs = preciseMsRef.current;
-        const initialPhases = getWordPhases(wordGroups, initialTimeMs);
-        wordPhaseKeyRef.current = getWordPhaseKey(initialPhases);
-        setWordPhaseSnapshot(previous =>
-            getWordPhaseKey(previous.phases) === wordPhaseKeyRef.current
-                ? previous
-                : { phases: initialPhases, timeMs: initialTimeMs }
+        const initialPhases = getWordPhases(
+            wordMotionWindows,
+            initialTimeMs
         );
+        wordPhaseKeyRef.current = getWordPhaseKey(initialPhases);
         updateWordStyles(initialTimeMs, true);
         lastTimeMs = initialTimeMs;
         frame = requestAnimationFrame(tick);
-        // 在焦点切换的提交阶段、浏览器绘制退出态之前同步停掉逐帧写入。
-        // 否则旧 rAF 可能把少数尾字重新写成未完成渐变并留在退出层中。
         return () => cancelAnimationFrame(frame);
-    }, [isActive, isFocused, preciseMsRef, wordGroups]);
+    }, [
+        isActive,
+        isFocused,
+        preciseMsRef,
+        wordGroups,
+        wordMotionWindows,
+    ]);
 
     useLayoutEffect(() => {
-        if (!keepRichLayer) return;
+        const wasFocused = wasFocusedRef.current;
+        wasFocusedRef.current = isFocused;
 
-        const range = document.createRange();
-        wordGroups.forEach((group, wordIndex) => {
-            const baseWord = baseWordRefs.current[wordIndex];
-            const textNode = baseWord?.firstChild;
-            if (!baseWord || !textNode || textNode.nodeType !== Node.TEXT_NODE || !group?.length) return;
-
-            const baseRect = baseWord.getBoundingClientRect();
-            if (baseRect.width <= 0 || baseRect.height <= 0) return;
-            let textOffset = 0;
-            group.forEach(({ item, flatIndex }) => {
-                const charElement = charRefs.current[flatIndex];
-                const nextOffset = textOffset + item.char.length;
-                if (charElement) {
-                    range.setStart(textNode, textOffset);
-                    range.setEnd(textNode, nextOffset);
-                    const charRect = range.getBoundingClientRect();
-                    charElement.style.left =
-                        `${((charRect.left - baseRect.left) / baseRect.width) * 100}%`;
-                    charElement.style.top =
-                        `${((charRect.top - baseRect.top) / baseRect.height) * 100}%`;
-                    charElement.style.width = `${(charRect.width / baseRect.width) * 100}%`;
-                }
-                textOffset = nextOffset;
+        if (isFocused) {
+            charRefs.current.forEach((element) => {
+                if (!element) return;
+                element.style.animation = 'none';
+                element.style.willChange = 'transform';
+                element.style.backfaceVisibility = 'hidden';
             });
-        });
-        range.detach();
-    }, [keepRichLayer, wordGroups]);
-
-    useLayoutEffect(() => {
-        if (isFocused || !keepRichLayer) return;
+            return;
+        }
 
         const timeMs = preciseMsRef.current;
-        const phases = getWordPhases(wordGroups, timeMs);
-        wordPhaseKeyRef.current = getWordPhaseKey(phases);
-        setWordPhaseSnapshot(previous =>
-            previous.timeMs === timeMs
-                ? previous
-                : { phases, timeMs }
-        );
-        if (phases.every(phase => phase === 'future')) {
-            setRichLayerState({
-                focused: false,
-                visible: false,
-                settling: false,
-            });
+        flatChars.forEach((charItem, flatIndex) => {
+            const element = charRefs.current[flatIndex];
+            if (!element) return;
+
+            element.style.backgroundImage = completedFillBackground;
+            if (!wasFocused) {
+                element.style.animation = 'none';
+                element.style.transform = restingCharTransform;
+                element.style.textShadow = transparentGlowShadow;
+                element.style.removeProperty('will-change');
+                element.style.removeProperty('backface-visibility');
+                return;
+            }
+
+            const style =
+                currentStylesRef.current[flatIndex] ??
+                getKaraokeCharStyle(
+                    charItem,
+                    timeMs,
+                    true,
+                    charItem.wordIndex === wordGroups.length - 1
+                );
+            element.style.setProperty(
+                '--karaoke-char-exit-x',
+                `${style.translateXEm.toFixed(4)}em`
+            );
+            element.style.setProperty(
+                '--karaoke-char-exit-y',
+                `${style.translateYEm.toFixed(4)}em`
+            );
+            element.style.setProperty(
+                '--karaoke-char-exit-scale',
+                style.scaleValue.toFixed(4)
+            );
+            element.style.setProperty(
+                '--karaoke-char-exit-shadow',
+                style.glowShadow
+            );
+            element.style.animation =
+                `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`;
+        });
+
+        if (!wasFocused) {
+            currentStylesRef.current = [];
+            return;
         }
-    }, [isFocused, keepRichLayer, preciseMsRef, wordGroups]);
 
-    useEffect(() => {
-        if (!keepRichLayer) return;
-        if (isFocused) return;
-
-        let settleFrame = 0;
         let releaseFrame = 0;
-        const timer = window.setTimeout(() => {
-            setRichLayerState(state => state.focused ? state : { ...state, settling: true });
-
-            // Let the stable glyph nodes paint without transforms before removing
-            // only their expensive glow effects.
-            settleFrame = requestAnimationFrame(() => {
-                releaseFrame = requestAnimationFrame(() => {
-                    setRichLayerState(state => state.focused
-                        ? state
-                        : { ...state, visible: false, settling: false });
+        const releaseTimer = window.setTimeout(() => {
+            releaseFrame = requestAnimationFrame(() => {
+                charRefs.current.forEach((element) => {
+                    if (!element) return;
+                    element.style.transform = restingCharTransform;
+                    element.style.textShadow = transparentGlowShadow;
+                    element.style.animation = 'none';
+                    element.style.removeProperty('will-change');
+                    element.style.removeProperty('backface-visibility');
                 });
+                currentStylesRef.current = [];
             });
         }, karaokeExitDurationMs);
 
         return () => {
-            window.clearTimeout(timer);
-            cancelAnimationFrame(settleFrame);
+            window.clearTimeout(releaseTimer);
             cancelAnimationFrame(releaseFrame);
         };
-    }, [isFocused, keepRichLayer]);
-
-    const renderWordGroups = () => wordGroups.map((group, wordIndex) => {
-                if (!group || group.length === 0) return null;
-
-                const phase = keepRichLayer
-                    ? renderWordPhases[wordIndex] ?? 'settled'
-                    : 'settled';
-                const shouldRenderCharLayer = keepRichLayer;
-                const isSettlingLayer = keepRichLayer && !isFocused && richLayerState.settling;
-                const isExitLayer = keepRichLayer && !isFocused && !isSettlingLayer;
-                const wordText = group.map(({ item }) => item.char).join('');
-                const baseWordFillBackground = isFocused && phase === 'future'
-                    ? 'linear-gradient(to right, rgba(255,255,255,0.30), rgba(255,255,255,0.30))'
-                    : completedFillBackground;
-                const baseWordExitStyle = isExitLayer && phase === 'settled'
-                    ? {
-                        animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
-                        '--karaoke-char-exit-x': '0',
-                        '--karaoke-char-exit-y': '-0.078em',
-                        '--karaoke-char-exit-scale': '1',
-                    }
-                    : undefined;
-
-                return (
-                    <span
-                        key={wordIndex}
-                        style={{
-                            position: 'relative',
-                            display: 'inline-block',
-                            whiteSpace: 'nowrap',
-                            fontKerning: 'none',
-                            fontVariantLigatures: 'none',
-                            transform: 'none',
-                            willChange: 'auto',
-                            transition: 'none',
-                            backfaceVisibility: 'hidden',
-                            overflow: 'visible',
-                        }}
-                    >
-                        <span
-                            ref={(el) => {
-                                baseWordRefs.current[wordIndex] = el;
-                            }}
-                            style={{
-                                display: 'inline-block',
-                                whiteSpace: 'pre-wrap',
-                                visibility: shouldRenderCharLayer ? 'hidden' : 'visible',
-                                backgroundImage: baseWordFillBackground,
-                                WebkitBackgroundClip: 'text',
-                                backgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                color: 'transparent',
-                                transform: isFocused && phase === 'settled'
-                                    ? settledWordTransform
-                                    : 'none',
-                                transformOrigin: 'center',
-                                backfaceVisibility: 'hidden',
-                                ...baseWordExitStyle,
-                            }}
-                        >
-                            {wordText}
-                        </span>
-                        {shouldRenderCharLayer && (
-                            <span
-                                aria-hidden="true"
-                                style={{
-                                    position: 'absolute',
-                                    inset: 0,
-                                    pointerEvents: 'none',
-                                    overflow: 'visible',
-                                }}
-                            >
-                                {group.map(({ item: charItem, flatIndex }) => {
-                                    const style = getKaraokeCharStyle(
-                                        charItem,
-                                        renderTimeMs,
-                                        true,
-                                        wordIndex === wordGroups.length - 1
-                                    );
-                                    const exitStyle = isExitLayer ? {
-                                        animation: `karaoke-char-exit ${karaokeExitDurationMs}ms ease-in-out both`,
-                                        '--karaoke-char-exit-x': `${style.translateXEm.toFixed(4)}em`,
-                                        '--karaoke-char-exit-y': `${style.translateYEm.toFixed(4)}em`,
-                                        '--karaoke-char-exit-scale': style.scaleValue.toFixed(4),
-                                        '--karaoke-char-exit-shadow': style.glowShadow,
-                                    } : isSettlingLayer ? {
-                                        animation: 'none',
-                                        transform: 'none',
-                                        textShadow: transparentGlowShadow,
-                                    } : undefined;
-
-                                    return (
-                                        <span
-                                            key={charItem.charIndexInWord}
-                                            ref={(el) => {
-                                                charRefs.current[flatIndex] = el;
-                                            }}
-                                            style={{
-                                                position: 'absolute',
-                                                display: 'inline-block',
-                                                whiteSpace: 'pre-wrap',
-                                                transform: style.transform,
-                                                willChange: style.willChange,
-                                                transition: 'none',
-                                                backfaceVisibility: 'hidden',
-                                                overflow: 'visible',
-                                                // 退出层必须使用完成态填充，避免低频 currentTime
-                                                // 覆盖高精度时钟已经推进完成的尾字颜色。
-                                                backgroundImage: isFocused
-                                                    ? style.fillBackgroundImage
-                                                    : completedFillBackground,
-                                                WebkitBackgroundClip: 'text',
-                                                backgroundClip: 'text',
-                                                WebkitTextFillColor: 'transparent',
-                                                color: 'transparent',
-                                                textShadow: style.glowShadow,
-                                                ...exitStyle,
-                                            }}
-                                        >
-                                            {charItem.char}
-                                        </span>
-                                    );
-                                })}
-                            </span>
-                        )}
-                    </span>
-                );
-            });
+    }, [flatChars, isFocused, preciseMsRef, wordGroups.length]);
 
     return (
         <span style={{ display: 'block' }}>
-            <span style={{ display: 'block' }}>
-                {renderWordGroups()}
+            <span
+                style={{
+                    display: 'block',
+                    fontKerning: 'none',
+                    fontVariantLigatures: 'none',
+                }}
+            >
+                {wordGroups.map((group, wordIndex) => {
+                    if (!group || group.length === 0) return null;
+
+                    return (
+                        <span
+                            key={wordIndex}
+                            style={{
+                                display: 'inline-block',
+                                whiteSpace: 'nowrap',
+                            }}
+                        >
+                            {group.map(({ item: charItem, flatIndex }) => {
+                                const style = isFocused
+                                    ? getKaraokeCharStyle(
+                                        charItem,
+                                        baseCurrentMs,
+                                        true,
+                                        wordIndex === wordGroups.length - 1
+                                    )
+                                    : null;
+
+                                return (
+                                    <span
+                                        key={charItem.charIndexInWord}
+                                        ref={(element) => {
+                                            charRefs.current[flatIndex] = element;
+                                        }}
+                                        style={{
+                                            position: 'relative',
+                                            display: 'inline-block',
+                                            whiteSpace: 'pre-wrap',
+                                            transform:
+                                                style?.transform ??
+                                                restingCharTransform,
+                                            transformOrigin: 'center',
+                                            transition: 'none',
+                                            overflow: 'visible',
+                                            backgroundImage:
+                                                style?.fillBackgroundImage ??
+                                                completedFillBackground,
+                                            WebkitBackgroundClip: 'text',
+                                            backgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            color: 'transparent',
+                                            textShadow:
+                                                style?.glowShadow ??
+                                                transparentGlowShadow,
+                                        }}
+                                    >
+                                        {charItem.char}
+                                    </span>
+                                );
+                            })}
+                        </span>
+                    );
+                })}
             </span>
         </span>
     );
