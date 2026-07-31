@@ -71,7 +71,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
         <>
             <div className="relative" ref={queueRef}>
                 <PlayQueuePopup show={showQueuePopup} onNavigateClose={() => setShowQueuePopup(false)} />
-                <CustomTooltip text="播放队列">
+                <CustomTooltip text="播放队列" disabled={showQueuePopup}>
                     <button
                         onClick={() => {
                             setShowQueuePopup((value) => !value);
@@ -92,7 +92,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
 
             <div className="relative" ref={volumeRef}>
                 <VolumePopup show={showVolumePopup} onChange={setLocalVolume} />
-                <CustomTooltip text={`音量: ${localVolume}%`}>
+                <CustomTooltip text={`音量: ${localVolume}%`} disabled={showVolumePopup}>
                     <button
                         onClick={() => {
                             setShowVolumePopup((value) => !value);
@@ -137,7 +137,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
             </div>
 
             <div className={clsx(mode === 'compact' ? "block" : "hidden")}>
-                <CustomTooltip text="更多">
+                <CustomTooltip text="更多" disabled={showCompactMenu}>
                     <button
                         onClick={toggleCompactMenu}
                         className={clsx(

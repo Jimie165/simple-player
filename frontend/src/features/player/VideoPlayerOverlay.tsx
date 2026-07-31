@@ -373,7 +373,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                                     {/* RIGHT */}
                                     <div className="flex items-center gap-2 shrink-0">
-                                        <CustomTooltip text="播放列表">
+                                        <CustomTooltip text="播放列表" disabled={isPlaylistOpen}>
                                             <button
                                                 onClick={() => setIsPlaylistOpen(!isPlaylistOpen)}
                                                 aria-label="播放列表"

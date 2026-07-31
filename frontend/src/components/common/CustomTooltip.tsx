@@ -95,8 +95,23 @@ export default function CustomTooltip({
     const hoverTimeoutRef = useRef<number | null>(null);
     const leaveTimeoutRef = useRef<number | null>(null);
 
+    const hideTooltip = useCallback(() => {
+        if (hoverTimeoutRef.current) {
+            clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+        }
+        if (leaveTimeoutRef.current) {
+            clearTimeout(leaveTimeoutRef.current);
+        }
+        setIsVisible(false);
+        leaveTimeoutRef.current = window.setTimeout(() => {
+            setIsRendered(false);
+            leaveTimeoutRef.current = null;
+        }, 200);
+    }, []);
+
     const handleMouseEnter = () => {
-        if (disabled) return;
+        if (disabled || show === false) return;
         if (leaveTimeoutRef.current) {
             clearTimeout(leaveTimeoutRef.current);
             leaveTimeoutRef.current = null;
@@ -112,15 +127,7 @@ export default function CustomTooltip({
     };
 
     const handleMouseLeave = () => {
-        if (hoverTimeoutRef.current) {
-            clearTimeout(hoverTimeoutRef.current);
-            hoverTimeoutRef.current = null;
-        }
-        setIsVisible(false);
-        // 延时 200ms 以匹配过渡动画时间
-        leaveTimeoutRef.current = setTimeout(() => {
-            setIsRendered(false);
-        }, 200) as unknown as number;
+        hideTooltip();
     };
 
     // 清理定时器防泄漏
@@ -136,17 +143,16 @@ export default function CustomTooltip({
 
     // 全局 mousedown：任何点击都立即关闭 tooltip（兼容 React 重绘后 mouseleave 丢失的情况）
     useEffect(() => {
-        const forceHide = () => {
-            if (hoverTimeoutRef.current) {
-                clearTimeout(hoverTimeoutRef.current);
-                hoverTimeoutRef.current = null;
-            }
-            setIsVisible(false);
-            leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
-        };
-        window.addEventListener('mousedown', forceHide);
-        return () => window.removeEventListener('mousedown', forceHide);
-    }, []);
+        window.addEventListener('mousedown', hideTooltip);
+        return () => window.removeEventListener('mousedown', hideTooltip);
+    }, [hideTooltip]);
+
+    useEffect(() => {
+        if (!disabled) return;
+        const frame = requestAnimationFrame(hideTooltip);
+        return () => cancelAnimationFrame(frame);
+    }, [disabled, hideTooltip]);
+
     // 如果父组件强制 show，也需要更新位置和渲染状态
     useEffect(() => {
         let frame: number | null = null;
@@ -188,8 +194,7 @@ export default function CustomTooltip({
             className={twMerge("group/tooltip relative flex items-center justify-center", className)}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            // 避免点击后仍然顽固显示的情况
-            onClick={handleMouseLeave}
+            onClick={hideTooltip}
         >
             {children}
 

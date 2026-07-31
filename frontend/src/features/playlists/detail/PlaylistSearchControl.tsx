@@ -20,7 +20,12 @@ export default function PlaylistSearchControl({
     setSuppressTooltip,
 }: PlaylistSearchControlProps) {
     return (
-        <CustomTooltip text="搜索" placement="bottom" show={suppressTooltip ? false : undefined}>
+        <CustomTooltip
+            text="搜索"
+            placement="bottom"
+            show={suppressTooltip ? false : undefined}
+            disabled={isSearchOpen}
+        >
             <div
                 onMouseLeave={() => setSuppressTooltip(false)}
                 className={clsx(

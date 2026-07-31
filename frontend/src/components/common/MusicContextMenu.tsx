@@ -389,7 +389,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 menuRef={menuRef}
                             />
                             {tooltipText
-                                ? <CustomTooltip text={tooltipText}>{trigger}</CustomTooltip>
+                                ? <CustomTooltip text={tooltipText} disabled={open}>{trigger}</CustomTooltip>
                                 : trigger}
                             <MenuContent
                                 open={open}

@@ -26,7 +26,12 @@ export default function PlaylistSortControl({
 }: PlaylistSortControlProps) {
     return (
         <div className="relative">
-            <CustomTooltip text="排序方式" placement="bottom" show={suppressSortTooltip ? false : undefined}>
+            <CustomTooltip
+                text="排序方式"
+                placement="bottom"
+                show={suppressSortTooltip ? false : undefined}
+                disabled={isSortMenuOpen}
+            >
                 <button
                     onMouseLeave={() => setSuppressSortTooltip(false)}
                     onClick={() => {
