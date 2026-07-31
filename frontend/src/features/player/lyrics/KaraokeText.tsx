@@ -43,6 +43,9 @@ const transparentGlowShadow =
     '0 0 5px rgba(255,255,255,0)';
 const restingCharTransform =
     'translate(0, 0) scale(1)';
+const cjkLayoutCharPattern =
+    /^[\p{Unified_Ideograph}\u0800-\u9FFC]+$/u;
+const whitespaceLayoutCharPattern = /^\s+$/u;
 
 const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
 const smoothstep = (value: number) => {
@@ -306,6 +309,36 @@ function KaraokeTextBase({
         });
         return groups;
     }, [flatChars]);
+    const layoutGroups = useMemo(() => {
+        const groups: IndexedCharItem[][] = [];
+        let currentGroup: IndexedCharItem[] = [];
+        const flushCurrentGroup = () => {
+            if (currentGroup.length === 0) return;
+            groups.push(currentGroup);
+            currentGroup = [];
+        };
+
+        flatChars.forEach((charItem, flatIndex) => {
+            const indexedChar = { item: charItem, flatIndex };
+            if (whitespaceLayoutCharPattern.test(charItem.char)) {
+                if (currentGroup.length > 0) {
+                    currentGroup.push(indexedChar);
+                    flushCurrentGroup();
+                } else if (groups.length > 0) {
+                    groups[groups.length - 1].push(indexedChar);
+                }
+                return;
+            }
+            if (cjkLayoutCharPattern.test(charItem.char)) {
+                flushCurrentGroup();
+                groups.push([indexedChar]);
+                return;
+            }
+            currentGroup.push(indexedChar);
+        });
+        flushCurrentGroup();
+        return groups;
+    }, [flatChars]);
     const wordMotionWindows = useMemo(
         () => wordGroups.map((group, wordIndex) =>
             getWordMotionWindow(
@@ -507,12 +540,12 @@ function KaraokeTextBase({
                     fontVariantLigatures: 'none',
                 }}
             >
-                {wordGroups.map((group, wordIndex) => {
+                {layoutGroups.map((group) => {
                     if (!group || group.length === 0) return null;
 
                     return (
                         <span
-                            key={wordIndex}
+                            key={group[0].flatIndex}
                             style={{
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',
@@ -524,13 +557,13 @@ function KaraokeTextBase({
                                         charItem,
                                         baseCurrentMs,
                                         true,
-                                        wordIndex === wordGroups.length - 1
+                                        charItem.wordIndex === wordGroups.length - 1
                                     )
                                     : null;
 
                                 return (
                                     <span
-                                        key={charItem.charIndexInWord}
+                                        key={flatIndex}
                                         ref={(element) => {
                                             charRefs.current[flatIndex] = element;
                                         }}
