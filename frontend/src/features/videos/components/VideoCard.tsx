@@ -76,7 +76,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 {/* Play Overlay & Context Menu Trigger */}
                 {!isSelectionMode && video.duration > 0 && (
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CardPlayButton onClick={() => onPlay(video)} title="播放视频" />
+                        <CardPlayButton onClick={() => onPlay(video)} />
 
                         <SmartMusicContextMenu
                             className="absolute bottom-3 right-3"

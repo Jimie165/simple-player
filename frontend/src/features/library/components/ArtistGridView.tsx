@@ -142,13 +142,13 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                     {!isSelectionMode && (
                         <div className="absolute inset-0 z-20 pointer-events-none">
                             <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity">
-                                <CustomTooltip text="播放艺人">
+                                <CustomTooltip text="播放">
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation();
                                             onPlayArtist(artist);
                                         }}
-                                        aria-label="播放艺人"
+                                        aria-label="播放"
                                         className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white hover:bg-white/30 hover:scale-105 transition-all"
                                     >
                                         <MdPlayArrow className="translate-x-0.5 text-xl" />
