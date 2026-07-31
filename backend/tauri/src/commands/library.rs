@@ -1,5 +1,6 @@
 use crate::DbState;
 use crate::modules::database::{FolderRepo, LibraryFolder, SongRepo};
+use crate::modules::library::covers::{SongArtworkState, delete_song_artwork, save_song_artwork};
 use crate::modules::library::{self, SongMetadata};
 use crate::utils::path::normalize_folder_path;
 use crate::utils::paths::{is_app_relative_path, is_user_file_path};
@@ -74,6 +75,10 @@ pub struct UpdateSongDetailsRequest {
     pub lyrics_text: Option<String>,
     pub lyrics_source_path: Option<String>,
     pub lyrics_offset_ms: i32,
+    #[serde(default)]
+    pub artwork_source_path: Option<String>,
+    #[serde(default)]
+    pub remove_artwork: bool,
 }
 
 fn clean_optional_string(value: Option<String>) -> Option<String> {
@@ -709,7 +714,9 @@ pub fn restore_excluded_songs(
 /// 更新歌曲信息和播放器内自定义歌词
 #[tauri::command]
 pub fn update_song_details(
+    app: tauri::AppHandle,
     db: State<'_, DbState>,
+    artwork_state: State<'_, SongArtworkState>,
     request: UpdateSongDetailsRequest,
 ) -> Result<SongMetadata, String> {
     let title = request.title.trim();
@@ -735,9 +742,38 @@ pub fn update_song_details(
         return Err("歌词偏移必须是 -5000 到 5000 毫秒之间的 100 毫秒整数倍".to_string());
     }
 
+    if request.remove_artwork && request.artwork_source_path.is_some() {
+        return Err("不能同时添加和移除封面".to_string());
+    }
+
+    let artwork_changed = request.remove_artwork || request.artwork_source_path.is_some();
+    let _artwork_guard = if artwork_changed {
+        Some(artwork_state.0.lock().map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let app_data_dir = if artwork_changed {
+        Some(app.path().app_data_dir().map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let next_artwork_path = if let Some(source) = request.artwork_source_path.as_deref() {
+        let data_dir = app_data_dir
+            .as_deref()
+            .ok_or_else(|| "无法获取封面资源目录".to_string())?;
+        Some(save_song_artwork(data_dir, Path::new(source))?.relative_path)
+    } else {
+        None
+    };
+
     let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let existing = SongRepo::get_by_id(&conn, request.id)
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "未找到歌曲".to_string())?;
+    let old_artwork_path = existing.artwork_path.clone();
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
     SongRepo::update_details(
-        &conn,
+        &tx,
         request.id,
         title,
         artist,
@@ -755,9 +791,32 @@ pub fn update_song_details(
     )
     .map_err(|e| e.to_string())?;
 
-    let updated = SongRepo::get_by_id(&conn, request.id)
+    if artwork_changed {
+        SongRepo::set_artwork_path(&tx, request.id, next_artwork_path.as_deref())
+            .map_err(|e| e.to_string())?;
+    }
+
+    let updated = SongRepo::get_by_id(&tx, request.id)
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "未找到歌曲".to_string())?;
+    let should_delete_old = if artwork_changed && old_artwork_path != updated.artwork_path {
+        old_artwork_path.as_deref().is_some_and(|old_path| {
+            SongRepo::count_artwork_references(&tx, old_path).unwrap_or(1) == 0
+        })
+    } else {
+        false
+    };
+    tx.commit().map_err(|e| e.to_string())?;
+    drop(conn);
+
+    if should_delete_old
+        && let (Some(data_dir), Some(old_path)) =
+            (app_data_dir.as_deref(), old_artwork_path.as_deref())
+        && let Err(error) = delete_song_artwork(data_dir, old_path)
+    {
+        eprintln!("{error}");
+    }
+
     Ok(SongMetadata::from_db_song(&updated))
 }
 

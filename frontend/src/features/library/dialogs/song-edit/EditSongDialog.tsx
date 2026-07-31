@@ -12,6 +12,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SongInfoFields from '@/features/library/dialogs/song-edit/SongInfoFields';
 import SongLyricsFields from '@/features/library/dialogs/song-edit/SongLyricsFields';
+import SongArtworkFields from '@/features/library/dialogs/song-edit/SongArtworkFields';
 import {
     buildUpdateSongDetailsRequest,
     makeInitialSongEditForm,
@@ -29,7 +30,7 @@ type Tab = 'details' | 'artwork' | 'lyrics';
 
 const tabs: Array<{ id: Tab; label: string }> = [
     { id: 'details', label: '详细信息' },
-    { id: 'artwork', label: '插图' },
+    { id: 'artwork', label: '封面' },
     { id: 'lyrics', label: '歌词' },
 ];
 
@@ -170,15 +171,21 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
         }
         if (activeTab === 'artwork') {
             return (
-                <div className="flex h-full min-h-0 items-center justify-center">
-                    <div className="aspect-square w-[min(430px,100%)] overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 shadow-sm dark:border-white/10 dark:bg-neutral-800">
-                        <CoverImage song={song} className="h-full w-full" iconClassName="text-6xl" />
-                    </div>
-                </div>
+                <SongArtworkFields
+                    song={song}
+                    artworkSourcePath={resolvedValues.artworkSourcePath}
+                    removeArtwork={resolvedValues.removeArtwork}
+                    onChange={handleChange}
+                    onError={setMessage}
+                />
             );
         }
         return null;
     };
+
+    const displayedCoverPath = resolvedValues.artworkSourcePath
+        ?? (resolvedValues.removeArtwork ? song.embedded_cover_path : song.cover_path)
+        ?? null;
 
     return (
         <Transition show={isOpen} as={Fragment}>
@@ -199,7 +206,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-[6px]">
+                            <DialogPanel className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
                                 <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">编辑歌曲信息</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
@@ -213,8 +220,8 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                         </button>
 
                                         <div className="flex items-start gap-3 pr-10">
-                                            <div className="h-[76px] w-[76px] shrink-0 overflow-hidden rounded-[5px] bg-neutral-100 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800 dark:ring-white/10">
-                                                <CoverImage song={song} className="h-full w-full" iconClassName="text-5xl" />
+                                            <div className="h-19 w-19 shrink-0 overflow-hidden rounded-[5px] bg-neutral-100 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800 dark:ring-white/10">
+                                                <CoverImage song={song} src={displayedCoverPath} className="h-full w-full" iconClassName="text-5xl" fallbackToSongCover={false} />
                                             </div>
                                             <div className="min-w-0 pt-1">
                                                 <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{resolvedValues.title || song.title}</div>
@@ -276,7 +283,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
                                                 <span
                                                     aria-live="polite"
-                                                    className="min-w-[92px] text-center text-[13px] font-medium tabular-nums text-neutral-600 dark:text-neutral-300"
+                                                    className="min-w-23 text-center text-[13px] font-medium tabular-nums text-neutral-600 dark:text-neutral-300"
                                                 >
                                                     {formatLyricsOffset(resolvedValues.lyricsOffsetMs)}
                                                 </span>
@@ -305,7 +312,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                             <button
                                                 type="submit"
                                                 disabled={saving}
-                                                className="h-10 min-w-[120px] rounded-[7px] bg-primary px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                                                className="h-10 min-w-30 rounded-[7px] bg-primary px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
                                             >
                                                 {saving ? '保存中...' : '确定'}
                                             </button>
@@ -313,7 +320,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                                                 type="button"
                                                 onClick={onClose}
                                                 disabled={saving}
-                                                className="h-10 min-w-[120px] rounded-[7px] border border-neutral-300 bg-white px-7 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                                                className="h-10 min-w-30 rounded-[7px] border border-neutral-300 bg-white px-7 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
                                             >
                                                 取消
                                             </button>

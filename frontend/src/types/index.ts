@@ -6,7 +6,9 @@ export interface SongMetadata {
     album: string;
     duration: number; // 秒
     cover?: string | null; // Deprecated: 保留字段，不再使用 base64
-    cover_path?: string | null; // 封面文件路径
+    cover_path?: string | null; // 当前生效的封面路径
+    embedded_cover_path?: string | null; // 音乐文件内嵌封面的缓存路径
+    artwork_path?: string | null; // 应用管理的自定义覆盖封面
     path?: string; // 文件路径
     size?: number; // 字节
     sample_rate?: number; // Hz

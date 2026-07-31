@@ -197,7 +197,7 @@ impl PlaylistRepo {
         let sql = "SELECT s.id, s.path, s.title, s.artist, s.album, s.duration, s.cover, s.cover_path, s.folder_id,
                     s.album_artist, s.year, s.genre, s.track_number, s.track_total, s.disc_number, s.disc_total,
                     s.play_count, s.last_played_at, s.is_favorite, s.rating, s.lyrics_text, s.lyrics_source_path, s.lyrics_offset_ms,
-                    s.status, s.created_at, s.updated_at,
+                    s.status, s.created_at, s.updated_at, s.artwork_path,
                     ps.id as playlist_entry_id
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
@@ -207,8 +207,8 @@ impl PlaylistRepo {
         let songs = stmt
             .query_map(params![playlist_id], |row| {
                 let mut song = SongRepo::map_row(row)?;
-                // map_row reads 0-25; the playlist entry id follows at 26.
-                song.unique_id = Some(row.get(26)?);
+                // map_row reads 0-26; the playlist entry id follows at 27.
+                song.unique_id = Some(row.get(27)?);
                 Ok(song)
             })?
             .collect::<Result<Vec<_>>>()?;
@@ -218,14 +218,14 @@ impl PlaylistRepo {
     /// 按首次出现位置返回不同封面路径，供卡片预览进一步按图片内容去重。
     pub fn get_cover_paths(conn: &Connection, playlist_id: i64) -> Result<Vec<String>> {
         let mut stmt = conn.prepare(
-            "SELECT s.cover_path
+            "SELECT COALESCE(s.artwork_path, s.cover_path) AS effective_cover_path
              FROM songs s
              INNER JOIN playlist_songs ps ON s.id = ps.song_id
              WHERE ps.playlist_id = ?1
                AND s.status = 'active'
-               AND s.cover_path IS NOT NULL
-               AND s.cover_path <> ''
-             GROUP BY s.cover_path
+               AND COALESCE(s.artwork_path, s.cover_path) IS NOT NULL
+               AND COALESCE(s.artwork_path, s.cover_path) <> ''
+             GROUP BY effective_cover_path
              ORDER BY MIN(ps.position)",
         )?;
         stmt.query_map(params![playlist_id], |row| row.get(0))?

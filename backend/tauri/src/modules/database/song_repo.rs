@@ -38,6 +38,7 @@ impl SongRepo {
                 .unwrap_or("active".to_string()),
             created_at: row.get(24)?,
             updated_at: row.get(25)?,
+            artwork_path: row.get(26)?,
             unique_id: None,
         })
     }
@@ -46,7 +47,7 @@ impl SongRepo {
         "id, path, title, artist, album, duration, cover, cover_path, folder_id, 
          album_artist, year, genre, track_number, track_total, disc_number, disc_total,
          play_count, last_played_at, is_favorite, rating, lyrics_text, lyrics_source_path, lyrics_offset_ms,
-         status, created_at, updated_at";
+         status, created_at, updated_at, artwork_path";
 
     /// 获取所有活跃歌曲
     pub fn get_all(conn: &Connection) -> Result<Vec<Song>> {
@@ -388,6 +389,22 @@ impl SongRepo {
             ],
         )?;
         Ok(())
+    }
+
+    pub fn set_artwork_path(conn: &Connection, id: i64, artwork_path: Option<&str>) -> Result<()> {
+        conn.execute(
+            "UPDATE songs SET artwork_path = ?1, updated_at = datetime('now') WHERE id = ?2",
+            params![artwork_path, id],
+        )?;
+        Ok(())
+    }
+
+    pub fn count_artwork_references(conn: &Connection, artwork_path: &str) -> Result<i64> {
+        conn.query_row(
+            "SELECT COUNT(*) FROM songs WHERE artwork_path = ?1",
+            params![artwork_path],
+            |row| row.get(0),
+        )
     }
 
     /// 硬删除歌曲（用于清理文件已不存在的记录）

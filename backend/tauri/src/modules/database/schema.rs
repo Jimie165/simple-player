@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 14;
+const SCHEMA_VERSION: i32 = 15;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -108,6 +108,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 14 {
         migrate_v14(conn)?;
+        set_db_version(conn, 14)?;
+    }
+
+    if current_version < 15 {
+        migrate_v15(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -566,6 +571,24 @@ fn migrate_v14(conn: &Connection) -> Result<()> {
 
     Ok(())
 }
+
+/// Version 15: application-managed per-song artwork overrides.
+fn migrate_v15(conn: &Connection) -> Result<()> {
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(songs)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"artwork_path".to_string()) {
+        conn.execute("ALTER TABLE songs ADD COLUMN artwork_path TEXT", [])?;
+    }
+
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_songs_artwork_path ON songs(artwork_path)",
+        [],
+    )?;
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,5 +661,24 @@ mod tests {
             .collect::<Result<Vec<_>>>()
             .expect("collect statuses");
         assert_eq!(statuses, vec!["missing", "active"]);
+    }
+
+    #[test]
+    fn migration_v15_adds_artwork_path_idempotently() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute("CREATE TABLE songs (id INTEGER PRIMARY KEY)", [])
+            .expect("create legacy songs table");
+
+        migrate_v15(&conn).expect("run v15 migration");
+        migrate_v15(&conn).expect("v15 migration remains idempotent");
+
+        let columns: Vec<String> = conn
+            .prepare("PRAGMA table_info(songs)")
+            .expect("prepare columns")
+            .query_map([], |row| row.get(1))
+            .expect("query columns")
+            .collect::<Result<Vec<_>>>()
+            .expect("collect columns");
+        assert!(columns.contains(&"artwork_path".to_string()));
     }
 }

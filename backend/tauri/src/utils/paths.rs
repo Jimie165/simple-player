@@ -12,6 +12,7 @@ pub const TRANSCODED_DIR: &str = "cache/transcoded";
 pub const DATA_DIR_NAME: &str = "data";
 #[allow(dead_code)]
 pub const PLAYLIST_COVERS_DIR: &str = "data/playlist_covers";
+pub const SONG_ARTWORK_DIR: &str = "data/song_artwork";
 
 /// 判断是否为程序相对路径（缓存或用户数据）
 pub fn is_app_relative_path(path: &str) -> bool {

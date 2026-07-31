@@ -32,6 +32,8 @@ pub fn get_metadata(
             duration: video_meta.duration as u64,
             cover: None,
             cover_path: thumbnail_path,
+            embedded_cover_path: None,
+            artwork_path: None,
             path: Some(normalize_db_path(std::path::Path::new(&video_meta.path))),
             size: Some(video_meta.size),
             sample_rate: None,
@@ -94,6 +96,9 @@ pub fn get_metadata(
             meta.play_count = Some(db_song.play_count);
             meta.last_played_at = db_song.last_played_at;
             meta.rating = db_song.rating;
+            meta.embedded_cover_path = db_song.cover_path.clone();
+            meta.artwork_path = db_song.artwork_path.clone();
+            meta.cover_path = db_song.artwork_path.or(db_song.cover_path);
             // 可以根据需要合并更多字段，但 ID 是最关键的
         }
     }
@@ -142,6 +147,8 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 duration: video_meta.duration as u64,
                 cover: None,
                 cover_path: thumbnail_path,
+                embedded_cover_path: None,
+                artwork_path: None,
                 path: Some(normalize_db_path(std::path::Path::new(&video_meta.path))),
                 size: Some(video_meta.size),
                 sample_rate: None,
@@ -186,6 +193,8 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
                 duration: 0,
                 cover: None,
                 cover_path: None,
+                embedded_cover_path: None,
+                artwork_path: None,
                 path: Some(normalize_db_path(std::path::Path::new(&path))),
                 size: None,
                 sample_rate: None,

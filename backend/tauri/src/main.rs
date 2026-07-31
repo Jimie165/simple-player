@@ -23,6 +23,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .manage(audio_state)
+        .manage(modules::library::covers::SongArtworkState(Mutex::new(())))
         .setup(|app| {
             // 初始化数据库
             let app_data_dir = app.path().app_data_dir()?;

@@ -1,10 +1,17 @@
-use crate::utils::paths::COVERS_DIR;
+use crate::utils::paths::{COVERS_DIR, SONG_ARTWORK_DIR};
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Write;
+use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 const COVER_THUMBNAIL_SIZES: [u32; 2] = [128, 512];
+
+pub struct SongArtworkState(pub Mutex<()>);
+
+pub struct SavedSongArtwork {
+    pub relative_path: String,
+}
 
 fn ensure_cover_thumbnail(covers_dir: &Path, hash: &str, cover_bytes: &[u8], max_size: u32) {
     let thumbnail_path = covers_dir.join(format!("{}.thumb-{}.jpg", hash, max_size));
@@ -87,6 +94,67 @@ pub fn generate_cover_hash(cover_bytes: &[u8]) -> String {
     hasher.update(cover_bytes);
     let result = hasher.finalize();
     format!("{:x}", result)[..16].to_string()
+}
+
+fn song_artwork_extension(bytes: &[u8]) -> Result<&'static str, String> {
+    let format = image::guess_format(bytes).map_err(|_| "无法识别所选图片格式".to_string())?;
+    image::load_from_memory_with_format(bytes, format)
+        .map_err(|_| "所选文件不是有效图片".to_string())?;
+
+    match format {
+        image::ImageFormat::Jpeg => Ok("jpg"),
+        image::ImageFormat::Png => Ok("png"),
+        image::ImageFormat::Gif => Ok("gif"),
+        image::ImageFormat::WebP => Ok("webp"),
+        _ => Err("仅支持 JPG、PNG、GIF 和 WebP 图片".to_string()),
+    }
+}
+
+/// 将用户选择的图片复制到持久资源目录；相同内容复用同一文件。
+pub fn save_song_artwork(
+    app_data_dir: &Path,
+    source_path: &Path,
+) -> Result<SavedSongArtwork, String> {
+    let bytes = fs::read(source_path).map_err(|e| format!("读取封面失败: {e}"))?;
+    let extension = song_artwork_extension(&bytes)?;
+    let hash = format!("{:x}", Sha256::digest(&bytes));
+    let filename = format!("{hash}.{extension}");
+    let relative_path = format!("{SONG_ARTWORK_DIR}/{filename}");
+    let artwork_dir = app_data_dir.join(SONG_ARTWORK_DIR);
+    fs::create_dir_all(&artwork_dir).map_err(|e| format!("创建封面目录失败: {e}"))?;
+
+    let destination = artwork_dir.join(filename);
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&destination)
+    {
+        Ok(mut file) => {
+            if let Err(error) = file.write_all(&bytes) {
+                let _ = fs::remove_file(&destination);
+                return Err(format!("保存封面失败: {error}"));
+            }
+        }
+        Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+        Err(error) => return Err(format!("保存封面失败: {error}")),
+    }
+
+    Ok(SavedSongArtwork { relative_path })
+}
+
+/// 只允许清理由本应用创建的单个歌曲封面资源。
+pub fn delete_song_artwork(app_data_dir: &Path, relative_path: &str) -> Result<(), String> {
+    let prefix = format!("{SONG_ARTWORK_DIR}/");
+    let filename = relative_path
+        .strip_prefix(&prefix)
+        .filter(|value| !value.is_empty() && !value.contains(['/', '\\']))
+        .ok_or_else(|| "拒绝删除无效的封面资源路径".to_string())?;
+    let path = app_data_dir.join(SONG_ARTWORK_DIR).join(filename);
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(format!("清理旧封面失败: {error}")),
+    }
 }
 
 fn extension_from_mime(mime: &str) -> &'static str {

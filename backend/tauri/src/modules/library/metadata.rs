@@ -31,7 +31,9 @@ pub struct SongMetadata {
     pub album: String,
     pub duration: u64,
     pub cover: Option<String>,      // Deprecated: 保留字段，不再使用 base64
-    pub cover_path: Option<String>, // 封面文件路径
+    pub cover_path: Option<String>, // 当前生效的封面路径
+    pub embedded_cover_path: Option<String>,
+    pub artwork_path: Option<String>,
     pub path: Option<String>,
     pub size: Option<u64>,
     pub sample_rate: Option<u32>,
@@ -252,7 +254,12 @@ impl SongMetadata {
             album: song.album.clone(),
             duration: song.duration as u64,
             cover: song.cover.clone(),
-            cover_path: song.cover_path.clone(),
+            cover_path: song
+                .artwork_path
+                .clone()
+                .or_else(|| song.cover_path.clone()),
+            embedded_cover_path: song.cover_path.clone(),
+            artwork_path: song.artwork_path.clone(),
             path: Some(song.path.clone()),
             size: None,
             sample_rate: None,
@@ -375,6 +382,8 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         duration,
         cover: None,
         cover_path: resolved_cover_path,
+        embedded_cover_path: None,
+        artwork_path: None,
         path: Some(normalize_db_path(path_obj)),
         size,
         sample_rate,

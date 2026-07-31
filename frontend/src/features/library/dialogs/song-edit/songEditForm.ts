@@ -16,6 +16,8 @@ export interface SongEditFormValues {
     lyricsSourcePath: string;
     customLyricsEnabled: boolean;
     lyricsOffsetMs: number;
+    artworkSourcePath: string | null;
+    removeArtwork: boolean;
 }
 
 export interface SongEditFormErrors {
@@ -42,6 +44,8 @@ export const makeInitialSongEditForm = (song: SongMetadata): SongEditFormValues 
     lyricsSourcePath: song.lyrics_source_path || '',
     customLyricsEnabled: Boolean(song.lyrics_text?.trim()),
     lyricsOffsetMs: song.lyrics_offset_ms ?? 0,
+    artworkSourcePath: null,
+    removeArtwork: false,
 });
 
 const optionalText = (value: string) => {
@@ -104,6 +108,8 @@ export function buildUpdateSongDetailsRequest(
             lyrics_text: lyricsText,
             lyrics_source_path: lyricsText ? optionalText(values.lyricsSourcePath) : null,
             lyrics_offset_ms: values.lyricsOffsetMs,
+            artwork_source_path: values.artworkSourcePath,
+            remove_artwork: values.removeArtwork,
         },
         errors,
     };

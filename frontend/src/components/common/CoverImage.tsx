@@ -21,9 +21,17 @@ interface CoverImageProps {
     className?: string;
     iconClassName?: string;
     thumbnail?: CoverThumbnailSize | false;
+    fallbackToSongCover?: boolean;
 }
 
-export default function CoverImage({ song, src, className, iconClassName, thumbnail = 512 }: CoverImageProps) {
+export default function CoverImage({
+    song,
+    src,
+    className,
+    iconClassName,
+    thumbnail = 512,
+    fallbackToSongCover = true,
+}: CoverImageProps) {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
@@ -39,7 +47,7 @@ export default function CoverImage({ song, src, className, iconClassName, thumbn
                 blobUrlRef.current = null;
             }
 
-            const originalPath = src && src.length > 0 ? src : song?.cover_path;
+            const originalPath = src || (fallbackToSongCover ? song?.cover_path : null);
             if (originalPath) {
                 const thumbnailPath = thumbnail ? getCoverThumbnailPath(originalPath, thumbnail) : null;
                 const [url, originalUrl] = await Promise.all([
@@ -76,7 +84,7 @@ export default function CoverImage({ song, src, className, iconClassName, thumbn
                 blobUrlRef.current = null;
             }
         };
-    }, [song, src, libraryVersion, thumbnail]);
+    }, [song, src, libraryVersion, thumbnail, fallbackToSongCover]);
 
     if (imageSrc) {
         return (
