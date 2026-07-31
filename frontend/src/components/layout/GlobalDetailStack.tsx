@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo, useEffect, useRef, useState } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { libraryService } from '@/services/libraryService';
@@ -192,6 +192,9 @@ interface OverlayProps {
 }
 
 function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
+    const libraryVersion = useLibraryStore(state => state.libraryVersion);
+    const pop = useNavigationStore(state => state.pop);
+    const resolvedSongIdsRef = useRef<Set<number> | null>(null);
     const albumInitialData = useMemo<AlbumData>(() => {
         const data = initialData as Partial<AlbumData>;
         return {
@@ -211,13 +214,22 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
             if (albumInitialData.name) {
                 try {
                     const allSongs = await libraryService.getLibrarySongs();
-                    const albumSongs = allSongs.filter(s => songMatchesAlbum(s, albumInitialData.name, albumInitialData.artist));
+                    const resolvedIds = resolvedSongIdsRef.current;
+                    const albumSongs = resolvedIds
+                        ? allSongs.filter(song => typeof song.id === 'number' && resolvedIds.has(song.id))
+                        : allSongs.filter(song => songMatchesAlbum(song, albumInitialData.name, albumInitialData.artist));
                     if (albumSongs.length > 0) {
+                        resolvedSongIdsRef.current = new Set(
+                            albumSongs.flatMap(song => typeof song.id === 'number' ? [song.id] : [])
+                        );
+                        const firstSong = albumSongs[0];
+                        const coverPath = albumSongs.find(song => song.cover_path)?.cover_path ?? null;
                         setAlbumData({
                             ...albumInitialData,
+                            name: firstSong.album?.trim() || 'Unknown Album',
                             songs: albumSongs,
-                            cover: albumSongs.find(song => song.cover_path)?.cover_path || albumInitialData.cover_path || null,
-                            cover_path: albumSongs.find(song => song.cover_path)?.cover_path || albumInitialData.cover_path || null,
+                            cover: coverPath,
+                            cover_path: coverPath,
                             artist: getAlbumDisplayArtist(albumSongs)
                         });
                     }
@@ -227,7 +239,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
             }
         };
         fetchAlbumSongs();
-    }, [albumInitialData]);
+    }, [albumInitialData, libraryVersion]);
 
     return (
         <AlbumDetailView
@@ -257,11 +269,13 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
             }}
             onOpenAlbumByName={() => { }}
             onOpenArtistByName={onOpenArtistByName}
+            onAlbumDeleted={pop}
         />
     );
 }
 
 function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
+    const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const artistInitialData = useMemo<ArtistData>(() => {
         const data = initialData as Partial<ArtistData>;
         return {
@@ -270,35 +284,36 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
             count: data.count ?? 0,
             albumCount: data.albumCount ?? 0,
             songs: Array.isArray(data.songs) ? data.songs : [],
+            includeAlbumArtistSongs: data.includeAlbumArtistSongs ?? false,
         };
     }, [initialData]);
     const [artistData, setArtistData] = useState<ArtistData>(artistInitialData);
 
     useEffect(() => {
         const fetchArtistSongs = async () => {
-            // If songs are empty, fetch from library
-            if (!artistInitialData.songs || artistInitialData.songs.length === 0) {
-                try {
-                    const allSongs = await libraryService.getLibrarySongs();
-                    const artistSongs = allSongs.filter(s => s.artist === artistInitialData.name);
-
-                    if (artistSongs.length > 0) {
-                        const albums = new Set(artistSongs.map(s => s.album));
-                        setArtistData({
-                            ...artistInitialData,
-                            songs: artistSongs,
-                            count: artistSongs.length,
-                            albumCount: albums.size,
-                            cover: artistSongs[0]?.cover_path || artistInitialData.cover
-                        });
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch artist songs", e);
-                }
+            try {
+                const allSongs = await libraryService.getLibrarySongs();
+                const artistSongs = allSongs.filter(song => (
+                    song.artist === artistInitialData.name
+                    || (
+                        artistInitialData.includeAlbumArtistSongs
+                        && song.album_artist?.trim() === artistInitialData.name
+                    )
+                ));
+                const albums = new Set(artistSongs.map(s => s.album));
+                setArtistData({
+                    ...artistInitialData,
+                    songs: artistSongs,
+                    count: artistSongs.length,
+                    albumCount: albums.size,
+                    cover: artistSongs[0]?.cover_path || null
+                });
+            } catch (e) {
+                console.error("Failed to fetch artist songs", e);
             }
         };
         fetchArtistSongs();
-    }, [artistInitialData]);
+    }, [artistInitialData, libraryVersion]);
 
     // Correct usage of useMemo: It is now at the top level of this component
     const artistAlbums = useMemo(() => {

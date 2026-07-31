@@ -2,9 +2,11 @@ import { useMemo } from 'react';
 import { MdPlayArrow, MdShuffle } from 'react-icons/md';
 import SongListView from '@/features/library/components/SongListView';
 import CoverImage from '@/components/common/CoverImage';
+import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { SongMetadata } from '@/types';
 import { useScrollBlur } from '@/hooks/useScrollBlur';
+import { useDialogStore } from '@/store/useDialogStore';
 import clsx from 'clsx';
 
 interface AlbumDetailViewProps {
@@ -13,6 +15,7 @@ interface AlbumDetailViewProps {
     onPlayAll: () => void;
     onShuffle: () => void;
     onDeleteSong?: (song: SongMetadata) => void;
+    onAlbumDeleted?: () => void;
     onOpenArtistByName?: (name: string) => void;
     onOpenAlbumByName?: (name: string) => void;
 }
@@ -23,9 +26,11 @@ export default function AlbumDetailView({
     onPlayAll,
     onShuffle,
     onDeleteSong,
+    onAlbumDeleted,
     onOpenArtistByName
 }: AlbumDetailViewProps) {
     const { isScrolled, topSentinelRef } = useScrollBlur();
+    const openEditAlbum = useDialogStore(state => state.openEditAlbum);
 
     const totalDuration = useMemo(() => {
         if (!album || !album.songs) return 0;
@@ -89,7 +94,7 @@ export default function AlbumDetailView({
                     </div>
 
                     {/* Actions Row */}
-                    <div className="flex flex-wrap gap-3 mt-6">
+                    <div className="flex flex-wrap items-center gap-3 mt-6">
                         <button
                             onClick={onPlayAll}
                             className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
@@ -105,6 +110,20 @@ export default function AlbumDetailView({
                             <MdShuffle className="text-xl" />
                             随机播放
                         </button>
+
+                        <SmartMusicContextMenu
+                            className="ml-auto"
+                            buttonClassName="h-10 w-10 rounded-full btn-blur text-2xl hover:bg-surface-container-highest"
+                            variant="clean"
+                            tooltipText="更多"
+                            items={album}
+                            context="album_detail"
+                            onPlay={onPlayAll}
+                            onShuffle={onShuffle}
+                            onEdit={() => openEditAlbum(album)}
+                            onDeleted={onAlbumDeleted}
+                            hideSelect
+                        />
                     </div>
                 </div>
             </div>

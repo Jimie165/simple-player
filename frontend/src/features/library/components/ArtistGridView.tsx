@@ -22,6 +22,7 @@ export interface ArtistData {
     count: number;
     albumCount: number;
     songs: SongMetadata[];
+    includeAlbumArtistSongs?: boolean;
 }
 
 interface ArtistGridViewProps {

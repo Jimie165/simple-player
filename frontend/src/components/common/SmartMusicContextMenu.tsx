@@ -17,6 +17,8 @@ interface SmartMusicContextMenuProps {
     // 覆盖/额外回调
     onPlay?: () => void;
     onDelete?: () => void;
+    onDeleted?: () => void;
+    onEdit?: () => void;
     onShuffle?: () => void;
     onSelect?: () => void;
     onShowProperties?: () => void;
@@ -33,7 +35,7 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
     const {
         items, context, playlistId,
         className, buttonClassName, variant, tooltipText, onOpen, suppressCloseEvent,
-        onPlay, onDelete, onShuffle, onSelect, onShowProperties, hideSelect, selectText, isSelected, onNavigate
+        onPlay, onDelete, onDeleted, onEdit, onShuffle, onSelect, onShowProperties, hideSelect, selectText, isSelected, onNavigate
     } = props;
 
     const normalizedItems = Array.isArray(items) ? items : [items];
@@ -44,6 +46,8 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
         playlistId,
         onPlay,
         onDelete,
+        onDeleted,
+        onEdit,
         onShuffle,
         onSelect,
         onShowProperties,

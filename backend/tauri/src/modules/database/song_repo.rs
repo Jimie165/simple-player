@@ -2,7 +2,7 @@
 // ============================================================================
 
 use super::models::Song;
-use rusqlite::{Connection, Result, params};
+use rusqlite::{Connection, Result, params, params_from_iter, types::Value};
 
 pub struct SongRepo;
 
@@ -431,6 +431,109 @@ impl SongRepo {
         Ok(())
     }
 
+    /// 只更新专辑批量编辑中由用户明确修改的字段。
+    #[allow(clippy::too_many_arguments)]
+    pub fn update_album_fields(
+        conn: &Connection,
+        ids: &[i64],
+        album: Option<&str>,
+        artist: Option<&str>,
+        album_artist: Option<Option<&str>>,
+        genre: Option<Option<&str>>,
+        year: Option<Option<i32>>,
+        track_number: Option<Option<i32>>,
+        track_total: Option<Option<i32>>,
+        disc_number: Option<Option<i32>>,
+        disc_total: Option<Option<i32>>,
+        metadata_overridden: bool,
+    ) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let mut assignments = Vec::new();
+        let mut values = Vec::new();
+        let mut push_text = |column: &'static str, value: Option<&str>| {
+            assignments.push(format!("{column} = ?"));
+            values.push(value.map_or(Value::Null, |value| Value::Text(value.to_string())));
+        };
+
+        if let Some(value) = album {
+            push_text("album", Some(value));
+        }
+        if let Some(value) = artist {
+            push_text("artist", Some(value));
+        }
+        if let Some(value) = album_artist {
+            push_text("album_artist", value);
+        }
+        if let Some(value) = genre {
+            push_text("genre", value);
+        }
+        drop(push_text);
+
+        let mut push_number = |column: &'static str, value: Option<i32>| {
+            assignments.push(format!("{column} = ?"));
+            values.push(value.map_or(Value::Null, |value| Value::Integer(value.into())));
+        };
+        if let Some(value) = year {
+            push_number("year", value);
+        }
+        if let Some(value) = track_number {
+            push_number("track_number", value);
+        }
+        if let Some(value) = track_total {
+            push_number("track_total", value);
+        }
+        if let Some(value) = disc_number {
+            push_number("disc_number", value);
+        }
+        if let Some(value) = disc_total {
+            push_number("disc_total", value);
+        }
+        drop(push_number);
+
+        if assignments.is_empty() {
+            return Ok(());
+        }
+
+        assignments.push(format!(
+            "metadata_overridden = {}",
+            i32::from(metadata_overridden)
+        ));
+        assignments.push("updated_at = datetime('now')".to_string());
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        values.extend(ids.iter().copied().map(Value::Integer));
+        let sql = format!(
+            "UPDATE songs SET {} WHERE id IN ({})",
+            assignments.join(", "),
+            placeholders
+        );
+        conn.execute(&sql, params_from_iter(values))?;
+        Ok(())
+    }
+
+    pub fn set_artwork_for_songs(
+        conn: &Connection,
+        ids: &[i64],
+        artwork_path: Option<&str>,
+    ) -> Result<()> {
+        if ids.is_empty() {
+            return Ok(());
+        }
+
+        let placeholders = ids.iter().map(|_| "?").collect::<Vec<_>>().join(",");
+        let mut values =
+            vec![artwork_path.map_or(Value::Null, |path| Value::Text(path.to_string()))];
+        values.extend(ids.iter().copied().map(Value::Integer));
+        let sql = format!(
+            "UPDATE songs SET artwork_path = ?, updated_at = datetime('now') WHERE id IN ({})",
+            placeholders
+        );
+        conn.execute(&sql, params_from_iter(values))?;
+        Ok(())
+    }
+
     pub fn count_artwork_references(conn: &Connection, artwork_path: &str) -> Result<i64> {
         conn.query_row(
             "SELECT COUNT(*) FROM songs WHERE artwork_path = ?1",
@@ -647,6 +750,93 @@ mod tests {
 
         assert_eq!(restored, 1);
         assert_eq!(statuses, vec!["active", "missing"]);
+    }
+
+    #[test]
+    fn album_field_updates_preserve_untouched_mixed_values() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute_batch(
+            "CREATE TABLE songs (
+                id INTEGER PRIMARY KEY,
+                album TEXT NOT NULL,
+                artist TEXT NOT NULL,
+                album_artist TEXT,
+                genre TEXT,
+                year INTEGER,
+                track_number INTEGER,
+                track_total INTEGER,
+                disc_number INTEGER,
+                disc_total INTEGER,
+                metadata_overridden INTEGER,
+                updated_at TEXT
+            );
+            INSERT INTO songs (id, album, artist, album_artist, year)
+            VALUES
+                (1, 'Album', 'Artist A', NULL, 2024),
+                (2, 'Album', 'Artist B', 'Guest', 2025);",
+        )
+        .expect("create album songs");
+
+        SongRepo::update_album_fields(
+            &conn,
+            &[1, 2],
+            None,
+            None,
+            Some(Some("Various Artists")),
+            None,
+            Some(Some(2026)),
+            None,
+            None,
+            None,
+            None,
+            true,
+        )
+        .expect("update selected album fields");
+
+        let rows: Vec<(String, Option<String>, Option<i32>, i32)> = conn
+            .prepare(
+                "SELECT artist, album_artist, year, metadata_overridden FROM songs ORDER BY id",
+            )
+            .expect("prepare updated rows")
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .expect("query updated rows")
+            .collect::<Result<Vec<_>>>()
+            .expect("collect updated rows");
+
+        assert_eq!(rows[0].0, "Artist A");
+        assert_eq!(rows[1].0, "Artist B");
+        assert_eq!(rows[0].1.as_deref(), Some("Various Artists"));
+        assert_eq!(rows[1].1.as_deref(), Some("Various Artists"));
+        assert_eq!(rows[0].2, Some(2026));
+        assert_eq!(rows[1].2, Some(2026));
+        assert_eq!(rows[0].3, 1);
+        assert_eq!(rows[1].3, 1);
+
+        SongRepo::update_album_fields(
+            &conn,
+            &[1, 2],
+            None,
+            None,
+            Some(None),
+            None,
+            Some(None),
+            None,
+            None,
+            None,
+            None,
+            false,
+        )
+        .expect("clear optional album fields");
+        let cleared: (Option<String>, Option<i32>, i32) = conn
+            .query_row(
+                "SELECT album_artist, year, metadata_overridden FROM songs WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("read cleared fields");
+        assert_eq!(cleared, (None, None, 0));
     }
 
     #[test]

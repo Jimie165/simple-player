@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { SongMetadata, RecentItem } from '@/types';
+import type { AlbumData } from '@/features/library/components/AlbumGridView';
 
 // 定义通用的音乐项类型，涵盖 SongMetadata, RecentItem 等
 export type MusicItem = SongMetadata | RecentItem | unknown;
@@ -26,6 +27,11 @@ interface DialogState {
         song: SongMetadata | null;
     };
 
+    editAlbum: {
+        isOpen: boolean;
+        album: AlbumData | null;
+    };
+
     // Actions
     openDeleteConfirm: (items: MusicItem[], onConfirm: () => void, text: string, title?: string, confirmText?: string) => void;
     closeDeleteConfirm: () => void;
@@ -35,9 +41,12 @@ interface DialogState {
 
     openEditSong: (song: SongMetadata) => void;
     closeEditSong: () => void;
+    openEditAlbum: (album: AlbumData) => void;
+    closeEditAlbum: () => void;
 }
 
 let editSongOpenFrame: number | null = null;
+let editAlbumOpenFrame: number | null = null;
 
 export const useDialogStore = create<DialogState>((set) => ({
     deleteConfirm: {
@@ -55,6 +64,10 @@ export const useDialogStore = create<DialogState>((set) => ({
     editSong: {
         isOpen: false,
         song: null,
+    },
+    editAlbum: {
+        isOpen: false,
+        album: null,
     },
 
     openDeleteConfirm: (items, onConfirm, description, title = '删除', confirmText = '删除') =>
@@ -117,6 +130,31 @@ export const useDialogStore = create<DialogState>((set) => ({
 
         set((state) => ({
             editSong: { ...state.editSong, isOpen: false },
+        }));
+    },
+
+    openEditAlbum: (album) => {
+        if (editAlbumOpenFrame !== null) {
+            window.cancelAnimationFrame(editAlbumOpenFrame);
+        }
+        set({ editAlbum: { isOpen: false, album } });
+        editAlbumOpenFrame = window.requestAnimationFrame(() => {
+            editAlbumOpenFrame = null;
+            set((state) => ({
+                editAlbum: state.editAlbum.album === album
+                    ? { ...state.editAlbum, isOpen: true }
+                    : state.editAlbum,
+            }));
+        });
+    },
+
+    closeEditAlbum: () => {
+        if (editAlbumOpenFrame !== null) {
+            window.cancelAnimationFrame(editAlbumOpenFrame);
+            editAlbumOpenFrame = null;
+        }
+        set((state) => ({
+            editAlbum: { ...state.editAlbum, isOpen: false },
         }));
     },
 }));

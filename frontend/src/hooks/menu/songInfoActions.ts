@@ -81,10 +81,33 @@ export function handleShowArtistAction({
     if (!isSingle || !firstItem) return;
     const item = getRecord(firstItem);
     const type = getMusicItemType(firstItem);
-    const artist = stringValue(item.artist) || (type === 'artist' ? stringValue(item.name) : undefined);
+    const albumSongs = type === 'album' && Array.isArray(item.songs)
+        ? item.songs.filter((song): song is SongMetadata => typeof song === 'object' && song !== null)
+        : [];
+    const albumArtists = new Set(
+        albumSongs.map(song => song.album_artist?.trim()).filter((name): name is string => Boolean(name))
+    );
+    const albumArtist = albumArtists.size === 1 ? Array.from(albumArtists)[0] : undefined;
+    const artist = albumArtist
+        || stringValue(item.artist)
+        || (type === 'artist' ? stringValue(item.name) : undefined);
     if (artist) {
+        const includeAlbumArtistSongs = type === 'album' && albumArtist === artist;
+        const initialSongs = includeAlbumArtistSongs
+            ? albumSongs.filter(song => song.artist === artist || song.album_artist?.trim() === artist)
+            : [];
         clearSelection();
-        push({ type: 'artist_detail', data: { name: artist, count: 0, albumCount: 0, songs: [], cover: null } });
+        push({
+            type: 'artist_detail',
+            data: {
+                name: artist,
+                count: initialSongs.length,
+                albumCount: new Set(initialSongs.map(song => song.album)).size,
+                songs: initialSongs,
+                cover: initialSongs.find(song => song.cover_path)?.cover_path || null,
+                includeAlbumArtistSongs,
+            },
+        });
         onNavigate?.();
     }
 }

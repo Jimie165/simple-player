@@ -44,6 +44,7 @@ interface UseSongOperationsOptions {
     onShuffle?: () => void;
     onAddToQueue?: () => void;
     onDelete?: () => void; // 仅当您想覆盖默认删除逻辑时使用
+    onDeleted?: () => void;
     onEdit?: () => void;
     onSelect?: () => void; // 用于触发选择模式或切换选中状态
     onShowProperties?: () => void; // New: Callback for custom properties dialog
@@ -59,7 +60,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const {
         items, context, playlistId, onSelect,
         hideSelect = false, selectText = '选择', isSelected = false,
-        onPlay, onShuffle, onAddToQueue, onDelete, onEdit, onShowProperties, onNavigate
+        onPlay, onShuffle, onAddToQueue, onDelete, onDeleted, onEdit, onShowProperties, onNavigate
     } = options;
 
     // Stores
@@ -200,8 +201,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             removeFromRecent,
             triggerLibraryUpdate,
             triggerPlaylistUpdate,
+            onDeleted,
         });
-    }, [items, count, context, clearSelection, openDeleteConfirm, removeFromRecent, triggerLibraryUpdate, triggerPlaylistUpdate]);
+    }, [items, count, context, clearSelection, openDeleteConfirm, removeFromRecent, triggerLibraryUpdate, triggerPlaylistUpdate, onDeleted]);
 
     // 5. 删除或从播放列表移除
     const handleDeleteOrRemove = useCallback(async () => {

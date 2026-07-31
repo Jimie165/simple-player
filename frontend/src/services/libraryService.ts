@@ -22,6 +22,31 @@ export interface UpdateSongDetailsRequest {
     metadata_overridden: boolean;
 }
 
+export interface AlbumFieldUpdate<T> {
+    value: T | null;
+}
+
+export interface UpdateAlbumSongDetails {
+    id: number;
+    album?: AlbumFieldUpdate<string>;
+    artist?: AlbumFieldUpdate<string>;
+    album_artist?: AlbumFieldUpdate<string>;
+    genre?: AlbumFieldUpdate<string>;
+    year?: AlbumFieldUpdate<number>;
+    track_number?: AlbumFieldUpdate<number>;
+    track_total?: AlbumFieldUpdate<number>;
+    disc_number?: AlbumFieldUpdate<number>;
+    disc_total?: AlbumFieldUpdate<number>;
+    metadata_overridden: boolean;
+}
+
+export interface UpdateAlbumDetailsRequest {
+    ids: number[];
+    updates: UpdateAlbumSongDetails[];
+    artwork_source_path?: string | null;
+    remove_artwork?: boolean;
+}
+
 export interface AddLibraryFolderResult {
     songs: SongMetadata[];
     existing_folder: boolean;
@@ -136,6 +161,10 @@ export const libraryService = {
 
     updateSongDetails: async (request: UpdateSongDetailsRequest): Promise<SongMetadata> => {
         return invoke('update_song_details', { request });
+    },
+
+    updateAlbumDetails: async (request: UpdateAlbumDetailsRequest): Promise<SongMetadata[]> => {
+        return invoke('update_album_details', { request });
     },
 
     // ========== 批量操作 ==========

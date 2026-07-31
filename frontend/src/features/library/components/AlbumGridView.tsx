@@ -4,6 +4,7 @@ import clsx from 'clsx';
 
 import CoverImage from '@/components/common/CoverImage';
 import { useSelectionStore } from '@/store/useSelectionStore';
+import { useDialogStore } from '@/store/useDialogStore';
 import type { SongMetadata } from '@/types';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import CardPlayButton from '@/components/common/CardPlayButton';
@@ -39,6 +40,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     const mainContentWidth = useMainContentWidth();
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
+    const openEditAlbum = useDialogStore(state => state.openEditAlbum);
 
     // Selection Store
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds } = useSelectionStore();
@@ -113,6 +115,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                 itemContent={(_index, album) => {
                     const id = getAlbumId(album);
                     const isSelected = selectedIds.has(id);
+                    const canEditAlbum = !isSelected || selectedIds.size <= 1;
                     const canOpenArtist = !!onOpenArtist && album.songs.some(song => song.artist === album.artist);
 
                     return (
@@ -156,6 +159,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                             onPlay={() => onPlayAlbum(album)}
                                             onShuffle={onShuffleAlbum ? () => onShuffleAlbum(album) : undefined}
                                             onDelete={onDeleteAlbum ? () => handleDeleteClick(album) : undefined}
+                                            onEdit={canEditAlbum ? () => openEditAlbum(album) : undefined}
                                             onOpen={() => setContextMenu(null)}
                                             isSelected={isSelected}
                                             onSelect={() => isSelectionMode
@@ -212,6 +216,11 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                     onPlay={() => onPlayAlbum(contextMenu.album)}
                     onShuffle={onShuffleAlbum ? () => onShuffleAlbum(contextMenu.album) : undefined}
                     onDelete={onDeleteAlbum ? () => handleDeleteClick(contextMenu.album) : undefined}
+                    onEdit={
+                        selectedIds.has(getAlbumId(contextMenu.album)) && selectedIds.size > 1
+                            ? undefined
+                            : () => openEditAlbum(contextMenu.album)
+                    }
                 />
             )}
         </>

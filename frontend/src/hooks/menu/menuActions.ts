@@ -23,6 +23,7 @@ interface DeleteFromLibraryParams {
     removeFromRecent: (id: string) => void;
     triggerLibraryUpdate: () => void;
     triggerPlaylistUpdate: () => void;
+    onDeleted?: () => void;
 }
 
 export function handleDeleteFromLibraryAction({
@@ -34,6 +35,7 @@ export function handleDeleteFromLibraryAction({
     removeFromRecent,
     triggerLibraryUpdate,
     triggerPlaylistUpdate,
+    onDeleted,
 }: DeleteFromLibraryParams) {
     if (items.length === 0) return;
 
@@ -90,6 +92,7 @@ export function handleDeleteFromLibraryAction({
 
             triggerLibraryUpdate();
             triggerPlaylistUpdate();
+            onDeleted?.();
         },
         context === 'video'
             ? `确定要从视频库中删除选中的 ${count} 项吗？此操作不会删除本地文件。`

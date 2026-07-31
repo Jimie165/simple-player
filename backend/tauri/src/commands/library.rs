@@ -82,10 +82,59 @@ pub struct UpdateSongDetailsRequest {
     pub metadata_overridden: Option<bool>,
 }
 
+#[derive(Deserialize)]
+pub struct AlbumTextFieldUpdate {
+    pub value: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct AlbumNumberFieldUpdate {
+    pub value: Option<i32>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateAlbumSongDetails {
+    pub id: i64,
+    pub album: Option<AlbumTextFieldUpdate>,
+    pub artist: Option<AlbumTextFieldUpdate>,
+    pub album_artist: Option<AlbumTextFieldUpdate>,
+    pub genre: Option<AlbumTextFieldUpdate>,
+    pub year: Option<AlbumNumberFieldUpdate>,
+    pub track_number: Option<AlbumNumberFieldUpdate>,
+    pub track_total: Option<AlbumNumberFieldUpdate>,
+    pub disc_number: Option<AlbumNumberFieldUpdate>,
+    pub disc_total: Option<AlbumNumberFieldUpdate>,
+    pub metadata_overridden: bool,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateAlbumDetailsRequest {
+    pub ids: Vec<i64>,
+    #[serde(default)]
+    pub updates: Vec<UpdateAlbumSongDetails>,
+    #[serde(default)]
+    pub artwork_source_path: Option<String>,
+    #[serde(default)]
+    pub remove_artwork: bool,
+}
+
 fn clean_optional_string(value: Option<String>) -> Option<String> {
     value
         .map(|s| s.trim().to_string())
         .filter(|s| !s.is_empty())
+}
+
+fn validate_album_number_update(
+    update: Option<AlbumNumberFieldUpdate>,
+    label: &str,
+) -> Result<Option<Option<i32>>, String> {
+    let Some(update) = update else {
+        return Ok(None);
+    };
+    if update.value.is_some_and(|value| value < 0) {
+        return Err(format!("{label}需要是非负整数"));
+    }
+    Ok(Some(update.value))
 }
 
 /// 判断 `child` 是否是 `parent` 的子路径（要求两端都已经过 `normalize_folder_path` 处理）。
@@ -820,6 +869,134 @@ pub fn update_song_details(
     }
 
     Ok(SongMetadata::from_db_song(&updated))
+}
+
+/// 批量更新专辑歌曲；未出现在请求中的字段保持各歌曲原值。
+#[tauri::command]
+pub fn update_album_details(
+    app: tauri::AppHandle,
+    db: State<'_, DbState>,
+    artwork_state: State<'_, SongArtworkState>,
+    request: UpdateAlbumDetailsRequest,
+) -> Result<Vec<SongMetadata>, String> {
+    let mut ids = request.ids;
+    ids.sort_unstable();
+    ids.dedup();
+    if ids.is_empty() {
+        return Err("专辑中没有可编辑的歌曲".to_string());
+    }
+    let mut updated_ids = HashSet::new();
+    for update in &request.updates {
+        if ids.binary_search(&update.id).is_err() {
+            return Err(format!("歌曲不属于当前专辑编辑范围: {}", update.id));
+        }
+        if !updated_ids.insert(update.id) {
+            return Err(format!("歌曲包含重复更新: {}", update.id));
+        }
+    }
+    if request.remove_artwork && request.artwork_source_path.is_some() {
+        return Err("不能同时添加和移除封面".to_string());
+    }
+
+    let artwork_changed = request.remove_artwork || request.artwork_source_path.is_some();
+    let _artwork_guard = if artwork_changed {
+        Some(artwork_state.0.lock().map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let app_data_dir = if artwork_changed {
+        Some(app.path().app_data_dir().map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    let next_artwork_path = if let Some(source) = request.artwork_source_path.as_deref() {
+        let data_dir = app_data_dir
+            .as_deref()
+            .ok_or_else(|| "无法获取封面资源目录".to_string())?;
+        Some(save_song_artwork(data_dir, Path::new(source))?.relative_path)
+    } else {
+        None
+    };
+
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    let mut existing_songs = Vec::with_capacity(ids.len());
+    for id in &ids {
+        let song = SongRepo::get_by_id(&conn, *id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("未找到歌曲: {id}"))?;
+        existing_songs.push(song);
+    }
+    let old_artwork_paths: HashSet<String> = existing_songs
+        .iter()
+        .filter_map(|song| song.artwork_path.clone())
+        .collect();
+
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    for update in request.updates {
+        let album = update
+            .album
+            .map(|field| field.value.unwrap_or_default().trim().to_string());
+        let artist = update
+            .artist
+            .map(|field| field.value.unwrap_or_default().trim().to_string());
+        let album_artist = update
+            .album_artist
+            .map(|field| clean_optional_string(field.value));
+        let genre = update.genre.map(|field| clean_optional_string(field.value));
+        let year = validate_album_number_update(update.year, "年份")?;
+        let track_number = validate_album_number_update(update.track_number, "曲号")?;
+        let track_total = validate_album_number_update(update.track_total, "总曲数")?;
+        let disc_number = validate_album_number_update(update.disc_number, "碟号")?;
+        let disc_total = validate_album_number_update(update.disc_total, "总碟数")?;
+
+        SongRepo::update_album_fields(
+            &tx,
+            &[update.id],
+            album.as_deref(),
+            artist.as_deref(),
+            album_artist.as_ref().map(|value| value.as_deref()),
+            genre.as_ref().map(|value| value.as_deref()),
+            year,
+            track_number,
+            track_total,
+            disc_number,
+            disc_total,
+            update.metadata_overridden,
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if artwork_changed {
+        SongRepo::set_artwork_for_songs(&tx, &ids, next_artwork_path.as_deref())
+            .map_err(|e| e.to_string())?;
+    }
+
+    let mut updated = Vec::with_capacity(ids.len());
+    for id in &ids {
+        let song = SongRepo::get_by_id(&tx, *id)
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| format!("未找到歌曲: {id}"))?;
+        updated.push(song);
+    }
+    let unused_old_artwork: Vec<String> = if artwork_changed {
+        old_artwork_paths
+            .into_iter()
+            .filter(|path| SongRepo::count_artwork_references(&tx, path).unwrap_or(1) == 0)
+            .collect()
+    } else {
+        Vec::new()
+    };
+    tx.commit().map_err(|e| e.to_string())?;
+    drop(conn);
+
+    if let Some(data_dir) = app_data_dir.as_deref() {
+        for old_path in unused_old_artwork {
+            if let Err(error) = delete_song_artwork(data_dir, &old_path) {
+                eprintln!("{error}");
+            }
+        }
+    }
+
+    Ok(updated.iter().map(SongMetadata::from_db_song).collect())
 }
 
 /// 搜索歌曲

@@ -104,6 +104,7 @@ fn main() {
             commands::library::batch_delete_songs,
             commands::library::restore_excluded_songs,
             commands::library::update_song_details,
+            commands::library::update_album_details,
             commands::library::search_library,
             commands::library::toggle_favorite,
             commands::library::batch_toggle_favorite,
