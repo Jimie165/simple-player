@@ -19,6 +19,7 @@ export interface UpdateSongDetailsRequest {
     lyrics_offset_ms: number;
     artwork_source_path?: string | null;
     remove_artwork?: boolean;
+    metadata_overridden: boolean;
 }
 
 export interface AddLibraryFolderResult {

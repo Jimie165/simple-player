@@ -41,6 +41,7 @@ pub struct Song {
     pub lyrics_text: Option<String>,
     pub lyrics_source_path: Option<String>,
     pub lyrics_offset_ms: i32,
+    pub metadata_overridden: Option<bool>,
     pub status: String, // 'active' | 'missing' | 'excluded'
     pub created_at: String,
     pub updated_at: String,

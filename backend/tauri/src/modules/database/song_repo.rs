@@ -39,6 +39,7 @@ impl SongRepo {
             created_at: row.get(24)?,
             updated_at: row.get(25)?,
             artwork_path: row.get(26)?,
+            metadata_overridden: row.get::<_, Option<i32>>(27)?.map(|value| value != 0),
             unique_id: None,
         })
     }
@@ -47,7 +48,7 @@ impl SongRepo {
         "id, path, title, artist, album, duration, cover, cover_path, folder_id, 
          album_artist, year, genre, track_number, track_total, disc_number, disc_total,
          play_count, last_played_at, is_favorite, rating, lyrics_text, lyrics_source_path, lyrics_offset_ms,
-         status, created_at, updated_at, artwork_path";
+         status, created_at, updated_at, artwork_path, metadata_overridden";
 
     /// 获取所有活跃歌曲
     pub fn get_all(conn: &Connection) -> Result<Vec<Song>> {
@@ -166,11 +167,11 @@ impl SongRepo {
             INSERT INTO songs (
                 path, title, artist, album, duration, cover, cover_path, folder_id,
                 album_artist, year, genre, track_number, track_total, disc_number, disc_total,
-                status, updated_at
+                status, updated_at, metadata_overridden
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8,
                 ?9, ?10, ?11, ?12, ?13, ?14, ?15,
-                'active', datetime('now')
+                'active', datetime('now'), 0
             )
             ON CONFLICT(path) DO UPDATE SET
                 title = excluded.title,
@@ -316,31 +317,59 @@ impl SongRepo {
         disc_number: Option<i32>,
         disc_total: Option<i32>,
     ) -> Result<()> {
-        conn.execute(
-            "UPDATE songs SET
-                title = ?1, artist = ?2, album = ?3, duration = ?4,
-                cover = ?5, cover_path = ?6, album_artist = ?7,
-                year = ?8, genre = ?9, track_number = ?10, track_total = ?11,
-                disc_number = ?12, disc_total = ?13,
-                updated_at = datetime('now')
-            WHERE id = ?14",
-            params![
-                title,
-                artist,
-                album,
-                duration,
-                cover,
-                cover_path,
-                album_artist,
-                year,
-                genre,
-                track_number,
-                track_total,
-                disc_number,
-                disc_total,
-                id
-            ],
-        )?;
+        let Some(existing) = Self::get_by_id(conn, id)? else {
+            return Ok(());
+        };
+        let is_placeholder = existing.artist == "Unknown" || existing.album == "Unknown";
+        let metadata_differs = existing.title != title
+            || existing.artist != artist
+            || existing.album != album
+            || existing.album_artist.as_deref() != album_artist
+            || existing.year != year
+            || existing.genre.as_deref() != genre
+            || existing.track_number != track_number
+            || existing.track_total != track_total
+            || existing.disc_number != disc_number
+            || existing.disc_total != disc_total;
+        let preserve_metadata = existing
+            .metadata_overridden
+            .unwrap_or(!is_placeholder && metadata_differs);
+
+        if preserve_metadata {
+            conn.execute(
+                "UPDATE songs SET
+                    duration = ?1, cover = ?2, cover_path = ?3,
+                    metadata_overridden = 1, updated_at = datetime('now')
+                 WHERE id = ?4",
+                params![duration, cover, cover_path, id],
+            )?;
+        } else {
+            conn.execute(
+                "UPDATE songs SET
+                    title = ?1, artist = ?2, album = ?3, duration = ?4,
+                    cover = ?5, cover_path = ?6, album_artist = ?7,
+                    year = ?8, genre = ?9, track_number = ?10, track_total = ?11,
+                    disc_number = ?12, disc_total = ?13, metadata_overridden = 0,
+                    updated_at = datetime('now')
+                 WHERE id = ?14",
+                params![
+                    title,
+                    artist,
+                    album,
+                    duration,
+                    cover,
+                    cover_path,
+                    album_artist,
+                    year,
+                    genre,
+                    track_number,
+                    track_total,
+                    disc_number,
+                    disc_total,
+                    id
+                ],
+            )?;
+        }
         Ok(())
     }
 
@@ -362,6 +391,7 @@ impl SongRepo {
         lyrics_text: Option<&str>,
         lyrics_source_path: Option<&str>,
         lyrics_offset_ms: i32,
+        metadata_overridden: bool,
     ) -> Result<()> {
         conn.execute(
             "UPDATE songs SET
@@ -369,8 +399,9 @@ impl SongRepo {
                 year = ?5, genre = ?6, track_number = ?7, track_total = ?8,
                 disc_number = ?9, disc_total = ?10, lyrics_text = ?11,
                 lyrics_source_path = ?12, lyrics_offset_ms = ?13,
+                metadata_overridden = ?14,
                 updated_at = datetime('now')
-            WHERE id = ?14",
+            WHERE id = ?15",
             params![
                 title,
                 artist,
@@ -385,6 +416,7 @@ impl SongRepo {
                 lyrics_text,
                 lyrics_source_path,
                 lyrics_offset_ms,
+                metadata_overridden,
                 id
             ],
         )?;
@@ -546,6 +578,7 @@ impl SongRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modules::database::init_schema;
 
     #[test]
     fn delete_excludes_song_and_clears_library_relations() {
@@ -614,5 +647,158 @@ mod tests {
 
         assert_eq!(restored, 1);
         assert_eq!(statuses, vec!["active", "missing"]);
+    }
+
+    #[test]
+    fn refresh_preserves_player_metadata_until_override_is_cleared() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        init_schema(&conn).expect("initialize schema");
+        SongRepo::upsert(
+            &conn,
+            "C:/music/song.mp3",
+            "File title",
+            "File artist",
+            "File album",
+            100,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("insert song");
+        let song = SongRepo::get_by_path(&conn, "C:/music/song.mp3")
+            .expect("query song")
+            .expect("song exists");
+
+        conn.execute(
+            "UPDATE songs SET title = 'Legacy player title', metadata_overridden = NULL WHERE id = ?1",
+            params![song.id],
+        )
+        .expect("simulate metadata saved before v16");
+        SongRepo::update_metadata(
+            &conn,
+            song.id,
+            "File title",
+            "File artist",
+            "File album",
+            110,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("classify legacy metadata");
+        let legacy = SongRepo::get_by_id(&conn, song.id)
+            .expect("query legacy song")
+            .expect("legacy song exists");
+        assert_eq!(legacy.title, "Legacy player title");
+        assert_eq!(legacy.duration, 110);
+        assert_eq!(legacy.metadata_overridden, Some(true));
+
+        SongRepo::update_details(
+            &conn,
+            song.id,
+            "Player title",
+            "Player artist",
+            "File album",
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            true,
+        )
+        .expect("save player metadata");
+        SongRepo::update_metadata(
+            &conn,
+            song.id,
+            "Changed file title",
+            "Changed file artist",
+            "Changed file album",
+            120,
+            None,
+            None,
+            None,
+            Some(2026),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("refresh protected song");
+
+        let protected = SongRepo::get_by_id(&conn, song.id)
+            .expect("query protected song")
+            .expect("protected song exists");
+        assert_eq!(protected.title, "Player title");
+        assert_eq!(protected.artist, "Player artist");
+        assert_eq!(protected.album, "File album");
+        assert_eq!(protected.duration, 120);
+        assert_eq!(protected.metadata_overridden, Some(true));
+
+        SongRepo::update_details(
+            &conn,
+            song.id,
+            "Changed file title",
+            "Changed file artist",
+            "Changed file album",
+            None,
+            Some(2026),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            0,
+            false,
+        )
+        .expect("clear player metadata override");
+        SongRepo::update_metadata(
+            &conn,
+            song.id,
+            "Latest file title",
+            "Latest file artist",
+            "Latest file album",
+            130,
+            None,
+            None,
+            None,
+            Some(2027),
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect("refresh unprotected song");
+
+        let refreshed = SongRepo::get_by_id(&conn, song.id)
+            .expect("query refreshed song")
+            .expect("refreshed song exists");
+        assert_eq!(refreshed.title, "Latest file title");
+        assert_eq!(refreshed.artist, "Latest file artist");
+        assert_eq!(refreshed.album, "Latest file album");
+        assert_eq!(refreshed.year, Some(2027));
+        assert_eq!(refreshed.duration, 130);
+        assert_eq!(refreshed.metadata_overridden, Some(false));
     }
 }

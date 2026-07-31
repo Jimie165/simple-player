@@ -120,7 +120,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
         event.preventDefault();
         if (!song || !values) return;
 
-        const { request, errors: nextErrors } = buildUpdateSongDetailsRequest(song, values);
+        const { request, errors: nextErrors } = buildUpdateSongDetailsRequest(song, values, originalValues);
         setErrors(nextErrors);
         if (!request) {
             setActiveTab('details');

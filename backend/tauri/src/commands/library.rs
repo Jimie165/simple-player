@@ -79,6 +79,7 @@ pub struct UpdateSongDetailsRequest {
     pub artwork_source_path: Option<String>,
     #[serde(default)]
     pub remove_artwork: bool,
+    pub metadata_overridden: Option<bool>,
 }
 
 fn clean_optional_string(value: Option<String>) -> Option<String> {
@@ -788,6 +789,7 @@ pub fn update_song_details(
         lyrics_text.as_deref(),
         lyrics_source_path.as_deref(),
         request.lyrics_offset_ms,
+        request.metadata_overridden.unwrap_or(true),
     )
     .map_err(|e| e.to_string())?;
 

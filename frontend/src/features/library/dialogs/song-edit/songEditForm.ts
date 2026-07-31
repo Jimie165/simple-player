@@ -71,7 +71,8 @@ const optionalNumber = (
 
 export function buildUpdateSongDetailsRequest(
     song: SongMetadata,
-    values: SongEditFormValues
+    values: SongEditFormValues,
+    originalValues?: SongEditFormValues | null
 ): { request: UpdateSongDetailsRequest | null; errors: SongEditFormErrors } {
     const errors: SongEditFormErrors = {};
     const title = values.title.trim();
@@ -110,7 +111,29 @@ export function buildUpdateSongDetailsRequest(
             lyrics_offset_ms: values.lyricsOffsetMs,
             artwork_source_path: values.artworkSourcePath,
             remove_artwork: values.removeArtwork,
+            metadata_overridden: hasMetadataOverrides(values, originalValues),
         },
         errors,
     };
+}
+
+const metadataTextFields = ['title', 'artist', 'album', 'albumArtist', 'genre'] as const;
+const metadataNumberFields = ['year', 'trackNumber', 'trackTotal', 'discNumber', 'discTotal'] as const;
+
+function hasMetadataOverrides(
+    values: SongEditFormValues,
+    originalValues?: SongEditFormValues | null
+) {
+    if (!originalValues) return true;
+
+    const textChanged = metadataTextFields.some(
+        field => values[field].trim() !== originalValues[field].trim()
+    );
+    if (textChanged) return true;
+
+    return metadataNumberFields.some(field => {
+        const value = values[field].trim();
+        const originalValue = originalValues[field].trim();
+        return (value ? Number(value) : null) !== (originalValue ? Number(originalValue) : null);
+    });
 }

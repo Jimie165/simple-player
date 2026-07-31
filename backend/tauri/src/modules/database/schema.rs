@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 15;
+const SCHEMA_VERSION: i32 = 16;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -113,6 +113,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 15 {
         migrate_v15(conn)?;
+        set_db_version(conn, 15)?;
+    }
+
+    if current_version < 16 {
+        migrate_v16(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -589,6 +594,26 @@ fn migrate_v15(conn: &Connection) -> Result<()> {
     )?;
     Ok(())
 }
+
+/// Version 16: remember whether library metadata differs from the media file.
+///
+/// Existing rows remain unclassified until their next scan, where differences are
+/// treated conservatively as player edits so a migration cannot discard user data.
+fn migrate_v16(conn: &Connection) -> Result<()> {
+    let columns: Vec<String> = conn
+        .prepare("PRAGMA table_info(songs)")?
+        .query_map([], |row| row.get(1))?
+        .collect::<Result<Vec<String>>>()?;
+
+    if !columns.contains(&"metadata_overridden".to_string()) {
+        conn.execute(
+            "ALTER TABLE songs ADD COLUMN metadata_overridden INTEGER",
+            [],
+        )?;
+    }
+
+    Ok(())
+}
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -680,5 +705,26 @@ mod tests {
             .collect::<Result<Vec<_>>>()
             .expect("collect columns");
         assert!(columns.contains(&"artwork_path".to_string()));
+    }
+
+    #[test]
+    fn migration_v16_leaves_existing_metadata_override_unclassified() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute("CREATE TABLE songs (id INTEGER PRIMARY KEY)", [])
+            .expect("create legacy songs table");
+        conn.execute("INSERT INTO songs (id) VALUES (1)", [])
+            .expect("insert legacy song");
+
+        migrate_v16(&conn).expect("run v16 migration");
+        migrate_v16(&conn).expect("v16 migration remains idempotent");
+
+        let metadata_overridden: Option<i32> = conn
+            .query_row(
+                "SELECT metadata_overridden FROM songs WHERE id = 1",
+                [],
+                |row| row.get(0),
+            )
+            .expect("read metadata override state");
+        assert_eq!(metadata_overridden, None);
     }
 }
