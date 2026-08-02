@@ -46,6 +46,10 @@ export function useFluidLyricsLayout({
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
     const retainedWindowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const heightCacheRef = useRef<{
+        items: DisplayItem[];
+        heights: Map<number, number>;
+    }>({ items: displayItems, heights: new Map() });
     const [measurements, setMeasurements] = useState<{
         items: DisplayItem[];
         heights: Map<number, number>;
@@ -151,6 +155,13 @@ export function useFluidLyricsLayout({
 
     const measureItems = useCallback((updates: ReadonlyMap<number, number>) => {
         if (updates.size === 0) return;
+        const cache = heightCacheRef.current.items === displayItems
+            ? heightCacheRef.current
+            : { items: displayItems, heights: new Map<number, number>() };
+        heightCacheRef.current = cache;
+        updates.forEach((height, index) => {
+            if (height > 0) cache.heights.set(index, height);
+        });
         setMeasurements(previous => {
             const previousHeights = previous.items === displayItems
                 ? previous.heights
@@ -170,9 +181,15 @@ export function useFluidLyricsLayout({
     const observeItem = useCallback((index: number, node: HTMLDivElement) => {
         nodeIndexesRef.current.set(node, index);
         observedNodesRef.current.add(node);
-        // ResizeObserver 在下一帧才回调。行首次进入视口或窗口宽度变化时，
-        // 先同步写回当前排版高度，避免这一帧仍按旧高度排列而互相挤压。
-        measureItems(new Map([[index, node.offsetHeight]]));
+        const cache = heightCacheRef.current.items === displayItems
+            ? heightCacheRef.current
+            : { items: displayItems, heights: new Map<number, number>() };
+        heightCacheRef.current = cache;
+        // 已测量的虚拟行重新挂载时复用缓存，避免在换行提交中强制同步布局。
+        // 首次出现或宽度变化后缓存失效时仍立即测量，保证行间距正确。
+        if (!cache.heights.has(index)) {
+            measureItems(new Map([[index, node.offsetHeight]]));
+        }
         itemObserverRef.current?.observe(node);
 
         return () => {
@@ -180,7 +197,7 @@ export function useFluidLyricsLayout({
             observedNodesRef.current.delete(node);
             // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
         };
-    }, [measureItems]);
+    }, [displayItems, measureItems]);
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
@@ -209,6 +226,7 @@ export function useFluidLyricsLayout({
             const previousWidth = lastViewportWidthRef.current;
             lastViewportWidthRef.current = nextSize.width;
             if (previousWidth !== nextSize.width) {
+                heightCacheRef.current.heights.clear();
                 const updates = new Map<number, number>();
                 observedNodesRef.current.forEach(node => {
                     const index = nodeIndexesRef.current.get(node);

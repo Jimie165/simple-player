@@ -286,6 +286,9 @@ function FluidLyricsPanel({
         springParams: dynamicSpringParams,
         targetScrollY,
         visualShifts: visualInterludeShifts,
+        isUserScrolling,
+        pausedScroll,
+        variant,
     });
 
     return (

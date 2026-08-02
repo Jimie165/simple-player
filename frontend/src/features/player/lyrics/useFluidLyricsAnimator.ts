@@ -1,6 +1,10 @@
 import { useCallback, useInsertionEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FluidSpringParams } from '@/features/player/lyrics/fluidLyricsSpring';
 import { FluidLyricsSpring } from '@/features/player/lyrics/fluidLyricsSpring';
+import {
+    getFluidLyricsRowVisualStyle,
+    type FluidLyricsRowVisualStyle,
+} from '@/features/player/lyrics/fluidLyricsMotion';
 
 const SCALE_SPRING: FluidSpringParams = {
     stiffness: 100,
@@ -21,6 +25,12 @@ interface RowAnimationState {
     scale: FluidLyricsSpring;
     targetTranslateY: number;
     targetScale: number;
+    lastRenderedY: string | null;
+    lastRenderedScale: string | null;
+    rowElement: HTMLButtonElement | null;
+    lastRenderedFilter: string | null;
+    lastRenderedOpacity: string | null;
+    lastRenderedTransition: string | null;
 }
 
 interface FluidLyricsAnimatorArgs {
@@ -31,6 +41,9 @@ interface FluidLyricsAnimatorArgs {
     springParams: FluidSpringParams;
     targetScrollY: number;
     visualShifts: number[];
+    isUserScrolling: boolean;
+    pausedScroll: boolean;
+    variant: 'side' | 'narrow';
 }
 
 interface LatestTargets {
@@ -39,7 +52,30 @@ interface LatestTargets {
     springParams: FluidSpringParams;
     targetScrollY: number;
     visualShifts: number[];
+    isUserScrolling: boolean;
+    pausedScroll: boolean;
+    variant: 'side' | 'narrow';
 }
+
+const getRowVisualStyle = (
+    index: number,
+    activeDisplayIndex: number,
+    isUserScrolling: boolean,
+    pausedScroll: boolean,
+    variant: 'side' | 'narrow',
+    delay: number,
+): FluidLyricsRowVisualStyle => {
+    const isActive = index === activeDisplayIndex;
+    const distance = activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - index) : 0;
+    return getFluidLyricsRowVisualStyle({
+        delay,
+        distanceFromActive: distance,
+        isActive,
+        isUserScrolling,
+        pausedScroll,
+        variant,
+    });
+};
 
 class FluidLyricsAnimator {
     private readonly rows = new Map<number, RowAnimationState>();
@@ -71,7 +107,13 @@ class FluidLyricsAnimator {
         });
     }
 
-    register(index: number, element: HTMLDivElement, targetY: number, targetScale: number) {
+    register(
+        index: number,
+        element: HTMLDivElement,
+        targetY: number,
+        targetScale: number,
+        rowVisualStyle: FluidLyricsRowVisualStyle,
+    ) {
         const state = this.ensureModel(index, targetY, targetScale);
         if (state.detachedAt !== null) {
             const elapsedSeconds = Math.max(0, performance.now() - state.detachedAt) / 1000;
@@ -87,12 +129,19 @@ class FluidLyricsAnimator {
         }
         state.element = element;
         state.scaleElement = element.querySelector<HTMLElement>('[data-fluid-lyrics-scale]');
+        state.rowElement = element.querySelector<HTMLButtonElement>('.lyrics-motion-row');
+        state.lastRenderedY = null;
+        state.lastRenderedScale = null;
+        state.lastRenderedFilter = null;
+        state.lastRenderedOpacity = null;
+        state.lastRenderedTransition = null;
         element.style.willChange = 'transform';
-        if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
         this.mountedRows.add(index);
         this.renderState(state);
+        this.renderRowVisual(state, rowVisualStyle);
         if (state.translateY.isAnimating() || (state.scaleElement && state.scale.isAnimating())) {
             this.animatingRows.add(index);
+            if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
             this.start();
         }
 
@@ -102,6 +151,7 @@ class FluidLyricsAnimator {
             state.detachedAt = performance.now();
             state.element = null;
             state.scaleElement = null;
+            state.rowElement = null;
             this.mountedRows.delete(index);
             this.animatingRows.delete(index);
         };
@@ -112,15 +162,19 @@ class FluidLyricsAnimator {
         activeDisplayIndex: number,
         springParams: FluidSpringParams,
         getDelay: (index: number) => number,
+        getRowVisual: (index: number, delay: number) => FluidLyricsRowVisualStyle,
     ) {
         this.mountedRows.forEach(index => {
+            const delay = getDelay(index);
             this.setTarget(
                 index,
                 getTargetY(index),
                 index === activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
                 springParams,
-                getDelay(index),
+                delay,
             );
+            const state = this.rows.get(index);
+            if (state) this.renderRowVisual(state, getRowVisual(index, delay));
         });
     }
 
@@ -182,6 +236,7 @@ class FluidLyricsAnimator {
             this.renderState(state);
             if (!state.translateY.isAnimating() && (!state.scaleElement || !state.scale.isAnimating())) {
                 this.animatingRows.delete(index);
+                if (state.scaleElement) state.scaleElement.style.willChange = '';
             }
         });
 
@@ -190,11 +245,41 @@ class FluidLyricsAnimator {
 
     private renderState(state: RowAnimationState) {
         if (state.element) {
-            state.element.style.transform = `translate3d(0, ${state.translateY.getPosition()}px, 0)`;
+            const renderedY = this.formatOutput(state.translateY.getPosition(), 3);
+            if (state.lastRenderedY !== renderedY) {
+                state.element.style.transform = `translate3d(0, ${renderedY}px, 0)`;
+                state.lastRenderedY = renderedY;
+            }
         }
         if (state.scaleElement) {
-            state.scaleElement.style.transform = `scale(${state.scale.getPosition()}) translateZ(0)`;
+            const renderedScale = this.formatOutput(state.scale.getPosition(), 5);
+            if (state.lastRenderedScale !== renderedScale) {
+                state.scaleElement.style.transform = `scale(${renderedScale}) translateZ(0)`;
+                state.lastRenderedScale = renderedScale;
+            }
         }
+    }
+
+    private renderRowVisual(state: RowAnimationState, style: FluidLyricsRowVisualStyle) {
+        const element = state.rowElement;
+        if (!element) return;
+        if (state.lastRenderedFilter !== style.filter) {
+            element.style.filter = style.filter;
+            state.lastRenderedFilter = style.filter;
+        }
+        if (state.lastRenderedOpacity !== style.opacity) {
+            element.style.opacity = style.opacity;
+            state.lastRenderedOpacity = style.opacity;
+        }
+        if (state.lastRenderedTransition !== style.transition) {
+            element.style.transition = style.transition;
+            state.lastRenderedTransition = style.transition;
+        }
+    }
+
+    private formatOutput(value: number, precision: number) {
+        const zeroThreshold = 0.5 * Math.pow(10, -precision);
+        return Math.abs(value) < zeroThreshold ? '0' : value.toFixed(precision);
     }
 
     private ensureModel(index: number, targetY: number, targetScale: number) {
@@ -209,6 +294,12 @@ class FluidLyricsAnimator {
             scale: new FluidLyricsSpring(targetScale, SCALE_SPRING),
             targetTranslateY: targetY,
             targetScale,
+            lastRenderedY: null,
+            lastRenderedScale: null,
+            rowElement: null,
+            lastRenderedFilter: null,
+            lastRenderedOpacity: null,
+            lastRenderedTransition: null,
         };
         this.rows.set(index, state);
         return state;
@@ -231,6 +322,9 @@ export function useFluidLyricsAnimator({
     springParams,
     targetScrollY,
     visualShifts,
+    isUserScrolling,
+    pausedScroll,
+    variant,
 }: FluidLyricsAnimatorArgs) {
     const [animator] = useState(() => new FluidLyricsAnimator());
     const latestTargetsRef = useRef<LatestTargets>({
@@ -239,6 +333,9 @@ export function useFluidLyricsAnimator({
         springParams,
         targetScrollY,
         visualShifts,
+        isUserScrolling,
+        pausedScroll,
+        variant,
     });
     useInsertionEffect(() => {
         latestTargetsRef.current = {
@@ -247,8 +344,11 @@ export function useFluidLyricsAnimator({
             springParams,
             targetScrollY,
             visualShifts,
+            isUserScrolling,
+            pausedScroll,
+            variant,
         };
-    }, [activeDisplayIndex, getDelay, springParams, targetScrollY, visualShifts]);
+    }, [activeDisplayIndex, getDelay, isUserScrolling, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
     useInsertionEffect(() => {
         const targets = latestTargetsRef.current;
         animator.syncModels(
@@ -265,6 +365,14 @@ export function useFluidLyricsAnimator({
             element,
             (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
             index === targets.activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
+            getRowVisualStyle(
+                index,
+                targets.activeDisplayIndex,
+                targets.isUserScrolling,
+                targets.pausedScroll,
+                targets.variant,
+                targets.getDelay(index),
+            ),
         );
     }, [animator]);
 
@@ -274,8 +382,16 @@ export function useFluidLyricsAnimator({
             activeDisplayIndex,
             springParams,
             getDelay,
+            (index, delay) => getRowVisualStyle(
+                index,
+                activeDisplayIndex,
+                isUserScrolling,
+                pausedScroll,
+                variant,
+                delay,
+            ),
         );
-    }, [activeDisplayIndex, animator, getDelay, springParams, targetScrollY, visualShifts]);
+    }, [activeDisplayIndex, animator, getDelay, isUserScrolling, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

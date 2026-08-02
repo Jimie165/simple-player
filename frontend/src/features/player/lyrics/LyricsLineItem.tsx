@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import { memo, useEffect, useRef, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
+import { getFluidLyricsRowVisualStyle } from '@/features/player/lyrics/fluidLyricsMotion';
 
 interface LyricsLineItemProps {
     line: LyricsLine;
@@ -57,21 +58,14 @@ function LyricsLineItem({
     variant,
 }: LyricsLineItemProps) {
     const rowRef = useRef<HTMLButtonElement | null>(null);
-    const isNarrow = variant === 'narrow';
-    const blurPx = isActive
-        ? 0
-        : isNarrow
-            ? Math.min(2.8, 0.3 + distanceFromActive * 0.45)
-            : Math.min(5.4, 0.8 + distanceFromActive * 1.05);
-
-    const rowOpacity = isActive
-        ? 1
-        : isNarrow
-            ? Math.max(0.35, 0.85 - distanceFromActive * 0.07)
-            : Math.max(0.22, 0.82 - distanceFromActive * 0.12);
-
-    const rowFilter = isUserScrolling || pausedScroll ? 'blur(0px)' : `blur(${blurPx}px)`;
-    const appliedOpacity = isUserScrolling || pausedScroll ? 1 : rowOpacity;
+    const rowVisualStyle = getFluidLyricsRowVisualStyle({
+        delay: motionDelay,
+        distanceFromActive,
+        isActive,
+        isUserScrolling,
+        pausedScroll,
+        variant: variant ?? 'side',
+    });
     const canSeek = line.time_ms !== null;
     const currentMs = currentTime * 1000;
     const karaokeWords = line.words ?? [];
@@ -186,12 +180,7 @@ function LyricsLineItem({
                 disabled={!canSeek}
                 style={{
                     ...renderingIsolationStyle,
-                    filter: rowFilter,
-                    opacity: appliedOpacity,
-                    transition: [
-                        `filter 380ms ease-out ${motionDelay * 0.2}s`,
-                        `opacity 350ms ease-out ${motionDelay * 0.2}s`,
-                    ].join(', '),
+                    ...rowVisualStyle,
                 }}
                 className={className}
             >
@@ -208,8 +197,8 @@ function LyricsLineItem({
             disabled={!canSeek}
             style={{
                 ...renderingIsolationStyle,
-                filter: rowFilter,
-                opacity: appliedOpacity,
+                filter: rowVisualStyle.filter,
+                opacity: rowVisualStyle.opacity,
                 transform: 'translateY(' + interludeShift + 'px)',
                 transition: 'filter 300ms, opacity 300ms, transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
             }}
@@ -226,7 +215,7 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.isKaraokeActive === next.isKaraokeActive &&
     prev.isUserScrolling === next.isUserScrolling &&
     prev.pausedScroll === next.pausedScroll &&
-    prev.distanceFromActive === next.distanceFromActive &&
+    (prev.fluidMotion && next.fluidMotion || prev.distanceFromActive === next.distanceFromActive) &&
     prev.interludeShift === next.interludeShift &&
     prev.interludeShiftDurationMs === next.interludeShiftDurationMs &&
     prev.lineEndMs === next.lineEndMs &&
@@ -235,7 +224,12 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.preciseMsRef === next.preciseMsRef &&
     prev.onSeek === next.onSeek &&
     prev.fluidMotion === next.fluidMotion &&
-    prev.motionDelay === next.motionDelay &&
+    (
+        prev.fluidMotion &&
+        next.fluidMotion &&
+        (prev.line.words?.length ?? 0) > 0
+        || prev.motionDelay === next.motionDelay
+    ) &&
     prev.variant === next.variant
 );
 

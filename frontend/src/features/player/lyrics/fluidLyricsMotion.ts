@@ -21,6 +21,52 @@ interface FluidLyricsMotionArgs {
     variant: 'side' | 'narrow';
 }
 
+interface FluidLyricsRowVisualArgs {
+    delay: number;
+    distanceFromActive: number;
+    isActive: boolean;
+    isUserScrolling: boolean;
+    pausedScroll: boolean;
+    variant: 'side' | 'narrow';
+}
+
+export interface FluidLyricsRowVisualStyle {
+    filter: string;
+    opacity: string;
+    transition: string;
+}
+
+export function getFluidLyricsRowVisualStyle({
+    delay,
+    distanceFromActive,
+    isActive,
+    isUserScrolling,
+    pausedScroll,
+    variant,
+}: FluidLyricsRowVisualArgs): FluidLyricsRowVisualStyle {
+    const blurPx = isActive
+        ? 0
+        : variant === 'narrow'
+            ? Math.min(2.8, 0.3 + distanceFromActive * 0.45)
+            : Math.min(5.4, 0.8 + distanceFromActive * 1.05);
+    const rowOpacity = isActive
+        ? 1
+        : variant === 'narrow'
+            ? Math.max(0.35, 0.85 - distanceFromActive * 0.07)
+            : Math.max(0.22, 0.82 - distanceFromActive * 0.12);
+    const showAll = isUserScrolling || pausedScroll;
+    const transitionDelay = delay * 0.2;
+
+    return {
+        filter: showAll ? 'blur(0px)' : `blur(${blurPx}px)`,
+        opacity: String(showAll ? 1 : rowOpacity),
+        transition: [
+            `filter 380ms ease-out ${transitionDelay}s`,
+            `opacity 350ms ease-out ${transitionDelay}s`,
+        ].join(', '),
+    };
+}
+
 /** 计算动画优先歌词的纵向滚动弹簧参数。 */
 export function getFluidLyricsSpringParams({
     activeDisplayIndex,
