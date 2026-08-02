@@ -33,7 +33,10 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     // Player controls
     const { playSong } = usePlaybackActions();
     const { push } = useNavigationStore();
-    const { setVideoMode, setIsPlaying, setVideoMetadata, setVideoQueue } = usePlayerStore();
+    const setVideoMode = usePlayerStore(s => s.setVideoMode);
+    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
+    const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
+    const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
     const addToRecent = useLibraryStore(s => s.addToRecent);
 
     useEffect(() => {

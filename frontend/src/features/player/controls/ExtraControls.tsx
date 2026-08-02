@@ -12,7 +12,7 @@ interface ExtraControlsProps {
 }
 
 export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps) {
-    const { volume } = usePlayerStore();
+    const volume = usePlayerStore(s => s.volume);
     const [localVolume, setLocalVolume] = useState(volume);
     const [showVolumePopup, setShowVolumePopup] = useState(false);
     const [showQueuePopup, setShowQueuePopup] = useState(false); // 队列弹窗状态
@@ -151,7 +151,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
             </div>
 
             {showCompactMenu && (
-                <div className="absolute right-0 bottom-11 z-30 flex items-center gap-1 rounded-full border border-black/[0.08] bg-white/[0.78] px-2 py-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-[20px] backdrop-saturate-[180%] dark:border-white/[0.14] dark:bg-[#24262c]/[0.78] dark:shadow-[0_16px_34px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] dark:ring-1 dark:ring-white/[0.04]">
+                <div className="absolute right-0 bottom-11 z-30 flex items-center gap-1 rounded-full border border-black/8 bg-white/78 px-2 py-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-[20px] backdrop-saturate-180 dark:border-white/[0.14] dark:bg-[#24262c]/78 dark:shadow-[0_16px_34px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] dark:ring-1 dark:ring-white/4">
                     {controls}
                 </div>
             )}

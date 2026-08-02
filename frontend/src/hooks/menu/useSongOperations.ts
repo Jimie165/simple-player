@@ -66,10 +66,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     // Stores
     const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite } = useLibraryStore();
     const { playList, shufflePlay } = usePlaybackActions();
-    const {
-        setShuffleState, isShuffling, isPlaying, setIsPlaying,
-        setVideoMode, setVideoMetadata, setVideoQueue
-    } = usePlayerStore();
+    const setShuffleState = usePlayerStore(s => s.setShuffleState);
+    const isShuffling = usePlayerStore(s => s.isShuffling);
+    const isPlaying = usePlayerStore(s => s.isPlaying);
+    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
+    const setVideoMode = usePlayerStore(s => s.setVideoMode);
+    const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
+    const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
     const { open: openAddToPlaylist } = useAddToPlaylistStore();
     const { openDeleteConfirm, openProperties, openEditSong } = useDialogStore();
     const { push } = useNavigationStore();

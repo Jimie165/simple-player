@@ -31,26 +31,25 @@ export default function AppleMusicPlayer({
     isOpen: boolean;
     mainContentWidth: number;
 }) {
-    const {
-        metadata, isPlaying, isShuffling, repeatMode,
-        togglePlay, toggleRepeat
-    } = usePlayerStore();
-    const {
-        volume,
-        setVolume,
-        isQueueOpen,
-        isLyricsOpen,
-        lyrics,
-        lyricsStatus,
-        lyricsHasTimestamps,
-        lyricsPath,
-        currentTime,
-        setPlaybackTime,
-        requestLyricsForPath,
-    } = usePlayerStore();
+    const metadata = usePlayerStore(state => state.metadata);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isShuffling = usePlayerStore(state => state.isShuffling);
+    const repeatMode = usePlayerStore(state => state.repeatMode);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+    const volume = usePlayerStore(state => state.volume);
+    const setVolume = usePlayerStore(state => state.setVolume);
+    const isQueueOpen = usePlayerStore(state => state.isQueueOpen);
+    const isLyricsOpen = usePlayerStore(state => state.isLyricsOpen);
+    const lyrics = usePlayerStore(state => state.lyrics);
+    const lyricsStatus = usePlayerStore(state => state.lyricsStatus);
+    const lyricsHasTimestamps = usePlayerStore(state => state.lyricsHasTimestamps);
+    const lyricsPath = usePlayerStore(state => state.lyricsPath);
+    const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
+    const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
 
-    const { toggleFavorite } = useLibraryStore();
-    const { push } = useNavigationStore();
+    const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
+    const push = useNavigationStore(state => state.push);
     const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
     const { playerEffectMode, reactiveBackgroundEnabled } = useTheme();
     const lowFrequencyRef = useLowFrequencyLevel(
@@ -118,13 +117,15 @@ export default function AppleMusicPlayer({
         metadata,
         isOpen,
         isPlaying,
-        currentTime,
         setPlaybackTime,
         seek,
         onNarrowActivity: handleNarrowActivity,
     });
 
     const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
+    const handlePlayPrev = useCallback(() => {
+        void playPrev(usePlayerStore.getState().currentTime);
+    }, [playPrev]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -176,12 +177,11 @@ export default function AppleMusicPlayer({
         isPlaying,
         isShuffling,
         toggleShuffle,
-        playPrev: () => playPrev(currentTime),
+        playPrev: handlePlayPrev,
         togglePlay,
         playNext,
         toggleRepeat,
         repeatMode,
-        currentTime,
         handleSeekChange,
         handleSeekStart,
         handleSeekEnd,

@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
@@ -87,22 +88,24 @@ const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
 };
 
 export function usePlaybackActions() {
-    const { setPlaylist, setCurrentSongIndex, toggleShuffleList, addToRecent, setQueueContext } = useLibraryStore();
-    const {
-        setMetadata,
-        setIsPlaying,
-        setShuffleState,
-        setRepeatState,
-        togglePlay,
-        restartSong,
-        toggleShuffle: togglePlayerShuffle,
-        setAudioLoaded,
-        setPlaybackTime,
-        resetPlaybackClock,
-        requestLyricsForPath,
-    } = usePlayerStore();
+    const setPlaylist = useLibraryStore(state => state.setPlaylist);
+    const setCurrentSongIndex = useLibraryStore(state => state.setCurrentSongIndex);
+    const toggleShuffleList = useLibraryStore(state => state.toggleShuffleList);
+    const addToRecent = useLibraryStore(state => state.addToRecent);
+    const setQueueContext = useLibraryStore(state => state.setQueueContext);
+    const setMetadata = usePlayerStore(state => state.setMetadata);
+    const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
+    const setShuffleState = usePlayerStore(state => state.setShuffleState);
+    const setRepeatState = usePlayerStore(state => state.setRepeatState);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const restartSong = usePlayerStore(state => state.restartSong);
+    const togglePlayerShuffle = usePlayerStore(state => state.toggleShuffle);
+    const setAudioLoaded = usePlayerStore(state => state.setAudioLoaded);
+    const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
+    const resetPlaybackClock = usePlayerStore(state => state.resetPlaybackClock);
+    const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
 
-    const applyQueueItemPlayback = async (
+    const applyQueueItemPlayback = useCallback(async (
         song: SongMetadata,
         index: number,
         transitionId: number,
@@ -148,9 +151,19 @@ export function usePlaybackActions() {
         } catch (error) {
             console.error('Queue play failed', error);
         }
-    };
+    }, [
+        requestLyricsForPath,
+        resetPlaybackClock,
+        restartSong,
+        setAudioLoaded,
+        setCurrentSongIndex,
+        setIsPlaying,
+        setMetadata,
+        setPlaybackTime,
+        togglePlay,
+    ]);
 
-    const toggleShuffle = () => {
+    const toggleShuffle = useCallback(() => {
         const { isShuffling } = usePlayerStore.getState();
         const newShuffleState = !isShuffling;
 
@@ -159,9 +172,9 @@ export function usePlaybackActions() {
 
         // 2. Update Library Store (Queue Order)
         toggleShuffleList(newShuffleState);
-    };
+    }, [togglePlayerShuffle, toggleShuffleList]);
 
-    const playSongInternal = async ({ song, index, playlist, options, context }: PlaySongParams, transitionId: number) => {
+    const playSongInternal = useCallback(async ({ song, index, playlist, options, context }: PlaySongParams, transitionId: number) => {
         if (!song.path) return;
 
         const { metadata, isShuffling } = usePlayerStore.getState();
@@ -223,41 +236,29 @@ export function usePlaybackActions() {
             console.error('Play failed', error);
             setIsPlaying(false);
         }
-    };
+    }, [
+        addToRecent,
+        requestLyricsForPath,
+        resetPlaybackClock,
+        setAudioLoaded,
+        setCurrentSongIndex,
+        setIsPlaying,
+        setMetadata,
+        setPlaybackTime,
+        setPlaylist,
+        setQueueContext,
+        setShuffleState,
+        togglePlay,
+        toggleShuffleList,
+    ]);
 
-    const playSong = async (params: PlaySongParams) => {
+    const playSong = useCallback(async (params: PlaySongParams) => {
         await runPlaybackTransition(async (transitionId) => {
             await playSongInternal(params, transitionId);
         });
-    };
+    }, [playSongInternal]);
 
-    const playList = async ({ songs, startIndex = 0, shuffle = false, options, context }: PlayListParams) => {
-        if (songs.length === 0) return;
-        if (playbackTransitionRunning) return;
-
-        if (shuffle) {
-            await shufflePlay({ songs, options, context });
-            return;
-        }
-
-        const song = songs[startIndex];
-        if (!song?.path) return;
-
-        setShuffleState(false);
-
-        await playSong({
-            song,
-            index: startIndex,
-            playlist: songs,
-            options: {
-                ...options,
-                disableShuffle: !shuffle
-            },
-            context
-        });
-    };
-
-    const shufflePlay = async ({ songs, options, context }: ShufflePlayParams) => {
+    const shufflePlay = useCallback(async ({ songs, options, context }: ShufflePlayParams) => {
         if (songs.length === 0) return;
         if (playbackTransitionRunning) return;
 
@@ -290,16 +291,50 @@ export function usePlaybackActions() {
             },
             context
         });
-    };
+    }, [
+        playSong,
+        setCurrentSongIndex,
+        setPlaylist,
+        setQueueContext,
+        setRepeatState,
+        setShuffleState,
+        toggleShuffleList,
+    ]);
 
-    const playQueueItem = async ({ song, index, restartIfCurrent = false }: PlayQueueParams) => {
+    const playList = useCallback(async ({ songs, startIndex = 0, shuffle = false, options, context }: PlayListParams) => {
+        if (songs.length === 0) return;
+        if (playbackTransitionRunning) return;
+
+        if (shuffle) {
+            await shufflePlay({ songs, options, context });
+            return;
+        }
+
+        const song = songs[startIndex];
+        if (!song?.path) return;
+
+        setShuffleState(false);
+
+        await playSong({
+            song,
+            index: startIndex,
+            playlist: songs,
+            options: {
+                ...options,
+                disableShuffle: !shuffle
+            },
+            context
+        });
+    }, [playSong, setShuffleState, shufflePlay]);
+
+    const playQueueItem = useCallback(async ({ song, index, restartIfCurrent = false }: PlayQueueParams) => {
         await runPlaybackTransition(async (transitionId) => {
             await applyQueueItemPlayback(song, index, transitionId, restartIfCurrent);
         });
-    };
+    }, [applyQueueItemPlayback]);
 
     // --- New Actions for Controls ---
-    const seek = async (time: number) => {
+    const seek = useCallback(async (time: number) => {
         const { isAudioLoaded, metadata } = usePlayerStore.getState();
 
         if (!isAudioLoaded && metadata?.path) {
@@ -312,9 +347,9 @@ export function usePlaybackActions() {
         setPlaybackTime(actualTime);
         window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
         return actualTime;
-    };
+    }, [requestLyricsForPath, setAudioLoaded, setPlaybackTime]);
 
-    const playNext = async () => {
+    const playNext = useCallback(async () => {
         await runPlaybackTransition(async (transitionId) => {
             const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
@@ -325,9 +360,9 @@ export function usePlaybackActions() {
                 await applyQueueItemPlayback(song, nextIdx, transitionId, true);
             }
         });
-    };
+    }, [applyQueueItemPlayback]);
 
-    const playPrev = async (currentTime: number = 0) => {
+    const playPrev = useCallback(async (currentTime: number = 0) => {
         await runPlaybackTransition(async (transitionId) => {
             const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
@@ -347,9 +382,9 @@ export function usePlaybackActions() {
                 await applyQueueItemPlayback(song, prevIdx, transitionId, true);
             }
         });
-    };
+    }, [applyQueueItemPlayback, seek]);
 
-    const handlePlaybackEnded = async () => {
+    const handlePlaybackEnded = useCallback(async () => {
         if (!canHandleEndedEvent()) return;
 
         await runPlaybackTransition(async (transitionId) => {
@@ -379,7 +414,7 @@ export function usePlaybackActions() {
                 await applyQueueItemPlayback(song, nextIdx, transitionId, true);
             }
         });
-    };
+    }, [applyQueueItemPlayback]);
 
     return {
         playSong,

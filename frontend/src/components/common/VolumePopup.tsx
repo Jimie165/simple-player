@@ -10,7 +10,8 @@ interface VolumePopupProps {
 
 export default function VolumePopup({ show, onChange }: VolumePopupProps) {
     // 从 Store 获取和设置音量
-    const { volume, setVolume } = usePlayerStore();
+    const volume = usePlayerStore(s => s.volume);
+    const setVolume = usePlayerStore(s => s.setVolume);
     const [localVolume, setLocalVolume] = useState(volume);
     const [isDragging, setIsDragging] = useState(false);
 

@@ -26,7 +26,6 @@ interface BaseLayoutProps {
     playNext: () => void;
     toggleRepeat: () => void;
     repeatMode: 'off' | 'all' | 'one';
-    currentTime: number;
     handleSeekChange: (value: number) => void;
     handleSeekStart: () => void;
     handleSeekEnd: () => void;
@@ -66,7 +65,6 @@ export function AppleMusicNarrowPanelLayout({
     playNext,
     toggleRepeat,
     repeatMode,
-    currentTime,
     handleSeekChange,
     handleSeekStart,
     handleSeekEnd,
@@ -164,7 +162,6 @@ export function AppleMusicNarrowPanelLayout({
                             lyricsPath={lyricsPath}
                             lyricsStatus={lyricsStatus}
                             hasTimestamps={lyricsHasTimestamps}
-                            currentTime={currentTime}
                             onSeek={seek}
                             onUserScrollDirection={handleNarrowPanelScroll}
                             narrowControlsVisible={narrowControlsVisible}
@@ -190,7 +187,6 @@ export function AppleMusicNarrowPanelLayout({
             >
                 <ApplePlayerNarrowBottomControls
                     metadata={metadata}
-                    currentTime={currentTime}
                     handleSeekChange={handleSeekChange}
                     handleSeekStart={handleSeekStart}
                     handleSeekEnd={handleSeekEnd}
@@ -237,7 +233,6 @@ export function AppleMusicStandardLayout({
     playNext,
     toggleRepeat,
     repeatMode,
-    currentTime,
     handleSeekChange,
     handleSeekStart,
     handleSeekEnd,
@@ -291,7 +286,7 @@ export function AppleMusicStandardLayout({
                         (isQueueOpen || isLyricsOpen) ? "w-[41%] pr-[clamp(0.5rem,1.5vw,1rem)]" : "w-full px-[clamp(1rem,4vw,3rem)]"
                       ]
             )}>
-                <div className="w-full h-full max-w-[500px] flex flex-col gap-8 justify-center items-center mx-auto">
+                <div className="w-full h-full max-w-125 flex flex-col gap-8 justify-center items-center mx-auto">
                     <div className="flex-1 min-h-0 flex items-center justify-center w-full">
                         <div
                             ref={coverShellRef}
@@ -319,7 +314,6 @@ export function AppleMusicStandardLayout({
                         onClose={onClose}
                         push={push}
                         toggleFavorite={toggleFavorite}
-                        currentTime={currentTime}
                         handleSeekChange={handleSeekChange}
                         handleSeekStart={handleSeekStart}
                         handleSeekEnd={handleSeekEnd}
@@ -357,7 +351,6 @@ export function AppleMusicStandardLayout({
                 lyricsPath={lyricsPath}
                 lyricsStatus={lyricsStatus}
                 hasTimestamps={lyricsHasTimestamps}
-                currentTime={currentTime}
                 onSeek={seek}
             />
 

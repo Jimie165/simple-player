@@ -44,7 +44,7 @@ export default function PlaylistList() {
 
     const { openPlaylistDetail } = useNavigationStore();
     const { addMultipleToNext, libraryVersion, playlistVersion, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
-    const { setShuffleState } = usePlayerStore();
+    const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
 

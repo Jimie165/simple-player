@@ -22,7 +22,8 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         currentSongIndex,
         removeSongFromPlaylistByIndex
     } = useLibraryStore();
-    const { togglePlay, restartSong } = usePlayerStore();
+    const togglePlay = usePlayerStore(s => s.togglePlay);
+    const restartSong = usePlayerStore(s => s.restartSong);
     const { playQueueItem } = usePlaybackActions();
 
     // Context menu state

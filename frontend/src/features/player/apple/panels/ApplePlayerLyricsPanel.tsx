@@ -10,6 +10,8 @@ import {
     performanceLyricsTimingStrategy,
 } from '@/features/player/lyrics/timingStrategy';
 import type { LyricsLine } from '@/types';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 
 interface ApplePlayerLyricsPanelProps {
     variant?: 'side' | 'narrow';
@@ -21,7 +23,6 @@ interface ApplePlayerLyricsPanelProps {
     lyricsPath: string | null;
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
     hasTimestamps: boolean;
-    currentTime: number;
     onSeek: (time: number) => void;
     onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
     narrowControlsVisible?: boolean;
@@ -37,7 +38,6 @@ export default function ApplePlayerLyricsPanel({
     lyricsPath,
     lyricsStatus,
     hasTimestamps,
-    currentTime,
     onSeek,
     onUserScrollDirection,
     narrowControlsVisible = true,
@@ -112,20 +112,19 @@ export default function ApplePlayerLyricsPanel({
                                 lyrics={lyrics}
                                 status={lyricsStatus}
                                 hasTimestamps={hasTimestamps}
-                                currentTime={currentTime}
+                                currentTime={usePlayerStore.getState().currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
                                 timingStrategy={animationLyricsTimingStrategy}
                             />
                         ) : (
-                            <LyricsPanel
+                            <SyncedPerformanceLyricsPanel
                                 key={`virtual-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
                                 lyrics={lyrics}
                                 status={lyricsStatus}
                                 hasTimestamps={hasTimestamps}
-                                currentTime={currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
@@ -137,4 +136,9 @@ export default function ApplePlayerLyricsPanel({
             </div>
         </div>
     );
+}
+
+function SyncedPerformanceLyricsPanel(props: Omit<LyricsPanelProps, 'currentTime'>) {
+    const currentTime = usePlayerStore(state => state.currentTime);
+    return <LyricsPanel {...props} currentTime={currentTime} />;
 }

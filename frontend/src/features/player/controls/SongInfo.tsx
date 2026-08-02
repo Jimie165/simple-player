@@ -15,7 +15,7 @@ interface SongInfoProps {
 import { usePlayerStore } from '@/store/usePlayerStore';
 
 export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }: SongInfoProps) {
-    const { setVideoMode } = usePlayerStore();
+    const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const { push } = useNavigationStore();
     const canNavigate = !!metadata && typeof metadata.id === 'number';
 
@@ -30,7 +30,7 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                         onToggleFullScreen();
                     }
                 }}
-                className="group relative flex h-16 min-w-0 max-w-full items-start overflow-hidden rounded-md p-1 pt-1.5 pr-3 text-left transition-colors hover:bg-black/[0.045] dark:hover:bg-white/[0.075]"
+                className="group relative flex h-16 min-w-0 max-w-full items-start overflow-hidden rounded-md p-1 pt-1.5 pr-3 text-left transition-colors hover:bg-black/4.5 dark:hover:bg-white/7.5"
             >
                 <div className={clsx(
                     "relative shrink-0 flex items-center justify-center overflow-hidden bg-neutral-200 shadow-sm ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] dark:bg-neutral-800 dark:ring-white/10",

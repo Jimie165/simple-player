@@ -19,16 +19,14 @@ import { useVideoControls } from '@/features/player/hooks/useVideoControls';
 import CustomTooltip from '@/components/common/CustomTooltip';
 
 export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-    const {
-        videoMetadata: metadata,
-        videoQueue,
-        currentVideoIndex,
-        playNextVideo,
-        playPreviousVideo,
-        setVideoQueue,
-        volume,
-        setVolume,
-    } = usePlayerStore();
+    const metadata = usePlayerStore(s => s.videoMetadata);
+    const videoQueue = usePlayerStore(s => s.videoQueue);
+    const currentVideoIndex = usePlayerStore(s => s.currentVideoIndex);
+    const playNextVideo = usePlayerStore(s => s.playNextVideo);
+    const playPreviousVideo = usePlayerStore(s => s.playPreviousVideo);
+    const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
+    const volume = usePlayerStore(s => s.volume);
+    const setVolume = usePlayerStore(s => s.setVolume);
     const videoRef = useRef<HTMLVideoElement>(null);
     const [isControlsVisible, setIsControlsVisible] = useState(true);
     const controlsTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

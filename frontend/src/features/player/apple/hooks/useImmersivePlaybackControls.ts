@@ -9,7 +9,6 @@ interface UseImmersivePlaybackControlsArgs {
     metadata: SongMetadata | null;
     isOpen: boolean;
     isPlaying: boolean;
-    currentTime: number;
     setPlaybackTime: (time: number) => void;
     seek: (time: number) => Promise<number>;
     onNarrowActivity: () => void;
@@ -21,7 +20,6 @@ export function useImmersivePlaybackControls({
     metadata,
     isOpen,
     isPlaying,
-    currentTime,
     setPlaybackTime,
     seek,
     onNarrowActivity,
@@ -97,7 +95,7 @@ export function useImmersivePlaybackControls({
 
     const handleSeekEnd = async () => {
         setIsDragging(false);
-        const actualTime = await seek(currentTime);
+        const actualTime = await seek(usePlayerStore.getState().currentTime);
         setPlaybackTime(actualTime);
         window.dispatchEvent(new CustomEvent('playback:dragging', { detail: { dragging: false } }));
     };

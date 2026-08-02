@@ -8,7 +8,6 @@ export interface ApplePlayerControlsSectionProps {
     onClose: () => void;
     push: (entry: ViewState) => void;
     toggleFavorite: (song: SongMetadata) => Promise<void>;
-    currentTime: number;
     handleSeekChange: (value: number) => void;
     handleSeekStart: () => void;
     handleSeekEnd: () => void;

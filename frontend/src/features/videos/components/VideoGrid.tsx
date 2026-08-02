@@ -16,7 +16,10 @@ import { getSparseGridStyle } from '@/utils/gridLayout';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
     const mainContentWidth = useMainContentWidth();
-    const { setVideoMode, setIsPlaying, setVideoMetadata, setVideoQueue } = usePlayerStore();
+    const setVideoMode = usePlayerStore(s => s.setVideoMode);
+    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
+    const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
+    const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
     const { isSelectionMode, toggleSelection, toggleSelectionMode, selectedIds } = useSelectionStore();
     const { openProperties } = useDialogStore();
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; video: VideoMetadata } | null>(null);

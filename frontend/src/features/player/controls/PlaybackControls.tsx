@@ -11,18 +11,60 @@ interface PlaybackControlsProps {
     mode: 'full' | 'compact' | 'mini';
 }
 
+interface PlaybackProgressClockProps {
+    mode: PlaybackControlsProps['mode'];
+    isMini: boolean;
+    metadata: ReturnType<typeof usePlayerStore.getState>['metadata'];
+    isDragging: boolean;
+    handleSeekStart: () => void;
+    handleSeekChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+    handleSeekEnd: (event: React.MouseEvent<HTMLInputElement>) => void;
+}
+
+function PlaybackProgressClock({
+    mode,
+    isMini,
+    metadata,
+    isDragging,
+    handleSeekStart,
+    handleSeekChange,
+    handleSeekEnd,
+}: PlaybackProgressClockProps) {
+    const currentTime = usePlayerStore(state => state.currentTime);
+    const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
+    const displayCurrentTime = Math.max(0, Math.floor(currentTime));
+    const displayDuration = Math.max(0, Math.floor(metadata?.duration || 0));
+    const remainingTime = Math.max(displayDuration - displayCurrentTime, 0);
+
+    return (
+        <PlaybackProgressBar
+            mode={mode}
+            isMini={isMini}
+            metadata={metadata}
+            currentTime={currentTime}
+            displayCurrentTime={displayCurrentTime}
+            remainingTime={remainingTime}
+            progressPercent={progressPercent}
+            isDragging={isDragging}
+            handleSeekStart={handleSeekStart}
+            handleSeekChange={handleSeekChange}
+            handleSeekEnd={handleSeekEnd}
+        />
+    );
+}
+
 export default function PlaybackControls({ mode }: PlaybackControlsProps) {
     const isMini = mode === 'mini';
-    const {
-        isPlaying, metadata,
-        isShuffling, repeatMode,
-        togglePlay, setIsPlaying,
-        toggleRepeat,
-        restartTrigger, // Destructure trigger
-        currentTime,
-        setPlaybackTime,
-        resetPlaybackClock,
-    } = usePlayerStore();
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const metadata = usePlayerStore(state => state.metadata);
+    const isShuffling = usePlayerStore(state => state.isShuffling);
+    const repeatMode = usePlayerStore(state => state.repeatMode);
+    const togglePlay = usePlayerStore(state => state.togglePlay);
+    const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+    const restartTrigger = usePlayerStore(state => state.restartTrigger);
+    const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
+    const resetPlaybackClock = usePlayerStore(state => state.resetPlaybackClock);
 
     const { toggleShuffle, seek, playNext, playPrev, handlePlaybackEnded } = usePlaybackActions();
 
@@ -40,7 +82,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
 
     // --- 按钮逻辑：上一首 ---
     const handlePrev = async () => {
-        await playPrev(currentTime);
+        await playPrev(usePlayerStore.getState().currentTime);
     };
 
     // --- 歌曲自然结束的处理逻辑 ---
@@ -270,11 +312,6 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
         const actualTime = await seek(newTime); // Use hook action to ensure consistent behavior & event dispatch
         setPlaybackTime(actualTime);
     };
-    const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
-    const displayCurrentTime = Math.max(0, Math.floor(currentTime));
-    const displayDuration = Math.max(0, Math.floor(metadata?.duration || 0));
-    const remainingTime = Math.max(displayDuration - displayCurrentTime, 0);
-
     return (
         <>
             <PlaybackControlButtons
@@ -290,14 +327,10 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 handleBtnRepeat={handleBtnRepeat}
             />
 
-            <PlaybackProgressBar
+            <PlaybackProgressClock
                 mode={mode}
                 isMini={isMini}
                 metadata={metadata}
-                currentTime={currentTime}
-                displayCurrentTime={displayCurrentTime}
-                remainingTime={remainingTime}
-                progressPercent={progressPercent}
                 isDragging={isDragging}
                 handleSeekStart={handleSeekStart}
                 handleSeekChange={handleSeekChange}

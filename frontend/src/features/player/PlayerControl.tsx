@@ -18,7 +18,7 @@ interface PlayerControlProps {
 }
 
 export default function PlayerControl({ isFullScreen, onToggleFullScreen, sidebarOffset, mode }: PlayerControlProps) {
-    const { metadata } = usePlayerStore();
+    const metadata = usePlayerStore(s => s.metadata);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const isMini = mode === 'mini';
 
@@ -30,22 +30,22 @@ export default function PlayerControl({ isFullScreen, onToggleFullScreen, sideba
                 style={{ left: sidebarOffset }}
             >
                 <div className={clsx(
-                    "pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full border border-black/[0.08] bg-white/[0.72] shadow-[0_10px_30px_rgba(15,23,42,0.14)] backdrop-blur-[22px] backdrop-saturate-[180%] dark:border-transparent dark:bg-[#2b2e35]/[0.78] dark:shadow-[0_18px_42px_rgba(0,0,0,0.38)] dark:ring-1 dark:ring-black/[0.18]",
-                    mode === 'full' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_178px] px-8",
-                    mode === 'compact' && "h-20 max-w-[760px] grid-cols-[172px_minmax(0,1fr)_40px] px-8",
-                    isMini && "h-[72px] max-w-[460px] grid-cols-[minmax(0,1fr)_104px] px-4"
+                    "pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full border border-black/8 bg-white/72 shadow-[0_10px_30px_rgba(15,23,42,0.14)] backdrop-blur-[22px] backdrop-saturate-180 dark:border-transparent dark:bg-[#2b2e35]/78 dark:shadow-[0_18px_42px_rgba(0,0,0,0.38)] dark:ring-1 dark:ring-black/18",
+                    mode === 'full' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_178px] px-8",
+                    mode === 'compact' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_40px] px-8",
+                    isMini && "h-18 max-w-115 grid-cols-[minmax(0,1fr)_104px] px-4"
                 )}>
                     <div
                         aria-hidden
-                        className="pointer-events-none absolute inset-[1px] hidden rounded-full dark:block dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.022)_42%,rgba(255,255,255,0)_100%)]"
+                        className="pointer-events-none absolute inset-px hidden rounded-full dark:block dark:bg-[linear-gradient(180deg,rgba(255,255,255,0.055)_0%,rgba(255,255,255,0.022)_42%,rgba(255,255,255,0)_100%)]"
                     />
                     <button
                         type="button"
                         onClick={onToggleFullScreen}
                         className={clsx(
                             "absolute top-2 h-8 rounded-full bg-transparent",
-                            mode === 'full' && "left-[172px] right-[128px]",
-                            mode === 'compact' && "left-[172px] right-[92px]",
+                            mode === 'full' && "left-43 right-32",
+                            mode === 'compact' && "left-43 right-23",
                             isMini && "hidden"
                         )}
                         aria-label="打开播放页"
