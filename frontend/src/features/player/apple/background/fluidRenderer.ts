@@ -433,7 +433,7 @@ export class FluidRenderer {
         this.animationFrame = 0;
         if (!this.active || !this.visible || this.disposed || !this.target) return;
         const elapsed = time - this.lastFrame;
-        const frameInterval = 1000 / 60;
+        const frameInterval = 1000 / 30;
         if (elapsed < frameInterval) {
             this.requestFrame();
             return;
