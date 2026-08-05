@@ -130,8 +130,10 @@ function LyricsLineItem({
     }, [isBackground, onBackgroundHeight]);
     const className = clsx(
         'lyrics-motion-row w-full',
-        // 背景和声加对称 padding：内容垂直居中于撑开的空隙（上下留白）
-        'py-[clamp(0.7rem,1.3vw,1.25rem)]',
+        // 背景和声行距压缩：顶部靠近主歌词
+        isBackground
+            ? 'pt-[clamp(0.2rem,0.5vw,0.4rem)] pb-[clamp(0.4rem,0.8vw,0.75rem)]'
+            : 'py-[clamp(0.7rem,1.3vw,1.25rem)]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
         // 背景和声小字无发光/模糊效果
         isActive && !isBackground ? 'text-white drop-shadow-xl' : 'text-white',
