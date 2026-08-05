@@ -84,6 +84,13 @@ function LyricsLineItem({
     // 淡出 400ms 保持明显过渡，缓解与下一行的重合。
     const bgTextActive = 'transition-opacity duration-[320ms] ease-in-out delay-[200ms] opacity-100';
     const bgTextInactive = 'transition-opacity duration-[400ms] ease-in-out opacity-0';
+    // 背景和声行：简单淡入淡出 + 从小变大（对齐间奏三点入场：
+    // scale 从 0.8 放大 + 淡入同步 + origin-left，出现过程即逐渐变大）。
+    // 独立 scale 层避免与 animator 的 scale 层（data-fluid-lyrics-scale）冲突。
+    // 过渡节奏与文字透明度一致：active 类 delay 200ms（等撑开空隙腾出再放大淡入），
+    // inactive 无 delay（缩小淡出立即开始）。
+    const bgScaleActive = 'transition-transform duration-[320ms] ease-in-out delay-[200ms] scale-100';
+    const bgScaleInactive = 'transition-transform duration-[400ms] ease-in-out scale-80';
     const handleClick = () => {
         if (line.start_time_ms === null) return;
         onSeek(line.start_time_ms / 1000);
@@ -228,6 +235,20 @@ function LyricsLineItem({
         </div>
     );
 
+    // 背景和声行：独立层承载从小变大过渡（配合文字淡入淡出），
+    // 对齐间奏 origin-left，不与 animator 的 scale 层（data-fluid-lyrics-scale）冲突
+    const renderedContent = isBackground ? (
+        <div
+            className={clsx(
+                'lyrics-bg-scale-layer origin-left',
+                isActive ? bgScaleActive : bgScaleInactive
+            )}
+            style={{ willChange: 'transform' }}
+        >
+            {content}
+        </div>
+    ) : content;
+
     if (fluidMotion) {
         return (
             <button
@@ -241,7 +262,7 @@ function LyricsLineItem({
                 }}
                 className={className}
             >
-                {content}
+                {renderedContent}
             </button>
         );
     }
@@ -261,7 +282,7 @@ function LyricsLineItem({
             }}
             className={className}
         >
-            {content}
+            {renderedContent}
         </button>
     );
 }
