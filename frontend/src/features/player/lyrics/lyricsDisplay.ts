@@ -136,24 +136,30 @@ export function getTtmlLineWindows(
 
     const overlaps = (i: number) => i > 0 && mains[i].start < mains[i - 1].end;
 
-    // 窗口结束点自后向前计算：链结束分支需要下一行的 windowEnd 已算好。
+     // 窗口结束点：不依赖链结构，也不依赖相邻行的 windowEnd。
     for (let i = count - 1; i >= 0; i--) {
         lineIndices[i] = mains[i].index;
-        const start = mains[i].start;
         const end = mains[i].end;
         const next = i + 1 < count ? mains[i + 1] : null;
-        const nextNext = i + 2 < count ? mains[i + 2] : null;
 
         let windowEnd: number;
         if (next === null) {
             windowEnd = end;
         } else if (next.start < end) {
-            // 与下一行重叠：链继续则失活于「隔一行」的提前换行点（不早于自己语义开始）；
-            // 链在此结束则与下一行在同一有效结束点退出（尾部压缩/提前聚焦对两行一致），
-            // 避免上一行在下一行已熄灭后仍保持激活
-            windowEnd = nextNext !== null && nextNext.start < next.end
-                ? Math.max(start, nextNext.start - leadMs)
-                : Math.max(start, windowEndMs[i + 1]);
+            // 与下一行重叠
+            const nextNext = i + 2 < count ? mains[i + 2] : null;
+            if (nextNext !== null && nextNext.start < next.end) {
+                // 链继续：失活于「隔一行」的提前换行点，但不应早于本行语义结束
+                windowEnd = Math.max(end, nextNext.start - leadMs);
+            } else {
+                // 链在此结束：如果本行和下一行是一起结束的（对唱组），同步使用下一行的退出时间
+                // （这能保证下一行触发词尾加速压缩时，本行也同步压缩，不会导致本行反而更晚结束）。
+                if (end <= next.end + 50) {
+                    windowEnd = windowEndMs[i + 1];
+                } else {
+                    windowEnd = Math.max(end, windowEndMs[i + 1]);
+                }
+            }
         } else {
             // 不重叠：LRC 切换点（词尾加速复用）
             const visualEndMs = compressTail
@@ -550,7 +556,48 @@ export function buildDisplayItems(
         };
     });
 
-    for (let index = 0; index < displayLines.length; index++) {
+    // 按时间轴排序构建显示顺序：主唱行按 start_time_ms 升序，背景行紧跟父行。
+    // TTML 文档中不同 agent 的 <p> 可能交替排列（如 v1 连续三句后跟 v2），
+    // 但时间轴上 v2 行可能穿插在 v1 行之间，需要按实际演唱时间排列。
+    const sortedIndices: number[] = [];
+    const childIndices = new Map<number, number[]>();
+    for (let i = 0; i < displayLines.length; i++) {
+        const line = displayLines[i];
+        if (line.role === 'background') {
+            // 找到父行在 displayLines 中的索引
+            const parentIdx = line.parent_id != null
+                ? displayLines.findIndex((l) => l.id === line.parent_id)
+                : -1;
+            if (parentIdx >= 0) {
+                let children = childIndices.get(parentIdx);
+                if (!children) { children = []; childIndices.set(parentIdx, children); }
+                children.push(i);
+            } else {
+                // 无父行的背景行按原始位置插入
+                sortedIndices.push(i);
+            }
+        } else {
+            sortedIndices.push(i);
+        }
+    }
+    // 主唱行按 start_time_ms 排序（无时间的行保留相对顺序在末尾）
+    sortedIndices.sort((a, b) => {
+        const aStart = displayLines[a].start_time_ms;
+        const bStart = displayLines[b].start_time_ms;
+        if (aStart === null && bStart === null) return a - b;
+        if (aStart === null) return 1;
+        if (bStart === null) return -1;
+        return aStart - bStart || a - b;
+    });
+    // 展开：主唱行后紧跟其背景行
+    const traversalOrder: number[] = [];
+    for (const idx of sortedIndices) {
+        traversalOrder.push(idx);
+        const children = childIndices.get(idx);
+        if (children) traversalOrder.push(...children);
+    }
+
+    for (const index of traversalOrder) {
         const line = displayLines[index];
         const isTimelineLine = line.role === 'main';
 
