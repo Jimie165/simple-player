@@ -79,7 +79,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
 
     return (
         <div className="flex h-full min-h-0 flex-col">
-            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/[0.03]">
+            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/3">
                 <textarea
                     value={displayText}
                     readOnly={!customEnabled}

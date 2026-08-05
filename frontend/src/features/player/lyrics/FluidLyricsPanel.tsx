@@ -20,10 +20,11 @@ import {
 import {
     buildDisplayItems,
     buildFluidLyricsRenderBoundaries,
-    getActiveDisplayIndex,
+    getActiveLyricsState,
     getFluidLyricsRenderKey,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
+import { animationLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
@@ -44,17 +45,20 @@ const lineSeekSyncToleranceMs = 1000;
 
 function FluidLyricsPanel({
     isOpen,
-    lyrics,
+    lyricsDocument,
     status,
-    hasTimestamps,
     currentTime,
     onSeek,
     onUserScrollDirection,
     variant = 'side',
-    timingStrategy,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    const lines = useMemo(() => lyrics ?? [], [lyrics]);
+    const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
+    const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
+    const isTtml = lyricsDocument?.origin === 'native-ttml';
+    // TTML 与 LRC 共用同一套切换/加速/淡出参数
+    const timingStrategy = animationLyricsTimingStrategy;
+    const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
     const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const previousTargetYRef = useRef(0);
     const pausedScrollRef = useRef(false);
@@ -73,14 +77,14 @@ function FluidLyricsPanel({
         if (!lines.length) return '暂无歌词';
         return null;
     }, [status, lines.length]);
-    const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
+    const focusNextLineByVisualEnd = timingStrategy.focusNextLineByVisualEnd;
     const displayItems = useMemo(
         () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
         [hasTimestamps, lines, timingStrategy]
     );
     const renderBoundaries = useMemo(
-        () => buildFluidLyricsRenderBoundaries(displayItems, lines, timingStrategy),
-        [displayItems, lines, timingStrategy]
+        () => buildFluidLyricsRenderBoundaries(displayItems, lines, timingStrategy, isTtml),
+        [displayItems, lines, timingStrategy, isTtml]
     );
     const getRenderKey = useCallback(
         (currentMs: number) => getFluidLyricsRenderKey(renderBoundaries, currentMs),
@@ -91,9 +95,9 @@ function FluidLyricsPanel({
         getRenderKey,
         true,
     );
-    const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, 0, renderCurrentMs / 1000, timingStrategy),
-        [displayItems, lines, renderCurrentMs, timingStrategy]
+    const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
+        () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
+        [displayItems, lines, renderCurrentMs, timingStrategy, isTtml]
     );
     const {
         exitingInterludeIndex,
@@ -115,6 +119,42 @@ function FluidLyricsPanel({
                 renderCurrentMs < item.endMs - interludeNextLineFocusLeadMs;
         }) ?? -1;
     })();
+    const parentDisplayIndexMap = useMemo(() => {
+        const map = new Map<number, number>();
+        const lineIdToDisplayIndex = new Map<string, number>();
+        displayItems.forEach((item, index) => {
+            if (item.type === 'line' && item.line.id) {
+                lineIdToDisplayIndex.set(item.line.id, index);
+            }
+        });
+        displayItems.forEach((item, index) => {
+            if (item.type === 'line' && item.line.role === 'background' && item.line.parent_id) {
+                const parentIdx = lineIdToDisplayIndex.get(item.line.parent_id);
+                if (parentIdx !== undefined) {
+                    map.set(index, parentIdx);
+                }
+            }
+        });
+        return map;
+    }, [displayItems]);
+
+    const backgroundHeightsCacheRef = useRef<{
+        items: typeof displayItems;
+        heights: Record<number, number>;
+    }>({ items: displayItems, heights: {} });
+    const [backgroundHeights, setBackgroundHeights] = useState<Record<number, number>>({});
+    const reportBackgroundHeight = useCallback((displayIndex: number, height: number) => {
+        const cache = backgroundHeightsCacheRef.current.items === displayItems
+            ? backgroundHeightsCacheRef.current
+            : { items: displayItems, heights: {} };
+        backgroundHeightsCacheRef.current = cache;
+        if (cache.heights[displayIndex] === height) return;
+        cache.heights[displayIndex] = height;
+        setBackgroundHeights({ ...cache.heights });
+    }, [displayItems]);
+
+    const activeItem = displayItems[activeDisplayIndex];
+
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
         const rowHeight = getInterludeRowHeightPx();
@@ -129,8 +169,17 @@ function FluidLyricsPanel({
 
         displayItems.forEach((item, displayIndex) => {
             shifts[displayIndex] = shift;
-            if (item.type !== 'interlude') return;
-            if (!openInterludeIndices.has(displayIndex)) shift -= rowHeight;
+            if (item.type === 'interlude') {
+                if (!openInterludeIndices.has(displayIndex)) shift -= rowHeight;
+                return;
+            }
+            if (item.type === 'line' && item.line.role === 'background') {
+                // 布局模型中背景行高度为 0（不占位）；激活时撑开真实高度，
+                // 后续行下移补偿（间奏式出现：拉开距离 + 淡入）
+                if (activeIndices.has(displayIndex)) {
+                    shift += backgroundHeights[displayIndex] ?? 0;
+                }
+            }
         });
 
         openInterludeIndices.forEach(interludeIndex => {
@@ -140,8 +189,8 @@ function FluidLyricsPanel({
             }
         });
         return shifts;
-    }, [displayItems, exitingInterludeIndex, openInterludeIndex]);
-    const activeItem = displayItems[activeDisplayIndex];
+    }, [activeIndices, backgroundHeights, displayItems, exitingInterludeIndex, openInterludeIndex]);
+
     const {
         activeTargetScrollY,
         contentHeight,
@@ -280,6 +329,7 @@ function FluidLyricsPanel({
     );
     const registerAnimatedRow = useFluidLyricsAnimator({
         activeDisplayIndex,
+        activeIndices,
         getDelay: getMotionDelay,
         modelIdentity: displayItems,
         rowCount: displayItems.length,
@@ -289,6 +339,7 @@ function FluidLyricsPanel({
         isUserScrolling,
         pausedScroll,
         variant,
+        parentDisplayIndexMap,
     });
 
     return (
@@ -313,15 +364,15 @@ function FluidLyricsPanel({
                         {visibleIndices.map(displayIndex => {
                             const item = displayItems[displayIndex];
                             const interludeShift = visualInterludeShifts[displayIndex] ?? 0;
-                            const isActive = activeDisplayIndex >= 0 && activeItem === item;
+                            const isActive = activeIndices.has(displayIndex);
                             const isKaraokeActive = item.type === 'line' && item.line.words?.length
                                 ? isActive || (
                                     focusNextLineByVisualEnd &&
                                     typeof item.line.visual_end_ms === 'number' &&
-                                    typeof item.line.end_ms === 'number' &&
-                                    item.line.visual_end_ms < item.line.end_ms &&
+                                    typeof item.line.end_time_ms === 'number' &&
+                                    item.line.visual_end_ms < item.line.end_time_ms &&
                                     renderCurrentMs >= item.line.visual_end_ms &&
-                                    renderCurrentMs < item.line.end_ms
+                                    renderCurrentMs < item.line.end_time_ms
                                 )
                                 : isActive;
 
@@ -354,18 +405,32 @@ function FluidLyricsPanel({
                                             isKaraokeActive={isKaraokeActive}
                                             isUserScrolling={isUserScrolling}
                                             pausedScroll={pausedScroll}
-                                            distanceFromActive={activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0}
+                                            distanceFromActive={
+                                                activeDisplayIndex >= 0
+                                                    ? Math.abs(
+                                                        activeDisplayIndex -
+                                                        (parentDisplayIndexMap.get(displayIndex) ?? displayIndex)
+                                                    )
+                                                    : 0
+                                            }
                                             interludeShift={interludeShift}
                                             interludeShiftDurationMs={interludeGapOpenDurationMs}
-                                            lineEndMs={typeof item.line.end_ms === 'number' ? item.line.end_ms : getLineEndMsByIndex(lines, item.lineIndex)}
+                                            lineEndMs={typeof item.line.end_time_ms === 'number' ? item.line.end_time_ms : getLineEndMsByIndex(lines, item.lineIndex)}
                                             nextLineStartMs={item.line.words?.length ? getLineEndMsByIndex(lines, item.lineIndex) : null}
-                                            enableTightHandoffTailCompression={timingStrategy?.compressTightHandoffTail ?? false}
+                                            enableTightHandoffTailCompression={timingStrategy.compressTightHandoffTail}
                                             currentTime={renderCurrentMs / 1000}
                                             preciseMsRef={preciseMsRef}
                                             onSeek={handleLineSeek}
                                             fluidMotion
                                             motionDelay={getMotionDelay(displayIndex)}
                                             variant={variant}
+                                            isBackground={item.line.role === 'background'}
+                                            hasDuetLine={hasDuetLine}
+                                            onBackgroundHeight={
+                                                item.line.role === 'background'
+                                                    ? (height) => reportBackgroundHeight(displayIndex, height)
+                                                    : undefined
+                                            }
                                         />
                                     )}
                                 </FluidLyricsLayoutItem>
@@ -380,13 +445,12 @@ function FluidLyricsPanel({
 
 const areFluidLyricsPanelPropsEqual = (previous: LyricsPanelProps, next: LyricsPanelProps) => (
     previous.isOpen === next.isOpen &&
-    previous.lyrics === next.lyrics &&
+    previous.lyricsDocument === next.lyricsDocument &&
     previous.status === next.status &&
-    previous.hasTimestamps === next.hasTimestamps &&
     previous.onSeek === next.onSeek &&
     previous.onUserScrollDirection === next.onUserScrollDirection &&
     previous.variant === next.variant &&
-    previous.timingStrategy === next.timingStrategy
+    previous.playerEffectMode === next.playerEffectMode
 );
 
 // 播放时间由内部精确时钟订阅；父组件的进度刷新不应重新执行歌词布局。

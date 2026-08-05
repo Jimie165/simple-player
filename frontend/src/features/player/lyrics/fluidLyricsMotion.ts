@@ -44,6 +44,8 @@ export function getFluidLyricsRowVisualStyle({
     pausedScroll,
     variant,
 }: FluidLyricsRowVisualArgs): FluidLyricsRowVisualStyle {
+    // 激活行（含重叠双亮的非焦点行）不模糊、不透明减淡；
+    // 未激活行按距离模糊 + 降低不透明度。
     const blurPx = isActive
         ? 0
         : variant === 'narrow'
@@ -84,8 +86,8 @@ export function getFluidLyricsSpringParams({
         return { stiffness: 90, damping: 15, mass: 1 };
     }
 
-    const currentStartMs = currentItem.line.time_ms ?? 0;
-    const previousStartMs = previousItem.line.time_ms ?? 0;
+    const currentStartMs = currentItem.line.start_time_ms ?? 0;
+    const previousStartMs = previousItem.line.start_time_ms ?? 0;
     const clampedInterval = clamp(currentStartMs - previousStartMs, 100, 800);
     let speedRatio = 1 - (clampedInterval - 100) / 700;
     speedRatio = Math.pow(speedRatio, 0.2);
@@ -116,7 +118,7 @@ export function getFluidLyricsMotionDelay({
         focusNextLineByVisualEnd &&
         previousItem?.type === 'line' &&
         typeof previousItem.line.visual_end_ms === 'number' &&
-        (typeof previousItem.line.end_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_ms);
+        (typeof previousItem.line.end_time_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_time_ms);
     const visibleRowsAboveFocus = isVisualHandoff ? 2 : (variant === 'narrow' ? 3 : 4);
     let topVisibleIndex = activeDisplayIndex;
     let remainingRowsAboveFocus = visibleRowsAboveFocus;

@@ -35,12 +35,15 @@ export function parseLyricsWordsToChars(
 
     words.forEach((word, wordIndex) => {
         const nextStart = wordIndex + 1 < words.length
-            ? words[wordIndex + 1].time_ms
-            : lineEndMs ?? word.time_ms + 600;
+            ? words[wordIndex + 1].start_time_ms
+            : lineEndMs ?? word.start_time_ms + 600;
 
-        const calculatedDuration = word.duration_ms ?? Math.max(80, nextStart - word.time_ms);
+        const hasExplicitEnd = word.end_time_ms !== undefined;
+        const calculatedDuration = word.end_time_ms !== undefined
+            ? Math.max(80, word.end_time_ms - word.start_time_ms)
+            : Math.max(80, nextStart - word.start_time_ms);
         const isLastWord = wordIndex + 1 === words.length;
-        const durationMs = (isLastWord && word.duration_ms === undefined)
+        const durationMs = (isLastWord && !hasExplicitEnd)
             ? Math.min(800, calculatedDuration)
             : calculatedDuration;
 
@@ -51,20 +54,20 @@ export function parseLyricsWordsToChars(
         let activeCharIndex = 0;
         chars.forEach((char, charIndex) => {
             const isWhitespace = /^\s$/.test(char);
-            let charStart = word.time_ms;
+            let charStart = word.start_time_ms;
             let charDuration = 0;
             const activeCharIndexInWord = Math.max(0, activeCharIndex - (isWhitespace ? 1 : 0));
 
             if (nonSpaceCount === 0) {
                 charDuration = durationMs / chars.length;
-                charStart = word.time_ms + charIndex * charDuration;
+                charStart = word.start_time_ms + charIndex * charDuration;
             } else if (!isWhitespace) {
                 charDuration = durationMs / nonSpaceCount;
-                charStart = word.time_ms + activeCharIndex * charDuration;
+                charStart = word.start_time_ms + activeCharIndex * charDuration;
                 activeCharIndex++;
             } else {
                 charDuration = 0;
-                charStart = word.time_ms + activeCharIndex * (durationMs / nonSpaceCount);
+                charStart = word.start_time_ms + activeCharIndex * (durationMs / nonSpaceCount);
             }
 
             result.push({
@@ -72,7 +75,7 @@ export function parseLyricsWordsToChars(
                 time_ms: charStart,
                 durationMs: Math.max(20, charDuration),
                 nextStart: charStart + charDuration,
-                groupStartMs: word.time_ms,
+                groupStartMs: word.start_time_ms,
                 groupEndMs: nextStart,
                 groupDurationMs: durationMs,
                 wordIndex,

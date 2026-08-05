@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
-import type { SongMetadata, LyricsLine } from '@/types';
+import type { SongMetadata, LyricsDocument } from '@/types';
 import type { ViewState } from '@/store/useNavigationStore';
 import ApplePlayerControlsSection, {
     ApplePlayerNarrowBottomControls,
@@ -44,10 +44,9 @@ interface BaseLayoutProps {
     panelFlipTarget: SidePanel | null;
     isPanelFlipping: boolean;
     queueScrollToTopSignal: number;
-    lyrics: LyricsLine[] | null;
+    lyricsDocument: LyricsDocument | null;
     lyricsPath: string | null;
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
-    lyricsHasTimestamps: boolean;
     seek: (time: number) => void;
     handleToggleLyrics: () => void;
     handleToggleQueue: () => void;
@@ -83,10 +82,9 @@ export function AppleMusicNarrowPanelLayout({
     panelFlipTarget,
     isPanelFlipping,
     queueScrollToTopSignal,
-    lyrics,
+    lyricsDocument,
     lyricsPath,
     lyricsStatus,
-    lyricsHasTimestamps,
     seek,
     handleToggleLyrics,
     handleToggleQueue,
@@ -158,10 +156,9 @@ export function AppleMusicNarrowPanelLayout({
                             lyricsMounted={lyricsMounted}
                             panelFlipTarget={panelFlipTarget}
                             isPanelFlipping={isPanelFlipping}
-                            lyrics={lyrics}
+                            lyricsDocument={lyricsDocument}
                             lyricsPath={lyricsPath}
                             lyricsStatus={lyricsStatus}
-                            hasTimestamps={lyricsHasTimestamps}
                             onSeek={seek}
                             onUserScrollDirection={handleNarrowPanelScroll}
                             narrowControlsVisible={narrowControlsVisible}
@@ -251,10 +248,9 @@ export function AppleMusicStandardLayout({
     panelFlipTarget,
     isPanelFlipping,
     queueScrollToTopSignal,
-    lyrics,
+    lyricsDocument,
     lyricsPath,
     lyricsStatus,
-    lyricsHasTimestamps,
     seek,
     handleToggleLyrics,
     handleToggleQueue,
@@ -347,10 +343,9 @@ export function AppleMusicStandardLayout({
                 lyricsMounted={lyricsMounted}
                 panelFlipTarget={panelFlipTarget}
                 isPanelFlipping={isPanelFlipping}
-                lyrics={lyrics}
+                lyricsDocument={lyricsDocument}
                 lyricsPath={lyricsPath}
                 lyricsStatus={lyricsStatus}
-                hasTimestamps={lyricsHasTimestamps}
                 onSeek={seek}
             />
 

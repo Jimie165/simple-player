@@ -35,6 +35,7 @@ interface RowAnimationState {
 
 interface FluidLyricsAnimatorArgs {
     activeDisplayIndex: number;
+    activeIndices: Set<number>;
     getDelay: (displayIndex: number) => number;
     modelIdentity: object;
     rowCount: number;
@@ -44,10 +45,12 @@ interface FluidLyricsAnimatorArgs {
     isUserScrolling: boolean;
     pausedScroll: boolean;
     variant: 'side' | 'narrow';
+    parentDisplayIndexMap?: Map<number, number>;
 }
 
 interface LatestTargets {
     activeDisplayIndex: number;
+    activeIndices: Set<number>;
     getDelay: (displayIndex: number) => number;
     springParams: FluidSpringParams;
     targetScrollY: number;
@@ -55,18 +58,34 @@ interface LatestTargets {
     isUserScrolling: boolean;
     pausedScroll: boolean;
     variant: 'side' | 'narrow';
+    parentDisplayIndexMap?: Map<number, number>;
 }
 
-const getRowVisualStyle = (
+const getEffectiveIndex = (index: number, parentDisplayIndexMap?: Map<number, number>) =>
+    parentDisplayIndexMap?.get(index) ?? index;
+
+// 激活行判定与 getRowVisualStyle 一致：activeIndices 含重叠双亮的非焦点行，
+// 使重叠时两行都放大到 ACTIVE_SCALE，而不是只有焦点行放大
+const getScaleTarget = (
+    index: number,
+    activeIndices: Set<number>,
+    parentDisplayIndexMap?: Map<number, number>,
+) => (activeIndices.has(getEffectiveIndex(index, parentDisplayIndexMap)) ? ACTIVE_SCALE : INACTIVE_SCALE);
+
+export const getRowVisualStyle = (
     index: number,
     activeDisplayIndex: number,
+    activeIndices: Set<number>,
     isUserScrolling: boolean,
     pausedScroll: boolean,
     variant: 'side' | 'narrow',
     delay: number,
+    parentDisplayIndexMap?: Map<number, number>,
 ): FluidLyricsRowVisualStyle => {
-    const isActive = index === activeDisplayIndex;
-    const distance = activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - index) : 0;
+    const effectiveIndex = getEffectiveIndex(index, parentDisplayIndexMap);
+    // 激活行含重叠双亮的非焦点行：在 activeIndices 中的行不模糊、不透明减淡
+    const isActive = activeIndices.has(effectiveIndex);
+    const distance = activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - effectiveIndex) : 0;
     return getFluidLyricsRowVisualStyle({
         delay,
         distanceFromActive: distance,
@@ -89,7 +108,8 @@ class FluidLyricsAnimator {
         modelIdentity: object,
         rowCount: number,
         getTargetY: (index: number) => number,
-        activeDisplayIndex: number,
+        activeIndices: Set<number>,
+        parentDisplayIndexMap?: Map<number, number>,
     ) {
         if (this.modelIdentity !== modelIdentity) {
             this.resetRows();
@@ -97,7 +117,7 @@ class FluidLyricsAnimator {
         }
 
         for (let index = 0; index < rowCount; index++) {
-            this.ensureModel(index, getTargetY(index), index === activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE);
+            this.ensureModel(index, getTargetY(index), getScaleTarget(index, activeIndices, parentDisplayIndexMap));
         }
         this.rows.forEach((_state, index) => {
             if (index < rowCount) return;
@@ -159,17 +179,18 @@ class FluidLyricsAnimator {
 
     setMountedTargets(
         getTargetY: (index: number) => number,
-        activeDisplayIndex: number,
+        activeIndices: Set<number>,
         springParams: FluidSpringParams,
         getDelay: (index: number) => number,
         getRowVisual: (index: number, delay: number) => FluidLyricsRowVisualStyle,
+        parentDisplayIndexMap?: Map<number, number>,
     ) {
         this.mountedRows.forEach(index => {
             const delay = getDelay(index);
             this.setTarget(
                 index,
                 getTargetY(index),
-                index === activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
+                getScaleTarget(index, activeIndices, parentDisplayIndexMap),
                 springParams,
                 delay,
             );
@@ -199,7 +220,9 @@ class FluidLyricsAnimator {
         }
 
         state.translateY.setTarget(translateY, springParams, delay);
-        if (state.scaleElement) state.scale.setTarget(scale, SCALE_SPRING, delay);
+        // scale 是激活状态响应，不应受滚动牵拉延迟影响（重叠时 B 激活应立即放大，
+        // 与性能优先模式 CSS 无延迟一致）；否则要等 getDelay 耗尽才开始放大
+        if (state.scaleElement) state.scale.setTarget(scale, SCALE_SPRING, 0);
         else state.scale.setPosition(scale);
         if (state.translateY.isAnimating() || (state.scaleElement && state.scale.isAnimating())) {
             this.animatingRows.add(index);
@@ -316,6 +339,7 @@ class FluidLyricsAnimator {
 
 export function useFluidLyricsAnimator({
     activeDisplayIndex,
+    activeIndices,
     getDelay,
     modelIdentity,
     rowCount,
@@ -325,10 +349,12 @@ export function useFluidLyricsAnimator({
     isUserScrolling,
     pausedScroll,
     variant,
+    parentDisplayIndexMap,
 }: FluidLyricsAnimatorArgs) {
     const [animator] = useState(() => new FluidLyricsAnimator());
     const latestTargetsRef = useRef<LatestTargets>({
         activeDisplayIndex,
+        activeIndices,
         getDelay,
         springParams,
         targetScrollY,
@@ -336,10 +362,12 @@ export function useFluidLyricsAnimator({
         isUserScrolling,
         pausedScroll,
         variant,
+        parentDisplayIndexMap,
     });
     useInsertionEffect(() => {
         latestTargetsRef.current = {
             activeDisplayIndex,
+            activeIndices,
             getDelay,
             springParams,
             targetScrollY,
@@ -347,15 +375,17 @@ export function useFluidLyricsAnimator({
             isUserScrolling,
             pausedScroll,
             variant,
+            parentDisplayIndexMap,
         };
-    }, [activeDisplayIndex, getDelay, isUserScrolling, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
     useInsertionEffect(() => {
         const targets = latestTargetsRef.current;
         animator.syncModels(
             modelIdentity,
             rowCount,
             index => (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
-            targets.activeDisplayIndex,
+            targets.activeIndices,
+            targets.parentDisplayIndexMap,
         );
     }, [animator, modelIdentity, rowCount]);
     const registerAnimatedRow = useCallback((index: number, element: HTMLDivElement) => {
@@ -364,14 +394,16 @@ export function useFluidLyricsAnimator({
             index,
             element,
             (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
-            index === targets.activeDisplayIndex ? ACTIVE_SCALE : INACTIVE_SCALE,
+            getScaleTarget(index, targets.activeIndices, targets.parentDisplayIndexMap),
             getRowVisualStyle(
                 index,
                 targets.activeDisplayIndex,
+                targets.activeIndices,
                 targets.isUserScrolling,
                 targets.pausedScroll,
                 targets.variant,
                 targets.getDelay(index),
+                targets.parentDisplayIndexMap,
             ),
         );
     }, [animator]);
@@ -379,19 +411,22 @@ export function useFluidLyricsAnimator({
     useLayoutEffect(() => {
         animator.setMountedTargets(
             index => (visualShifts[index] ?? 0) - targetScrollY,
-            activeDisplayIndex,
+            activeIndices,
             springParams,
             getDelay,
             (index, delay) => getRowVisualStyle(
                 index,
                 activeDisplayIndex,
+                activeIndices,
                 isUserScrolling,
                 pausedScroll,
                 variant,
                 delay,
+                parentDisplayIndexMap,
             ),
+            parentDisplayIndexMap,
         );
-    }, [activeDisplayIndex, animator, getDelay, isUserScrolling, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

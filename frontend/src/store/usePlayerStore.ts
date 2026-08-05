@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LyricsData, LyricsLine, RepeatMode, SongMetadata } from '@/types/index';
+import type { LyricsDocument, RepeatMode, SongMetadata } from '@/types/index';
 import { audioService } from '@/services/audioService';
 
 // 1. 确保接口里定义了所有属性和方法
@@ -45,9 +45,7 @@ interface PlayerState {
     isLyricsOpen: boolean;
     toggleLyrics: () => void;
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
-    lyrics: LyricsLine[] | null;
-    lyricsHasTimestamps: boolean;
-    currentLyricsIndex: number;
+    lyricsDocument: LyricsDocument | null;
     lyricsRequestId: number;
     lyricsPath: string | null;
     requestLyricsForPath: (path?: string) => Promise<void>;
@@ -67,36 +65,6 @@ interface PlayerState {
     playPreviousVideo: () => void;
 }
 
-const sanitizeLyricsLines = (data: LyricsData | null): LyricsLine[] | null => {
-    if (!data?.lines?.length) return null;
-    if (!data.has_timestamps) {
-        const lines = data.lines.map((line) => ({
-            time_ms: null,
-            text: line.text,
-            translation: null,
-            words: null,
-            end_ms: null,
-        }));
-        return lines.some((line) => line.text.trim().length > 0) ? lines : null;
-    }
-    const lines = data.lines
-        .map((line) => {
-            const translation = line.translation ? line.translation.trim() : '';
-            return {
-                time_ms: line.time_ms ?? null,
-                text: line.text.trim(),
-                translation: translation.length > 0 ? translation : null,
-                words: line.words && line.words.length > 0 ? line.words : null,
-                end_ms: typeof line.end_ms === 'number' ? line.end_ms : null,
-            };
-        })
-        // Keep timed entries even when their text is empty — those serve as
-        // explicit interlude markers. Drop only fully empty untimed lines.
-        .filter((line) => line.text.length > 0 || typeof line.time_ms === 'number');
-
-    return lines.length > 0 ? lines : null;
-};
-
 export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     // --- 初始状态 ---
     isPlaying: false,
@@ -111,9 +79,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     isQueueOpen: false,
     isLyricsOpen: false,
     lyricsStatus: 'idle',
-    lyrics: null,
-    lyricsHasTimestamps: false,
-    currentLyricsIndex: 0,
+    lyricsDocument: null,
     lyricsRequestId: 0,
     lyricsPath: null,
     isVideoMode: false,
@@ -250,37 +216,29 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
             lyricsRequestId: requestId,
             lyricsPath: path ?? null,
             lyricsStatus: path ? 'loading' : 'empty',
-            lyrics: null,
-            lyricsHasTimestamps: false,
-            currentLyricsIndex: 0,
+            lyricsDocument: null,
         });
 
         if (!path) return;
 
         try {
-            const data = await audioService.getLyrics(path);
+            const document = await audioService.getLyrics(path);
             const currentState = get();
             if (
                 currentState.lyricsRequestId !== requestId ||
                 currentState.metadata?.path !== path
             ) return;
 
-            const lines = sanitizeLyricsLines(data);
-            if (!lines) {
-                set({ lyricsStatus: 'empty', lyrics: null, lyricsHasTimestamps: false });
+            if (!document.lines.length) {
+                set({ lyricsStatus: 'empty', lyricsDocument: null });
                 return;
             }
 
-            set({
-                lyricsStatus: 'ready',
-                lyrics: lines,
-                lyricsHasTimestamps: Boolean(data.has_timestamps),
-                currentLyricsIndex: 0
-            });
+            set({ lyricsStatus: 'ready', lyricsDocument: document });
         } catch (error) {
             console.error('Failed to load lyrics', error);
             if (get().lyricsRequestId !== requestId) return;
-            set({ lyricsStatus: 'error', lyrics: null, lyricsHasTimestamps: false });
+            set({ lyricsStatus: 'error', lyricsDocument: null });
         }
     },
 
@@ -288,8 +246,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         set({
             lyricsPath: null,
             lyricsStatus: 'idle',
-            lyrics: null,
-            lyricsHasTimestamps: false,
+            lyricsDocument: null,
         });
         await get().requestLyricsForPath(path);
     },

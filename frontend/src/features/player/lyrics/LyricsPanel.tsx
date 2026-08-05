@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
-import { useLyricsSync } from '@/hooks/useLyricsSync';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import {
     interludeExitCollapseDelayMs,
@@ -16,9 +15,10 @@ import { getInterludeFocusOffsetPx, getInterludeRowHeightPx } from '@/features/p
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import {
     buildDisplayItems,
-    getActiveDisplayIndex,
+    getActiveLyricsState,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
+import { performanceLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
@@ -41,24 +41,21 @@ const NARROW_LYRICS_END_STOP_OFFSET = 56;
 
 export default function LyricsPanel({
     isOpen,
-    lyrics,
+    lyricsDocument,
     status,
-    hasTimestamps,
     currentTime,
     onSeek,
     onUserScrollDirection,
     variant,
-    timingStrategy,
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    const lines = useMemo(() => lyrics ?? [], [lyrics]);
+    const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
+    const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
+    const isTtml = lyricsDocument?.origin === 'native-ttml';
+    // TTML 与 LRC 共用同一套切换/加速/淡出参数
+    const timingStrategy = performanceLyricsTimingStrategy;
+    const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
     const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
-    const currentLyricIndex = useLyricsSync({
-        lyrics: lines,
-        currentTime: renderCurrentMs / 1000,
-        enabled: isOpen,
-        hasTimestamps,
-    });
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const [topSpacerHeight, setTopSpacerHeight] = useState(0);
@@ -179,20 +176,54 @@ export default function LyricsPanel({
         return null;
     }, [status, lines.length]);
 
-    const enableTightHandoffTailCompression = timingStrategy?.compressTightHandoffTail ?? false;
-    const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
+    const enableTightHandoffTailCompression = timingStrategy.compressTightHandoffTail;
+    const focusNextLineByVisualEnd = timingStrategy.focusNextLineByVisualEnd;
     const displayItems = useMemo(
         () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
         [hasTimestamps, lines, timingStrategy]
     );
-    const activeDisplayIndex = useMemo(
-        () => getActiveDisplayIndex(displayItems, lines, currentLyricIndex, renderCurrentMs / 1000, timingStrategy),
-        [currentLyricIndex, displayItems, lines, renderCurrentMs, timingStrategy]
+    const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
+        () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
+        [displayItems, lines, renderCurrentMs, timingStrategy, isTtml]
     );
 
     useEffect(() => {
         exitingInterludeIndexRef.current = exitingInterludeIndex;
     }, [exitingInterludeIndex]);
+
+    const parentDisplayIndexMap = useMemo(() => {
+        const map = new Map<number, number>();
+        const lineIdToDisplayIndex = new Map<string, number>();
+        displayItems.forEach((item, index) => {
+            if (item.type === 'line' && item.line.id) {
+                lineIdToDisplayIndex.set(item.line.id, index);
+            }
+        });
+        displayItems.forEach((item, index) => {
+            if (item.type === 'line' && item.line.role === 'background' && item.line.parent_id) {
+                const parentIdx = lineIdToDisplayIndex.get(item.line.parent_id);
+                if (parentIdx !== undefined) {
+                    map.set(index, parentIdx);
+                }
+            }
+        });
+        return map;
+    }, [displayItems]);
+
+    const backgroundHeightsCacheRef = useRef<{
+        items: typeof displayItems;
+        heights: Record<number, number>;
+    }>({ items: displayItems, heights: {} });
+    const [backgroundHeights, setBackgroundHeights] = useState<Record<number, number>>({});
+    const reportBackgroundHeight = useCallback((displayIndex: number, height: number) => {
+        const cache = backgroundHeightsCacheRef.current.items === displayItems
+            ? backgroundHeightsCacheRef.current
+            : { items: displayItems, heights: {} };
+        backgroundHeightsCacheRef.current = cache;
+        if (cache.heights[displayIndex] === height) return;
+        cache.heights[displayIndex] = height;
+        setBackgroundHeights({ ...cache.heights });
+    }, [displayItems]);
 
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
@@ -201,17 +232,22 @@ export default function LyricsPanel({
 
         displayItems.forEach((item, displayIndex) => {
             shifts[displayIndex] = shift;
-            if (item.type !== 'interlude') return;
-
-            const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
-            const isOpen =
-                displayIndex === exitingInterludeIndex ||
-                (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
-            if (!isOpen) shift -= rowHeight;
+            if (item.type === 'interlude') {
+                const closeAtMs = item.endMs - interludeNextLineFocusLeadMs;
+                const isOpen =
+                    displayIndex === exitingInterludeIndex ||
+                    (renderCurrentMs >= item.startMs && renderCurrentMs < closeAtMs);
+                if (!isOpen) shift -= rowHeight;
+                return;
+            }
+            if (item.type === 'line' && item.line.role === 'background') {
+                // 背景行未激活：后续行上移其高度补偿（间奏式折叠，不占位）
+                if (!activeIndices.has(displayIndex)) shift -= backgroundHeights[displayIndex] ?? 0;
+            }
         });
 
         return shifts;
-    }, [displayItems, exitingInterludeIndex, renderCurrentMs]);
+    }, [activeIndices, backgroundHeights, displayItems, exitingInterludeIndex, renderCurrentMs]);
     const getVisualInterludeShift = useCallback(
         (displayIndex: number) => visualInterludeShifts[displayIndex] ?? 0,
         [visualInterludeShifts]
@@ -397,15 +433,15 @@ export default function LyricsPanel({
                         increaseViewportBy={{ top: 520, bottom: 520 }}
                         itemContent={(displayIndex, item) => {
                             const interludeShift = getVisualInterludeShift(displayIndex);
-                            const isActive = activeDisplayIndex >= 0 && displayItems[activeDisplayIndex] === item;
+                            const isActive = activeIndices.has(displayIndex);
                             const isKaraokeActive = item.type === 'line' && item.line.words?.length
                                 ? isActive || (
                                     focusNextLineByVisualEnd &&
                                     typeof item.line.visual_end_ms === 'number' &&
-                                    typeof item.line.end_ms === 'number' &&
-                                    item.line.visual_end_ms < item.line.end_ms &&
+                                    typeof item.line.end_time_ms === 'number' &&
+                                    item.line.visual_end_ms < item.line.end_time_ms &&
                                     renderCurrentMs >= item.line.visual_end_ms &&
-                                    renderCurrentMs < item.line.end_ms
+                                    renderCurrentMs < item.line.end_time_ms
                                 )
                                 : isActive;
 
@@ -441,13 +477,18 @@ export default function LyricsPanel({
                                     isUserScrolling={isUserScrolling}
                                     pausedScroll={pausedScrollRef.current}
                                     distanceFromActive={
-                                        activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - displayIndex) : 0
+                                        activeDisplayIndex >= 0
+                                            ? Math.abs(
+                                                activeDisplayIndex -
+                                                (parentDisplayIndexMap.get(displayIndex) ?? displayIndex)
+                                            )
+                                            : 0
                                     }
                                     interludeShift={interludeShift}
                                     interludeShiftDurationMs={interludeGapOpenDurationMs}
                                     lineEndMs={
-                                        typeof item.line.end_ms === 'number'
-                                            ? item.line.end_ms
+                                        typeof item.line.end_time_ms === 'number'
+                                            ? item.line.end_time_ms
                                             : getLineEndMsByIndex(lines, item.lineIndex)
                                     }
                                     nextLineStartMs={
@@ -460,6 +501,13 @@ export default function LyricsPanel({
                                     preciseMsRef={preciseMsRef}
                                     onSeek={handleLineSeek}
                                     variant={variant}
+                                    isBackground={item.line.role === 'background'}
+                                    hasDuetLine={hasDuetLine}
+                                    onBackgroundHeight={
+                                        item.line.role === 'background'
+                                            ? (height) => reportBackgroundHeight(displayIndex, height)
+                                            : undefined
+                                    }
                                 />
                             );
                         }}

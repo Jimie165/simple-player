@@ -5,11 +5,7 @@ import { useTheme } from '@/hooks/useTheme';
 import FluidLyricsPanel from '@/features/player/lyrics/FluidLyricsPanel';
 import LyricsPanel from '@/features/player/lyrics/LyricsPanel';
 import PlainLyricsPanel from '@/features/player/lyrics/PlainLyricsPanel';
-import {
-    animationLyricsTimingStrategy,
-    performanceLyricsTimingStrategy,
-} from '@/features/player/lyrics/timingStrategy';
-import type { LyricsLine } from '@/types';
+import type { LyricsDocument } from '@/types';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 
@@ -19,10 +15,9 @@ interface ApplePlayerLyricsPanelProps {
     lyricsMounted: boolean;
     panelFlipTarget: 'queue' | 'lyrics' | null;
     isPanelFlipping: boolean;
-    lyrics: LyricsLine[] | null;
+    lyricsDocument: LyricsDocument | null;
     lyricsPath: string | null;
     lyricsStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
-    hasTimestamps: boolean;
     onSeek: (time: number) => void;
     onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
     narrowControlsVisible?: boolean;
@@ -34,15 +29,15 @@ export default function ApplePlayerLyricsPanel({
     lyricsMounted,
     panelFlipTarget,
     isPanelFlipping,
-    lyrics,
+    lyricsDocument,
     lyricsPath,
     lyricsStatus,
-    hasTimestamps,
     onSeek,
     onUserScrollDirection,
     narrowControlsVisible = true,
 }: ApplePlayerLyricsPanelProps) {
     const { playerEffectMode } = useTheme();
+    const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
     const isFlippingIn = panelFlipTarget === 'lyrics' && isPanelFlipping && isLyricsOpen;
     const isFlippingOut = panelFlipTarget === 'queue' && isPanelFlipping;
     const isVisible = isLyricsOpen && !isFlippingOut;
@@ -102,33 +97,33 @@ export default function ApplePlayerLyricsPanel({
                     {lyricsMounted && (
                         !hasTimestamps ? (
                             <PlainLyricsPanel
-                                lyrics={lyrics}
+                                lyricsDocument={lyricsDocument}
                                 status={lyricsStatus}
                             />
                         ) : playerEffectMode === 'animation' ? (
                             <FluidLyricsPanel
                                 key={`fluid-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
-                                lyrics={lyrics}
+                                lyricsDocument={lyricsDocument}
                                 status={lyricsStatus}
-                                hasTimestamps={hasTimestamps}
+                                playerEffectMode={playerEffectMode}
                                 currentTime={usePlayerStore.getState().currentTime}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
-                                timingStrategy={animationLyricsTimingStrategy}
+                                narrowControlsVisible={narrowControlsVisible}
                             />
                         ) : (
                             <SyncedPerformanceLyricsPanel
                                 key={`virtual-${lyricsPath ?? 'empty'}`}
                                 isOpen={isLyricsOpen}
-                                lyrics={lyrics}
+                                lyricsDocument={lyricsDocument}
                                 status={lyricsStatus}
-                                hasTimestamps={hasTimestamps}
+                                playerEffectMode={playerEffectMode}
                                 onSeek={onSeek}
                                 onUserScrollDirection={onUserScrollDirection}
                                 variant={variant}
-                                timingStrategy={performanceLyricsTimingStrategy}
+                                narrowControlsVisible={narrowControlsVisible}
                             />
                         )
                     )}

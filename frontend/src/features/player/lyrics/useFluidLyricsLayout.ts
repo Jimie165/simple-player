@@ -73,7 +73,11 @@ export function useFluidLyricsLayout({
         let cursor = topSpacerHeight + topInsetPx;
 
         displayItems.forEach((item, index) => {
-            const estimatedHeight = item.type === 'interlude' ? interludeRowHeight : DEFAULT_LINE_HEIGHT_PX;
+            const estimatedHeight = item.type === 'interlude'
+                ? interludeRowHeight
+                : item.type === 'line' && item.line.role === 'background'
+                    ? 0
+                    : DEFAULT_LINE_HEIGHT_PX;
             const height = measuredHeights.get(index) ?? estimatedHeight;
             itemTops[index] = cursor;
             itemHeights[index] = height;
@@ -155,11 +159,20 @@ export function useFluidLyricsLayout({
 
     const measureItems = useCallback((updates: ReadonlyMap<number, number>) => {
         if (updates.size === 0) return;
+        // 背景行在布局模型中恒为 0 高度（间奏式折叠，不占位），
+        // 激活时的撑开由面板的 visualShifts 处理，因此忽略其测量。
+        const filteredUpdates = new Map<number, number>();
+        updates.forEach((height, index) => {
+            const item = displayItems[index];
+            if (item?.type === 'line' && item.line.role === 'background') return;
+            if (height > 0) filteredUpdates.set(index, height);
+        });
+        if (filteredUpdates.size === 0) return;
         const cache = heightCacheRef.current.items === displayItems
             ? heightCacheRef.current
             : { items: displayItems, heights: new Map<number, number>() };
         heightCacheRef.current = cache;
-        updates.forEach((height, index) => {
+        filteredUpdates.forEach((height, index) => {
             if (height > 0) cache.heights.set(index, height);
         });
         setMeasurements(previous => {
@@ -168,7 +181,7 @@ export function useFluidLyricsLayout({
                 : new Map<number, number>();
             const nextHeights = new Map(previousHeights);
             let changed = previous.items !== displayItems;
-            updates.forEach((height, index) => {
+            filteredUpdates.forEach((height, index) => {
                 if (height <= 0 || nextHeights.get(index) === height) return;
                 nextHeights.set(index, height);
                 changed = true;

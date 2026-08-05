@@ -134,13 +134,13 @@ export function tokenizeInlineSquare(stamps: InlineSquareStamp[], text: string):
             if (i === stamps.length - 1) endMs = stamps[i].ms;
             if (words.length > 0) {
                 const prevWord = words[words.length - 1];
-                if (prevWord.duration_ms === undefined) {
-                    prevWord.duration_ms = stamps[i].ms - prevWord.time_ms;
+                if (prevWord.end_time_ms === undefined) {
+                    prevWord.end_time_ms = stamps[i].ms;
                 }
             }
             continue;
         }
-        words.push({ time_ms: stamps[i].ms, text: segText });
+        words.push({ start_time_ms: stamps[i].ms, text: segText });
     }
 
     if (words.length === 0) return null;

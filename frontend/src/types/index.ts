@@ -40,30 +40,78 @@ export interface SongMetadata {
     channels?: number;
 }
 
+// ===== 统一歌词模型（TTML 风格规范化） =====
+
+// 歌词来源
+export type LyricsOrigin = 'native-ttml' | 'lrc' | 'sylt' | 'plain';
+
+// 时间模式
+export type LyricsTimingMode = 'none' | 'line' | 'word';
+
+// 行角色
+export type LyricsLineRole = 'main' | 'background' | 'timing-marker';
+
+// 单个词/字的起止时间
+// end_time_ms 可选：缺失 ⇔ 隐式词尾（LRC 无行尾显式戳），由视觉层按旧规则推导
 export interface LyricsWord {
-    time_ms: number;
+    start_time_ms: number;
+    end_time_ms?: number;
     text: string;
-    duration_ms?: number;
 }
 
+// 一行歌词（主唱/背景人声/时间标记）
 export interface LyricsLine {
+    id: string;
+    parent_id?: string | null;
+    role: LyricsLineRole;
+    start_time_ms: number | null;
+    end_time_ms: number | null;
+    text: string;
+    words: LyricsWord[];
+    translation?: string | null;
+    romanization?: string | null;
+    agent_id?: string | null;
+    is_duet?: boolean;
+    section?: string | null;
+    backgroundLine?: LyricsLine | null;
+}
+
+// 演唱者
+export interface LyricsAgent {
+    id: string;
+    type?: string | null;
+    name?: string | null;
+}
+
+// 歌词元数据
+export interface LyricsMetadata {
+    language?: string | null;
+    songwriters?: string[] | null;
+    agents?: LyricsAgent[] | null;
+    duration_ms?: number | null;
+}
+
+// 统一歌词文档。所有来源（TTML/LRC/SYLT/纯文本）都转换为该模型。
+export interface LyricsDocument {
+    model: 'ttml';
+    origin: LyricsOrigin;
+    timing_mode: LyricsTimingMode;
+    lines: LyricsLine[];
+    metadata: LyricsMetadata;
+    offset_ms: number;
+}
+
+// 后端 get_lyrics 返回的带时间行（SYLT 或数据库歌词）
+export interface BackendTimedLyricsLine {
     time_ms: number | null;
     text: string;
     translation?: string | null;
-    words?: LyricsWord[] | null;
-    // Explicit line-end time, e.g. from a trailing <mm:ss.xx> tag in
-    // enhanced LRC. Used to mark exactly when the previous lyric stops
-    // sounding so interlude dots can appear right after the last word.
-    end_ms?: number | null;
-    // Display-only end time after minimum necessary tail compression.
-    // Used only for word-timed lyrics so plain line LRC is untouched.
-    visual_end_ms?: number | null;
 }
 
-export interface LyricsData {
-    lines: LyricsLine[];
+export interface BackendLyricsData {
+    lines: BackendTimedLyricsLine[];
     has_timestamps: boolean;
-    offset_ms?: number;
+    offset_ms: number;
 }
 
 // 库文件夹

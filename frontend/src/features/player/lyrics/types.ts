@@ -1,19 +1,20 @@
-import type { LyricsLine } from '@/types';
-import type { LyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
+import type { LyricsDocument, LyricsLine } from '@/types';
+import type { PlayerEffectMode } from '@/store/useThemeStore';
 
 export interface LyricsPanelProps {
     isOpen: boolean;
-    lyrics: LyricsLine[] | null;
+    lyricsDocument: LyricsDocument | null;
     status: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
-    hasTimestamps: boolean;
+    playerEffectMode: PlayerEffectMode;
     currentTime: number;
     onSeek: (time: number) => void;
     onUserScrollDirection?: (direction: 'up' | 'down', delta?: number) => void;
     variant?: 'side' | 'narrow';
     narrowControlsVisible?: boolean;
-    timingStrategy?: LyricsTimingStrategy;
 }
 
+export type DisplayLine = LyricsLine & { visual_end_ms: number | null };
+
 export type DisplayItem =
-    | { type: 'line'; line: LyricsLine; lineIndex: number }
+    | { type: 'line'; line: DisplayLine; lineIndex: number }
     | { type: 'interlude'; afterLineIndex: number; startMs: number; endMs: number };

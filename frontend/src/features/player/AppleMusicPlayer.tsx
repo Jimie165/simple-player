@@ -41,9 +41,8 @@ export default function AppleMusicPlayer({
     const setVolume = usePlayerStore(state => state.setVolume);
     const isQueueOpen = usePlayerStore(state => state.isQueueOpen);
     const isLyricsOpen = usePlayerStore(state => state.isLyricsOpen);
-    const lyrics = usePlayerStore(state => state.lyrics);
+    const lyricsDocument = usePlayerStore(state => state.lyricsDocument);
     const lyricsStatus = usePlayerStore(state => state.lyricsStatus);
-    const lyricsHasTimestamps = usePlayerStore(state => state.lyricsHasTimestamps);
     const lyricsPath = usePlayerStore(state => state.lyricsPath);
     const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
     const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
@@ -200,10 +199,9 @@ export default function AppleMusicPlayer({
         panelFlipTarget,
         isPanelFlipping,
         queueScrollToTopSignal,
-        lyrics,
+        lyricsDocument,
         lyricsPath,
         lyricsStatus,
-        lyricsHasTimestamps,
         seek,
         handleToggleLyrics,
         handleToggleQueue,

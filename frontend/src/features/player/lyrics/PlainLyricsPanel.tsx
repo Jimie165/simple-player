@@ -1,18 +1,18 @@
-import type { LyricsLine } from '@/types';
+import type { LyricsDocument } from '@/types';
 
 interface PlainLyricsPanelProps {
-    lyrics: LyricsLine[] | null;
+    lyricsDocument: LyricsDocument | null;
     status: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
 }
 
-export default function PlainLyricsPanel({ lyrics, status }: PlainLyricsPanelProps) {
+export default function PlainLyricsPanel({ lyricsDocument, status }: PlainLyricsPanelProps) {
     const displayState = status === 'loading'
         ? '正在加载歌词...'
         : status === 'error'
             ? '歌词读取失败'
             : status === 'empty'
                 ? '此歌曲无歌词'
-                : !lyrics?.length
+                : !lyricsDocument?.lines.length
                     ? '暂无歌词'
                     : null;
 
@@ -20,7 +20,7 @@ export default function PlainLyricsPanel({ lyrics, status }: PlainLyricsPanelPro
         return <div className="flex h-full items-center justify-center text-sm text-white/40">{displayState}</div>;
     }
 
-    const displayLines = (lyrics ?? []).flatMap((line) =>
+    const displayLines = (lyricsDocument?.lines ?? []).flatMap((line) =>
         line.text.replace(/\r\n?/g, '\n').split('\n')
     );
 

@@ -1,40 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir, appCacheDir } from '@tauri-apps/api/path';
-import type { LyricsData, SongMetadata } from '@/types';
-import { enrichLyricsLines, parseLrcStrings } from '@/utils/lyricsParser';
-
-// Fallback / post-processing for lyrics returned from the backend.
-//   - Pre-timed (ID3 SYLT etc.): run translation enrichment only.
-//   - Raw LRC text without timestamps yet: run the full LRC parser.
-function tryParseLrc(data: LyricsData): LyricsData {
-    if (data.has_timestamps) {
-        return {
-            ...data,
-            lines: enrichLyricsLines(data.lines),
-            has_timestamps: true,
-        };
-    }
-    const parsed = parseLrcStrings(data.lines);
-    return parsed.has_timestamps ? { ...parsed, offset_ms: data.offset_ms } : data;
-}
-
-function applyLyricsOffset(data: LyricsData): LyricsData {
-    const offsetMs = data.offset_ms ?? 0;
-    if (!data.has_timestamps || offsetMs === 0) return data;
-
-    return {
-        ...data,
-        lines: data.lines.map(line => ({
-            ...line,
-            time_ms: typeof line.time_ms === 'number' ? line.time_ms + offsetMs : null,
-            end_ms: typeof line.end_ms === 'number' ? line.end_ms + offsetMs : line.end_ms,
-            words: line.words?.map(word => ({
-                ...word,
-                time_ms: word.time_ms + offsetMs,
-            })) ?? line.words,
-        })),
-    };
-}
+import type { BackendLyricsData, LyricsDocument, SongMetadata } from '@/types';
+import { parseLyrics } from '@/utils/lyrics/parseLyrics';
 
 let cachedAppDataDir: string | null = null;
 let cachedAppCacheDir: string | null = null;
@@ -114,10 +81,15 @@ export const audioService = {
     // 获取当前播放进度 (秒)
     getCurrentTime: async (): Promise<number> => invoke('get_audio_position'),
 
-    // 获取歌词 (嵌入歌词)
-    getLyrics: async (path: string): Promise<LyricsData> => {
-        const data: LyricsData = await invoke('get_lyrics', { path });
-        return applyLyricsOffset(tryParseLrc(data));
+    // 获取歌词 (嵌入歌词)。后端已解析（SYLT）时 lines 为带时间戳行，
+    // 未解析时 lines 为原始文本行，拼接回文本后由统一解析器做 LRC 检测。
+    getLyrics: async (path: string): Promise<LyricsDocument> => {
+        const data: BackendLyricsData = await invoke('get_lyrics', { path });
+        if (!data.has_timestamps && data.lines.length > 0) {
+            const rawText = data.lines.map(line => line.text).join('\n');
+            return parseLyrics({ rawText, sourcePath: path, offsetMs: data.offset_ms });
+        }
+        return parseLyrics({ timedLines: data.lines, sourcePath: path, offsetMs: data.offset_ms });
     },
 
     getRawLyrics: async (path: string): Promise<string | null> => {
