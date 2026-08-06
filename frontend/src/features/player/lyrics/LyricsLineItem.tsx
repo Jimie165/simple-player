@@ -95,9 +95,10 @@ function LyricsLineItem({
         if (line.start_time_ms === null) return;
         onSeek(line.start_time_ms / 1000);
     };
-    // 背景和声小字：主行 70% 字号 + 固定 0.4 透明度
+    // 背景和声：主行 70% 字号；字符颜色由 KaraokeText 的 --kb/--kfa 统一为 0.3，
+    // 此处 text-white/30 仅作继承兜底（无词时被 inline color 覆盖）
     const mainTextClass = isBackground
-        ? 'text-[clamp(1.24rem,3.32vmin,2.3rem)] text-white/40'
+        ? 'text-[clamp(1.24rem,3.32vmin,2.3rem)] text-white/30'
         : 'text-[clamp(1.76rem,4.73vmin,3.26rem)]';
     const translationTextClass = isBackground
         ? 'text-[clamp(0.9rem,2.4vmin,1.62rem)]'
@@ -172,9 +173,6 @@ function LyricsLineItem({
             }}
         >
             <span
-                style={!shouldRenderKaraoke ? {
-                    transitionDelay: `${motionDelay}s`,
-                } : undefined}
                 className={clsx(
                     'block font-bold leading-[1.38] tracking-wide relative',
                     mainTextClass,
@@ -187,11 +185,16 @@ function LyricsLineItem({
                         : isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
                             : 'transition-all duration-500 ease-in-out',
-                    // 背景行透明度已由 bgTextActive/bgTextInactive 控制，无需重复设置
+                    // 背景行虽然整体有容器透明度控制，但纯文本 fallback 需保持偏暗（text-white/30）以匹配 KaraokeText 的 --kb
                     isBackground
                         ? undefined
                         : (isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75')
                 )}
+                style={{
+                    ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
+                    // 强制给回退的纯文本应用 0.3 的透明度，以匹配 KaraokeText 内部的 --kb，防止闪烁
+                    color: (isBackground && !shouldRenderKaraoke) ? 'rgba(255,255,255,0.3)' : undefined,
+                }}
             >
                 {shouldRenderKaraoke ? (
                     <KaraokeText
@@ -204,7 +207,7 @@ function LyricsLineItem({
                         isActive={isKaraokeActive}
                         isFocused={isActive}
                         glowDisabled={isBackground}
-                        fillAlpha={isBackground ? 0.65 : 1}
+                        fillAlpha={isBackground ? 0.3 : 1}
                     />
                 ) : (
                     line.text
@@ -224,10 +227,10 @@ function LyricsLineItem({
                             : 'transition-all duration-300',
                         isActive
                             ? isBackground
-                                ? 'text-white/40'
+                                ? 'text-white/20'
                                 : 'text-white/65 opacity-95 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'
                             : isBackground
-                                ? 'text-white/40'
+                                ? 'text-white/20'
                                 : 'text-white/32 opacity-80'
                     )}
                 >

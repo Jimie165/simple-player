@@ -42,6 +42,20 @@
   --color-glass-border: var(--glass-border);
 }
 
+@property --kf {
+  /* 初始值为负：未播放字符默认不填充（::before 蒙版全透明），
+     避免激活时为所有未来字符逐字写 --kf */
+  syntax: '<number>';
+  inherits: true;
+  initial-value: -100;
+}
+
+@property --kg {
+  syntax: '<number>';
+  inherits: false;
+  initial-value: 0;
+}
+
 :root {
   /* Default Primary Fallback (Blue) - will be overridden by JS */
   --md-sys-color-primary: #005AC1;
@@ -404,25 +418,54 @@ body {
   }
 }
 
-@keyframes karaoke-char-exit {
-  from {
-    transform:
-      translate3d(
-        var(--karaoke-char-exit-x, 0),
-        var(--karaoke-char-exit-y, 0),
-        0
-      )
-      scale(var(--karaoke-char-exit-scale, 1));
-    text-shadow: var(
-      --karaoke-char-exit-shadow,
-      0 0 5px rgba(255,255,255,0)
-    );
-  }
+/* ── Karaoke dual-layer character ── */
+.karaoke-char {
+  position: relative;
+  display: inline-block;
+  white-space: pre-wrap;
+  transform-origin: center;
+  transition: none;
+  overflow: visible;
+  color: rgba(255, 255, 255, var(--kb, 0.30));
+  text-shadow: 0 0 5px rgba(255, 255, 255, var(--kg, 0));
+  
+  /* 防止溢出排版盒的字符（如 j, g 等连笔部分）被遮罩切断。
+     通过负 margin 保持布局不变，同时放大 padding box 给 mask 留出空间 */
+  padding: 0.1em;
+  margin: -0.1em;
+}
 
-  to {
-    transform: translate3d(0, 0, 0) scale(1);
-    text-shadow: 0 0 5px rgba(255,255,255,0);
-  }
+/* 行失焦退出：由行级 class 统一触发，整行字符只靠移除 inline transform/--kg
+   走一次 transition，不再为每字创建 CSS 动画 */
+.karaoke-char-exiting {
+  transition:
+    transform 250ms ease-in-out,
+    --kg 250ms ease-in-out;
+}
+
+.karaoke-char::before {
+  content: attr(data-c);
+  position: absolute;
+  inset: 0;
+  padding: inherit;
+  pointer-events: none;
+  color: rgba(255, 255, 255, var(--kfa, 1));
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    transparent 100%
+  );
 }
 
 .lyrics-motion-row,
