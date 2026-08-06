@@ -56,11 +56,11 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
         });
     };
 
-    const handleSelectLrc = async () => {
+    const handleSelectLyrics = async () => {
         try {
             const selected = await open({
                 multiple: false,
-                filters: [{ name: 'LRC Lyrics', extensions: ['lrc', 'txt'] }],
+                filters: [{ name: '歌词文件', extensions: ['lrc', 'ttml', 'txt'] }],
             });
             const lyricsPath = getSelectedPath(selected);
             if (!lyricsPath) return;
@@ -107,14 +107,14 @@ export default function SongLyricsFields({ songPath, values, onChange, onError }
                     <span className="text-[15px] text-neutral-900 dark:text-neutral-100">自定义歌词</span>
                 </button>
 
-                <div className={customEnabled ? 'invisible' : ''}>
+                <div>
                     <button
                         type="button"
-                        onClick={handleSelectLrc}
+                        onClick={handleSelectLyrics}
                         className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
                     >
                         <MdAttachFile className="text-lg" />
-                        选择 LRC
+                        选择歌词
                     </button>
                 </div>
             </div>

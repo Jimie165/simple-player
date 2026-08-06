@@ -520,6 +520,19 @@ export function getLineEndMsByIndex(lines: LyricsLine[], lineIndex: number): num
                 nextTimeMs = lines[index].start_time_ms;
             }
         }
+
+        // TTML 的多演唱者行可能按 agent 分组写入，源码顺序不一定等于播放顺序。
+        // 主行的“下一行”必须按实际开始时间计算，否则倒序行会把词尾压缩到已经
+        // 开始过的另一声部。非主行仍保留上面的源码顺序回退（供 timing marker 使用）。
+        const timedMainLines = lines
+            .map((line, index) => ({ index, start: line.start_time_ms, role: line.role }))
+            .filter((entry): entry is { index: number; start: number; role: LyricsLine['role'] } =>
+                entry.role === 'main' && entry.start !== null
+            )
+            .sort((left, right) => left.start - right.start || left.index - right.index);
+        timedMainLines.forEach((entry, index) => {
+            nextTimedLines![entry.index] = timedMainLines[index + 1]?.start ?? null;
+        });
         nextTimedLineCache.set(lines, nextTimedLines);
     }
     return nextTimedLines[lineIndex] ?? null;
@@ -580,13 +593,14 @@ export function buildDisplayItems(
             sortedIndices.push(i);
         }
     }
-    // 主唱行按 start_time_ms 排序（无时间的行保留相对顺序在末尾）
+    // 主唱行按 start_time_ms 排序；LRC/SYLT 的无时间说明行沿用旧行为置于最前，
+    // 避免元数据行在整首歌播放完后才出现。
     sortedIndices.sort((a, b) => {
         const aStart = displayLines[a].start_time_ms;
         const bStart = displayLines[b].start_time_ms;
         if (aStart === null && bStart === null) return a - b;
-        if (aStart === null) return 1;
-        if (bStart === null) return -1;
+        if (aStart === null) return -1;
+        if (bStart === null) return 1;
         return aStart - bStart || a - b;
     });
     // 展开：主唱行后紧跟其背景行

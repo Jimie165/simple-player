@@ -397,7 +397,8 @@ function parseBody(
                 translation: sidecarTranslation?.background ?? null,
                 romanization: sidecarTransliteration?.background ?? null,
                 agent_id: null,
-                is_duet: false,
+                // 背景和声跟随父行左右布局，避免右侧对唱行的和声跳到左侧。
+                is_duet: isDuet,
                 section: songPart ?? null,
             });
         }
@@ -464,13 +465,28 @@ export function parseTtmlLyrics(rawText: string, options: ParseTtmlLyricsOptions
         const parsed = parseBody(body, sidecarTranslations, sidecarTransliterations, metadata.agents ?? []);
         lines = parsed.lines;
         hasWords = parsed.hasWords;
+        const durationMs = parseTtmlTime(getAttr(body, NS_XML, 'dur'));
+        if (durationMs !== null) metadata.duration_ms = durationMs;
     }
 
     let timingMode: LyricsTimingMode;
     if (timingAttr) {
-        timingMode = timingAttr.toLowerCase() === 'word' ? 'word' : 'line';
+        const normalizedTiming = timingAttr.toLowerCase();
+        if (normalizedTiming === 'word') timingMode = 'word';
+        else if (normalizedTiming === 'line') timingMode = 'line';
+        else if (normalizedTiming === 'none') timingMode = 'none';
+        else if (hasWords) timingMode = 'word';
+        else timingMode = lines.some((line) => line.start_time_ms !== null) ? 'line' : 'none';
     } else {
-        timingMode = hasWords ? 'word' : 'line';
+        timingMode = hasWords
+            ? 'word'
+            : lines.some((line) => line.start_time_ms !== null) ? 'line' : 'none';
+    }
+
+    // itunes:timing 是权威模式。逐行/无时间文档即使包含用于排版的 timed span，
+    // 也不能让渲染层误判成逐字卡拉 OK。
+    if (timingMode !== 'word' && hasWords) {
+        lines = lines.map((line) => line.words.length > 0 ? { ...line, words: [] } : line);
     }
 
     return {
