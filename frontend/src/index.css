@@ -435,6 +435,13 @@ body {
   margin: -0.1em;
 }
 
+/* 长音从挂载到卸载始终保持同一种合成状态，避免高光结束时因
+   图层降级和文字重新栅格化产生肉眼可见的位置跳变。 */
+.karaoke-char-long-tone {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
 /* 行失焦退出：由行级 class 统一触发，整行字符只靠移除 inline transform/--kg
    走一次 transition，不再为每字创建 CSS 动画 */
 .karaoke-char-exiting {
@@ -466,15 +473,6 @@ body {
     transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
-}
-
-.lyrics-motion-row,
-.lyrics-motion-row .lyrics-line-scale-layer {
-  will-change: auto;
-}
-
-.lyrics-motion-row[data-in-lyrics-viewport] {
-  will-change: filter, opacity, transform;
 }
 
 .lyrics-motion-row[data-in-lyrics-viewport] .lyrics-line-scale-layer {

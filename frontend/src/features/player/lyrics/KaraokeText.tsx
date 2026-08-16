@@ -132,7 +132,8 @@ function getKaraokeCharStyle(
 
     const longToneRaw = clamp01((groupDurationMs - 800) / 760);
     const longToneAmount = smoothstep(longToneRaw);
-    const glowToneAmount = groupDurationMs > 800
+    const isLongTone = groupDurationMs > 800;
+    const glowToneAmount = isLongTone
         ? 0.3 + smoothstep(longToneRaw) * 0.6
         : 0;
     const fillStop = fillProgress * 100;
@@ -180,7 +181,7 @@ function getKaraokeCharStyle(
     return {
         transform: `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
         fillStop: hasFillProgress || isFillComplete ? fillStop : -(fillEdgeWidth + 1),
-        glowAlpha: glowDisabled ? 0 : glowPulse * glowReveal * 0.75,
+        glowAlpha: !isLongTone || glowDisabled ? 0 : glowPulse * glowReveal * 0.75,
     };
 }
 
@@ -327,16 +328,13 @@ function KaraokeTextBase({
         if (!isActive) return;
 
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
-        // ref 数组对象在挂载期间保持不变（useRef 初始化的数组不会替换），捕获供 cleanup 使用
         const charElements = charRefs.current;
 
-        // 激活时对全部字符一次性提升合成层，播放中不再增删。
-        // 逐词中途提升会反复触发图层重建，导致字符跳变。
+        // 行级容器已有独立硬件合成层，字符级无需反复提升合成层，
+        // 避免换行瞬间产生大量 Compositing Layer 创建/销毁开销。
         charElements.forEach((el) => {
             if (!el) return;
             el.style.animation = 'none';
-            el.style.willChange = 'transform';
-            el.style.backfaceVisibility = 'hidden';
         });
 
         const updateCharStyles = (flatIndex: number, style: KaraokeCharStyle) => {
@@ -458,8 +456,6 @@ function KaraokeTextBase({
                 if (!el) return;
                 el.style.transform = restingCharTransform;
                 el.style.setProperty('--kg', '0');
-                el.style.removeProperty('will-change');
-                el.style.removeProperty('backface-visibility');
             });
             return;
         }
@@ -481,8 +477,6 @@ function KaraokeTextBase({
                 el.classList.remove(exitingClassName);
                 el.style.transform = restingCharTransform;
                 el.style.setProperty('--kg', '0');
-                el.style.removeProperty('will-change');
-                el.style.removeProperty('backface-visibility');
             });
         }, karaokeExitDurationMs);
 
@@ -517,6 +511,7 @@ function KaraokeTextBase({
                             {group.map(({ item: charItem, flatIndex }) => {
                                 const longToneRaw = clamp01((charItem.groupDurationMs - 800) / 760);
                                 const longToneAmount = smoothstep(longToneRaw);
+                                const isLongTone = charItem.groupDurationMs > 800;
                                 const fillEdgeWidth = 26 + longToneAmount * 18;
                                 const fillEdgeAlpha = fillAlpha >= 1
                                     ? 0.72 + longToneAmount * 0.2
@@ -532,7 +527,9 @@ function KaraokeTextBase({
                                         ref={(element) => {
                                             charRefs.current[flatIndex] = element;
                                         }}
-                                        className="karaoke-char"
+                                        className={isLongTone
+                                            ? 'karaoke-char karaoke-char-long-tone'
+                                            : 'karaoke-char'}
                                         data-c={charItem.char}
                                         style={{
                                             '--kfe': fillEdgeWidth,

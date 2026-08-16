@@ -25,8 +25,8 @@ interface RowAnimationState {
     scale: FluidLyricsSpring;
     targetTranslateY: number;
     targetScale: number;
-    lastRenderedY: string | null;
-    lastRenderedScale: string | null;
+    lastRenderedYNum: number | null;
+    lastRenderedScaleNum: number | null;
     rowElement: HTMLButtonElement | null;
     lastRenderedFilter: string | null;
     lastRenderedOpacity: string | null;
@@ -150,8 +150,8 @@ class FluidLyricsAnimator {
         state.element = element;
         state.scaleElement = element.querySelector<HTMLElement>('[data-fluid-lyrics-scale]');
         state.rowElement = element.querySelector<HTMLButtonElement>('.lyrics-motion-row');
-        state.lastRenderedY = null;
-        state.lastRenderedScale = null;
+        state.lastRenderedYNum = null;
+        state.lastRenderedScaleNum = null;
         state.lastRenderedFilter = null;
         state.lastRenderedOpacity = null;
         state.lastRenderedTransition = null;
@@ -256,8 +256,12 @@ class FluidLyricsAnimator {
             }
             state.translateY.advance(deltaSeconds);
             if (state.scaleElement) state.scale.advance(deltaSeconds);
-            this.renderState(state);
-            if (!state.translateY.isAnimating() && (!state.scaleElement || !state.scale.isAnimating())) {
+            const isAnimating = state.translateY.isAnimating() ||
+                (state.scaleElement !== null && state.scale.isAnimating());
+            // 阈值去重可能跳过弹簧尾部的微小变化；停止帧强制提交一次，
+            // 保证 DOM transform 与已经吸附到目标值的弹簧模型完全一致。
+            this.renderState(state, !isAnimating);
+            if (!isAnimating) {
                 this.animatingRows.delete(index);
                 if (state.scaleElement) state.scaleElement.style.willChange = '';
             }
@@ -266,19 +270,19 @@ class FluidLyricsAnimator {
         if (this.animatingRows.size > 0) this.frame = requestAnimationFrame(this.update);
     };
 
-    private renderState(state: RowAnimationState) {
+    private renderState(state: RowAnimationState, force = false) {
         if (state.element) {
-            const renderedY = this.formatOutput(state.translateY.getPosition(), 3);
-            if (state.lastRenderedY !== renderedY) {
-                state.element.style.transform = `translate3d(0, ${renderedY}px, 0)`;
-                state.lastRenderedY = renderedY;
+            const y = state.translateY.getPosition();
+            if (force || state.lastRenderedYNum === null || Math.abs(y - state.lastRenderedYNum) >= 0.05) {
+                state.lastRenderedYNum = y;
+                state.element.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
             }
         }
         if (state.scaleElement) {
-            const renderedScale = this.formatOutput(state.scale.getPosition(), 5);
-            if (state.lastRenderedScale !== renderedScale) {
-                state.scaleElement.style.transform = `scale(${renderedScale}) translateZ(0)`;
-                state.lastRenderedScale = renderedScale;
+            const s = state.scale.getPosition();
+            if (force || state.lastRenderedScaleNum === null || Math.abs(s - state.lastRenderedScaleNum) >= 0.0005) {
+                state.lastRenderedScaleNum = s;
+                state.scaleElement.style.transform = `scale(${s.toFixed(4)}) translateZ(0)`;
             }
         }
     }
@@ -300,11 +304,6 @@ class FluidLyricsAnimator {
         }
     }
 
-    private formatOutput(value: number, precision: number) {
-        const zeroThreshold = 0.5 * Math.pow(10, -precision);
-        return Math.abs(value) < zeroThreshold ? '0' : value.toFixed(precision);
-    }
-
     private ensureModel(index: number, targetY: number, targetScale: number) {
         const current = this.rows.get(index);
         if (current) return current;
@@ -317,8 +316,8 @@ class FluidLyricsAnimator {
             scale: new FluidLyricsSpring(targetScale, SCALE_SPRING),
             targetTranslateY: targetY,
             targetScale,
-            lastRenderedY: null,
-            lastRenderedScale: null,
+            lastRenderedYNum: null,
+            lastRenderedScaleNum: null,
             rowElement: null,
             lastRenderedFilter: null,
             lastRenderedOpacity: null,

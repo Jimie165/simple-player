@@ -227,10 +227,10 @@ function LyricsLineItem({
                             : 'transition-all duration-300',
                         isActive
                             ? isBackground
-                                ? 'text-white/20'
+                                ? 'text-white/30'
                                 : 'text-white/65 opacity-95 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'
                             : isBackground
-                                ? 'text-white/20'
+                                ? 'text-white/30'
                                 : 'text-white/32 opacity-80'
                     )}
                 >
