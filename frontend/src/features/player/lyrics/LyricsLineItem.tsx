@@ -263,7 +263,6 @@ function LyricsLineItem({
                 disabled={!canSeek}
                 style={{
                     ...renderingIsolationStyle,
-                    ...rowVisualStyle,
                 }}
                 className={className}
             >

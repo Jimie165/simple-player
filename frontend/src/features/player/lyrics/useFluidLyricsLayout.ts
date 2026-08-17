@@ -231,12 +231,6 @@ export function useFluidLyricsLayout({
             lastViewportWidthRef.current = nextSize.width;
             if (previousWidth !== nextSize.width) {
                 heightCacheRef.current.heights.clear();
-                // 已发布的 measurements 才是布局计算的真实数据源。宽度变化后
-                // 先退回估算高度，再由各行 ResizeObserver 在提交后批量写回，
-                // 避免继续使用旧宽度下的行高，也不在 resize 回调中同步读布局。
-                setMeasurements(previous => previous.heights.size === 0
-                    ? previous
-                    : { items: previous.items, heights: new Map<number, number>() });
             }
             setViewportSize(previous =>
                 previous.width === nextSize.width && previous.height === nextSize.height
