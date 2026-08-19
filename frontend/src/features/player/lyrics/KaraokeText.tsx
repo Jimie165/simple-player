@@ -33,7 +33,6 @@ type WordMotionWindow = {
     endMs: number;
 };
 
-const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
 const syllableLiftEm = 0.078;
 const restingCharTransform = 'translate(0, 0) scale(1)';
@@ -261,6 +260,7 @@ function KaraokeTextBase({
     fillAlpha = 1,
 }: KaraokeTextProps) {
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const lineRef = useRef<HTMLSpanElement | null>(null);
     const wordPhaseKeyRef = useRef('');
     const wasFocusedRef = useRef(isFocused);
 
@@ -344,17 +344,20 @@ function KaraokeTextBase({
 
             // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
             // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
-            if (wasFocusedRef.current) {
+            if (isFocused) {
                 if (style.transform !== previous?.transform) {
-                    el.style.transform = style.transform;
+                    if (style.transform === restingCharTransform) el.style.removeProperty('transform');
+                    else el.style.transform = style.transform;
                 }
                 if (style.glowAlpha !== previous?.glowAlpha) {
-                    el.style.setProperty('--kg', String(style.glowAlpha));
+                    if (style.glowAlpha === 0) el.style.removeProperty('--kg');
+                    else el.style.setProperty('--kg', String(style.glowAlpha));
                 }
             }
 
             if (style.fillStop !== previous?.fillStop) {
-                el.style.setProperty('--kf', String(style.fillStop));
+                if (style.fillStop === -100) el.style.removeProperty('--kf');
+                else el.style.setProperty('--kf', String(style.fillStop));
             }
             previousStyles[flatIndex] = style;
         };
@@ -435,6 +438,7 @@ function KaraokeTextBase({
         wordGroups,
         wordMotionWindows,
         glowDisabled,
+        isFocused,
     ]);
 
     useLayoutEffect(() => {
@@ -442,52 +446,23 @@ function KaraokeTextBase({
         wasFocusedRef.current = isFocused;
 
         if (isFocused) {
-            charRefs.current.forEach((el) => {
-                if (!el) return;
-                el.style.animation = 'none';
-                el.classList.remove('karaoke-char-exiting');
-            });
+            lineRef.current?.classList.remove('karaoke-line-exiting');
             return;
         }
 
         if (!wasFocused) {
-            // 从未聚焦过（如初始非激活行）：无动画残留，直接归位
-            charRefs.current.forEach((el) => {
-                if (!el) return;
-                el.style.transform = restingCharTransform;
-                el.style.setProperty('--kg', '0');
-            });
+            // CSS 默认值已经是静止态；不要在虚拟窗口挂载时逐字重复写入。
             return;
         }
 
-        // 聚焦→失焦：行级退出过渡。只移除 inline transform/--kg（每字 2 次写入），
-        // 由 .karaoke-char-exiting 的 transition 统一驱动退出动画，
-        // 不再为每字写 4 个退出变量 + 创建 CSS 动画。
-        const exitingClassName = 'karaoke-char-exiting';
-        charRefs.current.forEach((el) => {
-            if (!el) return;
-            el.classList.add(exitingClassName);
-            el.style.transform = '';
-            el.style.removeProperty('--kg');
-        });
-
-        const releaseTimer = window.setTimeout(() => {
-            charRefs.current.forEach((el) => {
-                if (!el) return;
-                el.classList.remove(exitingClassName);
-                el.style.transform = restingCharTransform;
-                el.style.setProperty('--kg', '0');
-            });
-        }, karaokeExitDurationMs);
-
-        return () => {
-            window.clearTimeout(releaseTimer);
-        };
+        // 用一个父级 class 覆盖整行旧的内联运动值，避免换行边界逐字符改 DOM。
+        lineRef.current?.classList.add('karaoke-line-exiting');
     }, [flatChars, isFocused, preciseMsRef, wordGroups.length, glowDisabled]);
 
     return (
         <span style={{ display: 'block' }}>
             <span
+                ref={lineRef}
                 style={{
                     display: 'block',
                     fontKerning: 'none',

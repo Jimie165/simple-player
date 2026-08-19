@@ -6,10 +6,16 @@ const DEFAULT_LINE_HEIGHT_PX = 90;
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
 const OVERSCAN_PX = 300;
-const RETAINED_WINDOW_DURATION_MS = 1600;
+const WINDOW_SETTLE_DELAY_MS = 1600;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
+
+export const shouldSyncFluidLyricsWindowImmediately = (
+    nextTarget: number,
+    currentWindow: number,
+    retainPrevious: boolean,
+) => !retainPrevious || Math.abs(nextTarget - currentWindow) > OVERSCAN_PX;
 
 interface FluidLyricsLayoutArgs {
     activeDisplayIndex: number;
@@ -45,7 +51,8 @@ export function useFluidLyricsLayout({
     const lastViewportWidthRef = useRef(0);
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
-    const retainedWindowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+    const windowScrollYRef = useRef(0);
+    const windowUpdateTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const heightCacheRef = useRef<{
         items: DisplayItem[];
         heights: Map<number, number>;
@@ -56,7 +63,7 @@ export function useFluidLyricsLayout({
     }>({ items: displayItems, heights: new Map() });
     const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
     const [targetScrollY, setTargetScrollYState] = useState(0);
-    const [retainedScrollY, setRetainedScrollY] = useState<number | null>(null);
+    const [windowScrollY, setWindowScrollY] = useState(0);
 
     const focusAlpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
     const topSpacerHeight = viewportSize.height * focusAlpha;
@@ -106,30 +113,31 @@ export function useFluidLyricsLayout({
 
     const setTargetScrollY = useCallback((value: number, retainPrevious = true) => {
         const nextTarget = clamp(value, 0, maxScrollYRef.current);
-        const previousTarget = targetScrollYRef.current;
-
-        if (retainPrevious && Math.abs(nextTarget - previousTarget) > OVERSCAN_PX) {
-            setRetainedScrollY(previousTarget);
-            if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
-            retainedWindowTimerRef.current = window.setTimeout(() => {
-                setRetainedScrollY(null);
-                retainedWindowTimerRef.current = null;
-            }, RETAINED_WINDOW_DURATION_MS);
-        } else if (!retainPrevious) {
-            if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
-            retainedWindowTimerRef.current = null;
-            setRetainedScrollY(null);
-        }
 
         targetScrollYRef.current = nextTarget;
         setTargetScrollYState(nextTarget);
+
+        if (windowUpdateTimerRef.current) clearTimeout(windowUpdateTimerRef.current);
+        const syncWindow = () => {
+            windowScrollYRef.current = nextTarget;
+            setWindowScrollY(nextTarget);
+            windowUpdateTimerRef.current = null;
+        };
+        if (shouldSyncFluidLyricsWindowImmediately(nextTarget, windowScrollYRef.current, retainPrevious)) {
+            syncWindow();
+        } else {
+            windowUpdateTimerRef.current = window.setTimeout(syncWindow, WINDOW_SETTLE_DELAY_MS);
+        }
         return nextTarget;
     }, []);
 
     const visibleIndices = useMemo(() => {
-        const windows = [targetScrollY];
-        if (includeActiveWindow) windows.push(activeTargetScrollY);
-        if (retainedScrollY !== null) windows.push(retainedScrollY);
+        const windows = [windowScrollY];
+        // 普通换行落在 overscan 内，不应在弹簧启动帧改变 DOM；大跨度 seek
+        // 则先补上目标窗口，下一帧由 setTargetScrollY 正式同步窗口锚点。
+        if (includeActiveWindow && Math.abs(activeTargetScrollY - windowScrollY) > OVERSCAN_PX) {
+            windows.push(activeTargetScrollY);
+        }
 
         const visualTops = layout.itemTops.map((top, index) => top + (visualShifts[index] ?? 0));
         const visible = new Set<number>();
@@ -155,7 +163,7 @@ export function useFluidLyricsLayout({
             }
         });
         return [...visible].sort((left, right) => left - right);
-    }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, retainedScrollY, targetScrollY, viewportSize.height, visualShifts]);
+    }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, viewportSize.height, visualShifts, windowScrollY]);
 
     const measureItems = useCallback((updates: ReadonlyMap<number, number>) => {
         if (updates.size === 0) return;
@@ -251,7 +259,7 @@ export function useFluidLyricsLayout({
     }, [maxScrollY, setTargetScrollY]);
 
     useEffect(() => () => {
-        if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
+        if (windowUpdateTimerRef.current) clearTimeout(windowUpdateTimerRef.current);
     }, []);
 
     return {
