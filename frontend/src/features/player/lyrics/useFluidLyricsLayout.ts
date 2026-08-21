@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sideLyricsFocusAlpha, topInsetPx } from '@/features/player/lyrics/constants';
 import type { DisplayItem } from '@/features/player/lyrics/types';
 
@@ -42,7 +42,6 @@ export function useFluidLyricsLayout({
     const itemObserverRef = useRef<ResizeObserver | null>(null);
     const nodeIndexesRef = useRef(new WeakMap<Element, number>());
     const observedNodesRef = useRef(new Set<HTMLDivElement>());
-    const lastViewportWidthRef = useRef(0);
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
     const retainedWindowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
@@ -227,17 +226,8 @@ export function useFluidLyricsLayout({
 
         const update = () => {
             const nextSize = { width: element.clientWidth, height: element.clientHeight };
-            const previousWidth = lastViewportWidthRef.current;
-            lastViewportWidthRef.current = nextSize.width;
-            if (previousWidth !== nextSize.width) {
-                heightCacheRef.current.heights.clear();
-                // 已发布的 measurements 才是布局计算的真实数据源。宽度变化后
-                // 先退回估算高度，再由各行 ResizeObserver 在提交后批量写回，
-                // 避免继续使用旧宽度下的行高，也不在 resize 回调中同步读布局。
-                setMeasurements(previous => previous.heights.size === 0
-                    ? previous
-                    : { items: previous.items, heights: new Map<number, number>() });
-            }
+            // 宽度变化时保留上一帧的真实行高，等行 ResizeObserver 批量替换。
+            // 若先清成统一估算值，多行歌词会在重测完成前短暂压到相邻行上。
             setViewportSize(previous =>
                 previous.width === nextSize.width && previous.height === nextSize.height
                     ? previous
@@ -249,6 +239,22 @@ export function useFluidLyricsLayout({
         observer.observe(element);
         return () => observer.disconnect();
     }, []);
+
+    useLayoutEffect(() => {
+        if (viewportSize.width <= 0) return;
+        const updates = new Map<number, number>();
+        observedNodesRef.current.forEach(node => {
+            const index = nodeIndexesRef.current.get(node);
+            if (index !== undefined) updates.set(index, node.getBoundingClientRect().height);
+        });
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (!cancelled) measureItems(updates);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [measureItems, viewportSize.width]);
 
     useEffect(() => {
         maxScrollYRef.current = maxScrollY;

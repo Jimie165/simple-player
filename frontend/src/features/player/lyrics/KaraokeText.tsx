@@ -539,6 +539,7 @@ function KaraokeTextBase({
             >
                 {layoutGroups.map((group) => {
                     if (!group || group.length === 0) return null;
+                    const isCjkLayoutGroup = cjkLayoutCharPattern.test(group[0].item.char);
 
                     return (
                         <span
@@ -547,7 +548,7 @@ function KaraokeTextBase({
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',
                                 verticalAlign: 'bottom',
-                                contain: 'layout style',
+                                contain: isCjkLayoutGroup ? undefined : 'layout style',
                             }}
                         >
                             {group.map(({ item: charItem, flatIndex }) => {
