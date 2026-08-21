@@ -435,20 +435,41 @@ body {
   margin: -0.1em;
 }
 
-/* 长音从挂载到卸载始终保持同一种合成状态，避免高光结束时因
-   图层降级和文字重新栅格化产生肉眼可见的位置跳变。 */
-.karaoke-char-long-tone {
+/* 只在字符实际运动及归位缓冲期维持合成层，避免未来/已完成的长音字符
+   长期占用独立表面；延迟释放由 KaraokeText 控制以防重新栅格化跳变。 */
+.karaoke-char-motion {
   will-change: transform;
   backface-visibility: hidden;
 }
 
-/* 行失焦退出：父级单次切换即可覆盖整行旧的内联运动值，避免换行边界逐字改 DOM。 */
-.karaoke-line-exiting .karaoke-char {
-  transform: translate(0, 0) scale(1) !important;
-  --kg: 0 !important;
-  transition:
-    transform 250ms ease-in-out,
-    --kg 250ms ease-in-out;
+/* 保留逐字符上浮，只让一个行级合成层在退出时反向抵消共同的上浮量。 */
+.karaoke-line-exit-prepared {
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.karaoke-line-exiting {
+  transform: translateY(0.078em);
+  transition: transform 280ms ease-out;
+}
+
+/* 提前换行时可能只有最后几个字符尚未升到峰值；让它们随行级补偿同步
+   到达共同终点，避免终点切换时产生微小位置差。 */
+.karaoke-line-exiting .karaoke-char-exit-tail {
+  transform: translate3d(0, -0.078em, 0) scale(1) !important;
+  transition: transform 280ms ease-out;
+}
+
+/* 行级 +0.078em 与字符级 -0.078em 已互相抵消后，原子切换到零状态。
+   后续删除内联样式时这一规则会维持视觉不变。 */
+.karaoke-line-exiting.karaoke-line-reset {
+  transform: translateY(0);
+  transition: none;
+}
+
+.karaoke-line-reset .karaoke-char[style*="transform"] {
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  transition: none;
 }
 
 .karaoke-char::before {
@@ -474,10 +495,6 @@ body {
     transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
-}
-
-.lyrics-motion-row[data-in-lyrics-viewport] .lyrics-line-scale-layer {
-  will-change: transform;
 }
 
 /* Equalizer Animation */

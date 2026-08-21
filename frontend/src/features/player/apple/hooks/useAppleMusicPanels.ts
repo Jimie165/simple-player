@@ -49,6 +49,9 @@ export function useAppleMusicPanels({
             const frame = requestAnimationFrame(() => setLyricsMounted(true));
             return () => cancelAnimationFrame(frame);
         }
+        // 在正在播放界面仍打开时保留歌词与弹簧状态。
+        // 关闭侧栏只隐藏面板，避免再次打开时从顶部重新建立布局。
+        if (isOpen) return;
         const timeout = window.setTimeout(() => setLyricsMounted(false), PANEL_RELEASE_DELAY_MS);
         return () => window.clearTimeout(timeout);
     }, [isOpen, isLyricsOpen]);

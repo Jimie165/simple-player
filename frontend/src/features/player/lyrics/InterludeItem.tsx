@@ -4,6 +4,7 @@ import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
 } from '@/features/player/lyrics/constants';
+import { useLyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const dotIndexes = [0, 1, 2];
 
@@ -51,6 +52,7 @@ export default function InterludeItem({
     startMs,
     endMs,
 }: InterludeItemProps) {
+    const frameScheduler = useLyricsFrameScheduler();
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const animationEndMs = Math.max(startMs, endMs - interludeNextLineFocusLeadMs);
@@ -140,7 +142,7 @@ export default function InterludeItem({
         );
         const exitStartScale = getBreathScale(exitStartDurationMs);
         const exitScaleDistance = EXIT_SCALE_MAX - exitStartScale;
-        let frame: number;
+        let frame: number | null = null;
 
         const tick = () => {
             const preciseMs = clamp(preciseMsRef.current, startMs, animationEndMs);
@@ -205,11 +207,22 @@ export default function InterludeItem({
                 dot.style.opacity = `${clamp01(globalOpacity * dotOpacity)}`;
             });
 
-            frame = requestAnimationFrame(tick);
         };
 
-        frame = requestAnimationFrame(tick);
-        return () => cancelAnimationFrame(frame);
+        const unsubscribeFrame = frameScheduler
+            ? frameScheduler.subscribe('content', tick)
+            : undefined;
+        const requestNextFrame = () => {
+            frame = requestAnimationFrame(() => {
+                tick();
+                requestNextFrame();
+            });
+        };
+        if (!frameScheduler) requestNextFrame();
+        return () => {
+            unsubscribeFrame?.();
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
     }, [
         animationEndMs,
         canAnimateDots,
@@ -217,6 +230,7 @@ export default function InterludeItem({
         playbackSyncKey,
         preciseMsRef,
         startMs,
+        frameScheduler,
     ]);
 
     const shouldKeepContainer =

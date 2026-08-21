@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
+import type { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const RENDER_TICK_MS = 75;
 const CALIBRATION_INTERVAL_MS = 1500;
@@ -13,6 +14,7 @@ export function usePrecisePlaybackTime(
     currentTime: number,
     getRenderKey?: (currentMs: number) => number,
     subscribeToPlayerTime = false,
+    frameScheduler?: LyricsFrameScheduler,
 ) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const playbackRevision = usePlayerStore(state => state.playbackRevision);
@@ -208,9 +210,9 @@ export function usePrecisePlaybackTime(
             return () => cancelAnimationFrame(syncFrame);
         }
 
-        let frame: number;
-        const tick = (now: number) => {
-            const delta = now - lastTick.current;
+        let frame: number | null = null;
+        const tick = (now: number, scheduledDeltaMs?: number) => {
+            const delta = scheduledDeltaMs ?? now - lastTick.current;
             lastTick.current = now;
             let nudgeMs = 0;
             if (softNudgeTimeLeftMsRef.current > 0) {
@@ -238,18 +240,27 @@ export function usePrecisePlaybackTime(
                 void calibrateFromAudio();
             }
 
-            frame = requestAnimationFrame(tick);
         };
 
         lastTick.current = performance.now();
         lastRenderTickRef.current = lastTick.current;
         lastCalibrationRef.current = lastTick.current;
-        frame = requestAnimationFrame(tick);
+        const unsubscribeFrame = frameScheduler
+            ? frameScheduler.subscribe('clock', tick)
+            : undefined;
+        const requestNextFrame = () => {
+            frame = requestAnimationFrame((now) => {
+                tick(now);
+                requestNextFrame();
+            });
+        };
+        if (!frameScheduler) requestNextFrame();
         return () => {
             cancelAnimationFrame(syncFrame);
-            cancelAnimationFrame(frame);
+            unsubscribeFrame?.();
+            if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [calibrateFromAudio, getRenderKey, hardSync, isPlaying, isVisibilityActive, playbackRevision, publishRenderTime]);
+    }, [calibrateFromAudio, frameScheduler, getRenderKey, hardSync, isPlaying, isVisibilityActive, playbackRevision, publishRenderTime]);
 
     return { renderCurrentMs, preciseMsRef, syncRevision };
 }

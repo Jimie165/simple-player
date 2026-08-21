@@ -60,7 +60,7 @@ export function getFluidLyricsRowVisualStyle({
     const transitionDelay = delay * 0.2;
 
     return {
-        filter: showAll ? 'blur(0px)' : `blur(${blurPx}px)`,
+        filter: showAll || blurPx <= 0.01 ? 'none' : `blur(${blurPx}px)`,
         opacity: String(showAll ? 1 : rowOpacity),
         transition: [
             `filter 380ms ease-out ${transitionDelay}s`,

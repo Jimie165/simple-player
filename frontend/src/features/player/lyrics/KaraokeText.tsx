@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useRef, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
+import { useLyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 interface KaraokeTextProps {
     words: LyricsWord[];
@@ -35,7 +36,8 @@ type WordMotionWindow = {
 
 const animationHeadstartMs = 100;
 const syllableLiftEm = 0.078;
-const restingCharTransform = 'translate(0, 0) scale(1)';
+const restingCharTransform = 'translate3d(0, 0, 0) scale(1)';
+const settledLiftTransform = `translate3d(0.0000em, ${(-syllableLiftEm).toFixed(4)}em, 0) scale(1.0000)`;
 const cjkLayoutCharPattern = /^[\p{Unified_Ideograph}ࠀ-鿼]+$/u;
 const whitespaceLayoutCharPattern = /^\s+$/u;
 
@@ -138,14 +140,10 @@ function getKaraokeCharStyle(
     const fillStop = fillProgress * 100;
     const fillEdgeWidth = 26 + longToneAmount * 18;
     const elapsedMs = timeMs - time_ms;
-    const hasStarted = elapsedMs > 0;
-    const attackMs = Math.max(800, durationMs);
-    const regularLift = hasStarted
-        ? Math.sin(
-            (clamp01(elapsedMs / attackMs) * Math.PI) / 2
-        )
+    const motionDurationMs = Math.max(800, durationMs);
+    const regularLift = elapsedMs > 0
+        ? Math.sin((clamp01(elapsedMs / motionDurationMs) * Math.PI) / 2)
         : 0;
-
     const charCount = Math.max(1, activeCharCountInWord);
     const charIndex = Math.max(0, activeCharIndexInWord);
     const emphasisDurationMs = getEmphasisDurationMs(
@@ -177,8 +175,17 @@ function getKaraokeCharStyle(
         ? 1
         : smoothstep(fillProgress);
 
+    // 按实际输出精度判断 identity，避免 sin(PI) 的浮点残差留下
+    // translate3d(0, -0.0000em, 0)，使已完成字符继续占用运动层。
+    const renderedTranslateX = Number(translateX.toFixed(4));
+    const renderedTranslateY = Number(translateY.toFixed(4));
+    const renderedScale = Number(scale.toFixed(4));
+    const transform = renderedTranslateX === 0 && renderedTranslateY === 0 && renderedScale === 1
+        ? restingCharTransform
+        : `translate3d(${renderedTranslateX.toFixed(4)}em, ${renderedTranslateY.toFixed(4)}em, 0) scale(${renderedScale.toFixed(4)})`;
+
     return {
-        transform: `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`,
+        transform,
         fillStop: hasFillProgress || isFillComplete ? fillStop : -(fillEdgeWidth + 1),
         glowAlpha: !isLongTone || glowDisabled ? 0 : glowPulse * glowReveal * 0.75,
     };
@@ -259,8 +266,10 @@ function KaraokeTextBase({
     glowDisabled = false,
     fillAlpha = 1,
 }: KaraokeTextProps) {
+    const frameScheduler = useLyricsFrameScheduler();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const lineRef = useRef<HTMLSpanElement | null>(null);
+    const settledLiftElementsRef = useRef(new Set<HTMLElement>());
     const wordPhaseKeyRef = useRef('');
     const wasFocusedRef = useRef(isFocused);
 
@@ -330,24 +339,25 @@ function KaraokeTextBase({
         const previousStyles: Array<KaraokeCharStyle | undefined> = [];
         const charElements = charRefs.current;
 
-        // 行级容器已有独立硬件合成层，字符级无需反复提升合成层，
-        // 避免换行瞬间产生大量 Compositing Layer 创建/销毁开销。
-        charElements.forEach((el) => {
-            if (!el) return;
-            el.style.animation = 'none';
-        });
-
         const updateCharStyles = (flatIndex: number, style: KaraokeCharStyle) => {
             const el = charElements[flatIndex];
             if (!el) return;
             const previous = previousStyles[flatIndex];
 
-            // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
+            // 退出期间冻结字符运动和发光，让整行自身的退出动画统一承载视觉变化；
             // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
             if (isFocused) {
+                if (style.transform === settledLiftTransform) {
+                    settledLiftElementsRef.current.add(el);
+                } else {
+                    settledLiftElementsRef.current.delete(el);
+                }
                 if (style.transform !== previous?.transform) {
-                    if (style.transform === restingCharTransform) el.style.removeProperty('transform');
-                    else el.style.transform = style.transform;
+                    if (style.transform === restingCharTransform) {
+                        el.style.removeProperty('transform');
+                    } else {
+                        el.style.transform = style.transform;
+                    }
                 }
                 if (style.glowAlpha !== previous?.glowAlpha) {
                     if (style.glowAlpha === 0) el.style.removeProperty('--kg');
@@ -356,7 +366,7 @@ function KaraokeTextBase({
             }
 
             if (style.fillStop !== previous?.fillStop) {
-                if (style.fillStop === -100) el.style.removeProperty('--kf');
+                if (style.fillStop <= 0) el.style.removeProperty('--kf');
                 else el.style.setProperty('--kf', String(style.fillStop));
             }
             previousStyles[flatIndex] = style;
@@ -396,7 +406,7 @@ function KaraokeTextBase({
             });
         };
 
-        let frame: number;
+        let frame: number | null = null;
         let lastTimeMs = Number.NaN;
 
         const tick = () => {
@@ -413,7 +423,6 @@ function KaraokeTextBase({
                 updateWordStyles(audioMs, hasTimelineJump);
                 lastTimeMs = audioMs;
             }
-            frame = requestAnimationFrame(tick);
         };
 
         const initialMs = preciseMsRef.current;
@@ -426,10 +435,20 @@ function KaraokeTextBase({
             updateWordStyles(initialMs, true);
             lastTimeMs = initialMs;
         }
-        frame = requestAnimationFrame(tick);
+        const unsubscribeFrame = frameScheduler
+            ? frameScheduler.subscribe('content', tick)
+            : undefined;
+        const requestNextFrame = () => {
+            frame = requestAnimationFrame(() => {
+                tick();
+                requestNextFrame();
+            });
+        };
+        if (!frameScheduler) requestNextFrame();
 
         return () => {
-            cancelAnimationFrame(frame);
+            unsubscribeFrame?.();
+            if (frame !== null) cancelAnimationFrame(frame);
         };
     }, [
         isActive,
@@ -439,14 +458,24 @@ function KaraokeTextBase({
         wordMotionWindows,
         glowDisabled,
         isFocused,
+        frameScheduler,
     ]);
 
     useLayoutEffect(() => {
+        const line = lineRef.current;
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = isFocused;
 
         if (isFocused) {
-            lineRef.current?.classList.remove('karaoke-line-exiting');
+            line?.classList.remove('karaoke-line-exiting');
+            line?.classList.remove('karaoke-line-reset');
+            line?.classList.add('karaoke-line-exit-prepared');
+            line?.querySelectorAll<HTMLElement>('.karaoke-char-exit-tail').forEach(element => {
+                element.classList.remove('karaoke-char-exit-tail');
+            });
+            line?.querySelectorAll<HTMLElement>('.karaoke-char-long-tone').forEach(element => {
+                element.classList.add('karaoke-char-motion');
+            });
             return;
         }
 
@@ -455,9 +484,45 @@ function KaraokeTextBase({
             return;
         }
 
-        // 用一个父级 class 覆盖整行旧的内联运动值，避免换行边界逐字符改 DOM。
-        lineRef.current?.classList.add('karaoke-line-exiting');
-    }, [flatChars, isFocused, preciseMsRef, wordGroups.length, glowDisabled]);
+        // 字符继续保持原有的逐字上浮。退出时由一个行级反向位移统一抵消
+        // 已完成字符的上浮；只有尚未到达峰值的尾字符需要补齐到统一终点。
+        line?.querySelectorAll<HTMLElement>('.karaoke-char[style*="transform"]').forEach(element => {
+            if (!settledLiftElementsRef.current.has(element)) {
+                element.classList.add('karaoke-char-exit-tail');
+            }
+        });
+        line?.classList.add('karaoke-line-exiting');
+        let cleanupFrame: number | null = null;
+        const cleanupTimer = window.setTimeout(() => {
+            // 行位移与字符上浮此时刚好互相抵消；切到等价的零状态后再分帧
+            // 删除内联样式，不会在清理过程中逐字改变可见位置。
+            line?.classList.add('karaoke-line-reset');
+            const elements = Array.from(line?.querySelectorAll<HTMLElement>(
+                '.karaoke-char[style*="transform"], .karaoke-char[style*="--kg"], .karaoke-char-motion'
+            ) ?? []);
+            const cleanupBatch = () => {
+                elements.splice(0, 1).forEach(element => {
+                    element.style.removeProperty('transform');
+                    element.style.removeProperty('--kg');
+                    element.classList.remove('karaoke-char-motion');
+                    element.classList.remove('karaoke-char-exit-tail');
+                    settledLiftElementsRef.current.delete(element);
+                });
+                if (elements.length > 0) {
+                    cleanupFrame = requestAnimationFrame(cleanupBatch);
+                    return;
+                }
+                line?.classList.remove('karaoke-line-exiting');
+                line?.classList.remove('karaoke-line-reset');
+                line?.classList.remove('karaoke-line-exit-prepared');
+            };
+            cleanupFrame = requestAnimationFrame(cleanupBatch);
+        }, 280);
+        return () => {
+            clearTimeout(cleanupTimer);
+            if (cleanupFrame !== null) cancelAnimationFrame(cleanupFrame);
+        };
+    }, [flatChars, glowDisabled, isFocused, preciseMsRef, wordGroups.length]);
 
     return (
         <span style={{ display: 'block' }}>
@@ -481,6 +546,8 @@ function KaraokeTextBase({
                             style={{
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',
+                                verticalAlign: 'bottom',
+                                contain: 'layout style',
                             }}
                         >
                             {group.map(({ item: charItem, flatIndex }) => {

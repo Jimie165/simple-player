@@ -29,6 +29,10 @@ import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutIte
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import type { LyricsPanelProps } from '@/features/player/lyrics/types';
+import {
+    LyricsFrameScheduler,
+    LyricsFrameSchedulerContext,
+} from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const sideScrollMaskStyle = {
     maskImage: 'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
@@ -44,7 +48,6 @@ const INTERLUDE_FOCUS_OFFSET_RATIO = 0.9;
 const lineSeekSyncToleranceMs = 1000;
 
 function FluidLyricsPanel({
-    isOpen,
     lyricsDocument,
     status,
     currentTime,
@@ -69,6 +72,9 @@ function FluidLyricsPanel({
     } | null>(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
+    const [frameScheduler] = useState(() => new LyricsFrameScheduler());
+
+    useEffect(() => () => frameScheduler.dispose(), [frameScheduler]);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -94,6 +100,7 @@ function FluidLyricsPanel({
         currentTime,
         getRenderKey,
         true,
+        frameScheduler,
     );
     const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
         () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
@@ -228,7 +235,7 @@ function FluidLyricsPanel({
             updateTargetScrollY(0, false);
         });
         return () => cancelAnimationFrame(frame);
-    }, [isOpen, lines, updateTargetScrollY]);
+    }, [lines, updateTargetScrollY]);
 
     useEffect(() => {
         if (!isPlaying) return;
@@ -238,14 +245,14 @@ function FluidLyricsPanel({
     }, [isPlaying]);
 
     useEffect(() => {
-        if (!isOpen || displayState || isUserScrolling) return;
+        if (displayState || isUserScrolling) return;
         if (!isPlaying && firstPositionDoneRef.current) return;
         const frame = requestAnimationFrame(() => {
             updateTargetScrollY(activeTargetScrollY);
             firstPositionDoneRef.current = true;
         });
         return () => cancelAnimationFrame(frame);
-    }, [activeTargetScrollY, displayState, isOpen, isPlaying, isUserScrolling, updateTargetScrollY]);
+    }, [activeTargetScrollY, displayState, isPlaying, isUserScrolling, updateTargetScrollY]);
 
     const scheduleResumeFollow = useCallback(() => {
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
@@ -343,7 +350,8 @@ function FluidLyricsPanel({
     });
 
     return (
-        <div className="relative h-full w-full rounded-[22px] overflow-hidden">
+        <LyricsFrameSchedulerContext.Provider value={frameScheduler}>
+          <div className="relative h-full w-full rounded-[22px] overflow-hidden" style={{ contain: 'strict' }}>
             <motion.div
                 ref={scrollAreaRef}
                 className={clsx(
@@ -439,7 +447,8 @@ function FluidLyricsPanel({
                     </div>
                 )}
             </motion.div>
-        </div>
+          </div>
+        </LyricsFrameSchedulerContext.Provider>
     );
 }
 

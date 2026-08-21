@@ -27,20 +27,6 @@ interface LyricsLineItemProps {
     onBackgroundHeight?: (height: number) => void;
 }
 
-let lyricsViewportObserver: IntersectionObserver | null = null;
-
-const getLyricsViewportObserver = () => {
-    if (typeof window === 'undefined' || !('IntersectionObserver' in window)) return null;
-
-    lyricsViewportObserver ??= new IntersectionObserver((entries) => {
-        entries.forEach((entry) => {
-            entry.target.toggleAttribute('data-in-lyrics-viewport', entry.isIntersecting);
-        });
-    });
-
-    return lyricsViewportObserver;
-};
-
 function LyricsLineItem({
     line,
     isActive,
@@ -105,20 +91,6 @@ function LyricsLineItem({
         : 'text-[clamp(1.13rem,2.94vmin,2.02rem)]';
     // 对唱左右分屏：存在对唱行时主行右缩进 15%，对唱行左缩进 15% 并右对齐
     const isDuetRow = line.is_duet === true;
-    useEffect(() => {
-        const row = rowRef.current;
-        if (!row) return;
-
-        const observer = getLyricsViewportObserver();
-        if (!observer) {
-            row.setAttribute('data-in-lyrics-viewport', '');
-            return;
-        }
-
-        observer.observe(row);
-        return () => observer.unobserve(row);
-    }, []);
-
     useEffect(() => {
         if (!isBackground || !onBackgroundHeight) return;
         const row = rowRef.current;

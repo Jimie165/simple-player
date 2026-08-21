@@ -27,6 +27,7 @@ interface RowAnimationState {
     targetScale: number;
     lastRenderedYNum: number | null;
     lastRenderedScaleNum: number | null;
+    rowElement: HTMLButtonElement | null;
     lastRenderedFilter: string | null;
     lastRenderedOpacity: string | null;
     lastRenderedTransition: string | null;
@@ -148,6 +149,7 @@ class FluidLyricsAnimator {
         }
         state.element = element;
         state.scaleElement = element.querySelector<HTMLElement>('[data-fluid-lyrics-scale]');
+        state.rowElement = element.querySelector<HTMLButtonElement>('.lyrics-motion-row');
         state.lastRenderedYNum = null;
         state.lastRenderedScaleNum = null;
         state.lastRenderedFilter = null;
@@ -169,6 +171,7 @@ class FluidLyricsAnimator {
             state.detachedAt = performance.now();
             state.element = null;
             state.scaleElement = null;
+            state.rowElement = null;
             this.mountedRows.delete(index);
             this.animatingRows.delete(index);
         };
@@ -253,8 +256,12 @@ class FluidLyricsAnimator {
             }
             state.translateY.advance(deltaSeconds);
             if (state.scaleElement) state.scale.advance(deltaSeconds);
-            this.renderState(state);
-            if (!state.translateY.isAnimating() && (!state.scaleElement || !state.scale.isAnimating())) {
+            const isAnimating = state.translateY.isAnimating() ||
+                (state.scaleElement !== null && state.scale.isAnimating());
+            // 阈值去重可能跳过弹簧尾部的微小变化；停止帧强制提交一次，
+            // 保证 DOM transform 与已经吸附到目标值的弹簧模型完全一致。
+            this.renderState(state, !isAnimating);
+            if (!isAnimating) {
                 this.animatingRows.delete(index);
                 if (state.scaleElement) state.scaleElement.style.willChange = '';
             }
@@ -263,17 +270,17 @@ class FluidLyricsAnimator {
         if (this.animatingRows.size > 0) this.frame = requestAnimationFrame(this.update);
     };
 
-    private renderState(state: RowAnimationState) {
+    private renderState(state: RowAnimationState, force = false) {
         if (state.element) {
             const y = state.translateY.getPosition();
-            if (state.lastRenderedYNum === null || Math.abs(y - state.lastRenderedYNum) >= 0.05) {
+            if (force || state.lastRenderedYNum === null || Math.abs(y - state.lastRenderedYNum) >= 0.05) {
                 state.lastRenderedYNum = y;
-                state.element.style.transform = `translate3d(0, ${y.toFixed(2)}px, 0)`;
+                state.element.style.transform = `translateY(${y.toFixed(2)}px)`;
             }
         }
         if (state.scaleElement) {
             const s = state.scale.getPosition();
-            if (state.lastRenderedScaleNum === null || Math.abs(s - state.lastRenderedScaleNum) >= 0.0005) {
+            if (force || state.lastRenderedScaleNum === null || Math.abs(s - state.lastRenderedScaleNum) >= 0.0005) {
                 state.lastRenderedScaleNum = s;
                 state.scaleElement.style.transform = `scale(${s.toFixed(4)}) translateZ(0)`;
             }
@@ -281,10 +288,7 @@ class FluidLyricsAnimator {
     }
 
     private renderRowVisual(state: RowAnimationState, style: FluidLyricsRowVisualStyle) {
-        // 位移、模糊和透明度由同一个外层窗口项承载，
-        // 避免 filter/opacity 作用在 transform 外层的
-        // 子树上，导致换行时重复建立渲染表面。
-        const element = state.element;
+        const element = state.rowElement;
         if (!element) return;
         if (state.lastRenderedFilter !== style.filter) {
             element.style.filter = style.filter;
@@ -314,6 +318,7 @@ class FluidLyricsAnimator {
             targetScale,
             lastRenderedYNum: null,
             lastRenderedScaleNum: null,
+            rowElement: null,
             lastRenderedFilter: null,
             lastRenderedOpacity: null,
             lastRenderedTransition: null,
