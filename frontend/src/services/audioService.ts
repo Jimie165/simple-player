@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { appDataDir, appCacheDir } from '@tauri-apps/api/path';
-import type { BackendLyricsData, LyricsDocument, SongMetadata } from '@/types';
+import type { BackendLyricsData, LyricsDocument, PlaybackSnapshot, SongMetadata } from '@/types';
 import { parseLyrics } from '@/utils/lyrics/parseLyrics';
 
 let cachedAppDataDir: string | null = null;
@@ -61,19 +61,22 @@ export const audioService = {
                 resolvedMetadata = { ...metadata, cover_path: fixedPath };
             }
         }
-        return invoke('play_audio', { path, metadata: resolvedMetadata });
+        return invoke<PlaybackSnapshot>('play_audio', { path, metadata: resolvedMetadata });
     },
 
     load: async (path: string, metadata?: SongMetadata) => {
-        return invoke('load_audio', { path, metadata });
+        return invoke<PlaybackSnapshot>('load_audio', { path, metadata });
     },
 
-    pause: async () => invoke('pause_audio'),
+    pause: async (): Promise<PlaybackSnapshot> => invoke('pause_audio'),
 
-    resume: async () => invoke('resume_audio'),
+    resume: async (): Promise<PlaybackSnapshot> => invoke('resume_audio'),
 
     // 跳转进度 (秒)
     seek: async (position: number): Promise<number> => invoke('seek_audio', { position }),
+
+    getPlaybackSnapshot: async (): Promise<PlaybackSnapshot> =>
+        invoke('get_playback_snapshot'),
 
     // 设置音量 (0.0 - 1.0)
     setVolume: async (volume: number) => invoke('set_volume', { volume }),

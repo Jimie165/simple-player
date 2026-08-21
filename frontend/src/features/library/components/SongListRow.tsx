@@ -9,6 +9,7 @@ import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export function SongListRow({
     index,
@@ -58,19 +59,20 @@ export function SongListRow({
     onSelect: () => void;
 }) {
     const id = getMusicItemId(song);
+    const { togglePlayback } = usePlaybackActions();
 
     return (
         <div
             key={id || index}
             onDoubleClick={() => {
                 if (!isSelectionMode) {
-                    const { metadata, togglePlay } = usePlayerStore.getState();
+                    const { metadata } = usePlayerStore.getState();
                     const isCurrent = metadata && (
                         (song.id !== undefined && song.id === metadata.id) ||
                         (song.path === metadata.path)
                     );
                     if (isCurrent) {
-                        togglePlay();
+                        void togglePlayback();
                     } else {
                         onPlay(song, index);
                     }
@@ -118,7 +120,7 @@ export function SongListRow({
 
             <div className="flex items-center gap-3 overflow-hidden">
                 {!hideCover && (
-                    <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                    <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                         <SongCoverOverlay
                             song={song}
                             className="w-full h-full"

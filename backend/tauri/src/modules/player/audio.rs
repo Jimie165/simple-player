@@ -12,7 +12,7 @@ use serde::Serialize;
 use std::fs::File;
 use std::sync::{
     Arc, Mutex,
-    atomic::{AtomicBool, AtomicU32, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
 };
 use std::thread;
 use std::time::Duration;
@@ -22,6 +22,25 @@ use windows::Win32::Foundation::HWND;
 
 use super::smtc;
 use crate::modules::library::SongMetadata;
+
+#[derive(Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PlaybackStatus {
+    Idle,
+    Playing,
+    Paused,
+    Ended,
+}
+
+#[derive(Clone, Serialize)]
+pub struct PlaybackSnapshot {
+    pub session_id: u64,
+    pub status: PlaybackStatus,
+    pub path: Option<String>,
+    pub position: f32,
+    pub duration: Option<f32>,
+    pub volume: f32,
+}
 
 #[derive(Clone, Copy, Serialize)]
 struct LowFrequencyFrame {
@@ -273,10 +292,48 @@ struct PlaybackHandle {
     stream_error: Arc<AtomicBool>,
     path: String,
     metadata: Option<SongMetadata>,
+    session_id: u64,
+}
+
+fn snapshot_from_parts(
+    player: &Arc<Mutex<Option<PlaybackHandle>>>,
+    volume: &Arc<Mutex<f32>>,
+) -> PlaybackSnapshot {
+    let volume = *volume.lock().unwrap();
+    let player_lock = player.lock().unwrap();
+    let Some(handle) = player_lock.as_ref() else {
+        return PlaybackSnapshot {
+            session_id: 0,
+            status: PlaybackStatus::Idle,
+            path: None,
+            position: 0.0,
+            duration: None,
+            volume,
+        };
+    };
+
+    let position = handle.player.get_pos().as_secs_f32();
+    let status = if handle.player.empty() {
+        PlaybackStatus::Ended
+    } else if handle.player.is_paused() {
+        PlaybackStatus::Paused
+    } else {
+        PlaybackStatus::Playing
+    };
+
+    PlaybackSnapshot {
+        session_id: handle.session_id,
+        status,
+        path: Some(handle.path.clone()),
+        position,
+        duration: handle.metadata.as_ref().map(|meta| meta.duration as f32),
+        volume,
+    }
 }
 
 pub struct AudioState {
     player: Arc<Mutex<Option<PlaybackHandle>>>,
+    next_session_id: AtomicU64,
     volume: Arc<Mutex<f32>>,
     output_preference: Arc<Mutex<OutputPreference>>,
     active_device_name: Arc<Mutex<Option<String>>>,
@@ -293,6 +350,7 @@ impl AudioState {
     pub fn new() -> Self {
         Self {
             player: Arc::new(Mutex::new(None)),
+            next_session_id: AtomicU64::new(1),
             volume: Arc::new(Mutex::new(1.0)),
             output_preference: Arc::new(Mutex::new(OutputPreference::SystemDefault)),
             active_device_name: Arc::new(Mutex::new(None)),
@@ -323,7 +381,8 @@ impl AudioState {
         path: String,
         metadata: Option<SongMetadata>,
         autoplay: bool,
-    ) -> Result<(), String> {
+    ) -> Result<PlaybackSnapshot, String> {
+        let session_id = self.next_session_id.fetch_add(1, Ordering::Relaxed);
         let handle = Self::build_playback_handle(
             &self.volume,
             &self.output_preference,
@@ -333,6 +392,7 @@ impl AudioState {
             metadata.clone(),
             autoplay,
             0.0,
+            session_id,
         )?;
         let monitor_stop = handle.monitor_stop.clone();
         let previous = {
@@ -351,6 +411,7 @@ impl AudioState {
 
         if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
             Self::emit_output_changed(&app_handle, &self.active_device_name);
+            self.emit_state_changed(&app_handle);
             Self::start_monitor(
                 self.player.clone(),
                 self.volume.clone(),
@@ -369,7 +430,7 @@ impl AudioState {
             );
         }
 
-        Ok(())
+        Ok(self.snapshot())
     }
 
     // Playback construction needs these synchronized state handles as one atomic setup step.
@@ -383,6 +444,7 @@ impl AudioState {
         metadata: Option<SongMetadata>,
         autoplay: bool,
         start_position: f32,
+        session_id: u64,
     ) -> Result<PlaybackHandle, String> {
         let file = File::open(&path).map_err(|e| format!("Failed to open audio file: {}", e))?;
         let source =
@@ -428,6 +490,7 @@ impl AudioState {
             stream_error,
             path,
             metadata,
+            session_id,
         })
     }
 
@@ -537,6 +600,14 @@ impl AudioState {
         let _ = app_handle.emit("audio:output-changed", active);
     }
 
+    fn snapshot(&self) -> PlaybackSnapshot {
+        snapshot_from_parts(&self.player, &self.volume)
+    }
+
+    fn emit_state_changed(&self, app_handle: &AppHandle) {
+        let _ = app_handle.emit("audio:state-changed", self.snapshot());
+    }
+
     fn dispose_playback(previous: Option<PlaybackHandle>) {
         if let Some(previous) = previous {
             previous.monitor_stop.store(true, Ordering::SeqCst);
@@ -569,8 +640,8 @@ impl AudioState {
                     break;
                 }
 
-                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32)> = None;
-                let (ended, position) = {
+                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32, u64)> = None;
+                let (ended, position, session_id) = {
                     let player_lock = player_arc.lock().unwrap();
                     let Some(handle) = player_lock.as_ref() else {
                         break;
@@ -592,14 +663,15 @@ impl AudioState {
                             handle.metadata.clone(),
                             !handle.player.is_paused(),
                             position,
+                            handle.session_id,
                         ));
-                        (false, position)
+                        (false, position, handle.session_id)
                     } else {
-                        (handle.player.empty(), position)
+                        (handle.player.empty(), position, handle.session_id)
                     }
                 };
 
-                if let Some((path, metadata, should_play, position)) = recovery {
+                if let Some((path, metadata, should_play, position, session_id)) = recovery {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
                         match Self::recover_output_device(
                             player_arc.clone(),
@@ -614,6 +686,7 @@ impl AudioState {
                             metadata,
                             should_play,
                             position,
+                            session_id,
                         ) {
                             Ok(()) => {}
                             Err(err) => {
@@ -631,7 +704,11 @@ impl AudioState {
                 if ended {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
                         smtc::set_playing(false);
-                        let _ = app_handle.emit("audio:ended", ());
+                        let _ = app_handle.emit(
+                            "audio:state-changed",
+                            snapshot_from_parts(&player_arc, &volume_arc),
+                        );
+                        let _ = app_handle.emit("audio:ended", session_id);
                     }
                     break;
                 }
@@ -679,6 +756,7 @@ impl AudioState {
         metadata: Option<SongMetadata>,
         autoplay: bool,
         position: f32,
+        session_id: u64,
     ) -> Result<(), String> {
         let new_handle = Self::build_playback_handle(
             &volume_arc,
@@ -689,6 +767,7 @@ impl AudioState {
             metadata.clone(),
             autoplay,
             position,
+            session_id,
         )?;
         let new_monitor_stop = new_handle.monitor_stop.clone();
 
@@ -714,6 +793,8 @@ impl AudioState {
         smtc::set_playing(autoplay);
         smtc::set_position(position);
         Self::emit_output_changed(&app_handle, &active_device_name);
+        let state_snapshot = snapshot_from_parts(&player_arc, &volume_arc);
+        let _ = app_handle.emit("audio:state-changed", state_snapshot);
 
         Self::start_monitor(
             player_arc,
@@ -734,26 +815,44 @@ impl AudioState {
         Ok(())
     }
 
-    pub fn play_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {
+    pub fn play_file(
+        &self,
+        path: String,
+        metadata: Option<SongMetadata>,
+    ) -> Result<PlaybackSnapshot, String> {
         self.open_file(path, metadata, true)
     }
 
-    pub fn load_file(&self, path: String, metadata: Option<SongMetadata>) -> Result<(), String> {
+    pub fn load_file(
+        &self,
+        path: String,
+        metadata: Option<SongMetadata>,
+    ) -> Result<PlaybackSnapshot, String> {
         self.open_file(path, metadata, false)
     }
 
-    pub fn pause(&self) {
+    pub fn pause(&self) -> Result<PlaybackSnapshot, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             handle.player.pause();
             smtc::set_playing(false);
         }
+        let snapshot = self.snapshot();
+        if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+            let _ = app_handle.emit("audio:state-changed", snapshot.clone());
+        }
+        Ok(snapshot)
     }
 
-    pub fn resume(&self) {
+    pub fn resume(&self) -> Result<PlaybackSnapshot, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             handle.player.play();
             smtc::set_playing(true);
         }
+        let snapshot = self.snapshot();
+        if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+            let _ = app_handle.emit("audio:state-changed", snapshot.clone());
+        }
+        Ok(snapshot)
     }
 
     pub fn set_reactive_background_enabled(&self, enabled: bool) {
@@ -774,7 +873,7 @@ impl AudioState {
         }
     }
 
-    pub fn seek(&self, seconds: f32) -> Result<f32, String> {
+    pub fn seek(&self, seconds: f32) -> Result<PlaybackSnapshot, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             let position = Duration::from_secs_f32(seconds.max(0.0));
             handle
@@ -783,9 +882,12 @@ impl AudioState {
                 .map_err(|e| format!("Failed to seek audio: {}", e))?;
             let actual = handle.player.get_pos().as_secs_f32();
             smtc::set_position(actual);
-            return Ok(actual);
         }
-        Ok(0.0)
+        let snapshot = self.snapshot();
+        if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+            let _ = app_handle.emit("audio:state-changed", snapshot.clone());
+        }
+        Ok(snapshot)
     }
 
     pub fn set_volume(&self, volume: f32) {
@@ -870,11 +972,12 @@ impl AudioState {
                     !h.player.is_paused(),
                     h.player.get_pos().as_secs_f32(),
                     h.monitor_stop.clone(),
+                    h.session_id,
                 )
             })
         };
 
-        let Some((path, metadata, autoplay, position, monitor_stop)) = snapshot else {
+        let Some((path, metadata, autoplay, position, monitor_stop, session_id)) = snapshot else {
             // Nothing playing right now; preference will apply on next play_file.
             if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
                 Self::emit_output_changed(&app_handle, &self.active_device_name);
@@ -906,7 +1009,12 @@ impl AudioState {
             metadata,
             autoplay,
             position,
+            session_id,
         )
+    }
+
+    pub fn get_snapshot(&self) -> PlaybackSnapshot {
+        self.snapshot()
     }
 
     pub fn get_position(&self) -> Result<f32, String> {

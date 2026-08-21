@@ -9,6 +9,7 @@ import MusicContextMenu from '@/components/common/MusicContextMenu';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { useNavigationStore } from '@/store/useNavigationStore';
 
 const getSongId = (song: SongMetadata, index: number) => {
@@ -110,6 +111,7 @@ export const SongListItem = memo(({
     isFav?: boolean;
 }) => {
     const { push } = useNavigationStore();
+    const { togglePlayback } = usePlaybackActions();
 
     return (
         <div
@@ -129,13 +131,13 @@ export const SongListItem = memo(({
             onClick={(e) => handleItemClick && handleItemClick(e, song)}
             onDoubleClick={() => {
                 if (!isSelectionMode && onPlay) {
-                    const { metadata, togglePlay } = usePlayerStore.getState();
+                    const { metadata } = usePlayerStore.getState();
                     const isCurrent = metadata && (
                         (song.id !== undefined && song.id === metadata.id) ||
                         (song.path === metadata.path)
                     );
                     if (isCurrent) {
-                        togglePlay();
+                        void togglePlayback();
                     } else {
                         onPlay(song, index);
                     }
@@ -177,7 +179,7 @@ export const SongListItem = memo(({
             </div>
 
             <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-[4px] shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                     <SongCoverOverlay
                         song={song}
                         className="w-full h-full"

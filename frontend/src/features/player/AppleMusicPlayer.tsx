@@ -35,10 +35,8 @@ export default function AppleMusicPlayer({
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const isShuffling = usePlayerStore(state => state.isShuffling);
     const repeatMode = usePlayerStore(state => state.repeatMode);
-    const togglePlay = usePlayerStore(state => state.togglePlay);
     const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
     const volume = usePlayerStore(state => state.volume);
-    const setVolume = usePlayerStore(state => state.setVolume);
     const isQueueOpen = usePlayerStore(state => state.isQueueOpen);
     const isLyricsOpen = usePlayerStore(state => state.isLyricsOpen);
     const lyricsDocument = usePlayerStore(state => state.lyricsDocument);
@@ -49,7 +47,7 @@ export default function AppleMusicPlayer({
 
     const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
     const push = useNavigationStore(state => state.push);
-    const { playNext, playPrev, seek, toggleShuffle } = usePlaybackActions();
+    const { playNext, playPrev, seek, setVolume, togglePlayback, toggleShuffle } = usePlaybackActions();
     const { playerEffectMode, reactiveBackgroundEnabled } = useTheme();
     const lowFrequencyRef = useLowFrequencyLevel(
         isOpen && isPlaying && playerEffectMode === 'animation' && reactiveBackgroundEnabled,
@@ -113,9 +111,6 @@ export default function AppleMusicPlayer({
     } = useImmersivePlaybackControls({
         volume,
         setVolume,
-        metadata,
-        isOpen,
-        isPlaying,
         setPlaybackTime,
         seek,
         onNarrowActivity: handleNarrowActivity,
@@ -177,7 +172,7 @@ export default function AppleMusicPlayer({
         isShuffling,
         toggleShuffle,
         playPrev: handlePlayPrev,
-        togglePlay,
+        togglePlay: () => void togglePlayback(),
         playNext,
         toggleRepeat,
         repeatMode,

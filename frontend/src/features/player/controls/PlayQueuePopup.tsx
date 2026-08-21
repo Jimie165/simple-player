@@ -22,9 +22,8 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         currentSongIndex,
         removeSongFromPlaylistByIndex
     } = useLibraryStore();
-    const togglePlay = usePlayerStore(s => s.togglePlay);
     const restartSong = usePlayerStore(s => s.restartSong);
-    const { playQueueItem } = usePlaybackActions();
+    const { playQueueItem, togglePlayback } = usePlaybackActions();
 
     // Context menu state
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; song: SongMetadata; index: number } | null>(null);
@@ -85,7 +84,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         // In the play queue, we strictly use index to define the "current" playing item.
         // This allows multiple instances of the same song to coexist and be handled separately.
         if (index === currentSongIndex && !options?.restartIfCurrent) {
-            togglePlay();
+            void togglePlayback();
             return;
         }
 
@@ -93,7 +92,7 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         restartSong();
 
         await playQueueItem({ song, index, restartIfCurrent: options?.restartIfCurrent });
-    }, [currentSongIndex, playQueueItem, restartSong, togglePlay]);
+    }, [currentSongIndex, playQueueItem, restartSong, togglePlayback]);
 
     const contextMenuOps = useSongOperations({
         items: contextMenu ? [contextMenu.song] : [],

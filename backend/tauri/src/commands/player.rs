@@ -2,7 +2,7 @@ use crate::DbState;
 use crate::modules::database::SongRepo;
 use crate::modules::library::LyricsData;
 use crate::modules::library::SongMetadata;
-use crate::modules::player::{AudioOutputInfo, AudioOutputState, AudioState};
+use crate::modules::player::{AudioOutputInfo, AudioOutputState, AudioState, PlaybackSnapshot};
 use crate::utils::path::normalize_db_path;
 use std::path::Path;
 use tauri::State;
@@ -12,7 +12,7 @@ pub fn play_audio(
     state: State<'_, AudioState>,
     path: String,
     metadata: Option<SongMetadata>,
-) -> Result<(), String> {
+) -> Result<PlaybackSnapshot, String> {
     state.play_file(path, metadata)
 }
 
@@ -21,23 +21,23 @@ pub fn load_audio(
     state: State<'_, AudioState>,
     path: String,
     metadata: Option<SongMetadata>,
-) -> Result<(), String> {
+) -> Result<PlaybackSnapshot, String> {
     state.load_file(path, metadata)
 }
 
 #[tauri::command]
-pub fn pause_audio(state: State<'_, AudioState>) {
-    state.pause();
+pub fn pause_audio(state: State<'_, AudioState>) -> Result<PlaybackSnapshot, String> {
+    state.pause()
 }
 
 #[tauri::command]
-pub fn resume_audio(state: State<'_, AudioState>) {
-    state.resume();
+pub fn resume_audio(state: State<'_, AudioState>) -> Result<PlaybackSnapshot, String> {
+    state.resume()
 }
 
 #[tauri::command]
 pub fn seek_audio(state: State<'_, AudioState>, position: f32) -> Result<f32, String> {
-    state.seek(position)
+    state.seek(position).map(|snapshot| snapshot.position)
 }
 
 #[tauri::command]
@@ -53,6 +53,11 @@ pub fn set_reactive_background_enabled(state: State<'_, AudioState>, enabled: bo
 #[tauri::command]
 pub fn get_audio_position(state: State<'_, AudioState>) -> Result<f32, String> {
     state.get_position()
+}
+
+#[tauri::command]
+pub fn get_playback_snapshot(state: State<'_, AudioState>) -> PlaybackSnapshot {
+    state.get_snapshot()
 }
 
 #[tauri::command]

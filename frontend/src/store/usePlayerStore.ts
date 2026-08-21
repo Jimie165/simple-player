@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { LyricsDocument, RepeatMode, SongMetadata } from '@/types/index';
+import type { LyricsDocument, MediaKind, PlaybackSnapshot, RepeatMode, SongMetadata } from '@/types/index';
 import { audioService } from '@/services/audioService';
 
 // 1. 确保接口里定义了所有属性和方法
@@ -11,18 +11,22 @@ interface PlayerState {
     metadata: SongMetadata | null;
     isAudioLoaded: boolean;
     currentTime: number;
+    isSeeking: boolean;
     playbackPath: string | null;
     playbackRevision: number;
+    playbackSessionId: number;
+    mediaKind: MediaKind;
 
     isShuffling: boolean;      // 随机状态
     repeatMode: RepeatMode;    // 循环模式
 
     // Setter 方法
-    setIsPlaying: (isPlaying: boolean) => void;
     setVolume: (volume: number) => void;
     setMetadata: (metadata: SongMetadata | null) => void;
-    setAudioLoaded: (loaded: boolean) => void;
     setPlaybackTime: (time: number) => void;
+    setPlaybackSnapshot: (snapshot: PlaybackSnapshot) => void;
+    setMediaKind: (kind: MediaKind) => void;
+    setSeeking: (seeking: boolean) => void;
     resetPlaybackClock: (path?: string | null) => void;
 
     // 辅助 Setter (给 Library 用)
@@ -32,7 +36,6 @@ interface PlayerState {
     // 动作方法 (这就是你报错缺失的部分)
     toggleShuffle: () => void;
     toggleRepeat: () => void;
-    togglePlay: () => Promise<void>;
 
     restartTrigger: number;
     restartSong: () => void;
@@ -72,8 +75,11 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     metadata: null,
     isAudioLoaded: false,
     currentTime: 0,
+    isSeeking: false,
     playbackPath: null,
     playbackRevision: 0,
+    playbackSessionId: 0,
+    mediaKind: null,
     isShuffling: false,
     repeatMode: 'off',
     isQueueOpen: false,
@@ -88,22 +94,48 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     currentVideoIndex: -1,
 
     // --- Setter 实现 ---
-    setIsPlaying: (isPlaying) => set({ isPlaying }),
     setMetadata: (metadata) => set({ metadata }),
-    setAudioLoaded: (loaded) => set({ isAudioLoaded: loaded }),
     setPlaybackTime: (time) => set({
         currentTime: Number.isFinite(time) ? Math.max(0, time) : 0,
     }),
+    setPlaybackSnapshot: (snapshot) => set((state) => {
+        // A stopped monitor can finish after a new track has already replaced it.
+        // Never let that stale session move the visible player backwards.
+        if (
+            snapshot.session_id !== 0 &&
+            state.playbackSessionId !== 0 &&
+            snapshot.session_id < state.playbackSessionId
+        ) {
+            return state;
+        }
+
+        return {
+            isPlaying: snapshot.status === 'playing',
+            isAudioLoaded: snapshot.status !== 'idle',
+            currentTime: Number.isFinite(snapshot.position) ? Math.max(0, snapshot.position) : 0,
+            isSeeking: state.isSeeking,
+            playbackPath: snapshot.path,
+            mediaKind: snapshot.status === 'idle' ? null : 'audio',
+            volume: snapshot.volume * 100,
+            playbackRevision: snapshot.session_id !== 0 && snapshot.session_id !== state.playbackSessionId
+                ? state.playbackRevision + 1
+                : state.playbackRevision,
+            playbackSessionId: snapshot.session_id,
+        };
+    }),
+    setMediaKind: (mediaKind) => set({ mediaKind }),
+    setSeeking: (isSeeking) => set({ isSeeking }),
     resetPlaybackClock: (path) => set((state) => ({
         currentTime: 0,
+        isSeeking: false,
         playbackPath: path ?? null,
         playbackRevision: state.playbackRevision + 1,
     })),
-    setVolume: (volume) => {
-        set({ volume });
-        audioService.setVolume(volume / 100);
-    },
-    setVideoMode: (enabled) => set({ isVideoMode: enabled }),
+    setVolume: (volume) => set({ volume }),
+    setVideoMode: (enabled) => set({
+        isVideoMode: enabled,
+        ...(enabled ? {} : { mediaKind: null }),
+    }),
 
     setVideoMetadata: (metadata) => set({ videoMetadata: metadata }),
     setVideoQueue: (queue, startIndex) => set({ videoQueue: queue, currentVideoIndex: startIndex }),
@@ -127,9 +159,8 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     setShuffleState: (state) => set({ isShuffling: state }),
     setRepeatState: (mode) => set({ repeatMode: mode }),
 
-    // --- 动作实现 ---
+    // --- Action state helpers ---
 
-    // 切换随机 (开/关)
     toggleShuffle: () => {
         const { isShuffling } = get();
         set({ isShuffling: !isShuffling });
@@ -152,42 +183,6 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
                 // 关闭循环
                 set({ repeatMode: 'off' });
                 break;
-        }
-    },
-
-    togglePlay: async () => {
-        const { isPlaying } = get();
-        try {
-            if (isPlaying) {
-                await audioService.pause();
-                const currentTime = await audioService.getCurrentTime().catch(() => get().currentTime);
-                set({
-                    isPlaying: false,
-                    currentTime: Number.isFinite(currentTime) ? Math.max(0, currentTime) : get().currentTime,
-                });
-            } else {
-                // Check if audio is loaded. If not (and we have metadata), we must PLAY first to load it.
-                // This happens when app restarts: metadata is restored but backend audio is empty.
-                // NOTE: For video, we might handle this differently, but using standard audioService for now.
-                const { isAudioLoaded, metadata } = get();
-                if (!isAudioLoaded && metadata && metadata.path) {
-                    await audioService.play(metadata.path, metadata);
-                    set((state) => ({
-                        isPlaying: true,
-                        isAudioLoaded: true,
-                        currentTime: 0,
-                        playbackPath: metadata.path ?? null,
-                        playbackRevision: state.playbackRevision + 1,
-                    }));
-                    get().requestLyricsForPath(metadata.path);
-                } else {
-                    await audioService.resume();
-                    set({ isPlaying: true });
-                }
-            }
-        } catch (error) {
-            console.error('Toggle play failed', error);
-            if (!isPlaying) set({ isPlaying: false });
         }
     },
 

@@ -5,7 +5,6 @@ import { toast } from 'react-hot-toast';
 import type { RecentItem, SongMetadata } from '@/types';
 import { fileService } from '@/services/fileService';
 import { libraryService } from '@/services/libraryService';
-import { audioService } from '@/services/audioService';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -18,7 +17,7 @@ import { songMatchesAlbum } from '@/features/library/utils/grouping';
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 
 export function useRecentPlayback() {
-    const { playSong, playList } = usePlaybackActions();
+    const { pausePlayback, playSong, playList } = usePlaybackActions();
     const { isSelectionMode, toggleSelection } = useSelectionStore();
 
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; item: RecentItem } | null>(null);
@@ -40,16 +39,14 @@ export function useRecentPlayback() {
             path: path
         }];
 
-        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+        const { setVideoQueue, setVideoMetadata, setVideoMode, setMediaKind } = usePlayerStore.getState();
 
         setVideoQueue(queue, 0);
         setVideoMetadata(queue[0]);
         setVideoMode(true);
 
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
+        if (usePlayerStore.getState().isPlaying) await pausePlayback();
+        setMediaKind('video');
     };
 
     const buildRecentForFile = (path: string, meta: SongMetadata, isLibraryItem: boolean, existing?: RecentItem): RecentItem => {
@@ -137,14 +134,12 @@ export function useRecentPlayback() {
 
     const playVideoList = async (videos: SongMetadata[], recentItem: RecentItem) => {
         if (videos.length === 0) return;
-        const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+        const { setVideoQueue, setVideoMetadata, setVideoMode, setMediaKind } = usePlayerStore.getState();
         setVideoQueue(videos, 0);
         setVideoMetadata(videos[0]);
         setVideoMode(true);
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
+        if (usePlayerStore.getState().isPlaying) await pausePlayback();
+        setMediaKind('video');
         useLibraryStore.getState().addToRecent(recentItem);
     };
 
@@ -206,16 +201,14 @@ export function useRecentPlayback() {
             if (!firstSong.path) return;
 
             if (isVideoFile(firstSong.path)) {
-                const { setVideoQueue, setVideoMetadata, setVideoMode, setIsPlaying } = usePlayerStore.getState();
+                const { setVideoQueue, setVideoMetadata, setVideoMode, setMediaKind } = usePlayerStore.getState();
 
                 setVideoQueue(songs, 0);
                 setVideoMetadata(songs[0]);
                 setVideoMode(true);
 
-                if (usePlayerStore.getState().isPlaying) {
-                    await audioService.pause();
-                    setIsPlaying(false);
-                }
+                if (usePlayerStore.getState().isPlaying) await pausePlayback();
+                setMediaKind('video');
 
                 useLibraryStore.getState().addToRecent({ ...item, lastPlayed: Date.now() });
             } else {

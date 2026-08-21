@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { audioService } from '@/services/audioService';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface VolumePopupProps {
     show: boolean;
@@ -11,7 +11,7 @@ interface VolumePopupProps {
 export default function VolumePopup({ show, onChange }: VolumePopupProps) {
     // 从 Store 获取和设置音量
     const volume = usePlayerStore(s => s.volume);
-    const setVolume = usePlayerStore(s => s.setVolume);
+    const { setVolume: commitVolume } = usePlaybackActions();
     const [localVolume, setLocalVolume] = useState(volume);
     const [isDragging, setIsDragging] = useState(false);
 
@@ -22,14 +22,14 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
         const val = Number(e.target.value);
         setLocalVolume(val);
         // 拖动时直接改变应用内底层音频服务的音量（范围是 0 - 1），避免卡顿的同时给予实时听觉反馈
-        audioService.setVolume(val / 100);
+        void commitVolume(val);
         // 如果外部监听了拖拽变动，将实时值传递出去
         onChange?.(val);
     };
 
     const handleVolumeCommit = () => {
         setIsDragging(false);
-        setVolume(localVolume);
+        void commitVolume(localVolume);
     };
 
     return (

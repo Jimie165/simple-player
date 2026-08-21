@@ -5,7 +5,6 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useDialogStore } from '@/store/useDialogStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import { audioService } from '@/services/audioService';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
@@ -13,11 +12,12 @@ import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { VideoCard } from '@/features/videos/components/VideoCard';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
 import { getSparseGridStyle } from '@/utils/gridLayout';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
     const mainContentWidth = useMainContentWidth();
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
-    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
+    const { pausePlayback } = usePlaybackActions();
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
     const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
     const { isSelectionMode, toggleSelection, toggleSelectionMode, selectedIds } = useSelectionStore();
@@ -65,10 +65,8 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
         setVideoQueue(queue, index);
         setVideoMetadata(queue[index]);
         setVideoMode(true);
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
+        if (usePlayerStore.getState().isPlaying) await pausePlayback();
+        usePlayerStore.getState().setMediaKind('video');
 
         useLibraryStore.getState().addToRecent({
             id: video.path,

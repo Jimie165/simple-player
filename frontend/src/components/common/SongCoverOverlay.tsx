@@ -1,7 +1,7 @@
 import clsx from 'clsx';
 import { MdPlayArrow, MdPause } from 'react-icons/md';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { audioService } from '@/services/audioService';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
 import Equalizer from '@/components/common/Equalizer';
@@ -27,8 +27,7 @@ export default function SongCoverOverlay({
 }: SongCoverOverlayProps) {
     const metadata = usePlayerStore(state => state.metadata);
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    const togglePlay = usePlayerStore(state => state.togglePlay);
-    const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
+    const { restartCurrent, togglePlayback } = usePlaybackActions();
 
     // Determine if this is the currently active song
     // Prioritize manual isActive prop, then ID match, fallback to path match
@@ -44,17 +43,14 @@ export default function SongCoverOverlay({
         if (isCurrent) {
             if (restartOnPlay && song.path) {
                 try {
-                    const actualTime = await audioService.seek(0);
-                    window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
-                    await audioService.play(song.path, song);
-                    setIsPlaying(true);
+                    await restartCurrent(song);
                 } catch (error) {
                     console.error('Restart play failed', error);
                 }
             } else {
                 // If it's already the current song, just toggle play/pause
                 // This prevents the "restart from beginning" issue caused by parent's onPlay handling
-                togglePlay();
+                void togglePlayback();
             }
         } else {
             // New song, call parent handler

@@ -10,7 +10,6 @@ import { MdSearch } from 'react-icons/md';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { audioService } from '@/services/audioService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
@@ -31,10 +30,9 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [error, setError] = useState<string | null>(null);
 
     // Player controls
-    const { playSong } = usePlaybackActions();
+    const { pausePlayback, playSong } = usePlaybackActions();
     const { push } = useNavigationStore();
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
-    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
     const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
     const addToRecent = useLibraryStore(s => s.addToRecent);
@@ -164,10 +162,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         setVideoMetadata(queue[index]);
         setVideoMode(true);
 
-        if (usePlayerStore.getState().isPlaying) {
-            await audioService.pause();
-            setIsPlaying(false);
-        }
+        if (usePlayerStore.getState().isPlaying) await pausePlayback();
+        usePlayerStore.getState().setMediaKind('video');
 
         addToRecent({
             id: video.path,

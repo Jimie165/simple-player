@@ -84,6 +84,7 @@ fn main() {
             commands::player::set_reactive_background_enabled,
             commands::player::seek_audio,
             commands::player::get_audio_position,
+            commands::player::get_playback_snapshot,
             commands::player::get_lyrics,
             commands::player::get_raw_lyrics,
             commands::player::list_audio_outputs,

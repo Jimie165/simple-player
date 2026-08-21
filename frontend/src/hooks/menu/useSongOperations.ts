@@ -7,7 +7,6 @@ import { useDialogStore } from '@/store/useDialogStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { audioService } from '@/services/audioService';
 import { resolveSongsFromItems, getMusicItemType } from '@/utils/musicItemUtils';
 import type { MusicItem } from '@/utils/musicItemUtils';
 import type { SongMetadata } from '@/types';
@@ -65,11 +64,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
     // Stores
     const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite } = useLibraryStore();
-    const { playList, shufflePlay } = usePlaybackActions();
+    const { pausePlayback, playList, shufflePlay } = usePlaybackActions();
     const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const isShuffling = usePlayerStore(s => s.isShuffling);
     const isPlaying = usePlayerStore(s => s.isPlaying);
-    const setIsPlaying = usePlayerStore(s => s.setIsPlaying);
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
     const setVideoQueue = usePlayerStore(s => s.setVideoQueue);
@@ -121,9 +119,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
             // 如果音频正在播放，暂停它
             if (isPlaying) {
-                await audioService.pause();
-                setIsPlaying(false);
+                await pausePlayback();
             }
+            usePlayerStore.getState().setMediaKind('video');
         } else {
             await playList({
                 songs,
@@ -131,7 +129,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 options: { restartIfCurrent: true }
             });
         }
-    }, [items, onPlay, playList, isShuffling, setShuffleState, context, isPlaying, setIsPlaying, setVideoQueue, setVideoMetadata, setVideoMode]);
+    }, [items, onPlay, pausePlayback, playList, isShuffling, setShuffleState, context, isPlaying, setVideoQueue, setVideoMetadata, setVideoMode]);
 
     // 2. 随机播放
     const handleShufflePlay = useCallback(async () => {

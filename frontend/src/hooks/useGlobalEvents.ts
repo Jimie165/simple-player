@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 function isEditableTarget(target: EventTarget | null): boolean {
     if (!(target instanceof HTMLElement)) return false;
@@ -13,6 +14,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 export function useGlobalEvents() {
     const { refreshFavorites, refreshRecentHistory, triggerLibraryUpdate } = useLibraryStore();
+    const { togglePlayback } = usePlaybackActions();
 
     useEffect(() => {
         let unlistenLibrary: (() => void) | undefined;
@@ -52,15 +54,15 @@ export function useGlobalEvents() {
             if (event.repeat) return;
             if (isEditableTarget(event.target)) return;
 
-            const { metadata, isVideoMode, togglePlay } = usePlayerStore.getState();
-            if (isVideoMode || !metadata) return;
+            const { metadata, mediaKind } = usePlayerStore.getState();
+            if (mediaKind === 'video' || !metadata) return;
 
             event.preventDefault();
             event.stopPropagation();
-            void togglePlay();
+            void togglePlayback();
         };
 
         window.addEventListener('keydown', handleGlobalSpace, { capture: true });
         return () => window.removeEventListener('keydown', handleGlobalSpace, { capture: true });
-    }, []);
+    }, [togglePlayback]);
 }

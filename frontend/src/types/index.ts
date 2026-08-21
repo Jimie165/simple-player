@@ -153,6 +153,18 @@ export interface RecentItem {
 // 播放模式
 export type RepeatMode = 'off' | 'all' | 'one';
 
+export type MediaKind = 'audio' | 'video' | null;
+export type PlaybackStatus = 'idle' | 'playing' | 'paused' | 'ended';
+
+export interface PlaybackSnapshot {
+    session_id: number;
+    status: PlaybackStatus;
+    path: string | null;
+    position: number;
+    duration: number | null;
+    volume: number;
+}
+
 // 页面 ID
 export type PageId = 'home' | 'library' | 'videos' | 'playlists' | 'settings' | 'search';
 

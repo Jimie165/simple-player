@@ -33,6 +33,7 @@ import GlobalDialogLayer from '@/components/common/GlobalDialogLayer';
 import VideoPlayerOverlay from '@/features/player/VideoPlayerOverlay';
 import { Toaster } from 'react-hot-toast';
 import EditableContextMenu from '@/components/common/EditableContextMenu';
+import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
 
 function App() {
   const { init: initTheme } = useThemeStore();
@@ -217,6 +218,7 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans">
+      <PlaybackRuntime />
 
       {/* 1. 标题栏（始终在最顶层 z-100） */}
       <TitleBar />
@@ -285,7 +287,11 @@ function App() {
 
       <VideoPlayerOverlay
         isOpen={usePlayerStore((s) => s.isVideoMode)}
-        onClose={() => usePlayerStore.getState().setVideoMode(false)}
+        onClose={() => {
+          const state = usePlayerStore.getState();
+          state.setVideoMode(false);
+          state.setMediaKind(null);
+        }}
       />
       <EditableContextMenu />
 

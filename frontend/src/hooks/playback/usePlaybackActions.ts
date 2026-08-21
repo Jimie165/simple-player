@@ -40,31 +40,13 @@ interface PlayQueueParams {
     restartIfCurrent?: boolean;
 }
 
-const TRANSITION_ENDED_GRACE_MS = 1200;
-const ENDED_EVENT_DEDUPE_MS = 1200;
-
 let playbackTransitionRunning = false;
 let playbackTransitionId = 0;
-let ignoreEndedUntil = 0;
-let lastEndedHandledAt = 0;
-
-const suppressEndedBriefly = () => {
-    ignoreEndedUntil = Date.now() + TRANSITION_ENDED_GRACE_MS;
-};
-
-const canHandleEndedEvent = () => {
-    const now = Date.now();
-    if (playbackTransitionRunning || now < ignoreEndedUntil) return false;
-    if (now - lastEndedHandledAt < ENDED_EVENT_DEDUPE_MS) return false;
-    lastEndedHandledAt = now;
-    return true;
-};
 
 async function runPlaybackTransition(task: (transitionId: number) => Promise<void>) {
     if (playbackTransitionRunning) return;
 
     playbackTransitionRunning = true;
-    suppressEndedBriefly();
     const transitionId = ++playbackTransitionId;
 
     try {
@@ -72,7 +54,6 @@ async function runPlaybackTransition(task: (transitionId: number) => Promise<voi
     } finally {
         if (transitionId === playbackTransitionId) {
             playbackTransitionRunning = false;
-            suppressEndedBriefly();
         }
     }
 }
@@ -94,16 +75,72 @@ export function usePlaybackActions() {
     const addToRecent = useLibraryStore(state => state.addToRecent);
     const setQueueContext = useLibraryStore(state => state.setQueueContext);
     const setMetadata = usePlayerStore(state => state.setMetadata);
-    const setIsPlaying = usePlayerStore(state => state.setIsPlaying);
     const setShuffleState = usePlayerStore(state => state.setShuffleState);
     const setRepeatState = usePlayerStore(state => state.setRepeatState);
-    const togglePlay = usePlayerStore(state => state.togglePlay);
     const restartSong = usePlayerStore(state => state.restartSong);
     const togglePlayerShuffle = usePlayerStore(state => state.toggleShuffle);
-    const setAudioLoaded = usePlayerStore(state => state.setAudioLoaded);
     const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
+    const setPlaybackSnapshot = usePlayerStore(state => state.setPlaybackSnapshot);
+    const setMediaKind = usePlayerStore(state => state.setMediaKind);
+    const setSeeking = usePlayerStore(state => state.setSeeking);
     const resetPlaybackClock = usePlayerStore(state => state.resetPlaybackClock);
     const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
+
+    const togglePlayback = useCallback(async () => {
+        const state = usePlayerStore.getState();
+        const metadata = state.metadata;
+        if (!metadata?.path || state.mediaKind === 'video') return;
+
+        try {
+            const snapshot = state.isPlaying
+                ? await audioService.pause()
+                : state.isAudioLoaded
+                    ? await audioService.resume()
+                    : await audioService.play(metadata.path, metadata);
+            setMediaKind('audio');
+            setPlaybackSnapshot(snapshot);
+            if (!state.isAudioLoaded && metadata.path) {
+                await requestLyricsForPath(metadata.path);
+            }
+        } catch (error) {
+            console.error('Toggle play failed', error);
+            setPlaybackSnapshot({
+                session_id: state.playbackSessionId,
+                status: 'paused',
+                path: metadata.path ?? null,
+                position: state.currentTime,
+                duration: metadata.duration,
+                volume: state.volume / 100,
+            });
+        }
+    }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot]);
+
+    const pausePlayback = useCallback(async () => {
+        const snapshot = await audioService.pause();
+        setPlaybackSnapshot(snapshot);
+    }, [setPlaybackSnapshot]);
+
+    const resumePlayback = useCallback(async () => {
+        const state = usePlayerStore.getState();
+        if (!state.metadata?.path || state.mediaKind === 'video') return;
+
+        const snapshot = state.isAudioLoaded
+            ? await audioService.resume()
+            : await audioService.play(state.metadata.path, state.metadata);
+        setMediaKind('audio');
+        setPlaybackSnapshot(snapshot);
+        if (!state.isAudioLoaded) await requestLyricsForPath(state.metadata.path);
+    }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot]);
+
+    const restartCurrent = useCallback(async (song: SongMetadata) => {
+        if (!song.path) return;
+        const snapshot = await audioService.play(song.path, song);
+        setMetadata(song);
+        resetPlaybackClock(song.path);
+        setMediaKind('audio');
+        setPlaybackSnapshot(snapshot);
+        requestLyricsForPath(song.path);
+    }, [requestLyricsForPath, resetPlaybackClock, setMediaKind, setMetadata, setPlaybackSnapshot]);
 
     const applyQueueItemPlayback = useCallback(async (
         song: SongMetadata,
@@ -115,7 +152,7 @@ export function usePlaybackActions() {
         const { currentSongIndex } = useLibraryStore.getState();
 
         if (index === currentSongIndex && !restartIfCurrent) {
-            await togglePlay();
+            await togglePlayback();
             return;
         }
 
@@ -128,10 +165,9 @@ export function usePlaybackActions() {
                 const actualTime = await audioService.seek(0);
                 if (!isActiveTransition(transitionId)) return;
                 setPlaybackTime(actualTime);
-                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
 
-            await audioService.play(song.path, song);
+            const snapshot = await audioService.play(song.path, song);
             if (!isActiveTransition(transitionId)) return;
 
             if (!autoPlay) {
@@ -144,10 +180,9 @@ export function usePlaybackActions() {
             resetPlaybackClock(song.path);
             setCurrentSongIndex(index);
             setMetadata(song);
-            setIsPlaying(autoPlay);
-            setAudioLoaded(true);
+            setMediaKind('audio');
+            setPlaybackSnapshot({ ...snapshot, status: autoPlay ? 'playing' : 'paused' });
             requestLyricsForPath(song.path);
-            window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: 0 } }));
         } catch (error) {
             console.error('Queue play failed', error);
         }
@@ -155,12 +190,12 @@ export function usePlaybackActions() {
         requestLyricsForPath,
         resetPlaybackClock,
         restartSong,
-        setAudioLoaded,
         setCurrentSongIndex,
-        setIsPlaying,
+        setMediaKind,
         setMetadata,
+        setPlaybackSnapshot,
         setPlaybackTime,
-        togglePlay,
+        togglePlayback,
     ]);
 
     const toggleShuffle = useCallback(() => {
@@ -181,7 +216,7 @@ export function usePlaybackActions() {
         const isCurrent = isSameSong(metadata, song);
 
         if (isCurrent && !options?.restartIfCurrent) {
-            await togglePlay();
+            await togglePlayback();
             return;
         }
 
@@ -190,16 +225,15 @@ export function usePlaybackActions() {
                 const actualTime = await audioService.seek(0);
                 if (!isActiveTransition(transitionId)) return;
                 setPlaybackTime(actualTime);
-                window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
             }
 
-            await audioService.play(song.path, song);
+            const snapshot = await audioService.play(song.path, song);
             if (!isActiveTransition(transitionId)) return;
 
             resetPlaybackClock(song.path);
             setMetadata(song);
-            setIsPlaying(true);
-            setAudioLoaded(true);
+            setMediaKind('audio');
+            setPlaybackSnapshot(snapshot);
             requestLyricsForPath(song.path);
 
             if (playlist && playlist.length > 0) {
@@ -234,21 +268,28 @@ export function usePlaybackActions() {
             }
         } catch (error) {
             console.error('Play failed', error);
-            setIsPlaying(false);
+            setPlaybackSnapshot({
+                session_id: usePlayerStore.getState().playbackSessionId,
+                status: 'paused',
+                path: song.path,
+                position: usePlayerStore.getState().currentTime,
+                duration: song.duration,
+                volume: usePlayerStore.getState().volume / 100,
+            });
         }
     }, [
         addToRecent,
         requestLyricsForPath,
         resetPlaybackClock,
-        setAudioLoaded,
         setCurrentSongIndex,
-        setIsPlaying,
+        setMediaKind,
         setMetadata,
+        setPlaybackSnapshot,
         setPlaybackTime,
         setPlaylist,
         setQueueContext,
         setShuffleState,
-        togglePlay,
+        togglePlayback,
         toggleShuffleList,
     ]);
 
@@ -338,16 +379,27 @@ export function usePlaybackActions() {
         const { isAudioLoaded, metadata } = usePlayerStore.getState();
 
         if (!isAudioLoaded && metadata?.path) {
-            await audioService.load(metadata.path, metadata);
-            setAudioLoaded(true);
+            const snapshot = await audioService.load(metadata.path, metadata);
+            setMediaKind('audio');
+            setPlaybackSnapshot(snapshot);
             requestLyricsForPath(metadata.path);
         }
 
-        const actualTime = await audioService.seek(time);
-        setPlaybackTime(actualTime);
-        window.dispatchEvent(new CustomEvent('playback:seeked', { detail: { time: actualTime } }));
-        return actualTime;
-    }, [requestLyricsForPath, setAudioLoaded, setPlaybackTime]);
+        setSeeking(true);
+        try {
+            const actualTime = await audioService.seek(time);
+            setPlaybackTime(actualTime);
+            return actualTime;
+        } finally {
+            setSeeking(false);
+        }
+    }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot, setPlaybackTime, setSeeking]);
+
+    const setVolume = useCallback(async (volume: number) => {
+        const clamped = Math.max(0, Math.min(100, volume));
+        await audioService.setVolume(clamped / 100);
+        usePlayerStore.getState().setVolume(clamped);
+    }, []);
 
     const playNext = useCallback(async () => {
         await runPlaybackTransition(async (transitionId) => {
@@ -385,7 +437,7 @@ export function usePlaybackActions() {
     }, [applyQueueItemPlayback, seek]);
 
     const handlePlaybackEnded = useCallback(async () => {
-        if (!canHandleEndedEvent()) return;
+        if (playbackTransitionRunning) return;
 
         await runPlaybackTransition(async (transitionId) => {
             const { playlist, currentSongIndex, getNextIndex } = useLibraryStore.getState();
@@ -425,6 +477,11 @@ export function usePlaybackActions() {
         playPrev,
         handlePlaybackEnded,
         seek,
+        setVolume,
+        pausePlayback,
+        resumePlayback,
+        restartCurrent,
+        togglePlayback,
         toggleShuffle
     };
 }

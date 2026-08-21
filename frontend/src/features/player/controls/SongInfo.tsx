@@ -5,6 +5,7 @@ import type { SongMetadata } from '@/types';
 import CoverImage from '@/components/common/CoverImage';
 import OverflowMarquee from '@/components/common/OverflowMarquee';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
@@ -16,6 +17,8 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 
 export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }: SongInfoProps) {
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
+    const setMediaKind = usePlayerStore(s => s.setMediaKind);
+    const { pausePlayback } = usePlaybackActions();
     const { push } = useNavigationStore();
     const canNavigate = !!metadata && typeof metadata.id === 'number';
 
@@ -25,7 +28,12 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                 onClick={() => {
                     const isVideo = metadata?.path?.match(/\.(mp4|mkv|webm|avi|mov|flv)$/i);
                     if (isVideo) {
-                        setVideoMode(true);
+                        void pausePlayback()
+                            .then(() => {
+                                setVideoMode(true);
+                                setMediaKind('video');
+                            })
+                            .catch((error) => console.error('Failed to pause audio before video playback', error));
                     } else {
                         onToggleFullScreen();
                     }
