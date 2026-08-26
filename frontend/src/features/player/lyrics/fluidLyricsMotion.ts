@@ -24,6 +24,7 @@ interface FluidLyricsMotionArgs {
     displayItems: DisplayItem[];
     focusNextLineByVisualEnd: boolean;
     isPlaying: boolean;
+    isSeeking: boolean;
     isUserScrolling: boolean;
     variant: 'side' | 'narrow';
 }
@@ -72,9 +73,10 @@ export function getFluidLyricsSpringParams({
     activeDisplayIndex,
     displayItems,
     isPlaying,
+    isSeeking,
     isUserScrolling,
 }: FluidLyricsMotionArgs): FluidSpringParams {
-    if (!isPlaying || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
+    if (!isPlaying || isSeeking || isUserScrolling || activeDisplayIndex <= 0 || activeDisplayIndex >= displayItems.length) {
         return { stiffness: 90, damping: 15, mass: 1 };
     }
 

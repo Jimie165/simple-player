@@ -73,6 +73,10 @@ function FluidLyricsPanel({
         syncRevision: number;
         targetMs: number;
     } | null>(null);
+    const [pendingLineSeek, setPendingLineSeek] = useState<{
+        syncRevision: number;
+        targetMs: number;
+    } | null>(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
     const [frameScheduler] = useState(() => new LyricsFrameScheduler());
@@ -105,6 +109,9 @@ function FluidLyricsPanel({
         true,
         frameScheduler,
     );
+    const isLineSeekSync = pendingLineSeek !== null &&
+        pendingLineSeek.syncRevision !== syncRevision &&
+        Math.abs(renderCurrentMs - pendingLineSeek.targetMs) <= lineSeekSyncToleranceMs;
     const previousSpatialSyncRevisionRef = useRef(syncRevision);
     const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
         () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
@@ -238,6 +245,7 @@ function FluidLyricsPanel({
         previousTargetYRef.current = 0;
         pendingLineSeekRef.current = null;
         const frame = requestAnimationFrame(() => {
+            setPendingLineSeek(null);
             setPausedScroll(false);
             setIsUserScrolling(false);
             updateTargetScrollY(0);
@@ -285,6 +293,7 @@ function FluidLyricsPanel({
 
     const handleManualDelta = useCallback((deltaY: number) => {
         pendingLineSeekRef.current = null;
+        setPendingLineSeek(null);
         if (deltaY !== 0) onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
         setIsUserScrolling(true);
         if (!isPlaying) {
@@ -305,14 +314,14 @@ function FluidLyricsPanel({
             clearTimeout(resumeTimeoutRef.current);
             resumeTimeoutRef.current = null;
         }
-        if (isUserScrolling) {
-            pendingLineSeekRef.current = {
-                syncRevision,
-                targetMs: time * 1000,
-            };
-        }
+        const pendingSeek = {
+            syncRevision,
+            targetMs: time * 1000,
+        };
+        pendingLineSeekRef.current = pendingSeek;
+        setPendingLineSeek(pendingSeek);
         onSeek(time);
-    }, [isUserScrolling, keepCurrentInterludeForExit, onSeek, syncRevision]);
+    }, [keepCurrentInterludeForExit, onSeek, syncRevision]);
 
     useEffect(() => {
         const pendingSeek = pendingLineSeekRef.current;
@@ -322,6 +331,7 @@ function FluidLyricsPanel({
         const frame = requestAnimationFrame(() => {
             if (pendingLineSeekRef.current !== pendingSeek) return;
             pendingLineSeekRef.current = null;
+            setPendingLineSeek(null);
             // seek 已同步到新歌词行后再恢复跟随，避免旧播放位置先进入一次弹簧目标。
             firstPositionDoneRef.current = false;
             setIsUserScrolling(false);
@@ -334,10 +344,11 @@ function FluidLyricsPanel({
             displayItems,
             focusNextLineByVisualEnd,
             isPlaying,
+            isSeeking: isLineSeekSync,
             isUserScrolling,
             variant,
         }),
-        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
+        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isLineSeekSync, isPlaying, isUserScrolling, variant]
     );
     const getMotionDelay = useCallback(
         (displayIndex: number) => getFluidLyricsMotionDelay({
@@ -345,10 +356,11 @@ function FluidLyricsPanel({
             displayItems,
             focusNextLineByVisualEnd,
             isPlaying,
+            isSeeking: isLineSeekSync,
             isUserScrolling,
             variant,
         }, displayIndex),
-        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
+        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isLineSeekSync, isPlaying, isUserScrolling, variant]
     );
     const registerAnimatedRow = useFluidLyricsAnimator({
         activeDisplayIndex,
@@ -367,6 +379,7 @@ function FluidLyricsPanel({
         itemHeights,
         itemTops,
         onVisibleIndicesChange: updateVisibleIndices,
+        preserveMotionOnSync: isLineSeekSync,
         suppressRowDelay: isViewportResizing,
         syncRevision,
         viewportHeight,

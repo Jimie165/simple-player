@@ -53,6 +53,7 @@ interface FluidLyricsAnimatorArgs {
     itemHeights: number[];
     itemTops: number[];
     onVisibleIndicesChange: (indices: readonly number[]) => void;
+    preserveMotionOnSync: boolean;
     suppressRowDelay: boolean;
     syncRevision: number;
     viewportHeight: number;
@@ -305,13 +306,16 @@ class FluidLyricsAnimator {
         }
     }
 
-    synchronizeToTargets(syncRevision: number) {
+    synchronizeToTargets(syncRevision: number, preserveMotion: boolean) {
         if (this.lastSyncRevision === null) {
             this.lastSyncRevision = syncRevision;
             return;
         }
         if (this.lastSyncRevision === syncRevision) return;
         this.lastSyncRevision = syncRevision;
+        // 点击 Seek 会重建激活组并切换到稳定弹簧，但仍从当前位置运动到
+        // 新目标；仅普通时钟硬同步继续立即对齐，避免累计漂移。
+        if (preserveMotion) return;
         this.rows.forEach((state, index) => {
             state.translateY.setPosition(state.targetY);
             state.scale.setPosition(state.targetScale);
@@ -405,6 +409,7 @@ export function useFluidLyricsAnimator({
     itemHeights,
     itemTops,
     onVisibleIndicesChange,
+    preserveMotionOnSync,
     suppressRowDelay,
     syncRevision,
     viewportHeight,
@@ -486,8 +491,8 @@ export function useFluidLyricsAnimator({
             suppressRowDelay,
             parentDisplayIndexMap,
         );
-        animator.synchronizeToTargets(syncRevision);
-    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, suppressRowDelay, syncRevision, targetScrollY, variant, visualShifts]);
+        animator.synchronizeToTargets(syncRevision, preserveMotionOnSync);
+    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, preserveMotionOnSync, springParams, suppressRowDelay, syncRevision, targetScrollY, variant, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

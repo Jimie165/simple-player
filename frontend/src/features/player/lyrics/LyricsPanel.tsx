@@ -281,6 +281,15 @@ export default function LyricsPanel({
 
     const handleLineSeek = useCallback((time: number) => {
         keepCurrentInterludeForExit();
+        if (userScrollTimeoutRef.current) {
+            clearTimeout(userScrollTimeoutRef.current);
+            userScrollTimeoutRef.current = null;
+        }
+        //歌词点击 Seek 时立即 resetScroll，避免 pointerdown 留下的手动滚动
+        // 状态阻塞新激活行的高亮和跟随。
+        setIsUserScrolling(false);
+        lastAutoScrollIndexRef.current = null;
+        preferSmoothAutoScrollRef.current = true;
         onSeek(time);
     }, [keepCurrentInterludeForExit, onSeek]);
 
