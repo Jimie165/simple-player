@@ -1,82 +1,102 @@
 const fs = require('fs');
 const path = require('path');
 
-const rawVersion = process.argv[2];
-
-if (!rawVersion) {
-    console.error('Please provide a version number. Usage: node scripts/bump-version.js <version>');
-    process.exit(1);
-}
-
-const version = rawVersion.trim().replace(/^v/, '');
-const semverRegex = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
-
-if (!semverRegex.test(version)) {
-    console.error(`Invalid version "${rawVersion}". Expected SemVer like 1.2.3, optionally with -pre or +build.`);
-    process.exit(1);
-}
-
-const files = [
-    'package.json',
-    'frontend/package.json',
-    'backend/tauri/tauri.conf.json',
-    'backend/tauri/Cargo.toml'
+const root = path.resolve(__dirname, '..');
+const semverPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/;
+const jsonFiles = [
+    ['package.json', 2],
+    ['frontend/package.json', 2],
+    ['backend/tauri/tauri.conf.json', 4],
 ];
 
-const rootDir = path.resolve(__dirname, '..');
-
-files.forEach(file => {
-    const filePath = path.join(rootDir, file);
-    if (fs.existsSync(filePath)) {
-        let content = fs.readFileSync(filePath, 'utf8');
-        const lineEnding = content.includes('\r\n') ? '\r\n' : '\n';
-
-        if (file.endsWith('.json')) {
-            try {
-                const json = JSON.parse(content);
-                json.version = version;
-                const indent = file === 'backend/tauri/tauri.conf.json' ? 4 : 2;
-                content = JSON.stringify(json, null, indent) + '\n';
-                if (lineEnding !== '\n') {
-                    content = content.replace(/\n/g, lineEnding);
-                }
-            } catch (err) {
-                console.error(`Failed to parse JSON in ${file}:`, err);
-                process.exit(1);
-            }
-        } else if (file.endsWith('.toml')) {
-            // Replace version inside [package] section only
-            const lines = content.split(/\r?\n/);
-            let inPackage = false;
-            let updated = false;
-
-            for (let i = 0; i < lines.length; i += 1) {
-                const line = lines[i];
-                const sectionMatch = line.match(/^\s*\[(.+?)\]\s*$/);
-                if (sectionMatch) {
-                    inPackage = sectionMatch[1] === 'package';
-                }
-
-                if (inPackage && /^\s*version\s*=/.test(line)) {
-                    lines[i] = line.replace(/^\s*version\s*=\s*".*?"/, `version = "${version}"`);
-                    updated = true;
-                    break;
-                }
-            }
-
-            if (!updated) {
-                console.error(`Failed to update version in ${file}: [package] version not found.`);
-                process.exit(1);
-            }
-
-            content = lines.join(lineEnding) + lineEnding;
-        }
-
-        fs.writeFileSync(filePath, content);
-        console.log(`Updated ${file} to version ${version}`);
-    } else {
-        console.warn(`File not found: ${file}`);
+function normalizeVersion(value) {
+    const version = value.trim().replace(/^v/, '');
+    if (!semverPattern.test(version)) {
+        throw new Error(`Invalid SemVer "${value}".`);
     }
-});
+    return version;
+}
 
-console.log(`Successfully bumped version to ${version}`);
+function parseVersion(value) {
+    const version = normalizeVersion(value);
+    const match = version.match(semverPattern);
+    return {
+        version,
+        major: Number(match[1]),
+        minor: Number(match[2]),
+        patch: Number(match[3]),
+        prerelease: match[4] ? match[4].split('.') : [],
+    };
+}
+
+function nextPrerelease(current, preid) {
+    if (current.prerelease.length === 0) {
+        return `${current.major}.${current.minor}.${current.patch + 1}-${preid}.0`;
+    }
+    if (current.prerelease[0] !== preid) {
+        return `${current.major}.${current.minor}.${current.patch}-${preid}.0`;
+    }
+
+    const identifiers = [...current.prerelease];
+    const numericIndex = identifiers.findLastIndex(identifier => /^\d+$/.test(identifier));
+    if (numericIndex < 0) identifiers.push('0');
+    else identifiers[numericIndex] = String(Number(identifiers[numericIndex]) + 1);
+    return `${current.major}.${current.minor}.${current.patch}-${identifiers.join('.')}`;
+}
+
+function resolveVersion(currentValue, request, preid) {
+    const current = parseVersion(currentValue);
+    switch (request) {
+        case 'major': return `${current.major + 1}.0.0`;
+        case 'minor': return `${current.major}.${current.minor + 1}.0`;
+        case 'patch': return `${current.major}.${current.minor}.${current.patch + 1}`;
+        case 'premajor': return `${current.major + 1}.0.0-${preid}.0`;
+        case 'preminor': return `${current.major}.${current.minor + 1}.0-${preid}.0`;
+        case 'prepatch': return `${current.major}.${current.minor}.${current.patch + 1}-${preid}.0`;
+        case 'prerelease': return nextPrerelease(current, preid);
+        default: return normalizeVersion(request);
+    }
+}
+
+function readJson(file) {
+    return JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+}
+
+function writeJson(file, indent, version) {
+    const filePath = path.join(root, file);
+    const original = fs.readFileSync(filePath, 'utf8');
+    const lineEnding = original.includes('\r\n') ? '\r\n' : '\n';
+    const content = `${JSON.stringify({ ...JSON.parse(original), version }, null, indent)}\n`;
+    fs.writeFileSync(filePath, lineEnding === '\n' ? content : content.replace(/\n/g, lineEnding));
+}
+
+try {
+    const args = process.argv.slice(2);
+    const checkOnly = args.includes('--check');
+    const request = args.find(arg => !arg.startsWith('--'));
+    const preid = args.find(arg => arg.startsWith('--preid='))?.slice(8) || 'alpha';
+    if (!/^[0-9A-Za-z-]+$/.test(preid)) throw new Error(`Invalid prerelease identifier "${preid}".`);
+
+    const rootVersion = normalizeVersion(readJson('package.json').version);
+    const versions = jsonFiles.slice(1).map(([file]) => [file, normalizeVersion(readJson(file).version)]);
+    const mismatches = versions.filter(([, version]) => version !== rootVersion);
+
+    if (checkOnly) {
+        if (mismatches.length > 0) {
+            mismatches.forEach(([file, version]) => console.error(`${file}: ${version} (expected ${rootVersion})`));
+            process.exit(1);
+        }
+        console.log(`All project versions are synchronized at ${rootVersion}.`);
+        process.exit(0);
+    }
+    if (!request) {
+        throw new Error('Usage: pnpm bump <major|minor|patch|premajor|preminor|prepatch|prerelease|semver> [--preid=alpha]');
+    }
+
+    const version = resolveVersion(rootVersion, request.replace(/^v/, ''), preid);
+    jsonFiles.forEach(([file, indent]) => writeJson(file, indent, version));
+    console.log(`Updated project version: ${rootVersion} -> ${version}`);
+} catch (error) {
+    console.error(error instanceof Error ? error.message : error);
+    process.exit(1);
+}

@@ -138,7 +138,13 @@ Vite 开发服务器固定使用 `5173` 端口；端口被占用时 `pnpm dev` �
 | `pnpm --filter simple-player-ui build` | 运行前端 TypeScript 检查并构建 |
 | `cargo check --manifest-path backend/Cargo.toml` | 检查 Rust workspace |
 | `cargo test --manifest-path backend/Cargo.toml` | 运行 Rust 测试 |
-| `pnpm bump <semver>` | 同步更新前端、后端和 Tauri 配置中的版本号 |
+| `pnpm bump <类型或 semver>` | 以根 `package.json` 为版本源，同步更新前端包和 Tauri 配置 |
+| `pnpm version:check` | 检查项目内所有版本号是否一致 |
+
+版本号遵循 SemVer。正式版本使用 `pnpm bump major`、`pnpm bump minor` 或
+`pnpm bump patch` 递增；预发布版本可使用 `premajor`、`preminor`、`prepatch`
+和 `prerelease`，并通过 `--preid=alpha` 指定预发布通道。也可以传入完整版本号，
+例如 `pnpm bump 1.0.0-beta.1`。脚本只修改版本文件，不自动提交、打标签或发布。
 
 > 根目录的 `pnpm test` 当前是占位脚本，不是有效的测试命令。
 

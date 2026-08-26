@@ -33,6 +33,7 @@
         "fs:allow-appcache-read-recursive",
         "fs:allow-appcache-write-recursive",
         "core:path:default",
+        "shell:allow-open",
         {
             "identifier": "shell:allow-execute",
             "allow": [

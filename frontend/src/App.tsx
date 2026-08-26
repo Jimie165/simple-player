@@ -34,6 +34,7 @@ import VideoPlayerOverlay from '@/features/player/VideoPlayerOverlay';
 import { Toaster } from 'react-hot-toast';
 import EditableContextMenu from '@/components/common/EditableContextMenu';
 import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
+import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
 
 function App() {
   const { init: initTheme } = useThemeStore();
@@ -114,6 +115,7 @@ function App() {
 
   useQueuePersistence(); // Activate queue persistence
   useGlobalEvents(); // Activate global event listeners
+  useAutoUpdateCheck();
 
   // In compact mode, always use overlay sidebar (regardless of collapsed state)
   const isSidebarOverlay = isCompactSidebar;

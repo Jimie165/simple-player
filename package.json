@@ -9,7 +9,11 @@
     "preview": "pnpm --filter simple-player-ui preview",
     "lint": "pnpm --filter simple-player-ui lint",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "bump": "node scripts/bump-version.js"
+    "bump": "node scripts/bump-version.js",
+    "version:check": "node scripts/bump-version.js --check",
+    "version:major": "node scripts/bump-version.js major",
+    "version:minor": "node scripts/bump-version.js minor",
+    "version:patch": "node scripts/bump-version.js patch"
   },
   "keywords": [],
   "author": "",
