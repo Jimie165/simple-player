@@ -346,8 +346,8 @@ body {
   }
 
 
-  /* Keep the covered page laid out for seamless player transitions, while
-     stopping decorative CSS animation work behind the opaque player. */
+  /* Keep the covered app layer laid out for seamless player transitions, while
+     stopping its input, animation and paint work behind the opaque player. */
   .base-layer-paused,
   .base-layer-paused * {
     pointer-events: none !important;
@@ -362,7 +362,7 @@ body {
   /* 保留 React 状态和滚动位置，但让完全被播放器遮挡的页面退出渲染管线。 */
   .base-layer-frozen {
     content-visibility: hidden;
-    contain: strict;
+    contain: layout style paint;
   }
 
   .main-content-query {
@@ -419,13 +419,33 @@ body {
 }
 
 /* ── Karaoke dual-layer character ── */
+@property --kfa {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.karaoke-text-colors {
+  transition: --kfa 500ms ease-in-out;
+}
+
 .karaoke-char {
   position: relative;
   display: inline-block;
   white-space: pre-wrap;
+  /* 这一层只负责运动，不承载文字、mask 或 text-shadow。
+  绘制内容可以作为稳定纹理被整体移动。 */
+  transform: translate3d(0, 0, 0) scale(1);
   transform-origin: center;
   transition: none;
   overflow: visible;
+}
+
+.karaoke-char-paint {
+  position: relative;
+  display: inline-block;
+  white-space: pre-wrap;
+  vertical-align: baseline;
   color: rgba(255, 255, 255, var(--kb, 0.30));
   text-shadow: 0 0 5px rgba(255, 255, 255, var(--kg, 0));
   
@@ -435,66 +455,50 @@ body {
   margin: -0.1em;
 }
 
-/* 只在字符实际运动及归位缓冲期维持合成层，避免未来/已完成的长音字符
-   长期占用独立表面；延迟释放由 KaraokeText 控制以防重新栅格化跳变。 */
-.karaoke-char-motion {
+/* 长音的强调 transform 与辉光会同时回到零。保持运动壳的合成状态，
+   避免结束帧降级图层并重新栅格化字形。 */
+.karaoke-char-long-tone {
   will-change: transform;
   backface-visibility: hidden;
 }
 
-/* 保留逐字符上浮，只让一个行级合成层在退出时反向抵消共同的上浮量。 */
-.karaoke-line-exit-prepared {
-  will-change: transform;
-  backface-visibility: hidden;
-}
-
-.karaoke-line-exiting {
-  transform: translateY(0.078em);
+/* 退出时反向播放每个词的动画；字符保留自己的当前位移，
+   再分别回到静止态，避免整行统一平移造成字符级运动跳变。 */
+.karaoke-char-exiting {
   transition: transform 280ms ease-out;
 }
 
-/* 提前换行时可能只有最后几个字符尚未升到峰值；让它们随行级补偿同步
-   到达共同终点，避免终点切换时产生微小位置差。 */
-.karaoke-line-exiting .karaoke-char-exit-tail {
-  transform: translate3d(0, -0.078em, 0) scale(1) !important;
-  transition: transform 280ms ease-out;
+.karaoke-char-exiting .karaoke-char-paint {
+  transition: text-shadow 280ms ease-out;
 }
 
-/* 行级 +0.078em 与字符级 -0.078em 已互相抵消后，原子切换到零状态。
-   后续删除内联样式时这一规则会维持视觉不变。 */
-.karaoke-line-exiting.karaoke-line-reset {
-  transform: translateY(0);
-  transition: none;
-}
-
-.karaoke-line-reset .karaoke-char[style*="transform"] {
-  transform: translate3d(0, 0, 0) scale(1) !important;
-  transition: none;
-}
-
-.karaoke-char::before {
+.karaoke-char-paint::before {
   content: attr(data-c);
   position: absolute;
   inset: 0;
   padding: inherit;
   pointer-events: none;
-  color: rgba(255, 255, 255, var(--kfa, 1));
+  color: rgba(255, 255, 255, var(--kfa, 0));
   -webkit-mask-image: linear-gradient(
     to right,
     black 0%,
-    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    black max(0%, calc(var(--kf, -100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, -100) * 1%),
+    transparent min(125%, calc(var(--kf, -100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to right,
     black 0%,
-    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    black max(0%, calc(var(--kf, -100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, -100) * 1%),
+    transparent min(125%, calc(var(--kf, -100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
+}
+
+.fluid-lyrics-row-shell {
+  transition: filter 380ms ease-out, opacity 350ms ease-out;
 }
 
 /* Equalizer Animation */

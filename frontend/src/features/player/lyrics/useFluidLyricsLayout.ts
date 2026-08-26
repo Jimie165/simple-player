@@ -5,8 +5,7 @@ import type { DisplayItem } from '@/features/player/lyrics/types';
 const DEFAULT_LINE_HEIGHT_PX = 90;
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
-const OVERSCAN_PX = 300;
-const RETAINED_WINDOW_DURATION_MS = 1600;
+const VIEWPORT_RESIZE_SETTLE_MS = 120;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -15,7 +14,6 @@ interface FluidLyricsLayoutArgs {
     activeDisplayIndex: number;
     activeFocusOffset: number;
     displayItems: DisplayItem[];
-    includeActiveWindow: boolean;
     interludeRowHeight: number;
     variant: 'side' | 'narrow';
     visualShifts: number[];
@@ -26,6 +24,11 @@ interface ViewportSize {
     height: number;
 }
 
+interface ItemMeasurement {
+    height: number;
+    width: number;
+}
+
 /**
  * 为动画优先歌词维护轻量布局模型，只挂载视口与过渡窗口内的昂贵行内容。
  */
@@ -33,7 +36,6 @@ export function useFluidLyricsLayout({
     activeDisplayIndex,
     activeFocusOffset,
     displayItems,
-    includeActiveWindow,
     interludeRowHeight,
     variant,
     visualShifts,
@@ -42,20 +44,25 @@ export function useFluidLyricsLayout({
     const itemObserverRef = useRef<ResizeObserver | null>(null);
     const nodeIndexesRef = useRef(new WeakMap<Element, number>());
     const observedNodesRef = useRef(new Set<HTMLDivElement>());
+    const lastViewportWidthRef = useRef(0);
+    const viewportResizeTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
-    const retainedWindowTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const heightCacheRef = useRef<{
         items: DisplayItem[];
-        heights: Map<number, number>;
-    }>({ items: displayItems, heights: new Map() });
+        measurements: Map<number, ItemMeasurement>;
+    }>({ items: displayItems, measurements: new Map() });
     const [measurements, setMeasurements] = useState<{
         items: DisplayItem[];
-        heights: Map<number, number>;
-    }>({ items: displayItems, heights: new Map() });
+        measurements: Map<number, ItemMeasurement>;
+    }>({ items: displayItems, measurements: new Map() });
     const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
+    const [isViewportResizing, setIsViewportResizing] = useState(false);
     const [targetScrollY, setTargetScrollYState] = useState(0);
-    const [retainedScrollY, setRetainedScrollY] = useState<number | null>(null);
+    const [spatialVisibility, setSpatialVisibility] = useState<{
+        items: DisplayItem[];
+        indices: number[];
+    } | null>(null);
 
     const focusAlpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
     const topSpacerHeight = viewportSize.height * focusAlpha;
@@ -64,9 +71,9 @@ export function useFluidLyricsLayout({
         : viewportSize.height * (1 - focusAlpha);
 
     const layout = useMemo(() => {
-        const measuredHeights = measurements.items === displayItems
-            ? measurements.heights
-            : new Map<number, number>();
+        const measuredItems = measurements.items === displayItems
+            ? measurements.measurements
+            : new Map<number, ItemMeasurement>();
         const itemTops = new Array<number>(displayItems.length);
         const itemHeights = new Array<number>(displayItems.length);
         let cursor = topSpacerHeight + topInsetPx;
@@ -77,7 +84,7 @@ export function useFluidLyricsLayout({
                 : item.type === 'line' && item.line.role === 'background'
                     ? 0
                     : DEFAULT_LINE_HEIGHT_PX;
-            const height = measuredHeights.get(index) ?? estimatedHeight;
+            const height = measuredItems.get(index)?.height ?? estimatedHeight;
             itemTops[index] = cursor;
             itemHeights[index] = height;
             cursor += height;
@@ -103,90 +110,91 @@ export function useFluidLyricsLayout({
         );
     }, [activeDisplayIndex, activeFocusOffset, focusAlpha, layout.itemHeights, layout.itemTops, maxScrollY, viewportSize.height, visualShifts]);
 
-    const setTargetScrollY = useCallback((value: number, retainPrevious = true) => {
+    const setTargetScrollY = useCallback((value: number) => {
         const nextTarget = clamp(value, 0, maxScrollYRef.current);
-        const previousTarget = targetScrollYRef.current;
-
-        if (retainPrevious && Math.abs(nextTarget - previousTarget) > OVERSCAN_PX) {
-            setRetainedScrollY(previousTarget);
-            if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
-            retainedWindowTimerRef.current = window.setTimeout(() => {
-                setRetainedScrollY(null);
-                retainedWindowTimerRef.current = null;
-            }, RETAINED_WINDOW_DURATION_MS);
-        } else if (!retainPrevious) {
-            if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
-            retainedWindowTimerRef.current = null;
-            setRetainedScrollY(null);
-        }
-
         targetScrollYRef.current = nextTarget;
         setTargetScrollYState(nextTarget);
         return nextTarget;
     }, []);
 
-    const visibleIndices = useMemo(() => {
-        const windows = [targetScrollY];
-        if (includeActiveWindow) windows.push(activeTargetScrollY);
-        if (retainedScrollY !== null) windows.push(retainedScrollY);
-
-        const visualTops = layout.itemTops.map((top, index) => top + (visualShifts[index] ?? 0));
-        const visible = new Set<number>();
-        const lowerBound = (value: number) => {
-            let low = 0;
-            let high = visualTops.length;
-            while (low < high) {
-                const middle = (low + high) >> 1;
-                if (visualTops[middle] < value) low = middle + 1;
-                else high = middle;
+    const updateVisibleIndices = useCallback((indices: readonly number[]) => {
+        setSpatialVisibility(previous => {
+            if (
+                previous?.items === displayItems &&
+                previous.indices.length === indices.length &&
+                previous.indices.every((value, index) => value === indices[index])
+            ) {
+                return previous;
             }
-            return low;
-        };
+            return { items: displayItems, indices: [...indices] };
+        });
+    }, [displayItems]);
 
-        windows.forEach(windowTop => {
-            const minimum = windowTop - OVERSCAN_PX;
-            const maximum = windowTop + viewportSize.height + OVERSCAN_PX;
-            const firstIndex = Math.max(0, lowerBound(minimum) - 1);
-            const endIndex = Math.min(displayItems.length, lowerBound(maximum) + 1);
-            for (let index = firstIndex; index < endIndex; index++) {
-                const visualBottom = visualTops[index] + layout.itemHeights[index];
-                if (visualBottom >= minimum && visualTops[index] <= maximum) visible.add(index);
+    const initialVisibleIndices = useMemo(() => {
+        if (viewportSize.height <= 0) return [];
+        const minimum = -300;
+        const maximum = viewportSize.height + 300;
+        const initialVisible: number[] = [];
+        layout.itemTops.forEach((itemTop, index) => {
+            const top = itemTop + (visualShifts[index] ?? 0) - targetScrollY;
+            if (top + layout.itemHeights[index] >= minimum && top <= maximum) {
+                initialVisible.push(index);
             }
         });
-        return [...visible].sort((left, right) => left - right);
-    }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, retainedScrollY, targetScrollY, viewportSize.height, visualShifts]);
+        return initialVisible;
+    }, [layout.itemHeights, layout.itemTops, targetScrollY, viewportSize.height, visualShifts]);
+    const visibleIndices = spatialVisibility?.items === displayItems
+        ? spatialVisibility.indices
+        : initialVisibleIndices;
 
-    const measureItems = useCallback((updates: ReadonlyMap<number, number>) => {
+    const cachedItemHeights = useMemo(() => layout.itemHeights.map((_height, index) => {
+        const measurement = measurements.items === displayItems
+            ? measurements.measurements.get(index)
+            : undefined;
+        return measurement && Math.abs(measurement.width - viewportSize.width) < 0.5
+            ? measurement.height
+            : null;
+    }), [displayItems, layout.itemHeights, measurements, viewportSize.width]);
+
+    const measureItems = useCallback((updates: ReadonlyMap<number, ItemMeasurement>) => {
         if (updates.size === 0) return;
         // 背景行在布局模型中恒为 0 高度（间奏式折叠，不占位），
         // 激活时的撑开由面板的 visualShifts 处理，因此忽略其测量。
-        const filteredUpdates = new Map<number, number>();
-        updates.forEach((height, index) => {
+        const filteredUpdates = new Map<number, ItemMeasurement>();
+        updates.forEach((measurement, index) => {
             const item = displayItems[index];
             if (item?.type === 'line' && item.line.role === 'background') return;
-            if (height > 0) filteredUpdates.set(index, height);
+            if (measurement.height > 0 && measurement.width > 0) {
+                filteredUpdates.set(index, measurement);
+            }
         });
         if (filteredUpdates.size === 0) return;
         const cache = heightCacheRef.current.items === displayItems
             ? heightCacheRef.current
-            : { items: displayItems, heights: new Map<number, number>() };
+            : { items: displayItems, measurements: new Map<number, ItemMeasurement>() };
         heightCacheRef.current = cache;
-        filteredUpdates.forEach((height, index) => {
-            if (height > 0) cache.heights.set(index, height);
+        filteredUpdates.forEach((measurement, index) => {
+            const cached = cache.measurements.get(index);
+            if (cached && Math.abs(cached.width - measurement.width) < 0.5) return;
+            cache.measurements.set(index, measurement);
         });
         setMeasurements(previous => {
-            const previousHeights = previous.items === displayItems
-                ? previous.heights
-                : new Map<number, number>();
-            const nextHeights = new Map(previousHeights);
+            const previousMeasurements = previous.items === displayItems
+                ? previous.measurements
+                : new Map<number, ItemMeasurement>();
+            const nextMeasurements = new Map(previousMeasurements);
             let changed = previous.items !== displayItems;
-            filteredUpdates.forEach((height, index) => {
-                if (height <= 0 || nextHeights.get(index) === height) return;
-                nextHeights.set(index, height);
+            filteredUpdates.forEach((measurement, index) => {
+                const previousMeasurement = nextMeasurements.get(index);
+                if (
+                    previousMeasurement &&
+                    Math.abs(previousMeasurement.width - measurement.width) < 0.5
+                ) return;
+                nextMeasurements.set(index, measurement);
                 changed = true;
             });
             if (!changed) return previous;
-            return { items: displayItems, heights: nextHeights };
+            return { items: displayItems, measurements: nextMeasurements };
         });
     }, [displayItems]);
 
@@ -198,17 +206,18 @@ export function useFluidLyricsLayout({
         return () => {
             itemObserverRef.current?.unobserve(node);
             observedNodesRef.current.delete(node);
-            // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
+            // 虚拟化只卸载 DOM；真实尺寸测量保留给轻量 row model 复用。
         };
     }, []);
 
     useEffect(() => {
         const observer = new ResizeObserver(entries => {
-            const updates = new Map<number, number>();
+            const updates = new Map<number, ItemMeasurement>();
             entries.forEach(entry => {
                 const index = nodeIndexesRef.current.get(entry.target);
                 const height = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
-                if (index !== undefined) updates.set(index, height);
+                const width = entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width;
+                if (index !== undefined) updates.set(index, { height, width });
             });
             measureItems(updates);
         });
@@ -226,6 +235,16 @@ export function useFluidLyricsLayout({
 
         const update = () => {
             const nextSize = { width: element.clientWidth, height: element.clientHeight };
+            const previousWidth = lastViewportWidthRef.current;
+            lastViewportWidthRef.current = nextSize.width;
+            if (previousWidth > 0 && previousWidth !== nextSize.width) {
+                setIsViewportResizing(true);
+                if (viewportResizeTimerRef.current) clearTimeout(viewportResizeTimerRef.current);
+                viewportResizeTimerRef.current = window.setTimeout(() => {
+                    setIsViewportResizing(false);
+                    viewportResizeTimerRef.current = null;
+                }, VIEWPORT_RESIZE_SETTLE_MS);
+            }
             // 宽度变化时保留上一帧的真实行高，等行 ResizeObserver 批量替换。
             // 若先清成统一估算值，多行歌词会在重测完成前短暂压到相邻行上。
             setViewportSize(previous =>
@@ -237,15 +256,20 @@ export function useFluidLyricsLayout({
         update();
         const observer = new ResizeObserver(update);
         observer.observe(element);
-        return () => observer.disconnect();
+        return () => {
+            observer.disconnect();
+            if (viewportResizeTimerRef.current) clearTimeout(viewportResizeTimerRef.current);
+            viewportResizeTimerRef.current = null;
+        };
     }, []);
 
     useLayoutEffect(() => {
         if (viewportSize.width <= 0) return;
-        const updates = new Map<number, number>();
+        const updates = new Map<number, ItemMeasurement>();
         observedNodesRef.current.forEach(node => {
             const index = nodeIndexesRef.current.get(node);
-            if (index !== undefined) updates.set(index, node.getBoundingClientRect().height);
+            const bounds = node.getBoundingClientRect();
+            if (index !== undefined) updates.set(index, { height: bounds.height, width: bounds.width });
         });
         let cancelled = false;
         queueMicrotask(() => {
@@ -262,19 +286,20 @@ export function useFluidLyricsLayout({
         setTargetScrollY(maxScrollY);
     }, [maxScrollY, setTargetScrollY]);
 
-    useEffect(() => () => {
-        if (retainedWindowTimerRef.current) clearTimeout(retainedWindowTimerRef.current);
-    }, []);
-
     return {
         activeTargetScrollY,
+        cachedItemHeights,
         contentHeight: layout.contentHeight,
+        isViewportResizing,
+        itemHeights: layout.itemHeights,
         itemTops: layout.itemTops,
         observeItem,
         scrollAreaRef,
         setTargetScrollY,
         targetScrollY,
         topSpacerHeight,
+        updateVisibleIndices,
+        viewportHeight: viewportSize.height,
         visibleIndices,
     };
 }

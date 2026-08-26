@@ -33,7 +33,7 @@ function FluidLyricsLayoutItem({
     return (
         <div
             ref={elementRef}
-            className="absolute left-0 w-full"
+            className="fluid-lyrics-row-shell absolute left-0 w-full"
             style={{ top }}
         >
             {children}

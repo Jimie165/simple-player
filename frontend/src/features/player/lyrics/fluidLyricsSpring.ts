@@ -63,7 +63,11 @@ export class FluidLyricsSpring {
         }
 
         if (delay > 0) {
-            this.pendingTarget = { delay, params, position };
+            // 连续换行会在上一目标的牵拉延迟尚未结束时提交新目标。保留已经
+            // 消耗的延迟，避免屏幕外行每次都从完整 delay 重新计时而永远追不上。
+            this.pendingTarget = this.pendingTarget
+                ? { delay: Math.min(this.pendingTarget.delay, delay), params, position }
+                : { delay, params, position };
             return;
         }
 

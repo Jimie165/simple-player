@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -11,7 +11,10 @@ import {
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
 } from '@/features/player/lyrics/constants';
-import { getFluidLyricsMotionDelay, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
+import {
+    getFluidLyricsMotionDelay,
+    getFluidLyricsSpringParams,
+} from '@/features/player/lyrics/fluidLyricsMotion';
 import {
     getInterludeFocusOffsetPx,
     getInterludeNeighborShiftPx,
@@ -102,6 +105,7 @@ function FluidLyricsPanel({
         true,
         frameScheduler,
     );
+    const previousSpatialSyncRevisionRef = useRef(syncRevision);
     const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
         () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
         [displayItems, lines, renderCurrentMs, timingStrategy, isTtml]
@@ -200,12 +204,17 @@ function FluidLyricsPanel({
 
     const {
         activeTargetScrollY,
+        cachedItemHeights,
         contentHeight,
+        isViewportResizing,
+        itemHeights,
         itemTops,
         observeItem,
         scrollAreaRef,
         setTargetScrollY,
         targetScrollY,
+        updateVisibleIndices,
+        viewportHeight,
         visibleIndices,
     } = useFluidLyricsLayout({
         activeDisplayIndex,
@@ -213,14 +222,13 @@ function FluidLyricsPanel({
             ? -getInterludeFocusOffsetPx() * INTERLUDE_FOCUS_OFFSET_RATIO
             : 0,
         displayItems,
-        includeActiveWindow: !isUserScrolling,
         interludeRowHeight: getInterludeRowHeightPx(),
         variant,
         visualShifts: visualInterludeShifts,
     });
 
-    const updateTargetScrollY = useCallback((value: number, retainPrevious = true) => {
-        const nextTarget = setTargetScrollY(value, retainPrevious);
+    const updateTargetScrollY = useCallback((value: number) => {
+        const nextTarget = setTargetScrollY(value);
         previousTargetYRef.current = nextTarget;
     }, [setTargetScrollY]);
 
@@ -232,7 +240,7 @@ function FluidLyricsPanel({
         const frame = requestAnimationFrame(() => {
             setPausedScroll(false);
             setIsUserScrolling(false);
-            updateTargetScrollY(0, false);
+            updateTargetScrollY(0);
         });
         return () => cancelAnimationFrame(frame);
     }, [lines, updateTargetScrollY]);
@@ -243,6 +251,14 @@ function FluidLyricsPanel({
         const frame = requestAnimationFrame(() => setPausedScroll(false));
         return () => cancelAnimationFrame(frame);
     }, [isPlaying]);
+
+    useLayoutEffect(() => {
+        if (previousSpatialSyncRevisionRef.current === syncRevision) return;
+        previousSpatialSyncRevisionRef.current = syncRevision;
+        if (displayState || isUserScrolling) return;
+        updateTargetScrollY(activeTargetScrollY);
+        firstPositionDoneRef.current = true;
+    }, [activeTargetScrollY, displayState, isUserScrolling, syncRevision, updateTargetScrollY]);
 
     useEffect(() => {
         if (displayState || isUserScrolling) return;
@@ -347,6 +363,13 @@ function FluidLyricsPanel({
         pausedScroll,
         variant,
         parentDisplayIndexMap,
+        frameScheduler,
+        itemHeights,
+        itemTops,
+        onVisibleIndicesChange: updateVisibleIndices,
+        suppressRowDelay: isViewportResizing,
+        syncRevision,
+        viewportHeight,
     });
 
     return (
@@ -434,6 +457,7 @@ function FluidLyricsPanel({
                                             variant={variant}
                                             isBackground={item.line.role === 'background'}
                                             hasDuetLine={hasDuetLine}
+                                            cachedRowHeight={cachedItemHeights[displayIndex]}
                                             onBackgroundHeight={
                                                 item.line.role === 'background'
                                                     ? (height) => reportBackgroundHeight(displayIndex, height)

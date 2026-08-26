@@ -4,6 +4,13 @@ import type { DisplayItem } from '@/features/player/lyrics/types';
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
+export const isFluidLyricsRowSpatiallyVisible = (
+    top: number,
+    height: number,
+    viewportHeight: number,
+    overscanPx = 300,
+) => top + height >= -overscanPx && top <= viewportHeight + overscanPx;
+
 const countLineSteps = (displayItems: DisplayItem[], startIndex: number, endIndex: number) => {
     let steps = 0;
     for (let index = startIndex; index < endIndex; index++) {
@@ -22,7 +29,6 @@ interface FluidLyricsMotionArgs {
 }
 
 interface FluidLyricsRowVisualArgs {
-    delay: number;
     distanceFromActive: number;
     isActive: boolean;
     isUserScrolling: boolean;
@@ -33,11 +39,9 @@ interface FluidLyricsRowVisualArgs {
 export interface FluidLyricsRowVisualStyle {
     filter: string;
     opacity: string;
-    transition: string;
 }
 
 export function getFluidLyricsRowVisualStyle({
-    delay,
     distanceFromActive,
     isActive,
     isUserScrolling,
@@ -57,15 +61,9 @@ export function getFluidLyricsRowVisualStyle({
             ? Math.max(0.35, 0.85 - distanceFromActive * 0.07)
             : Math.max(0.22, 0.82 - distanceFromActive * 0.12);
     const showAll = isUserScrolling || pausedScroll;
-    const transitionDelay = delay * 0.2;
-
     return {
-        filter: showAll || blurPx <= 0.01 ? 'none' : `blur(${blurPx}px)`,
+        filter: showAll || blurPx <= 0.01 ? 'none' : `blur(${blurPx.toFixed(2)}px)`,
         opacity: String(showAll ? 1 : rowOpacity),
-        transition: [
-            `filter 380ms ease-out ${transitionDelay}s`,
-            `opacity 350ms ease-out ${transitionDelay}s`,
-        ].join(', '),
     };
 }
 

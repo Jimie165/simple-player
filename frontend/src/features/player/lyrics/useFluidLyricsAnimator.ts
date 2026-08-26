@@ -3,8 +3,10 @@ import type { FluidSpringParams } from '@/features/player/lyrics/fluidLyricsSpri
 import { FluidLyricsSpring } from '@/features/player/lyrics/fluidLyricsSpring';
 import {
     getFluidLyricsRowVisualStyle,
+    isFluidLyricsRowSpatiallyVisible,
     type FluidLyricsRowVisualStyle,
 } from '@/features/player/lyrics/fluidLyricsMotion';
+import type { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const SCALE_SPRING: FluidSpringParams = {
     stiffness: 100,
@@ -16,21 +18,22 @@ const SCALE_SPRING: FluidSpringParams = {
 
 const ACTIVE_SCALE = 1;
 const INACTIVE_SCALE = 0.98;
+const SPATIAL_OVERSCAN_PX = 300;
 
 interface RowAnimationState {
-    detachedAt: number | null;
     element: HTMLDivElement | null;
     scaleElement: HTMLElement | null;
     translateY: FluidLyricsSpring;
     scale: FluidLyricsSpring;
-    targetTranslateY: number;
+    layoutTop: number;
+    height: number;
+    targetY: number;
     targetScale: number;
-    lastRenderedYNum: number | null;
-    lastRenderedScaleNum: number | null;
-    rowElement: HTMLButtonElement | null;
+    delay: number;
+    lastRenderedY: string | null;
+    lastRenderedScale: string | null;
     lastRenderedFilter: string | null;
     lastRenderedOpacity: string | null;
-    lastRenderedTransition: string | null;
 }
 
 interface FluidLyricsAnimatorArgs {
@@ -46,6 +49,13 @@ interface FluidLyricsAnimatorArgs {
     pausedScroll: boolean;
     variant: 'side' | 'narrow';
     parentDisplayIndexMap?: Map<number, number>;
+    frameScheduler: LyricsFrameScheduler;
+    itemHeights: number[];
+    itemTops: number[];
+    onVisibleIndicesChange: (indices: readonly number[]) => void;
+    suppressRowDelay: boolean;
+    syncRevision: number;
+    viewportHeight: number;
 }
 
 interface LatestTargets {
@@ -79,7 +89,6 @@ export const getRowVisualStyle = (
     isUserScrolling: boolean,
     pausedScroll: boolean,
     variant: 'side' | 'narrow',
-    delay: number,
     parentDisplayIndexMap?: Map<number, number>,
 ): FluidLyricsRowVisualStyle => {
     const effectiveIndex = getEffectiveIndex(index, parentDisplayIndexMap);
@@ -87,7 +96,6 @@ export const getRowVisualStyle = (
     const isActive = activeIndices.has(effectiveIndex);
     const distance = activeDisplayIndex >= 0 ? Math.abs(activeDisplayIndex - effectiveIndex) : 0;
     return getFluidLyricsRowVisualStyle({
-        delay,
         distanceFromActive: distance,
         isActive,
         isUserScrolling,
@@ -98,11 +106,18 @@ export const getRowVisualStyle = (
 
 class FluidLyricsAnimator {
     private readonly rows = new Map<number, RowAnimationState>();
-    private readonly mountedRows = new Set<number>();
     private readonly animatingRows = new Set<number>();
+    private readonly frameScheduler: LyricsFrameScheduler;
     private modelIdentity: object | null = null;
-    private frame: number | null = null;
-    private lastFrameTime = 0;
+    private unsubscribeFrame: (() => void) | null = null;
+    private lastSyncRevision: number | null = null;
+    private lastVisibleKey: string | null = null;
+    private onVisibleIndicesChange: ((indices: readonly number[]) => void) | null = null;
+    private viewportHeight = 0;
+
+    constructor(frameScheduler: LyricsFrameScheduler) {
+        this.frameScheduler = frameScheduler;
+    }
 
     syncModels(
         modelIdentity: object,
@@ -122,9 +137,23 @@ class FluidLyricsAnimator {
         this.rows.forEach((_state, index) => {
             if (index < rowCount) return;
             this.rows.delete(index);
-            this.mountedRows.delete(index);
             this.animatingRows.delete(index);
         });
+    }
+
+    setSpatialViewport(
+        itemTops: readonly number[],
+        itemHeights: readonly number[],
+        viewportHeight: number,
+        onVisibleIndicesChange: (indices: readonly number[]) => void,
+    ) {
+        this.viewportHeight = viewportHeight;
+        this.onVisibleIndicesChange = onVisibleIndicesChange;
+        this.rows.forEach((state, index) => {
+            state.layoutTop = itemTops[index] ?? 0;
+            state.height = itemHeights[index] ?? 0;
+        });
+        this.publishSpatialVisibility();
     }
 
     register(
@@ -135,31 +164,22 @@ class FluidLyricsAnimator {
         rowVisualStyle: FluidLyricsRowVisualStyle,
     ) {
         const state = this.ensureModel(index, targetY, targetScale);
-        if (state.detachedAt !== null) {
-            const elapsedSeconds = Math.max(0, performance.now() - state.detachedAt) / 1000;
-            state.translateY.advance(elapsedSeconds);
-            state.scale.advance(elapsedSeconds);
-            state.detachedAt = null;
-        }
-        if (state.targetTranslateY !== targetY || state.targetScale !== targetScale) {
-            state.translateY.setPosition(targetY);
-            state.scale.setPosition(targetScale);
-            state.targetTranslateY = targetY;
-            state.targetScale = targetScale;
-        }
         state.element = element;
         state.scaleElement = element.querySelector<HTMLElement>('[data-fluid-lyrics-scale]');
-        state.rowElement = element.querySelector<HTMLButtonElement>('.lyrics-motion-row');
-        state.lastRenderedYNum = null;
-        state.lastRenderedScaleNum = null;
+        state.lastRenderedY = null;
+        state.lastRenderedScale = null;
         state.lastRenderedFilter = null;
         state.lastRenderedOpacity = null;
-        state.lastRenderedTransition = null;
         element.style.willChange = 'transform';
-        this.mountedRows.add(index);
-        this.renderState(state);
+        // scale 弹簧停止后仍保持这一行的合成表面。若在到达 scale(1) 的同一帧
+        // 清掉 will-change，WebView2 会撤销图层并重新栅格化整句，尚未播放的
+        // 字符也会一起发生纹理跳变。行离开空间窗口后 DOM 卸载会自然释放它。
+        if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
+        // 先提交 filter/opacity，再提交 scale/translate，保证点击跳转时
+        // 视觉目标与位置目标在同一批 DOM 写入中建立。
         this.renderRowVisual(state, rowVisualStyle);
-        if (state.translateY.isAnimating() || (state.scaleElement && state.scale.isAnimating())) {
+        this.renderState(state);
+        if (state.translateY.isAnimating() || state.scale.isAnimating()) {
             this.animatingRows.add(index);
             if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
             this.start();
@@ -168,12 +188,8 @@ class FluidLyricsAnimator {
         return () => {
             if (state.element !== element) return;
             // DOM 内容可以销毁；位置、速度和目标继续保存在轻量模型中。
-            state.detachedAt = performance.now();
             state.element = null;
             state.scaleElement = null;
-            state.rowElement = null;
-            this.mountedRows.delete(index);
-            this.animatingRows.delete(index);
         };
     }
 
@@ -182,11 +198,19 @@ class FluidLyricsAnimator {
         activeIndices: Set<number>,
         springParams: FluidSpringParams,
         getDelay: (index: number) => number,
-        getRowVisual: (index: number, delay: number) => FluidLyricsRowVisualStyle,
+        getRowVisual: (index: number) => FluidLyricsRowVisualStyle,
+        suppressRowDelay: boolean,
         parentDisplayIndexMap?: Map<number, number>,
     ) {
-        this.mountedRows.forEach(index => {
-            const delay = getDelay(index);
+        // 布局提交会更新所有 lyric group，而不仅是当前 DOM 中的行。
+        // 未挂载行只更新轻量弹簧模型，不触发任何 DOM 写入；这样它们重新进入
+        // overscan 区域时可以接续真实运动，而不是从新目标位置瞬移。
+        this.rows.forEach((_state, index) => {
+            const delay = suppressRowDelay ? 0 : getDelay(index);
+            const state = this.rows.get(index);
+            if (state?.element) {
+                this.renderRowVisual(state, getRowVisual(index));
+            }
             this.setTarget(
                 index,
                 getTargetY(index),
@@ -194,8 +218,6 @@ class FluidLyricsAnimator {
                 springParams,
                 delay,
             );
-            const state = this.rows.get(index);
-            if (state) this.renderRowVisual(state, getRowVisual(index, delay));
         });
     }
 
@@ -208,27 +230,24 @@ class FluidLyricsAnimator {
     ) {
         const state = this.rows.get(index);
         if (!state) return;
-        state.targetTranslateY = translateY;
-        state.targetScale = scale;
-
-        if (!state.element) {
-            state.translateY.setPosition(translateY);
-            state.scale.setPosition(scale);
-            state.detachedAt = null;
-            this.animatingRows.delete(index);
-            return;
-        }
 
         state.translateY.setTarget(translateY, springParams, delay);
         // scale 是激活状态响应，不应受滚动牵拉延迟影响（重叠时 B 激活应立即放大，
         // 与性能优先模式 CSS 无延迟一致）；否则要等 getDelay 耗尽才开始放大
-        if (state.scaleElement) state.scale.setTarget(scale, SCALE_SPRING, 0);
-        else state.scale.setPosition(scale);
-        if (state.translateY.isAnimating() || (state.scaleElement && state.scale.isAnimating())) {
+        state.scale.setTarget(scale, SCALE_SPRING, 0);
+        state.targetY = translateY;
+        state.targetScale = scale;
+        state.delay = delay;
+        if (state.translateY.isAnimating() || state.scale.isAnimating()) {
             this.animatingRows.add(index);
-            state.element.style.willChange = 'transform';
-            if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
+            if (state.element) {
+                state.element.style.willChange = 'transform';
+                if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
+            }
             this.start();
+        } else {
+            this.animatingRows.delete(index);
+            if (this.animatingRows.size === 0) this.stop();
         }
     }
 
@@ -238,58 +257,76 @@ class FluidLyricsAnimator {
     }
 
     private start() {
-        if (this.frame !== null) return;
-        this.lastFrameTime = performance.now();
-        this.frame = requestAnimationFrame(this.update);
+        if (this.unsubscribeFrame !== null) return;
+        this.unsubscribeFrame = this.frameScheduler.subscribe('motion', this.update);
     }
 
-    private readonly update = (time: number) => {
-        this.frame = null;
-        const deltaSeconds = Math.max(0, time - this.lastFrameTime) / 1000;
-        this.lastFrameTime = time;
-
+    private readonly update = (_time: number, deltaMs: number) => {
+        const deltaSeconds = Math.max(0, deltaMs) / 1000;
         this.animatingRows.forEach(index => {
             const state = this.rows.get(index);
-            if (!state?.element) {
+            if (!state) {
                 this.animatingRows.delete(index);
                 return;
             }
             state.translateY.advance(deltaSeconds);
-            if (state.scaleElement) state.scale.advance(deltaSeconds);
+            state.scale.advance(deltaSeconds);
             const isAnimating = state.translateY.isAnimating() ||
-                (state.scaleElement !== null && state.scale.isAnimating());
-            // 阈值去重可能跳过弹簧尾部的微小变化；停止帧强制提交一次，
-            // 保证 DOM transform 与已经吸附到目标值的弹簧模型完全一致。
-            this.renderState(state, !isAnimating);
+                state.scale.isAnimating();
+            if (state.element) this.renderState(state);
             if (!isAnimating) {
                 this.animatingRows.delete(index);
-                if (state.scaleElement) state.scaleElement.style.willChange = '';
             }
         });
+        this.publishSpatialVisibility();
 
-        if (this.animatingRows.size > 0) this.frame = requestAnimationFrame(this.update);
+        if (this.animatingRows.size === 0) this.stop();
     };
 
-    private renderState(state: RowAnimationState, force = false) {
+    private stop() {
+        this.unsubscribeFrame?.();
+        this.unsubscribeFrame = null;
+    }
+
+    private renderState(state: RowAnimationState) {
         if (state.element) {
-            const y = state.translateY.getPosition();
-            if (force || state.lastRenderedYNum === null || Math.abs(y - state.lastRenderedYNum) >= 0.05) {
-                state.lastRenderedYNum = y;
-                state.element.style.transform = `translateY(${y.toFixed(2)}px)`;
+            const transform = `translateY(${state.translateY.getPosition().toFixed(1)}px)`;
+            if (state.lastRenderedY !== transform) {
+                state.lastRenderedY = transform;
+                state.element.style.transform = transform;
             }
         }
         if (state.scaleElement) {
-            const s = state.scale.getPosition();
-            if (force || state.lastRenderedScaleNum === null || Math.abs(s - state.lastRenderedScaleNum) >= 0.0005) {
-                state.lastRenderedScaleNum = s;
-                state.scaleElement.style.transform = `scale(${s.toFixed(4)}) translateZ(0)`;
+            const transform = `scale(${state.scale.getPosition().toFixed(3)})`;
+            if (state.lastRenderedScale !== transform) {
+                state.lastRenderedScale = transform;
+                state.scaleElement.style.transform = transform;
             }
         }
     }
 
+    synchronizeToTargets(syncRevision: number) {
+        if (this.lastSyncRevision === null) {
+            this.lastSyncRevision = syncRevision;
+            return;
+        }
+        if (this.lastSyncRevision === syncRevision) return;
+        this.lastSyncRevision = syncRevision;
+        this.rows.forEach((state, index) => {
+            state.translateY.setPosition(state.targetY);
+            state.scale.setPosition(state.targetScale);
+            this.animatingRows.delete(index);
+            if (state.element) this.renderState(state);
+        });
+        this.publishSpatialVisibility();
+        if (this.animatingRows.size === 0) this.stop();
+    }
+
     private renderRowVisual(state: RowAnimationState, style: FluidLyricsRowVisualStyle) {
-        const element = state.rowElement;
+        const element = state.element;
         if (!element) return;
+        // 行壳的固定 CSS transition 同时覆盖激活和失活，避免只在失活时
+        // 过渡导致旧行仍然高亮而新行已经完成聚焦。
         if (state.lastRenderedFilter !== style.filter) {
             element.style.filter = style.filter;
             state.lastRenderedFilter = style.filter;
@@ -298,10 +335,25 @@ class FluidLyricsAnimator {
             element.style.opacity = style.opacity;
             state.lastRenderedOpacity = style.opacity;
         }
-        if (state.lastRenderedTransition !== style.transition) {
-            element.style.transition = style.transition;
-            state.lastRenderedTransition = style.transition;
-        }
+    }
+
+    private publishSpatialVisibility() {
+        if (!this.onVisibleIndicesChange || this.viewportHeight <= 0) return;
+        const visible: number[] = [];
+        this.rows.forEach((state, index) => {
+            const top = state.layoutTop + state.translateY.getPosition();
+            if (isFluidLyricsRowSpatiallyVisible(
+                top,
+                state.height,
+                this.viewportHeight,
+                SPATIAL_OVERSCAN_PX,
+            )) visible.push(index);
+        });
+        visible.sort((left, right) => left - right);
+        const key = visible.join(',');
+        if (key === this.lastVisibleKey) return;
+        this.lastVisibleKey = key;
+        this.onVisibleIndicesChange(visible);
     }
 
     private ensureModel(index: number, targetY: number, targetScale: number) {
@@ -309,30 +361,30 @@ class FluidLyricsAnimator {
         if (current) return current;
 
         const state: RowAnimationState = {
-            detachedAt: null,
             element: null,
             scaleElement: null,
             translateY: new FluidLyricsSpring(targetY, { stiffness: 90, damping: 15, mass: 1 }),
             scale: new FluidLyricsSpring(targetScale, SCALE_SPRING),
-            targetTranslateY: targetY,
+            layoutTop: 0,
+            height: 0,
+            targetY,
             targetScale,
-            lastRenderedYNum: null,
-            lastRenderedScaleNum: null,
-            rowElement: null,
+            delay: 0,
+            lastRenderedY: null,
+            lastRenderedScale: null,
             lastRenderedFilter: null,
             lastRenderedOpacity: null,
-            lastRenderedTransition: null,
         };
         this.rows.set(index, state);
         return state;
     }
 
     private resetRows() {
-        if (this.frame !== null) cancelAnimationFrame(this.frame);
-        this.frame = null;
+        this.stop();
         this.rows.clear();
-        this.mountedRows.clear();
         this.animatingRows.clear();
+        this.lastSyncRevision = null;
+        this.lastVisibleKey = null;
     }
 }
 
@@ -349,8 +401,15 @@ export function useFluidLyricsAnimator({
     pausedScroll,
     variant,
     parentDisplayIndexMap,
+    frameScheduler,
+    itemHeights,
+    itemTops,
+    onVisibleIndicesChange,
+    suppressRowDelay,
+    syncRevision,
+    viewportHeight,
 }: FluidLyricsAnimatorArgs) {
-    const [animator] = useState(() => new FluidLyricsAnimator());
+    const [animator] = useState(() => new FluidLyricsAnimator(frameScheduler));
     const latestTargetsRef = useRef<LatestTargets>({
         activeDisplayIndex,
         activeIndices,
@@ -377,16 +436,19 @@ export function useFluidLyricsAnimator({
             parentDisplayIndexMap,
         };
     }, [activeDisplayIndex, activeIndices, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
-    useInsertionEffect(() => {
-        const targets = latestTargetsRef.current;
-        animator.syncModels(
-            modelIdentity,
-            rowCount,
-            index => (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
-            targets.activeIndices,
-            targets.parentDisplayIndexMap,
-        );
-    }, [animator, modelIdentity, rowCount]);
+    // 这是纯内存且幂等的模型同步，不写 DOM，也不触发 React 更新。放在渲染阶段
+    // 可保证空间虚拟化第一次计算前所有行都已有状态；若依赖 insertion effect，
+    // 面板切换/并发重建时可能只由首屏 register() 懒创建少量模型。
+    animator.syncModels(
+        modelIdentity,
+        rowCount,
+        index => (visualShifts[index] ?? 0) - targetScrollY,
+        activeIndices,
+        parentDisplayIndexMap,
+    );
+    useLayoutEffect(() => {
+        animator.setSpatialViewport(itemTops, itemHeights, viewportHeight, onVisibleIndicesChange);
+    }, [animator, itemHeights, itemTops, onVisibleIndicesChange, viewportHeight]);
     const registerAnimatedRow = useCallback((index: number, element: HTMLDivElement) => {
         const targets = latestTargetsRef.current;
         return animator.register(
@@ -401,7 +463,6 @@ export function useFluidLyricsAnimator({
                 targets.isUserScrolling,
                 targets.pausedScroll,
                 targets.variant,
-                targets.getDelay(index),
                 targets.parentDisplayIndexMap,
             ),
         );
@@ -413,19 +474,20 @@ export function useFluidLyricsAnimator({
             activeIndices,
             springParams,
             getDelay,
-            (index, delay) => getRowVisualStyle(
+            index => getRowVisualStyle(
                 index,
                 activeDisplayIndex,
                 activeIndices,
                 isUserScrolling,
                 pausedScroll,
                 variant,
-                delay,
                 parentDisplayIndexMap,
             ),
+            suppressRowDelay,
             parentDisplayIndexMap,
         );
-    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, visualShifts]);
+        animator.synchronizeToTargets(syncRevision);
+    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, springParams, suppressRowDelay, syncRevision, targetScrollY, variant, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

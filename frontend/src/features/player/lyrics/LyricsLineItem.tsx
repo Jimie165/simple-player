@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { memo, useEffect, useRef, type RefObject } from 'react';
+import { memo, useEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 import { getFluidLyricsRowVisualStyle } from '@/features/player/lyrics/fluidLyricsMotion';
@@ -25,6 +25,7 @@ interface LyricsLineItemProps {
     isBackground?: boolean;
     hasDuetLine?: boolean;
     onBackgroundHeight?: (height: number) => void;
+    cachedRowHeight?: number | null;
 }
 
 function LyricsLineItem({
@@ -48,10 +49,10 @@ function LyricsLineItem({
     isBackground = false,
     hasDuetLine = false,
     onBackgroundHeight,
+    cachedRowHeight = null,
 }: LyricsLineItemProps) {
     const rowRef = useRef<HTMLButtonElement | null>(null);
     const rowVisualStyle = getFluidLyricsRowVisualStyle({
-        delay: motionDelay,
         distanceFromActive,
         isActive,
         isUserScrolling,
@@ -115,19 +116,26 @@ function LyricsLineItem({
             : 'text-left pl-[clamp(1.2rem,2.2vw,2rem)] origin-left',
         hasDuetLine && !isDuetRow ? 'pr-[15%]' : 'pr-[clamp(1.7rem,3vw,2.9rem)]'
     );
-    // Fluid scrolling depends on every row's real geometry. Intrinsic placeholders
-    // would shift later rows as they enter the viewport and restart their springs.
-    const renderingIsolationStyle = fluidMotion
-        ? {
-            contain: 'layout style paint',
-            backfaceVisibility: 'hidden',
-        } as const
+    // 首次渲染保持真实布局；只有同一宽度下已有测量缓存时才允许浏览器跳过内容。
+    const renderingIsolationStyle: CSSProperties & { '--cached-row-height'?: string } = fluidMotion
+        ? cachedRowHeight && cachedRowHeight > 0
+            ? {
+                contain: 'layout style paint',
+                contentVisibility: 'auto',
+                containIntrinsicSize: 'auto var(--cached-row-height)',
+                '--cached-row-height': `${cachedRowHeight}px`,
+                backfaceVisibility: 'hidden',
+            }
+            : {
+                contain: 'layout style paint',
+                backfaceVisibility: 'hidden',
+            }
         : {
             contentVisibility: 'auto',
             contain: 'layout style paint',
             containIntrinsicSize: 'auto 90px',
             backfaceVisibility: 'hidden',
-        } as const;
+        };
     const targetScale = isActive ? 1 : 0.98;
     const rowTransformOrigin = isDuetRow ? 'right center' : 'left center';
     const content = (
@@ -151,19 +159,19 @@ function LyricsLineItem({
                     shouldRenderKaraoke
                         ? (isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
-                            : isActive
-                                ? 'transition-none'
-                                : 'transition-opacity duration-500 ease-in-out')
+                            : 'opacity-100')
                         : isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
-                            : 'transition-all duration-500 ease-in-out',
+                            : 'transition-opacity duration-500 ease-in-out',
                     // 背景行虽然整体有容器透明度控制，但纯文本 fallback 需保持偏暗（text-white/30）以匹配 KaraokeText 的 --kb
                     isBackground
                         ? undefined
-                        : (isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75')
+                        : shouldRenderKaraoke
+                            ? undefined
+                            : (isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75')
                 )}
                 style={{
-                    ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
+                    ...(!shouldRenderKaraoke && isActive ? { transitionDelay: `${motionDelay}s` } : {}),
                     // 强制给回退的纯文本应用 0.3 的透明度，以匹配 KaraokeText 内部的 --kb，防止闪烁
                     color: (isBackground && !shouldRenderKaraoke) ? 'rgba(255,255,255,0.3)' : undefined,
                 }}
@@ -187,7 +195,7 @@ function LyricsLineItem({
             </span>
             {line.translation && (
                 <span
-                    style={!shouldRenderKaraoke ? {
+                    style={!shouldRenderKaraoke && isActive ? {
                         transitionDelay: `${motionDelay}s`,
                     } : undefined}
                     className={clsx(
@@ -196,7 +204,7 @@ function LyricsLineItem({
                         // 背景和声译文与主文字同步淡入淡出（含进入延迟）；未激活完全不可见
                         isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
-                            : 'transition-all duration-300',
+                            : 'transition-opacity duration-300',
                         isActive
                             ? isBackground
                                 ? 'text-white/30'
@@ -286,7 +294,8 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     ) &&
     prev.variant === next.variant &&
     prev.isBackground === next.isBackground &&
-    prev.hasDuetLine === next.hasDuetLine
+    prev.hasDuetLine === next.hasDuetLine &&
+    prev.cachedRowHeight === next.cachedRowHeight
 );
 
 export default memo(LyricsLineItem, areLyricsLineItemPropsEqual);
