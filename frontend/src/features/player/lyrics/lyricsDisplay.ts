@@ -94,6 +94,15 @@ const getMainLyricEndMs = (line: LyricsLine): number | null => {
     return line.end_time_ms;
 };
 
+const getBackgroundLyricEndMs = (line: LyricsLine): number | null => {
+    let endMs = line.end_time_ms;
+    for (const word of line.words) {
+        const wordEndMs = word.end_time_ms ?? word.start_time_ms;
+        endMs = endMs === null ? wordEndMs : Math.max(endMs, wordEndMs);
+    }
+    return endMs;
+};
+
 const ttmlLineWindowsCache = new WeakMap<LyricsLine[], WeakMap<LyricsTimingStrategy, TtmlLineWindows>>();
 
 export function getTtmlLineWindows(
@@ -111,6 +120,17 @@ export function getTtmlLineWindows(
 
     const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
     const compressTail = timingStrategy?.compressTightHandoffTail ?? false;
+    const backgroundEndByParentId = new Map<string, number>();
+    for (const line of lines) {
+        if (line.role !== 'background' || line.parent_id == null) continue;
+        const endMs = getBackgroundLyricEndMs(line);
+        if (endMs === null) continue;
+        const previousEndMs = backgroundEndByParentId.get(line.parent_id);
+        backgroundEndByParentId.set(
+            line.parent_id,
+            previousEndMs === undefined ? endMs : Math.max(previousEndMs, endMs),
+        );
+    }
 
     const mains = lines
         .map((line, index) => ({
@@ -124,9 +144,12 @@ export function getTtmlLineWindows(
         .sort((a, b) => a.start - b.start || a.index - b.index)
         .map((entry, i, sorted) => ({
             ...entry,
-            // 行语义结束 = 主唱歌词词尾（<p> end 可能含背景和声尾部，不参与重叠判断）；
-            // 无词尾时以下一主行起始兜底；末行无行尾则保持激活（与 LRC 一致）
-            end: getMainLyricEndMs(entry.line) ?? (i + 1 < sorted.length ? sorted[i + 1].start : Number.POSITIVE_INFINITY),
+            // 主行与背景和声作为同一组：组结束时间取两者最晚词尾，确保父行不会
+            // 在背景仍演唱时提前退出。无词尾时以下一主行起始兜底。
+            end: Math.max(
+                getMainLyricEndMs(entry.line) ?? (i + 1 < sorted.length ? sorted[i + 1].start : Number.POSITIVE_INFINITY),
+                backgroundEndByParentId.get(entry.line.id) ?? Number.NEGATIVE_INFINITY,
+            ),
         }));
 
     const count = mains.length;
