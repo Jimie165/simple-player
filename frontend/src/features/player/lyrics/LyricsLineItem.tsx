@@ -186,6 +186,7 @@ function LyricsLineItem({
                         preciseMsRef={preciseMsRef}
                         isActive={isKaraokeActive}
                         isFocused={isActive}
+                        isMotionPrepared={distanceFromActive <= 1}
                         glowDisabled={isBackground}
                         fillAlpha={isBackground ? 0.3 : 1}
                     />

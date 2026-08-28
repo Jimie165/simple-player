@@ -1,10 +1,13 @@
-import { useEffect, useRef, type RefObject } from 'react';
+import { useContext, useEffect, useRef, type RefObject } from 'react';
 import { motion } from 'framer-motion';
 import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
 } from '@/features/player/lyrics/constants';
-import { useLyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
+import {
+    LyricsFrameTaskRegistryContext,
+    useLyricsFrameScheduler,
+} from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const dotIndexes = [0, 1, 2];
 
@@ -53,6 +56,7 @@ export default function InterludeItem({
     endMs,
 }: InterludeItemProps) {
     const frameScheduler = useLyricsFrameScheduler();
+    const frameTaskRegistry = useContext(LyricsFrameTaskRegistryContext);
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const animationEndMs = Math.max(startMs, endMs - interludeNextLineFocusLeadMs);
@@ -209,8 +213,10 @@ export default function InterludeItem({
 
         };
 
-        const unsubscribeFrame = frameScheduler
-            ? frameScheduler.subscribe('content', tick)
+        const unsubscribeFrame = frameTaskRegistry
+            ? frameTaskRegistry.subscribe(tick)
+            : frameScheduler
+                ? frameScheduler.subscribe('content', tick)
             : undefined;
         const requestNextFrame = () => {
             frame = requestAnimationFrame(() => {
@@ -231,6 +237,7 @@ export default function InterludeItem({
         preciseMsRef,
         startMs,
         frameScheduler,
+        frameTaskRegistry,
     ]);
 
     const shouldKeepContainer =

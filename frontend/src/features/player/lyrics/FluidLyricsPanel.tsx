@@ -25,17 +25,17 @@ import {
     buildFluidLyricsRenderBoundaries,
     getActiveLyricsState,
     getFluidLyricsRenderKey,
-    getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
 import { animationLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
-import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
-import InterludeItem from '@/features/player/lyrics/InterludeItem';
-import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
+import FluidLyricsDomRenderer from '@/features/player/lyrics/FluidLyricsDomRenderer';
 import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 import {
     LyricsFrameScheduler,
     LyricsFrameSchedulerContext,
+    LyricsFrameTaskRegistry,
+    LyricsFrameTaskRegistryContext,
 } from '@/features/player/lyrics/lyricsFrameScheduler';
+import { LyricsVisibilityStore } from '@/features/player/lyrics/lyricsVisibilityStore';
 
 const sideScrollMaskStyle = {
     maskImage: 'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
@@ -49,6 +49,7 @@ const narrowScrollMaskStyle = {
 
 const INTERLUDE_FOCUS_OFFSET_RATIO = 0.9;
 const lineSeekSyncToleranceMs = 1000;
+const lineSeekMotionMaxDeltaMs = 1000;
 
 function FluidLyricsPanel({
     lyricsDocument,
@@ -72,16 +73,26 @@ function FluidLyricsPanel({
     const pendingLineSeekRef = useRef<{
         syncRevision: number;
         targetMs: number;
+        preserveMotion: boolean;
     } | null>(null);
     const [pendingLineSeek, setPendingLineSeek] = useState<{
         syncRevision: number;
         targetMs: number;
+        preserveMotion: boolean;
     } | null>(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
     const [frameScheduler] = useState(() => new LyricsFrameScheduler());
+    const [karaokeFrameRegistry] = useState(
+        () => new LyricsFrameTaskRegistry(frameScheduler, 'content')
+    );
+    const [visibilityStore] = useState(() => new LyricsVisibilityStore());
+    const rowsHostRef = useRef<HTMLDivElement | null>(null);
 
-    useEffect(() => () => frameScheduler.dispose(), [frameScheduler]);
+    useEffect(() => () => {
+        karaokeFrameRegistry.dispose();
+        frameScheduler.dispose();
+    }, [frameScheduler, karaokeFrameRegistry]);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -213,7 +224,6 @@ function FluidLyricsPanel({
         activeTargetScrollY,
         cachedItemHeights,
         contentHeight,
-        isViewportResizing,
         itemHeights,
         itemTops,
         observeItem,
@@ -222,7 +232,6 @@ function FluidLyricsPanel({
         targetScrollY,
         updateVisibleIndices,
         viewportHeight,
-        visibleIndices,
     } = useFluidLyricsLayout({
         activeDisplayIndex,
         activeFocusOffset: activeItem?.type === 'interlude'
@@ -232,6 +241,7 @@ function FluidLyricsPanel({
         interludeRowHeight: getInterludeRowHeightPx(),
         variant,
         visualShifts: visualInterludeShifts,
+        visibilityStore,
     });
 
     const updateTargetScrollY = useCallback((value: number) => {
@@ -317,11 +327,14 @@ function FluidLyricsPanel({
         const pendingSeek = {
             syncRevision,
             targetMs: time * 1000,
+            preserveMotion: Math.abs(
+                time * 1000 - (preciseMsRef.current ?? currentTime * 1000)
+            ) <= lineSeekMotionMaxDeltaMs,
         };
         pendingLineSeekRef.current = pendingSeek;
         setPendingLineSeek(pendingSeek);
         onSeek(time);
-    }, [keepCurrentInterludeForExit, onSeek, syncRevision]);
+    }, [currentTime, keepCurrentInterludeForExit, onSeek, preciseMsRef, syncRevision]);
 
     useEffect(() => {
         const pendingSeek = pendingLineSeekRef.current;
@@ -383,112 +396,66 @@ function FluidLyricsPanel({
         itemHeights,
         itemTops,
         onVisibleIndicesChange: updateVisibleIndices,
-        preserveMotionOnSync: isLineSeekSync,
-        suppressRowDelay: isViewportResizing,
+        preserveMotionOnSync: isLineSeekSync && pendingLineSeek?.preserveMotion === true,
         syncRevision,
         viewportHeight,
     });
 
     return (
         <LyricsFrameSchedulerContext.Provider value={frameScheduler}>
-          <div className="relative h-full w-full rounded-[22px] overflow-hidden" style={{ contain: 'strict' }}>
-            <motion.div
-                ref={scrollAreaRef}
-                className={clsx(
-                    'relative z-10 mt-0 overflow-hidden touch-none',
-                    variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
-                )}
-                style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
-                onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
-                onWheel={(event: WheelEvent<HTMLDivElement>) => {
-                    event.preventDefault();
-                    handleManualDelta(event.deltaY);
-                }}
-            >
-                {displayState ? (
-                    <div className="h-full flex items-center justify-center text-white/40 text-sm">{displayState}</div>
-                ) : (
-                    <div className="relative" style={{ height: contentHeight }}>
-                        {visibleIndices.map(displayIndex => {
-                            const item = displayItems[displayIndex];
-                            const interludeShift = visualInterludeShifts[displayIndex] ?? 0;
-                            const isActive = activeIndices.has(displayIndex);
-                            const isKaraokeActive = item.type === 'line' && item.line.words?.length
-                                ? isActive || (
-                                    focusNextLineByVisualEnd &&
-                                    typeof item.line.visual_end_ms === 'number' &&
-                                    typeof item.line.end_time_ms === 'number' &&
-                                    item.line.visual_end_ms < item.line.end_time_ms &&
-                                    renderCurrentMs >= item.line.visual_end_ms &&
-                                    renderCurrentMs < item.line.end_time_ms
-                                )
-                                : isActive;
-
-                            return (
-                                <FluidLyricsLayoutItem
-                                    key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
-                                    index={displayIndex}
-                                    onAnimateMount={registerAnimatedRow}
-                                    onMount={observeItem}
-                                    top={itemTops[displayIndex]}
-                                >
-                                    {item.type === 'interlude' ? (
-                                        <div>
-                                            <InterludeItem
-                                                isActive={isActive}
-                                                forceExiting={displayIndex === exitingInterludeIndex}
-                                                forceExitKey={interludeExitKey}
-                                                playbackSyncKey={playbackSyncKey}
-                                                suppressDots={false}
-                                                currentMs={renderCurrentMs}
-                                                preciseMsRef={preciseMsRef}
-                                                startMs={item.startMs}
-                                                endMs={item.endMs}
-                                            />
-                                        </div>
-                                    ) : (
-                                        <LyricsLineItem
-                                            line={item.line}
-                                            isActive={isActive}
-                                            isKaraokeActive={isKaraokeActive}
-                                            isUserScrolling={isUserScrolling}
-                                            pausedScroll={pausedScroll}
-                                            distanceFromActive={
-                                                activeDisplayIndex >= 0
-                                                    ? Math.abs(
-                                                        activeDisplayIndex -
-                                                        (parentDisplayIndexMap.get(displayIndex) ?? displayIndex)
-                                                    )
-                                                    : 0
-                                            }
-                                            interludeShift={interludeShift}
-                                            interludeShiftDurationMs={interludeGapOpenDurationMs}
-                                            lineEndMs={typeof item.line.end_time_ms === 'number' ? item.line.end_time_ms : getLineEndMsByIndex(lines, item.lineIndex)}
-                                            nextLineStartMs={item.line.words?.length ? getLineEndMsByIndex(lines, item.lineIndex) : null}
-                                            enableTightHandoffTailCompression={timingStrategy.compressTightHandoffTail}
-                                            currentTime={renderCurrentMs / 1000}
-                                            preciseMsRef={preciseMsRef}
-                                            onSeek={handleLineSeek}
-                                            fluidMotion
-                                            motionDelay={getMotionDelay(displayIndex)}
-                                            variant={variant}
-                                            isBackground={item.line.role === 'background'}
-                                            hasDuetLine={hasDuetLine}
-                                            cachedRowHeight={cachedItemHeights[displayIndex]}
-                                            onBackgroundHeight={
-                                                item.line.role === 'background'
-                                                    ? (height) => reportBackgroundHeight(displayIndex, height)
-                                                    : undefined
-                                            }
-                                        />
-                                    )}
-                                </FluidLyricsLayoutItem>
-                            );
-                        })}
-                    </div>
-                )}
-            </motion.div>
-          </div>
+            <LyricsFrameTaskRegistryContext.Provider value={karaokeFrameRegistry}>
+                <div className="relative h-full w-full rounded-[22px] overflow-hidden" style={{ contain: 'strict' }}>
+                    <motion.div
+                        ref={scrollAreaRef}
+                        className={clsx(
+                            'relative z-10 mt-0 overflow-hidden touch-none',
+                            variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
+                        )}
+                        style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
+                        onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
+                        onWheel={(event: WheelEvent<HTMLDivElement>) => {
+                            event.preventDefault();
+                            handleManualDelta(event.deltaY);
+                        }}
+                    >
+                        {displayState ? (
+                            <div className="h-full flex items-center justify-center text-white/40 text-sm">{displayState}</div>
+                        ) : (
+                            <FluidLyricsDomRenderer
+                                hostRef={rowsHostRef}
+                                visibilityStore={visibilityStore}
+                                displayItems={displayItems}
+                                itemTops={itemTops}
+                                itemHeights={itemHeights}
+                                contentHeight={contentHeight}
+                                activeDisplayIndex={activeDisplayIndex}
+                                activeIndices={activeIndices}
+                                parentDisplayIndexMap={parentDisplayIndexMap}
+                                focusNextLineByVisualEnd={focusNextLineByVisualEnd}
+                                renderCurrentMs={renderCurrentMs}
+                                preciseMsRef={preciseMsRef}
+                                isUserScrolling={isUserScrolling}
+                                pausedScroll={pausedScroll}
+                                interludeExitKey={interludeExitKey}
+                                exitingInterludeIndex={exitingInterludeIndex}
+                                playbackSyncKey={playbackSyncKey}
+                                interludeShiftDurationMs={interludeGapOpenDurationMs}
+                                lines={lines}
+                                enableTightHandoffTailCompression={timingStrategy.compressTightHandoffTail}
+                                onSeek={handleLineSeek}
+                                registerAnimatedRow={registerAnimatedRow}
+                                observeItem={observeItem}
+                                visualInterludeShifts={visualInterludeShifts}
+                                motionDelays={motionDelays}
+                                variant={variant}
+                                hasDuetLine={hasDuetLine}
+                                cachedRowHeights={cachedItemHeights}
+                                reportBackgroundHeight={reportBackgroundHeight}
+                            />
+                        )}
+                    </motion.div>
+                </div>
+            </LyricsFrameTaskRegistryContext.Provider>
         </LyricsFrameSchedulerContext.Provider>
     );
 }

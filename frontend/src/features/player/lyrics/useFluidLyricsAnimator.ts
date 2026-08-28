@@ -54,7 +54,6 @@ interface FluidLyricsAnimatorArgs {
     itemTops: number[];
     onVisibleIndicesChange: (indices: readonly number[]) => void;
     preserveMotionOnSync: boolean;
-    suppressRowDelay: boolean;
     syncRevision: number;
     viewportHeight: number;
 }
@@ -178,8 +177,8 @@ class FluidLyricsAnimator {
         state.lastRenderedFilter = null;
         state.lastRenderedOpacity = null;
         element.style.willChange = 'transform';
-        // 与 AMLL 的 lyricLineWrapper 一致：已进入 overscan 的行在整个挂载期
-        // 保持稳定合成表面，避免进入真实视口时集中 Layerize 或重新栅格化。
+        // 已进入 overscan 的行在整个挂载期保持稳定合成表面，
+        // 避免进入真实视口时集中 Layerize 或重新栅格化。
         if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
         // 先提交 filter/opacity，再提交 scale/translate，保证点击跳转时
         // 视觉目标与位置目标在同一批 DOM 写入中建立。
@@ -205,14 +204,13 @@ class FluidLyricsAnimator {
         springParams: FluidSpringParams,
         getDelay: (index: number) => number,
         getRowVisual: (index: number) => FluidLyricsRowVisualStyle,
-        suppressRowDelay: boolean,
         parentDisplayIndexMap?: Map<number, number>,
     ) {
         // 布局提交会更新所有 lyric group，而不仅是当前 DOM 中的行。
         // 未挂载行只更新轻量弹簧模型，不触发任何 DOM 写入；这样它们重新进入
         // overscan 区域时可以接续真实运动，而不是从新目标位置瞬移。
         this.rows.forEach((_state, index) => {
-            const delay = suppressRowDelay ? 0 : getDelay(index);
+            const delay = getDelay(index);
             const state = this.rows.get(index);
             if (state?.element) {
                 this.renderRowVisual(state, getRowVisual(index));
@@ -427,7 +425,6 @@ export function useFluidLyricsAnimator({
     itemTops,
     onVisibleIndicesChange,
     preserveMotionOnSync,
-    suppressRowDelay,
     syncRevision,
     viewportHeight,
 }: FluidLyricsAnimatorArgs) {
@@ -505,11 +502,10 @@ export function useFluidLyricsAnimator({
                 variant,
                 parentDisplayIndexMap,
             ),
-            suppressRowDelay,
             parentDisplayIndexMap,
         );
         animator.synchronizeToTargets(syncRevision, preserveMotionOnSync);
-    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, preserveMotionOnSync, springParams, suppressRowDelay, syncRevision, targetScrollY, variant, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, animator, getDelay, isUserScrolling, parentDisplayIndexMap, pausedScroll, preserveMotionOnSync, springParams, syncRevision, targetScrollY, variant, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

@@ -61,6 +61,50 @@ export class LyricsFrameScheduler {
     };
 }
 
+/**
+ * Coalesces a group of same-phase callbacks into one scheduler subscription.
+ * Karaoke lines can register independently, while the panel still pays for
+ * only one content-phase callback per frame.
+ */
+export class LyricsFrameTaskRegistry {
+    private readonly tasks = new Set<LyricsFrameCallback>();
+    private unsubscribe: (() => void) | null = null;
+    private readonly scheduler: LyricsFrameScheduler;
+    private readonly phase: LyricsFramePhase;
+
+    constructor(scheduler: LyricsFrameScheduler, phase: LyricsFramePhase) {
+        this.scheduler = scheduler;
+        this.phase = phase;
+    }
+
+    subscribe(callback: LyricsFrameCallback) {
+        if (this.tasks.has(callback)) return () => undefined;
+        this.tasks.add(callback);
+        if (this.unsubscribe === null) {
+            this.unsubscribe = this.scheduler.subscribe(this.phase, this.update);
+        }
+        return () => {
+            if (!this.tasks.delete(callback)) return;
+            if (this.tasks.size === 0) {
+                this.unsubscribe?.();
+                this.unsubscribe = null;
+            }
+        };
+    }
+
+    dispose() {
+        this.tasks.clear();
+        this.unsubscribe?.();
+        this.unsubscribe = null;
+    }
+
+    private readonly update: LyricsFrameCallback = (now, deltaMs) => {
+        this.tasks.forEach(callback => callback(now, deltaMs));
+    };
+}
+
 export const LyricsFrameSchedulerContext = createContext<LyricsFrameScheduler | null>(null);
+
+export const LyricsFrameTaskRegistryContext = createContext<LyricsFrameTaskRegistry | null>(null);
 
 export const useLyricsFrameScheduler = () => useContext(LyricsFrameSchedulerContext);

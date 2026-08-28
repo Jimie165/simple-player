@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sideLyricsFocusAlpha, topInsetPx } from '@/features/player/lyrics/constants';
 import type { DisplayItem } from '@/features/player/lyrics/types';
+import type { LyricsVisibilityStore } from '@/features/player/lyrics/lyricsVisibilityStore';
 
 const DEFAULT_LINE_HEIGHT_PX = 90;
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
-const VIEWPORT_RESIZE_SETTLE_MS = 120;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -17,6 +17,7 @@ interface FluidLyricsLayoutArgs {
     interludeRowHeight: number;
     variant: 'side' | 'narrow';
     visualShifts: number[];
+    visibilityStore: LyricsVisibilityStore;
 }
 
 interface ViewportSize {
@@ -39,13 +40,12 @@ export function useFluidLyricsLayout({
     interludeRowHeight,
     variant,
     visualShifts,
+    visibilityStore,
 }: FluidLyricsLayoutArgs) {
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const itemObserverRef = useRef<ResizeObserver | null>(null);
     const nodeIndexesRef = useRef(new WeakMap<Element, number>());
     const observedNodesRef = useRef(new Set<HTMLDivElement>());
-    const lastViewportWidthRef = useRef(0);
-    const viewportResizeTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
     const heightCacheRef = useRef<{
@@ -57,12 +57,12 @@ export function useFluidLyricsLayout({
         measurements: Map<number, ItemMeasurement>;
     }>({ items: displayItems, measurements: new Map() });
     const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
-    const [isViewportResizing, setIsViewportResizing] = useState(false);
     const [targetScrollY, setTargetScrollYState] = useState(0);
-    const [spatialVisibility, setSpatialVisibility] = useState<{
+    const spatialVisibilityRef = useRef<{
         items: DisplayItem[];
-        indices: number[];
+        indices: readonly number[];
     } | null>(null);
+    const initialVisibilityItemsRef = useRef<DisplayItem[] | null>(null);
 
     const focusAlpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
     const topSpacerHeight = viewportSize.height * focusAlpha;
@@ -118,17 +118,15 @@ export function useFluidLyricsLayout({
     }, []);
 
     const updateVisibleIndices = useCallback((indices: readonly number[]) => {
-        setSpatialVisibility(previous => {
-            if (
-                previous?.items === displayItems &&
-                previous.indices.length === indices.length &&
-                previous.indices.every((value, index) => value === indices[index])
-            ) {
-                return previous;
-            }
-            return { items: displayItems, indices: [...indices] };
-        });
-    }, [displayItems]);
+        const previous = spatialVisibilityRef.current;
+        if (
+            previous?.items === displayItems &&
+            previous.indices.length === indices.length &&
+            previous.indices.every((value, index) => value === indices[index])
+        ) return;
+        spatialVisibilityRef.current = { items: displayItems, indices: [...indices] };
+        visibilityStore.set(displayItems, indices);
+    }, [displayItems, visibilityStore]);
 
     const initialVisibleIndices = useMemo(() => {
         if (viewportSize.height <= 0) return [];
@@ -143,9 +141,18 @@ export function useFluidLyricsLayout({
         });
         return initialVisible;
     }, [layout.itemHeights, layout.itemTops, targetScrollY, viewportSize.height, visualShifts]);
-    const visibleIndices = spatialVisibility?.items === displayItems
-        ? spatialVisibility.indices
-        : initialVisibleIndices;
+    useLayoutEffect(() => {
+        // 目标滚动位置只用于首次填充 DOM。后续换行必须由 animator 根据每
+        // 行当前弹簧位置发布空间可见集合，否则会在弹簧尚未抵达目标前卸载
+        // 旧行并挂载目标行，形成换行尖峰。
+        if (
+            viewportSize.height <= 0 ||
+            initialVisibilityItemsRef.current === displayItems
+        ) return;
+        initialVisibilityItemsRef.current = displayItems;
+        spatialVisibilityRef.current = { items: displayItems, indices: initialVisibleIndices };
+        visibilityStore.set(displayItems, initialVisibleIndices);
+    }, [displayItems, initialVisibleIndices, visibilityStore, viewportSize.height]);
 
     const cachedItemHeights = useMemo(() => layout.itemHeights.map((_height, index) => {
         const measurement = measurements.items === displayItems
@@ -235,16 +242,6 @@ export function useFluidLyricsLayout({
 
         const update = () => {
             const nextSize = { width: element.clientWidth, height: element.clientHeight };
-            const previousWidth = lastViewportWidthRef.current;
-            lastViewportWidthRef.current = nextSize.width;
-            if (previousWidth > 0 && previousWidth !== nextSize.width) {
-                setIsViewportResizing(true);
-                if (viewportResizeTimerRef.current) clearTimeout(viewportResizeTimerRef.current);
-                viewportResizeTimerRef.current = window.setTimeout(() => {
-                    setIsViewportResizing(false);
-                    viewportResizeTimerRef.current = null;
-                }, VIEWPORT_RESIZE_SETTLE_MS);
-            }
             // 宽度变化时保留上一帧的真实行高，等行 ResizeObserver 批量替换。
             // 若先清成统一估算值，多行歌词会在重测完成前短暂压到相邻行上。
             setViewportSize(previous =>
@@ -258,8 +255,6 @@ export function useFluidLyricsLayout({
         observer.observe(element);
         return () => {
             observer.disconnect();
-            if (viewportResizeTimerRef.current) clearTimeout(viewportResizeTimerRef.current);
-            viewportResizeTimerRef.current = null;
         };
     }, []);
 
@@ -290,7 +285,6 @@ export function useFluidLyricsLayout({
         activeTargetScrollY,
         cachedItemHeights,
         contentHeight: layout.contentHeight,
-        isViewportResizing,
         itemHeights: layout.itemHeights,
         itemTops: layout.itemTops,
         observeItem,
@@ -300,6 +294,5 @@ export function useFluidLyricsLayout({
         topSpacerHeight,
         updateVisibleIndices,
         viewportHeight: viewportSize.height,
-        visibleIndices,
     };
 }
