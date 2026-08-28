@@ -12,12 +12,13 @@ import InfoDialog from '@/components/common/InfoDialog';
 
 interface PlayerControlProps {
     isFullScreen: boolean;
+    isSuspended: boolean;
     onToggleFullScreen: () => void;
     sidebarOffset: number;
     mode: 'full' | 'compact' | 'mini';
 }
 
-export default function PlayerControl({ isFullScreen, onToggleFullScreen, sidebarOffset, mode }: PlayerControlProps) {
+export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullScreen, sidebarOffset, mode }: PlayerControlProps) {
     const metadata = usePlayerStore(s => s.metadata);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const isMini = mode === 'mini';
@@ -51,7 +52,7 @@ export default function PlayerControl({ isFullScreen, onToggleFullScreen, sideba
                         aria-label="打开播放页"
                     />
 
-                    <PlaybackControls mode={mode} />
+                    <PlaybackControls mode={mode} isSuspended={isSuspended} />
 
                     <div className={clsx(
                         "relative z-10 row-start-1",

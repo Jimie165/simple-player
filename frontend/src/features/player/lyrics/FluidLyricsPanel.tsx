@@ -12,7 +12,7 @@ import {
     manualResumeFollowDelayMs,
 } from '@/features/player/lyrics/constants';
 import {
-    getFluidLyricsMotionDelay,
+    getFluidLyricsMotionDelays,
     getFluidLyricsSpringParams,
 } from '@/features/player/lyrics/fluidLyricsMotion';
 import {
@@ -350,8 +350,8 @@ function FluidLyricsPanel({
         }),
         [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isLineSeekSync, isPlaying, isUserScrolling, variant]
     );
-    const getMotionDelay = useCallback(
-        (displayIndex: number) => getFluidLyricsMotionDelay({
+    const motionDelays = useMemo(() => {
+        const motionArgs = {
             activeDisplayIndex,
             displayItems,
             focusNextLineByVisualEnd,
@@ -359,8 +359,12 @@ function FluidLyricsPanel({
             isSeeking: isLineSeekSync,
             isUserScrolling,
             variant,
-        }, displayIndex),
-        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isLineSeekSync, isPlaying, isUserScrolling, variant]
+        };
+        return getFluidLyricsMotionDelays(motionArgs);
+    }, [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isLineSeekSync, isPlaying, isUserScrolling, variant]);
+    const getMotionDelay = useCallback(
+        (displayIndex: number) => motionDelays[displayIndex] ?? 0,
+        [motionDelays]
     );
     const registerAnimatedRow = useFluidLyricsAnimator({
         activeDisplayIndex,

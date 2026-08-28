@@ -464,11 +464,17 @@ body {
 
 /* 退出时反向播放每个词的动画；字符保留自己的当前位移，
    再分别回到静止态，避免整行统一平移造成字符级运动跳变。 */
-.karaoke-char-exiting {
+.karaoke-char-exiting,
+.karaoke-line-exiting .karaoke-char {
   transition: transform 280ms ease-out;
 }
 
-.karaoke-char-exiting .karaoke-char-paint {
+.karaoke-line-returning .karaoke-char {
+  transform: translate3d(0, 0, 0) scale(1) !important;
+}
+
+.karaoke-char-exiting .karaoke-char-paint,
+.karaoke-line-exiting .karaoke-char-paint {
   transition: text-shadow 280ms ease-out;
 }
 

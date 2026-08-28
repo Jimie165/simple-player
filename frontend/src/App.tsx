@@ -222,67 +222,66 @@ function App() {
     <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans">
       <PlaybackRuntime />
 
-      {/* 1. 标题栏（始终在最顶层 z-100） */}
-      <TitleBar />
-      <SelectionMenuBar />
+      <div
+        className={`flex min-h-0 flex-1 flex-col ${isFullScreen ? 'base-layer-paused' : ''} ${isBaseLayerFrozen ? 'base-layer-frozen' : ''}`}
+        inert={isFullScreen}
+        aria-hidden={isFullScreen}
+      >
+        {/* 1. 标题栏（始终在最顶层 z-100） */}
+        <TitleBar />
+        <SelectionMenuBar />
 
-      <div className="flex flex-1 overflow-hidden relative">
+        <div className="flex flex-1 overflow-hidden relative">
+          {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
+          <div className="absolute inset-0 flex">
+            <Sidebar
+              activeId={currentPage}
+              onNavigate={handleNavigate}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed((prev) => !prev)}
+              canGoBack={mainHistory.length > 0 || hasOverlay || activePlaylistDetail !== null || isFullScreen}
+              onBack={handleBack}
+              onSearch={handleSearch}
+              isOverlay={isSidebarOverlay}
+              onRequestClose={() => setSidebarCollapsed(true)}
+            />
 
-        {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
-        <div
-          className={`absolute inset-0 flex ${isFullScreen ? 'base-layer-paused' : ''} ${isBaseLayerFrozen ? 'base-layer-frozen' : ''}`}
-          inert={isFullScreen}
-          aria-hidden={isFullScreen}
-        >
-          <Sidebar
-            activeId={currentPage}
-            onNavigate={handleNavigate}
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed((prev) => !prev)}
-            canGoBack={mainHistory.length > 0 || hasOverlay || activePlaylistDetail !== null || isFullScreen}
-            onBack={handleBack}
-            onSearch={handleSearch}
-            isOverlay={isSidebarOverlay}
-            onRequestClose={() => setSidebarCollapsed(true)}
-          />
+            <div className="flex-1 flex flex-col min-w-0 relative bg-surface-container before:absolute before:inset-0 before:bg-primary/5 before:pointer-events-none">
+              {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
+              {isSidebarOverlay && !sidebarCollapsed && (
+                <div
+                  className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
+                  onClick={() => setSidebarCollapsed(true)}
+                />
+              )}
 
-          <div className="flex-1 flex flex-col min-w-0 relative bg-surface-container before:absolute before:inset-0 before:bg-primary/5 before:pointer-events-none">
-            {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
-            {isSidebarOverlay && !sidebarCollapsed && (
-              <div
-                className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
-                onClick={() => setSidebarCollapsed(true)}
-              />
-            )}
+              {/* 顶角填充：主内容区左上角为圆角，此处填充侧边栏主题色以实现视觉无缝衔接 */}
+              <div className="absolute top-0 left-0 w-8 h-8 bg-primary/5 dark:bg-primary/8 pointer-events-none">
+                <div
+                  className="absolute inset-0 opacity-0 dark:opacity-100 pointer-events-none"
+                  style={{
+                    backgroundImage:
+                      'linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%)'
+                  }}
+                />
+              </div>
 
-            {/* 顶角填充：主内容区左上角为圆角，此处填充侧边栏主题色以实现视觉无缝衔接 */}
-            <div className="absolute top-0 left-0 w-8 h-8 bg-primary/5 dark:bg-primary/8 pointer-events-none">
-              <div
-                className="absolute inset-0 opacity-0 dark:opacity-100 pointer-events-none"
-                style={{
-                  backgroundImage:
-                    'linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%)'
-                }}
-              />
+              {/* Reuse mainContent variable content inline or wrapper */}
+              {mainContent}
             </div>
-
-            {/* Reuse mainContent variable content inline or wrapper */}
-            {mainContent}
           </div>
         </div>
 
-
-
-      </div>
-
-      {/* 4. 底部播放控制 - M3 Surface Container */}
-      <div className="relative z-70">
-        <PlayerControl
-          isFullScreen={isFullScreen}
-          onToggleFullScreen={toggleFullScreenPlayer}
-          sidebarOffset={sidebarOffset}
-          mode={playerMode}
-        />
+        {/* 4. 底部播放控制 - M3 Surface Container */}
+        <div className="relative z-70">
+          <PlayerControl
+            isFullScreen={isFullScreen}
+            isSuspended={isFullScreen}
+            onToggleFullScreen={toggleFullScreenPlayer}
+            sidebarOffset={sidebarOffset}
+            mode={playerMode}
+          />
+        </div>
       </div>
       <AddToPlaylistSheet />
       <GlobalDialogLayer />

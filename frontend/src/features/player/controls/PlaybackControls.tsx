@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { PlaybackControlButtons } from '@/features/player/controls/PlaybackControlButtons';
@@ -6,6 +6,7 @@ import { PlaybackProgressBar } from '@/features/player/controls/PlaybackProgress
 
 interface PlaybackControlsProps {
     mode: 'full' | 'compact' | 'mini';
+    isSuspended: boolean;
 }
 
 interface PlaybackProgressClockProps {
@@ -13,6 +14,7 @@ interface PlaybackProgressClockProps {
     isMini: boolean;
     metadata: ReturnType<typeof usePlayerStore.getState>['metadata'];
     isDragging: boolean;
+    isSuspended: boolean;
     handleSeekStart: () => void;
     handleSeekChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
     handleSeekEnd: (event: React.MouseEvent<HTMLInputElement>) => void;
@@ -23,11 +25,16 @@ function PlaybackProgressClock({
     isMini,
     metadata,
     isDragging,
+    isSuspended,
     handleSeekStart,
     handleSeekChange,
     handleSeekEnd,
 }: PlaybackProgressClockProps) {
-    const currentTime = usePlayerStore(state => state.currentTime);
+    const lastCurrentTimeRef = useRef(usePlayerStore.getState().currentTime);
+    const currentTime = usePlayerStore(state => isSuspended ? lastCurrentTimeRef.current : state.currentTime);
+    useEffect(() => {
+        if (!isSuspended) lastCurrentTimeRef.current = currentTime;
+    }, [currentTime, isSuspended]);
     const progressPercent = metadata && metadata.duration > 0 ? (currentTime / metadata.duration) * 100 : 0;
     const displayCurrentTime = Math.max(0, Math.floor(currentTime));
     const displayDuration = Math.max(0, Math.floor(metadata?.duration || 0));
@@ -50,7 +57,7 @@ function PlaybackProgressClock({
     );
 }
 
-export default function PlaybackControls({ mode }: PlaybackControlsProps) {
+export default function PlaybackControls({ mode, isSuspended }: PlaybackControlsProps) {
     const isMini = mode === 'mini';
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const metadata = usePlayerStore(state => state.metadata);
@@ -118,6 +125,7 @@ export default function PlaybackControls({ mode }: PlaybackControlsProps) {
                 isMini={isMini}
                 metadata={metadata}
                 isDragging={isDragging}
+                isSuspended={isSuspended}
                 handleSeekStart={handleSeekStart}
                 handleSeekChange={handleSeekChange}
                 handleSeekEnd={handleSeekEnd}

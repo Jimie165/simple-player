@@ -269,6 +269,7 @@ function KaraokeTextBase({
     const frameScheduler = useLyricsFrameScheduler();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const charPaintRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const colorsRef = useRef<HTMLSpanElement | null>(null);
     const wordPhaseKeyRef = useRef('');
     const wasFocusedRef = useRef(isFocused);
     const exitFrameRef = useRef<number | null>(null);
@@ -476,6 +477,10 @@ function KaraokeTextBase({
                 window.clearTimeout(exitTimerRef.current);
                 exitTimerRef.current = null;
             }
+            colorsRef.current?.classList.remove(
+                'karaoke-line-exiting',
+                'karaoke-line-returning'
+            );
             charRefs.current.forEach(element => {
                 if (!element) return;
                 element.classList.remove('karaoke-char-exiting');
@@ -501,27 +506,22 @@ function KaraokeTextBase({
                 paint.style.getPropertyValue('--kg') !== ''
             ) ? [{ motion, paint }] : [];
         });
+        colorsRef.current?.classList.add('karaoke-line-exiting');
         exitingElements.forEach(({ motion, paint }) => {
-            motion.classList.add('karaoke-char-exiting');
-            paint.style.setProperty('--kg', '0');
+            if (motion.classList.contains('karaoke-char-long-tone')) {
+                paint.style.setProperty('--kg', '0');
+            }
         });
         exitFrameRef.current = requestAnimationFrame(() => {
             exitFrameRef.current = null;
-            exitingElements.forEach(({ motion }) => {
-                if (motion.classList.contains('karaoke-char-exiting')) {
-                    motion.style.transform = restingCharTransform;
-                }
-            });
+            const colors = colorsRef.current;
+            if (colors?.classList.contains('karaoke-line-exiting')) {
+                colors.classList.add('karaoke-line-returning');
+            }
         });
         exitTimerRef.current = window.setTimeout(() => {
             exitTimerRef.current = null;
-            exitingElements.forEach(({ motion, paint }) => {
-                motion.classList.remove('karaoke-char-exiting');
-                motion.style.removeProperty('transform');
-                motion.style.removeProperty('transition');
-                paint.style.removeProperty('--kg');
-                paint.style.removeProperty('transition');
-            });
+            colorsRef.current?.classList.remove('karaoke-line-exiting');
         }, 280);
         return () => {
             if (exitFrameRef.current !== null) {
@@ -538,6 +538,7 @@ function KaraokeTextBase({
     return (
         <span style={{ display: 'block' }}>
             <span
+                ref={colorsRef}
                 className="karaoke-text-colors"
                 style={{
                     display: 'block',

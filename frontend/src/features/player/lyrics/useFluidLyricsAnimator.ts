@@ -112,9 +112,10 @@ class FluidLyricsAnimator {
     private modelIdentity: object | null = null;
     private unsubscribeFrame: (() => void) | null = null;
     private lastSyncRevision: number | null = null;
-    private lastVisibleKey: string | null = null;
     private onVisibleIndicesChange: ((indices: readonly number[]) => void) | null = null;
     private viewportHeight = 0;
+    private rowCount = 0;
+    private spatialVisibility = new Uint8Array(0);
 
     constructor(frameScheduler: LyricsFrameScheduler) {
         this.frameScheduler = frameScheduler;
@@ -130,6 +131,11 @@ class FluidLyricsAnimator {
         if (this.modelIdentity !== modelIdentity) {
             this.resetRows();
             this.modelIdentity = modelIdentity;
+        }
+
+        if (this.rowCount !== rowCount) {
+            this.rowCount = rowCount;
+            this.spatialVisibility = new Uint8Array(rowCount);
         }
 
         for (let index = 0; index < rowCount; index++) {
@@ -172,9 +178,8 @@ class FluidLyricsAnimator {
         state.lastRenderedFilter = null;
         state.lastRenderedOpacity = null;
         element.style.willChange = 'transform';
-        // scale 弹簧停止后仍保持这一行的合成表面。若在到达 scale(1) 的同一帧
-        // 清掉 will-change，WebView2 会撤销图层并重新栅格化整句，尚未播放的
-        // 字符也会一起发生纹理跳变。行离开空间窗口后 DOM 卸载会自然释放它。
+        // 与 AMLL 的 lyricLineWrapper 一致：已进入 overscan 的行在整个挂载期
+        // 保持稳定合成表面，避免进入真实视口时集中 Layerize 或重新栅格化。
         if (state.scaleElement) state.scaleElement.style.willChange = 'transform';
         // 先提交 filter/opacity，再提交 scale/translate，保证点击跳转时
         // 视觉目标与位置目标在同一批 DOM 写入中建立。
@@ -343,20 +348,31 @@ class FluidLyricsAnimator {
 
     private publishSpatialVisibility() {
         if (!this.onVisibleIndicesChange || this.viewportHeight <= 0) return;
-        const visible: number[] = [];
-        this.rows.forEach((state, index) => {
+        let spatialStateChanged = false;
+        for (let index = 0; index < this.rowCount; index++) {
+            const state = this.rows.get(index);
+            if (!state) continue;
             const top = state.layoutTop + state.translateY.getPosition();
-            if (isFluidLyricsRowSpatiallyVisible(
+            const isSpatiallyVisible = isFluidLyricsRowSpatiallyVisible(
                 top,
                 state.height,
                 this.viewportHeight,
                 SPATIAL_OVERSCAN_PX,
-            )) visible.push(index);
-        });
-        visible.sort((left, right) => left - right);
-        const key = visible.join(',');
-        if (key === this.lastVisibleKey) return;
-        this.lastVisibleKey = key;
+            );
+            const nextSpatialValue = isSpatiallyVisible ? 1 : 0;
+            if (this.spatialVisibility[index] !== nextSpatialValue) {
+                this.spatialVisibility[index] = nextSpatialValue;
+                spatialStateChanged = true;
+            }
+        }
+        if (!spatialStateChanged) return;
+
+        // 行模型始终按 display index 建立，按索引扫描即可保持顺序；只有可见
+        // 集合真正变化时才创建一次数组并通知 React，避免每个运动帧产生垃圾。
+        const visible: number[] = [];
+        for (let index = 0; index < this.rowCount; index++) {
+            if (this.spatialVisibility[index] === 1) visible.push(index);
+        }
         this.onVisibleIndicesChange(visible);
     }
 
@@ -388,7 +404,8 @@ class FluidLyricsAnimator {
         this.rows.clear();
         this.animatingRows.clear();
         this.lastSyncRevision = null;
-        this.lastVisibleKey = null;
+        this.rowCount = 0;
+        this.spatialVisibility = new Uint8Array(0);
     }
 }
 
