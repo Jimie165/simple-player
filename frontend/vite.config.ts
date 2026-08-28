@@ -31,7 +31,15 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
+        onlyExplicitManualChunks: true,
         manualChunks(id) {
+          if (
+            id.includes('/src/features/player/apple/') ||
+            id.includes('/src/features/player/lyrics/')
+          ) {
+            return 'immersive-player'
+          }
+
           if (!id.includes('/node_modules/')) return
 
           if (
