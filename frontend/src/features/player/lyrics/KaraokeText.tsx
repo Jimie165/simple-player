@@ -1,12 +1,8 @@
-import { memo, useContext, useLayoutEffect, useMemo, useRef, type RefObject } from 'react';
+import { useLayoutEffect, useMemo, useRef, memo, type RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
-import { getKaraokeWordMaskState } from '@/features/player/lyrics/karaokeWordMask';
-import {
-    LyricsFrameTaskRegistryContext,
-    useLyricsFrameScheduler,
-} from '@/features/player/lyrics/lyricsFrameScheduler';
+import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 interface KaraokeTextProps {
     words: LyricsWord[];
@@ -17,7 +13,8 @@ interface KaraokeTextProps {
     preciseMsRef: RefObject<number>;
     isActive: boolean;
     isFocused: boolean;
-    isMotionPrepared: boolean;
+    /** Fluid panels provide the playback state so paused rows do not keep a frame loop. */
+    isPlaying?: boolean;
     glowDisabled?: boolean;
     fillAlpha?: number;
 }
@@ -33,25 +30,17 @@ type KaraokeCharStyle = {
     glowAlpha: number;
 };
 
-type KaraokeFloatAnimation = {
-    animation: Animation;
-    duration: number;
-    element: HTMLSpanElement;
+type KaraokeCharRuntime = {
     item: FlatCharItem;
-    isLastWord: boolean;
-    lastCurrentTime: number | null;
-};
-
-type KaraokeWordMaskRuntime = {
-    charItems: FlatCharItem[];
-    charWidths: number[];
-    element: HTMLSpanElement;
-    endMs: number;
-    lastEdgeWidth: string | null;
-    lastFillPercent: string | null;
-    paddingLeft: number;
-    startMs: number;
-    totalWidth: number;
+    isLongTone: boolean;
+    longToneAmount: number;
+    glowToneAmount: number;
+    fillEdgeWidth: number;
+    charCount: number;
+    charIndex: number;
+    emphasisDurationMs: number;
+    charDelayMs: number;
+    motionAmount: number;
 };
 
 type WordMotionWindow = {
@@ -59,22 +48,10 @@ type WordMotionWindow = {
     endMs: number;
 };
 
+const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
-const karaokeExitDurationMs = 600;
 const syllableLiftEm = 0.078;
-const restingCharTransform = 'translate3d(0, 0, 0) scale(1)';
-const FLOAT_KEYFRAME_COUNT = 16;
-const floatKeyframes: Keyframe[] = Array.from(
-    { length: FLOAT_KEYFRAME_COUNT + 1 },
-    (_, index) => {
-        const progress = index / FLOAT_KEYFRAME_COUNT;
-        const lift = Math.sin((progress * Math.PI) / 2) * -syllableLiftEm;
-        return {
-            offset: progress,
-            transform: `translateY(${lift.toFixed(4)}em)`,
-        };
-    },
-);
+const restingCharTransform = 'translate(0, 0) scale(1)';
 const cjkLayoutCharPattern = /^[\p{Unified_Ideograph}ࠀ-鿼]+$/u;
 const whitespaceLayoutCharPattern = /^\s+$/u;
 
@@ -149,87 +126,103 @@ const getEmphasisPulse = (value: number) => {
         );
 };
 
-function getKaraokeCharStyle(
+function prepareKaraokeCharRuntime(
     charItem: FlatCharItem,
+    isLastWord: boolean,
+): KaraokeCharRuntime {
+    const longToneRaw = clamp01((charItem.groupDurationMs - 800) / 760);
+    const longToneAmount = smoothstep(longToneRaw);
+    const isLongTone = charItem.groupDurationMs > 800;
+    const glowToneAmount = isLongTone
+        ? 0.3 + longToneAmount * 0.6
+        : 0;
+    const charCount = Math.max(1, charItem.activeCharCountInWord);
+    const charIndex = Math.max(0, charItem.activeCharIndexInWord);
+    const emphasisDurationMs = getEmphasisDurationMs(
+        charItem.groupDurationMs,
+        isLastWord
+    );
+
+    return {
+        item: charItem,
+        isLongTone,
+        longToneAmount,
+        glowToneAmount,
+        fillEdgeWidth: 26 + longToneAmount * 18,
+        charCount,
+        charIndex,
+        emphasisDurationMs,
+        charDelayMs: (emphasisDurationMs / 2.5 / charCount) * charIndex,
+        motionAmount: Math.min(
+            1.2,
+            getDurationEmphasisAmount(emphasisDurationMs, 2000) * 0.6
+        ),
+    };
+}
+
+function getKaraokeCharStyle(
+    runtime: KaraokeCharRuntime,
     timeMs: number,
-    isLastWord: boolean = false,
     glowDisabled = false,
-    useWaapiFloat = false,
+    output: KaraokeCharStyle = { transform: '', fillStop: 0, glowAlpha: 0 },
 ): KaraokeCharStyle {
+    const {
+        item: charItem,
+        isLongTone,
+        longToneAmount,
+        glowToneAmount,
+        fillEdgeWidth,
+        charCount,
+        charIndex,
+        emphasisDurationMs,
+        charDelayMs,
+        motionAmount,
+    } = runtime;
     const {
         time_ms,
         durationMs,
         groupStartMs,
-        groupDurationMs,
-        activeCharIndexInWord,
-        activeCharCountInWord,
     } = charItem;
     const fillRawProgress = (timeMs - time_ms) / durationMs;
     const fillProgress = clamp01(fillRawProgress);
     const isFillComplete = fillRawProgress >= 1;
     const hasFillProgress = fillProgress > 0;
 
-    const longToneRaw = clamp01((groupDurationMs - 800) / 760);
-    const longToneAmount = smoothstep(longToneRaw);
-    const isLongTone = groupDurationMs > 800;
-    const glowToneAmount = isLongTone
-        ? 0.3 + smoothstep(longToneRaw) * 0.6
-        : 0;
     const fillStop = fillProgress * 100;
-    const fillEdgeWidth = 26 + longToneAmount * 18;
     const elapsedMs = timeMs - time_ms;
-    const motionDurationMs = Math.max(800, durationMs);
-    const regularLift = elapsedMs > 0
-        ? Math.sin((clamp01(elapsedMs / motionDurationMs) * Math.PI) / 2)
+    const hasStarted = elapsedMs > 0;
+    const attackMs = Math.max(800, durationMs);
+    const regularLift = hasStarted
+        ? Math.sin(
+            (clamp01(elapsedMs / attackMs) * Math.PI) / 2
+        )
         : 0;
-    const charCount = Math.max(1, activeCharCountInWord);
-    const charIndex = Math.max(0, activeCharIndexInWord);
-    const emphasisDurationMs = getEmphasisDurationMs(
-        groupDurationMs,
-        isLastWord
-    );
-    const charDelayMs =
-        (emphasisDurationMs / 2.5 / charCount) * charIndex;
+
     const emphasisProgress = clamp01(
         (timeMs - groupStartMs - charDelayMs) /
         emphasisDurationMs
     );
-    const emphasisPulse =
-        getEmphasisPulse(emphasisProgress) *
-        longToneAmount;
-    const motionAmount = Math.min(
-        1.2,
-        getDurationEmphasisAmount(emphasisDurationMs, 2000) * 0.6
-    );
-    const glowPulse =
-        getEmphasisPulse(emphasisProgress) *
-        glowToneAmount;
+    // Most words are shorter than the emphasis threshold. Avoid evaluating
+    // the cubic curve for those characters while preserving the exact zero
+    // result of the original multiplication.
+    const emphasisCurve = longToneAmount > 0 || (!glowDisabled && glowToneAmount > 0)
+        ? getEmphasisPulse(emphasisProgress)
+        : 0;
+    const emphasisPulse = emphasisCurve * longToneAmount;
+    const glowPulse = emphasisCurve * glowToneAmount;
     const centerOffset = charCount / 2 - charIndex;
     const translateX =
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
-    const translateY = useWaapiFloat
-        ? 0
-        : regularLift * -syllableLiftEm;
+    const translateY = regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
     const glowReveal = isFillComplete
         ? 1
         : smoothstep(fillProgress);
 
-    // 按实际输出精度判断 identity，避免 sin(PI) 的浮点残差留下。
-    // 静止态和运动态始终使用相同的 3D transform 形式。WebView2 对二维
-    // 亚像素文字位移会逐帧重新栅格化，视觉上表现为上浮过程持续抖动。
-    const renderedTranslateX = Number(translateX.toFixed(4));
-    const renderedTranslateY = Number(translateY.toFixed(4));
-    const renderedScale = Number(scale.toFixed(4));
-    const transform = renderedTranslateX === 0 && renderedTranslateY === 0 && renderedScale === 1
-        ? restingCharTransform
-        : `translate3d(${renderedTranslateX.toFixed(4)}em, ${renderedTranslateY.toFixed(4)}em, 0) scale(${renderedScale.toFixed(4)})`;
-
-    return {
-        transform,
-        fillStop: hasFillProgress || isFillComplete ? fillStop : -(fillEdgeWidth + 1),
-        glowAlpha: !isLongTone || glowDisabled ? 0 : glowPulse * glowReveal * 0.75,
-    };
+    output.transform = `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`;
+    output.fillStop = hasFillProgress || isFillComplete ? fillStop : -(fillEdgeWidth + 1);
+    output.glowAlpha = !isLongTone || glowDisabled ? 0 : glowPulse * glowReveal * 0.75;
+    return output;
 }
 
 function getWordMotionWindow(
@@ -285,23 +278,6 @@ const WORD_PHASE_FUTURE = 0;
 const WORD_PHASE_MOTION = 1;
 const WORD_PHASE_SETTLED = 2;
 
-const isKaraokeWaapiDisabled = () => typeof window !== 'undefined' &&
-    (window as Window & {
-        __SIMPLE_PLAYER_DISABLE_KARAOKE_WAAPI__?: boolean;
-    }).__SIMPLE_PLAYER_DISABLE_KARAOKE_WAAPI__ === true;
-
-const isKaraokeWordMaskDisabled = () => typeof window !== 'undefined' &&
-    (window as Window & {
-        __SIMPLE_PLAYER_DISABLE_KARAOKE_WORD_MASK__?: boolean;
-    }).__SIMPLE_PLAYER_DISABLE_KARAOKE_WORD_MASK__ === true;
-
-const getWordPhaseCode = ({ startMs, endMs }: WordMotionWindow, timeMs: number) =>
-    timeMs < startMs
-        ? WORD_PHASE_FUTURE
-        : timeMs < endMs
-            ? WORD_PHASE_MOTION
-            : WORD_PHASE_SETTLED;
-
 function KaraokeTextBase({
     words,
     lineEndMs,
@@ -310,21 +286,13 @@ function KaraokeTextBase({
     preciseMsRef,
     isActive,
     isFocused,
-    isMotionPrepared,
+    isPlaying,
     glowDisabled = false,
     fillAlpha = 1,
 }: KaraokeTextProps) {
-    const frameScheduler = useLyricsFrameScheduler();
-    const karaokeFrameRegistry = useContext(LyricsFrameTaskRegistryContext);
+    const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
-    const charPaintRefs = useRef<Array<HTMLSpanElement | null>>([]);
-    const layoutGroupRefs = useRef<Array<HTMLSpanElement | null>>([]);
-    const colorsRef = useRef<HTMLSpanElement | null>(null);
     const wasFocusedRef = useRef(isFocused);
-    const retainedExitFloatAnimationsRef = useRef<KaraokeFloatAnimation[]>([]);
-    const exitFrameRef = useRef<number | null>(null);
-    const exitTimerRef = useRef<number | null>(null);
-    const useWordMask = !isKaraokeWordMaskDisabled();
 
     const flatChars = useMemo(
         () => parseLyricsWordsToChars(words, lineEndMs, {
@@ -376,15 +344,6 @@ function KaraokeTextBase({
         return groups;
     }, [flatChars]);
 
-    const wordMaskedCharIndices = useMemo(() => {
-        if (!useWordMask) return new Set<number>();
-        return new Set(layoutGroups.flatMap(group =>
-            group.length > 0 && !cjkLayoutCharPattern.test(group[0].item.char)
-                ? group.map(({ flatIndex }) => flatIndex)
-                : []
-        ));
-    }, [layoutGroups, useWordMask]);
-
     const wordMotionWindows = useMemo(
         () => wordGroups.map((group, wordIndex) =>
             getWordMotionWindow(
@@ -395,177 +354,95 @@ function KaraokeTextBase({
         [wordGroups]
     );
 
-    useLayoutEffect(() => {
-        if (isFocused && retainedExitFloatAnimationsRef.current.length > 0) {
-            retainedExitFloatAnimationsRef.current.forEach(({ animation }) => {
-                animation.cancel();
+    // All values that only depend on the parsed lyric item are prepared once
+    // per line. The frame callback then evaluates only the time-dependent
+    // progress, avoiding repeated cubic/sqrt work and short-lived objects.
+    const charRuntimes = useMemo(() => {
+        const runtimes: Array<KaraokeCharRuntime | undefined> = [];
+        wordGroups.forEach((group, wordIndex) => {
+            const isLastWord = wordIndex === wordGroups.length - 1;
+            group?.forEach(({ item, flatIndex }) => {
+                runtimes[flatIndex] = prepareKaraokeCharRuntime(item, isLastWord);
             });
-            retainedExitFloatAnimationsRef.current = [];
-        }
+        });
+        return runtimes;
+    }, [wordGroups]);
+
+    useLayoutEffect(() => {
         if (!isActive) return;
 
-        const previousStyles: Array<KaraokeCharStyle | undefined> = [];
+        // Keep previous values as scalars. Returning a new style object for
+        // every character on every frame creates avoidable GC pressure.
+        const previousTransforms: Array<string | undefined> = [];
+        const previousFillStops: Array<number | undefined> = [];
+        const previousGlowAlphas: Array<number | undefined> = [];
         const charElements = charRefs.current;
-        const paintElements = charPaintRefs.current;
-        const clockRef = preciseMsRef;
-        const floatAnimations: Array<KaraokeFloatAnimation | undefined> = [];
-        const wordMaskRuntimes: KaraokeWordMaskRuntime[] = useWordMask
-            ? layoutGroups.flatMap((group, groupIndex) => {
-                const element = layoutGroupRefs.current[groupIndex];
-                if (
-                    !element ||
-                    group.length === 0 ||
-                    cjkLayoutCharPattern.test(group[0].item.char)
-                ) return [];
-                const computedStyle = getComputedStyle(element);
-                const charItems = group.map(({ item }) => item);
-                return [{
-                    charItems,
-                    charWidths: group.map(({ flatIndex }) =>
-                        charElements[flatIndex]?.offsetWidth ?? 0
-                    ),
-                    element,
-                    endMs: Math.max(...charItems.map(item => item.time_ms + item.durationMs)),
-                    lastEdgeWidth: null,
-                    lastFillPercent: null,
-                    paddingLeft: Number.parseFloat(computedStyle.paddingLeft) || 0,
-                    startMs: Math.min(...charItems.map(item => item.time_ms)),
-                    totalWidth: element.offsetWidth,
-                }];
-            })
-            : [];
-        const canUseWaapiFloat = isFocused &&
-            !isKaraokeWaapiDisabled() &&
-            typeof Element !== 'undefined' &&
-            typeof Element.prototype.animate === 'function';
+        const scratchStyle: KaraokeCharStyle = {
+            transform: '',
+            fillStop: 0,
+            glowAlpha: 0,
+        };
 
-        if (canUseWaapiFloat) {
-            flatChars.forEach((item, flatIndex) => {
-                const element = charElements[flatIndex];
-                if (!element) return;
-                const duration = Number.isFinite(item.durationMs)
-                    ? Math.max(800, item.durationMs)
-                    : 800;
-                try {
-                    const animation = element.animate(floatKeyframes, {
-                        duration,
-                        fill: 'both',
-                        composite: 'add',
-                        easing: 'linear',
-                    });
-                    animation.pause();
-                    floatAnimations[flatIndex] = {
-                        animation,
-                        duration,
-                        element,
-                        item,
-                        isLastWord: item.wordIndex === wordGroups.length - 1,
-                        lastCurrentTime: null,
-                    };
-                } catch {
-                    // WebView2 versions without additive transform support use
-                    // the existing direct-style path below.
-                }
-            });
-        }
+        // 行级容器已有独立硬件合成层，字符级无需反复提升合成层，
+        // 避免换行瞬间产生大量 Compositing Layer 创建/销毁开销。
+        charElements.forEach((el) => {
+            if (!el) return;
+            el.style.animation = 'none';
+        });
 
         const updateCharStyles = (flatIndex: number, style: KaraokeCharStyle) => {
             const el = charElements[flatIndex];
-            const paint = paintElements[flatIndex];
-            if (!el || !paint) return;
-            const previous = previousStyles[flatIndex];
-
-            // 激活期间由字符自身承载上浮、强调和辉光；退出阶段会反向回放
-            // 当前字符状态，因此这里不能在失焦时把字符运动改交给行容器。
-            if (isFocused) {
-                if (style.transform !== previous?.transform) {
-                    if (style.transform === restingCharTransform) {
-                        el.style.removeProperty('transform');
-                    } else {
-                        el.style.transform = style.transform;
-                    }
+            if (!el) return;
+            // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
+            // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
+            if (isFocused || wasFocusedRef.current) {
+                if (style.transform !== previousTransforms[flatIndex]) {
+                    el.style.transform = style.transform;
                 }
-                if (style.glowAlpha !== previous?.glowAlpha) {
-                    // 长音的高光归零后仍保留显式的 0，避免与强调 transform
-                    // 同时结束时切换绘制状态并重新栅格化字符纹理。
-                    if (style.glowAlpha === 0 && !el.classList.contains('karaoke-char-long-tone')) {
-                        paint.style.removeProperty('--kg');
-                    }
-                    else paint.style.setProperty('--kg', String(style.glowAlpha));
+                if (style.glowAlpha !== previousGlowAlphas[flatIndex]) {
+                    el.style.setProperty('--kg', String(style.glowAlpha));
                 }
             }
 
-            if (
-                !wordMaskedCharIndices.has(flatIndex) &&
-                style.fillStop !== previous?.fillStop
-            ) {
-                if (style.fillStop <= 0) paint.style.removeProperty('--kf');
-                else paint.style.setProperty('--kf', String(style.fillStop));
+            if (style.fillStop !== previousFillStops[flatIndex]) {
+                el.style.setProperty('--kf', String(style.fillStop));
             }
-            previousStyles[flatIndex] = style;
+            previousTransforms[flatIndex] = style.transform;
+            previousFillStops[flatIndex] = style.fillStop;
+            previousGlowAlphas[flatIndex] = style.glowAlpha;
         };
 
-        const wordMaskPhaseCodes = new Uint8Array(wordMaskRuntimes.length).fill(255);
-        const updateWordMaskStyles = (timeMs: number, forceAll = false) => {
-            wordMaskRuntimes.forEach((runtime, index) => {
-                const phase = timeMs < runtime.startMs
+        const wordPhaseCodes = new Uint8Array(wordMotionWindows.length);
+        const wordPhaseChanges = new Uint8Array(wordMotionWindows.length);
+        wordPhaseCodes.fill(255);
+        const updateWordStyles = (timeMs: number, forceAll = false) => {
+            wordMotionWindows.forEach((motionWindow, wordIndex) => {
+                const phase = timeMs < motionWindow.startMs
                     ? WORD_PHASE_FUTURE
-                    : timeMs < runtime.endMs
+                    : timeMs < motionWindow.endMs
                         ? WORD_PHASE_MOTION
                         : WORD_PHASE_SETTLED;
-                const phaseChanged = wordMaskPhaseCodes[index] !== phase;
-                if (!forceAll && !phaseChanged && phase !== WORD_PHASE_MOTION) return;
-                const state = getKaraokeWordMaskState(
-                    runtime.charItems,
-                    runtime.charWidths,
-                    timeMs,
-                    runtime.paddingLeft,
-                    runtime.totalWidth,
-                );
-                const fillPercent = state.fillPercent.toFixed(3);
-                const edgeWidth = `${state.edgeWidthPx.toFixed(2)}px`;
-                if (runtime.lastFillPercent !== fillPercent) {
-                    runtime.element.style.setProperty('--kw', fillPercent);
-                    runtime.lastFillPercent = fillPercent;
+                const changed = wordPhaseCodes[wordIndex] !== phase;
+                wordPhaseChanges[wordIndex] = changed ? 1 : 0;
+                if (changed) {
+                    wordPhaseCodes[wordIndex] = phase;
                 }
-                if (runtime.lastEdgeWidth !== edgeWidth) {
-                    runtime.element.style.setProperty('--kwfe', edgeWidth);
-                    runtime.lastEdgeWidth = edgeWidth;
-                }
-                wordMaskPhaseCodes[index] = phase;
             });
-        };
 
-        const wordPhaseCodes = new Uint8Array(wordMotionWindows.length).fill(255);
-        const updateWordStyles = (timeMs: number, forceAll = false) => {
-            wordMotionWindows.forEach((window, wordIndex) => {
-                const phase = getWordPhaseCode(window, timeMs);
-                const phaseChanged = wordPhaseCodes[wordIndex] !== phase;
-                if (!forceAll && !phaseChanged && phase !== WORD_PHASE_MOTION) return;
-                const isLastWord =
-                    wordIndex === wordGroups.length - 1;
-                wordGroups[wordIndex]?.forEach(({ item: charItem, flatIndex }) => {
-                    const floatAnimation = floatAnimations[flatIndex];
-                    if (floatAnimation) {
-                        const currentTime = Math.min(
-                            floatAnimation.duration,
-                            Math.max(0, timeMs - floatAnimation.item.time_ms),
-                        );
-                        if (floatAnimation.lastCurrentTime !== currentTime) {
-                            floatAnimation.animation.currentTime = currentTime;
-                            floatAnimation.lastCurrentTime = currentTime;
-                        }
-                    }
+            wordMotionWindows.forEach((_motionWindow, wordIndex) => {
+                const phase = wordPhaseCodes[wordIndex];
+                if (!forceAll && phase !== WORD_PHASE_MOTION && wordPhaseChanges[wordIndex] === 0) return;
+                wordGroups[wordIndex]?.forEach(({ flatIndex }) => {
+                    const runtime = charRuntimes[flatIndex];
+                    if (!runtime) return;
                     const style = getKaraokeCharStyle(
-                        charItem,
+                        runtime,
                         timeMs,
-                        isLastWord,
                         glowDisabled,
-                        floatAnimation !== undefined,
+                        scratchStyle,
                     );
                     updateCharStyles(flatIndex, style);
                 });
-                wordPhaseCodes[wordIndex] = phase;
             });
         };
 
@@ -584,240 +461,121 @@ function KaraokeTextBase({
                         audioMs - lastTimeMs > 200
                     );
                 updateWordStyles(audioMs, hasTimelineJump);
-                updateWordMaskStyles(audioMs, hasTimelineJump);
                 lastTimeMs = audioMs;
             }
+            if (!frameRegistry) frame = requestAnimationFrame(tick);
         };
 
         const initialMs = preciseMsRef.current;
         if (initialMs !== null) {
             updateWordStyles(initialMs, true);
-            updateWordMaskStyles(initialMs, true);
             lastTimeMs = initialMs;
         }
-        const unsubscribeFrame = karaokeFrameRegistry
-            ? karaokeFrameRegistry.subscribe(tick)
-            : frameScheduler
-                ? frameScheduler.subscribe('content', tick)
-                : undefined;
-        const requestNextFrame = () => {
-            frame = requestAnimationFrame(() => {
-                tick();
-                requestNextFrame();
-            });
-        };
-        if (!frameScheduler) requestNextFrame();
+        let unsubscribe: (() => void) | undefined;
+        if (frameRegistry && isPlaying !== false) {
+            unsubscribe = frameRegistry.subscribe(() => tick());
+        } else if (!frameRegistry) {
+            frame = requestAnimationFrame(tick);
+        }
 
         return () => {
-            unsubscribeFrame?.();
+            unsubscribe?.();
             if (frame !== null) cancelAnimationFrame(frame);
-            const retainedAnimations: KaraokeFloatAnimation[] = [];
-            floatAnimations.forEach(floatAnimation => {
-                if (!floatAnimation) return;
-                // Keep the existing additive Y animation alive on line exit,
-                // matching reverse-playback handoff. Only materialize
-                // X/scale underneath it; the exit effect reverses Y to zero.
-                const timeMs = clockRef.current;
-                if (timeMs !== null) {
-                    const style = getKaraokeCharStyle(
-                        floatAnimation.item,
-                        timeMs,
-                        floatAnimation.isLastWord,
-                        glowDisabled,
-                        true,
-                    );
-                    if (style.transform === restingCharTransform) {
-                        floatAnimation.element.style.removeProperty('transform');
-                    } else {
-                        floatAnimation.element.style.transform = style.transform;
-                    }
-                }
-                floatAnimation.animation.pause();
-                retainedAnimations.push(floatAnimation);
-            });
-            if (retainedAnimations.length > 0) {
-                retainedExitFloatAnimationsRef.current = retainedAnimations;
-            }
         };
     }, [
         isActive,
+        isFocused,
         preciseMsRef,
         flatChars,
         wordGroups,
         wordMotionWindows,
+        charRuntimes,
         glowDisabled,
-        isFocused,
-        frameScheduler,
-        karaokeFrameRegistry,
-        layoutGroups,
-        useWordMask,
-        wordMaskedCharIndices,
+        frameRegistry,
+        isPlaying,
     ]);
-
-    useLayoutEffect(() => () => {
-        retainedExitFloatAnimationsRef.current.forEach(({ animation }) => {
-            animation.cancel();
-        });
-        retainedExitFloatAnimationsRef.current = [];
-    }, []);
 
     useLayoutEffect(() => {
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = isFocused;
 
         if (isFocused) {
-            if (exitFrameRef.current !== null) {
-                cancelAnimationFrame(exitFrameRef.current);
-                exitFrameRef.current = null;
-            }
-            if (exitTimerRef.current !== null) {
-                window.clearTimeout(exitTimerRef.current);
-                exitTimerRef.current = null;
-            }
-            colorsRef.current?.classList.remove(
-                'karaoke-line-exiting',
-                'karaoke-line-returning',
-                'karaoke-line-settled'
-            );
+            charRefs.current.forEach((el) => {
+                if (!el) return;
+                el.style.animation = 'none';
+                el.classList.remove('karaoke-char-exiting');
+            });
             return;
         }
 
         if (!wasFocused) {
-            // CSS 默认值已经是静止态；不要在虚拟窗口挂载时逐字重复写入。
+            // 从未聚焦过（如初始非激活行）：无动画残留，直接归位
+            charRefs.current.forEach((el) => {
+                if (!el) return;
+                el.style.transform = restingCharTransform;
+                el.style.setProperty('--kg', '0');
+            });
             return;
         }
 
-        // 保留每个字符当前的 transform，下一帧
-        // 再逐字符回到静止态，确保浏览器把它识别为一次连续的反向过渡。
-        const exitingElements = charRefs.current.flatMap((motion, index) => {
-            const paint = charPaintRefs.current[index];
-            return motion && paint && (
-                motion.style.transform !== '' ||
-                paint.style.getPropertyValue('--kg') !== ''
-            ) ? [{ motion, paint }] : [];
+        // 聚焦→失焦：行级退出过渡。只移除 inline transform/--kg（每字 2 次写入），
+        // 由 .karaoke-char-exiting 的 transition 统一驱动退出动画，
+        // 不再为每字写 4 个退出变量 + 创建 CSS 动画。
+        const exitingClassName = 'karaoke-char-exiting';
+        charRefs.current.forEach((el) => {
+            if (!el) return;
+            el.classList.add(exitingClassName);
+            el.style.transform = '';
+            el.style.removeProperty('--kg');
         });
-        colorsRef.current?.classList.add('karaoke-line-exiting');
-        const exitFloatAnimations = retainedExitFloatAnimationsRef.current;
-        exitFloatAnimations.forEach(({ animation }) => {
-            const currentTime = Number(animation.currentTime ?? 0);
-            if (!Number.isFinite(currentTime) || currentTime <= 0) {
-                animation.cancel();
-                return;
-            }
-            // Preserve that speed for short progress, 
-            // but cap long/long-tone returns to the shared exit
-            // window so the character settles while its row is moving up.
-            animation.playbackRate = -Math.max(
-                1,
-                currentTime / karaokeExitDurationMs,
-            );
-            animation.play();
-        });
-        exitingElements.forEach(({ motion, paint }) => {
-            if (motion.classList.contains('karaoke-char-long-tone')) {
-                paint.style.setProperty('--kg', '0');
-            }
-        });
-        exitFrameRef.current = requestAnimationFrame(() => {
-            exitFrameRef.current = null;
-            const colors = colorsRef.current;
-            if (colors?.classList.contains('karaoke-line-exiting')) {
-                exitingElements.forEach(({ motion }) => {
-                    motion.style.removeProperty('transform');
-                });
-                colors.classList.add('karaoke-line-returning');
-            }
-        });
-        exitTimerRef.current = window.setTimeout(() => {
-            exitTimerRef.current = null;
-            exitFloatAnimations.forEach(({ animation }) => animation.cancel());
-            if (retainedExitFloatAnimationsRef.current === exitFloatAnimations) {
-                retainedExitFloatAnimationsRef.current = [];
-            }
-            const colors = colorsRef.current;
-            colors?.classList.remove(
-                'karaoke-line-exiting',
-                'karaoke-line-returning'
-            );
-            // 保留动画状态，仅由父级屏蔽历史 transform/辉光，避免逐字符回收形成尖峰。
-            colors?.classList.add('karaoke-line-settled');
+
+        const releaseTimer = window.setTimeout(() => {
+            charRefs.current.forEach((el) => {
+                if (!el) return;
+                el.classList.remove(exitingClassName);
+                el.style.transform = restingCharTransform;
+                el.style.setProperty('--kg', '0');
+            });
         }, karaokeExitDurationMs);
+
         return () => {
-            exitFloatAnimations.forEach(({ animation }) => animation.cancel());
-            if (retainedExitFloatAnimationsRef.current === exitFloatAnimations) {
-                retainedExitFloatAnimationsRef.current = [];
-            }
-            if (exitFrameRef.current !== null) {
-                cancelAnimationFrame(exitFrameRef.current);
-                exitFrameRef.current = null;
-            }
-            if (exitTimerRef.current !== null) {
-                window.clearTimeout(exitTimerRef.current);
-                exitTimerRef.current = null;
-            }
+            window.clearTimeout(releaseTimer);
         };
-    }, [flatChars, glowDisabled, isFocused, preciseMsRef, wordGroups.length]);
+    }, [flatChars, isFocused, preciseMsRef, wordGroups.length, glowDisabled]);
 
     return (
-        <span
-            className={isMotionPrepared ? 'karaoke-motion-region' : undefined}
-            style={{ display: 'block' }}
-        >
+        <span style={{ display: 'block' }}>
             <span
-                ref={colorsRef}
-                className="karaoke-text-colors"
                 style={{
                     display: 'block',
                     fontKerning: 'none',
                     fontVariantLigatures: 'none',
-                    '--kb': 0.30,
-                    // glowDisabled 只关闭辉光；背景和声仍需要逐字填充透明度变化。
-                    '--kfa': isFocused ? fillAlpha : 0,
-                    '--kwp': isFocused ? 1 : 0,
+                    // 对于和声行（glowDisabled为true），强制基色保持偏暗，防止因任何状态抖动导致瞬间变成100%纯白
+                    '--kb': (isActive || glowDisabled) ? 0.30 : 1,
+                    '--kfa': fillAlpha,
                 } as React.CSSProperties}
             >
-                {layoutGroups.map((group, groupIndex) => {
+                {layoutGroups.map((group) => {
                     if (!group || group.length === 0) return null;
                     const isCjkLayoutGroup = cjkLayoutCharPattern.test(group[0].item.char);
-                    const useGroupWordMask = useWordMask && !isCjkLayoutGroup;
-                    const baseAlpha = 0.30;
-                    const groupLongToneAmount = Math.max(...group.map(({ item }) =>
-                        smoothstep(clamp01((item.groupDurationMs - 800) / 760))
-                    ));
-                    const groupFillEdgeAlpha = fillAlpha >= 1
-                        ? 0.72 + groupLongToneAmount * 0.2
-                        : fillAlpha;
-                    const groupFillEdgeMaskAlpha = fillAlpha > baseAlpha
-                        ? (groupFillEdgeAlpha - baseAlpha) / (fillAlpha * (1 - baseAlpha))
-                        : 1;
-                    const filledMaskAlpha = baseAlpha + fillAlpha * (1 - baseAlpha);
-                    const filledEdgeMaskAlpha = baseAlpha +
-                        fillAlpha * groupFillEdgeMaskAlpha * (1 - baseAlpha);
 
                     return (
                         <span
                             key={group[0].flatIndex}
-                            ref={(element) => {
-                                layoutGroupRefs.current[groupIndex] = element;
-                            }}
-                            className={useGroupWordMask ? 'karaoke-word-mask' : undefined}
                             style={{
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',
                                 verticalAlign: 'bottom',
+                                // Isolate Latin word groups, but leave CJK runs
+                                // in the normal inline formatting context so
+                                // glyph shaping and line metrics stay stable.
                                 contain: isCjkLayoutGroup ? undefined : 'layout style',
-                                ...(useGroupWordMask ? {
-                                    '--kwbt': filledMaskAlpha,
-                                    '--kwmt': filledEdgeMaskAlpha,
-                                    '--kwd': baseAlpha,
-                                } : {}),
-                            } as React.CSSProperties}
+                            }}
                         >
                             {group.map(({ item: charItem, flatIndex }) => {
-                                const longToneRaw = clamp01((charItem.groupDurationMs - 800) / 760);
-                                const longToneAmount = smoothstep(longToneRaw);
-                                const isLongTone = charItem.groupDurationMs > 800;
-                                const fillEdgeWidth = 26 + longToneAmount * 18;
+                                const runtime = charRuntimes[flatIndex];
+                                if (!runtime) return null;
+                                const { isLongTone, longToneAmount, fillEdgeWidth } = runtime;
                                 const fillEdgeAlpha = fillAlpha >= 1
                                     ? 0.72 + longToneAmount * 0.2
                                     : fillAlpha;
@@ -836,20 +594,12 @@ function KaraokeTextBase({
                                             ? 'karaoke-char karaoke-char-long-tone'
                                             : 'karaoke-char'}
                                         data-c={charItem.char}
+                                        style={{
+                                            '--kfe': fillEdgeWidth,
+                                            '--kfem': fillEdgeMaskAlpha,
+                                        } as React.CSSProperties}
                                     >
-                                        <span
-                                            ref={(element) => {
-                                                charPaintRefs.current[flatIndex] = element;
-                                            }}
-                                            className="karaoke-char-paint"
-                                            data-c={charItem.char}
-                                            style={{
-                                                '--kfe': fillEdgeWidth,
-                                                '--kfem': fillEdgeMaskAlpha,
-                                            } as React.CSSProperties}
-                                        >
-                                            {charItem.char}
-                                        </span>
+                                        {charItem.char}
                                     </span>
                                 );
                             })}
@@ -870,7 +620,7 @@ const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
         prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive &&
         prev.isFocused === next.isFocused &&
-        prev.isMotionPrepared === next.isMotionPrepared &&
+        prev.isPlaying === next.isPlaying &&
         prev.glowDisabled === next.glowDisabled &&
         prev.fillAlpha === next.fillAlpha
     );

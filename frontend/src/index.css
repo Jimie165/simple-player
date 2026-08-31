@@ -419,38 +419,13 @@ body {
 }
 
 /* ── Karaoke dual-layer character ── */
-@property --kfa {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
-}
-
-@property --kwp {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
-}
-
-.karaoke-text-colors {
-  transition: --kfa 500ms ease-in-out, --kwp 500ms ease-in-out;
-}
-
 .karaoke-char {
   position: relative;
   display: inline-block;
   white-space: pre-wrap;
-  /* 这一层只负责运动，不承载文字、mask 或 text-shadow。
-  绘制内容可以作为稳定纹理被整体移动。 */
   transform-origin: center;
   transition: none;
   overflow: visible;
-}
-
-.karaoke-char-paint {
-  position: relative;
-  display: inline-block;
-  white-space: pre-wrap;
-  vertical-align: baseline;
   color: rgba(255, 255, 255, var(--kb, 0.30));
   text-shadow: 0 0 5px rgba(255, 255, 255, var(--kg, 0));
   
@@ -460,121 +435,56 @@ body {
   margin: -0.1em;
 }
 
-/* English lyrics keep character-level motion, but one word-like layout group
-   now owns the bright/dim mask. This removes one independently repainted mask
-   from every glyph while preserving the measured per-character timeline. */
-.karaoke-word-mask {
-  --kw: -25;
-  --kwfe: 0px;
-  --kwbt: 1;
-  --kwmt: 1;
-  --kwd: 0.3;
-  margin: -0.22em;
-  padding: 0.22em;
-  -webkit-mask-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwbt) - var(--kwd)))) 0%,
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwbt) - var(--kwd)))) max(0%, calc(var(--kw) * 1% - var(--kwfe))),
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwmt) - var(--kwd)))) calc(var(--kw) * 1%),
-    rgba(0, 0, 0, var(--kwd)) min(125%, calc(var(--kw) * 1% + var(--kwfe))),
-    rgba(0, 0, 0, var(--kwd)) 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwbt) - var(--kwd)))) 0%,
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwbt) - var(--kwd)))) max(0%, calc(var(--kw) * 1% - var(--kwfe))),
-    rgba(0, 0, 0, calc(var(--kwd) + var(--kwp) * (var(--kwmt) - var(--kwd)))) calc(var(--kw) * 1%),
-    rgba(0, 0, 0, var(--kwd)) min(125%, calc(var(--kw) * 1% + var(--kwfe))),
-    rgba(0, 0, 0, var(--kwd)) 100%
-  );
-  -webkit-mask-repeat: no-repeat;
-  mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
-  mask-size: 100% 100%;
-}
-
-.karaoke-word-mask .karaoke-char-paint {
-  color: rgb(255, 255, 255);
-}
-
-.karaoke-word-mask .karaoke-char-paint::before {
-  content: none;
-}
-
-/* 只为强调字符保持稳定的背面栅格，不用永久 will-change
-   把整屏长音字符提升成独立合成层。 */
+/* 长音从挂载到卸载始终保持同一种合成状态，避免高光结束时因
+   图层降级和文字重新栅格化产生肉眼可见的位置跳变。 */
 .karaoke-char-long-tone {
+  will-change: transform;
   backface-visibility: hidden;
 }
 
-/* 对已经进入运动准备范围的长音字符保留合成表面，避免高光和缩放同时
-   归零时重新栅格化；远处行仍不会因为长音而永久占用合成层。 */
-.karaoke-motion-region .karaoke-char-long-tone,
-.karaoke-line-exiting .karaoke-char-long-tone,
-.karaoke-line-returning .karaoke-char-long-tone {
-  will-change: transform;
+/* 行失焦退出：由行级 class 统一触发，整行字符只靠移除 inline transform/--kg
+   走一次 transition，不再为每字创建 CSS 动画 */
+.karaoke-char-exiting {
+  transition:
+    transform 250ms ease-in-out,
+    --kg 250ms ease-in-out;
 }
 
-/* 当前行与相邻行提前保持同一种 3D 栅格，既避免激活瞬间切换纹理，
-   又不让 overscan 内所有英文字符长期参与合成。 */
-.karaoke-motion-region .karaoke-char,
-.karaoke-line-exiting .karaoke-char,
-.karaoke-line-returning .karaoke-char {
-  transform: translate3d(0, 0, 0) scale(1);
-}
-
-/* 退出时保留字符当前位移，再平滑回到静止态。避免换行时字符像被立即压回基线。 */
-.karaoke-line-exiting .karaoke-char {
-  transition: transform 600ms ease-in-out;
-}
-
-.karaoke-line-returning .karaoke-char {
-  transform: translate3d(0, 0, 0) scale(1);
-}
-
-.karaoke-line-settled .karaoke-char {
-  transform: none !important;
-}
-
-.karaoke-motion-region .karaoke-line-settled .karaoke-char {
-  transform: translate3d(0, 0, 0) scale(1) !important;
-}
-
-.karaoke-line-settled .karaoke-char-paint {
-  --kg: 0 !important;
-}
-
-.karaoke-line-exiting .karaoke-char-long-tone .karaoke-char-paint {
-  transition: text-shadow 600ms ease-in-out;
-}
-
-.karaoke-char-paint::before {
+.karaoke-char::before {
   content: attr(data-c);
   position: absolute;
   inset: 0;
   padding: inherit;
   pointer-events: none;
-  color: rgba(255, 255, 255, var(--kfa, 0));
+  color: rgba(255, 255, 255, var(--kfa, 1));
   -webkit-mask-image: linear-gradient(
     to right,
     black 0%,
-    black max(0%, calc(var(--kf, -100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, -100) * 1%),
-    transparent min(125%, calc(var(--kf, -100) * 1% + var(--kfe, 13) * 1%)),
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
   mask-image: linear-gradient(
     to right,
     black 0%,
-    black max(0%, calc(var(--kf, -100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, -100) * 1%),
-    transparent min(125%, calc(var(--kf, -100) * 1% + var(--kfe, 13) * 1%)),
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
     transparent 100%
   );
 }
 
 .fluid-lyrics-row-shell {
+  /* Keep transition properties on the persistent line wrapper.  The
+     wrapper is spatially mounted, so this does not create layers for the
+     entire document and avoids per-frame transition string writes. */
   transition: filter 380ms ease-out, opacity 350ms ease-out;
+  will-change: transform;
+}
+
+.lyrics-motion-row[data-in-lyrics-viewport] .lyrics-line-scale-layer {
+  will-change: transform;
 }
 
 /* Equalizer Animation */

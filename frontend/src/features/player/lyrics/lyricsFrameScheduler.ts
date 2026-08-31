@@ -57,7 +57,13 @@ export class LyricsFrameScheduler {
         this.tasks.motion.forEach(callback => callback(now, deltaMs));
         this.tasks.content.forEach(callback => callback(now, deltaMs));
 
-        if (this.taskCount > 0) this.frame = requestAnimationFrame(this.update);
+        // A task may subscribe while the current frame is dispatching (for
+        // example after a row re-enters the spatial window). `subscribe`
+        // already schedules the next frame in that case; do not enqueue a
+        // second loop or overwrite its handle here.
+        if (this.taskCount > 0 && this.frame === null) {
+            this.frame = requestAnimationFrame(this.update);
+        }
     };
 }
 
@@ -108,3 +114,9 @@ export const LyricsFrameSchedulerContext = createContext<LyricsFrameScheduler | 
 export const LyricsFrameTaskRegistryContext = createContext<LyricsFrameTaskRegistry | null>(null);
 
 export const useLyricsFrameScheduler = () => useContext(LyricsFrameSchedulerContext);
+
+/**
+ * Returns the panel-owned content registry. A null value is intentional:
+ * non-fluid lyrics keep their existing standalone rendering path.
+ */
+export const useLyricsFrameTaskRegistry = () => useContext(LyricsFrameTaskRegistryContext);

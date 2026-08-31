@@ -1,13 +1,10 @@
-import { useContext, useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import { motion } from 'framer-motion';
 import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
 } from '@/features/player/lyrics/constants';
-import {
-    LyricsFrameTaskRegistryContext,
-    useLyricsFrameScheduler,
-} from '@/features/player/lyrics/lyricsFrameScheduler';
+import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const dotIndexes = [0, 1, 2];
 
@@ -40,6 +37,7 @@ interface InterludeItemProps {
     suppressDots: boolean;
     currentMs: number;
     preciseMsRef: RefObject<number>;
+    isPlaying?: boolean;
     startMs: number;
     endMs: number;
 }
@@ -52,11 +50,11 @@ export default function InterludeItem({
     suppressDots,
     currentMs,
     preciseMsRef,
+    isPlaying,
     startMs,
     endMs,
 }: InterludeItemProps) {
-    const frameScheduler = useLyricsFrameScheduler();
-    const frameTaskRegistry = useContext(LyricsFrameTaskRegistryContext);
+    const frameRegistry = useLyricsFrameTaskRegistry();
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const animationEndMs = Math.max(startMs, endMs - interludeNextLineFocusLeadMs);
@@ -211,22 +209,17 @@ export default function InterludeItem({
                 dot.style.opacity = `${clamp01(globalOpacity * dotOpacity)}`;
             });
 
+            if (!frameRegistry) frame = requestAnimationFrame(tick);
         };
 
-        const unsubscribeFrame = frameTaskRegistry
-            ? frameTaskRegistry.subscribe(tick)
-            : frameScheduler
-                ? frameScheduler.subscribe('content', tick)
-            : undefined;
-        const requestNextFrame = () => {
-            frame = requestAnimationFrame(() => {
-                tick();
-                requestNextFrame();
-            });
-        };
-        if (!frameScheduler) requestNextFrame();
+        let unsubscribe: (() => void) | undefined;
+        if (frameRegistry && isPlaying !== false) {
+            unsubscribe = frameRegistry.subscribe(() => tick());
+        } else if (!frameRegistry) {
+            frame = requestAnimationFrame(tick);
+        }
         return () => {
-            unsubscribeFrame?.();
+            unsubscribe?.();
             if (frame !== null) cancelAnimationFrame(frame);
         };
     }, [
@@ -236,8 +229,8 @@ export default function InterludeItem({
         playbackSyncKey,
         preciseMsRef,
         startMs,
-        frameScheduler,
-        frameTaskRegistry,
+        frameRegistry,
+        isPlaying,
     ]);
 
     const shouldKeepContainer =

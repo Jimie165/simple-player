@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { sideLyricsFocusAlpha, topInsetPx } from '@/features/player/lyrics/constants';
 import type { DisplayItem } from '@/features/player/lyrics/types';
-import type { LyricsVisibilityStore } from '@/features/player/lyrics/lyricsVisibilityStore';
 
 const DEFAULT_LINE_HEIGHT_PX = 90;
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
 const NARROW_LYRICS_END_STOP_OFFSET = 56;
+const OVERSCAN_PX = 300;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -14,10 +14,10 @@ interface FluidLyricsLayoutArgs {
     activeDisplayIndex: number;
     activeFocusOffset: number;
     displayItems: DisplayItem[];
+    includeActiveWindow: boolean;
     interludeRowHeight: number;
     variant: 'side' | 'narrow';
     visualShifts: number[];
-    visibilityStore: LyricsVisibilityStore;
 }
 
 interface ViewportSize {
@@ -37,10 +37,10 @@ export function useFluidLyricsLayout({
     activeDisplayIndex,
     activeFocusOffset,
     displayItems,
+    includeActiveWindow,
     interludeRowHeight,
     variant,
     visualShifts,
-    visibilityStore,
 }: FluidLyricsLayoutArgs) {
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const itemObserverRef = useRef<ResizeObserver | null>(null);
@@ -58,11 +58,19 @@ export function useFluidLyricsLayout({
     }>({ items: displayItems, measurements: new Map() });
     const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
     const [targetScrollY, setTargetScrollYState] = useState(0);
-    const spatialVisibilityRef = useRef<{
-        items: DisplayItem[];
-        indices: readonly number[];
-    } | null>(null);
-    const initialVisibilityItemsRef = useRef<DisplayItem[] | null>(null);
+    const [visibleIndices, setVisibleIndices] = useState<readonly number[]>([]);
+    const visibleIndicesRef = useRef<readonly number[]>([]);
+    const [visibleIndicesItems, setVisibleIndicesItems] = useState(displayItems);
+    const displayItemsRef = useRef(displayItems);
+
+    useInsertionEffect(() => {
+        displayItemsRef.current = displayItems;
+        if (visibleIndicesItems === displayItems) return;
+        // Do not let a previous document's numeric indices render against a
+        // new document for one commit. The animator publishes the new spatial
+        // set after its models are synchronized.
+        visibleIndicesRef.current = [];
+    }, [displayItems, visibleIndicesItems]);
 
     const focusAlpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
     const topSpacerHeight = viewportSize.height * focusAlpha;
@@ -117,51 +125,73 @@ export function useFluidLyricsLayout({
         return nextTarget;
     }, []);
 
-    const updateVisibleIndices = useCallback((indices: readonly number[]) => {
-        const previous = spatialVisibilityRef.current;
-        if (
-            previous?.items === displayItems &&
-            previous.indices.length === indices.length &&
-            previous.indices.every((value, index) => value === indices[index])
-        ) return;
-        spatialVisibilityRef.current = { items: displayItems, indices: [...indices] };
-        visibilityStore.set(displayItems, indices);
-    }, [displayItems, visibilityStore]);
+    const fallbackVisibleIndices = useMemo(() => {
+        const windows = [targetScrollY];
+        if (includeActiveWindow) windows.push(activeTargetScrollY);
 
-    const initialVisibleIndices = useMemo(() => {
-        if (viewportSize.height <= 0) return [];
-        const minimum = -300;
-        const maximum = viewportSize.height + 300;
-        const initialVisible: number[] = [];
-        layout.itemTops.forEach((itemTop, index) => {
-            const top = itemTop + (visualShifts[index] ?? 0) - targetScrollY;
-            if (top + layout.itemHeights[index] >= minimum && top <= maximum) {
-                initialVisible.push(index);
+        const visualTops = layout.itemTops.map((top, index) => top + (visualShifts[index] ?? 0));
+        const visible = new Set<number>();
+        const lowerBound = (value: number) => {
+            let low = 0;
+            let high = visualTops.length;
+            while (low < high) {
+                const middle = (low + high) >> 1;
+                if (visualTops[middle] < value) low = middle + 1;
+                else high = middle;
+            }
+            return low;
+        };
+
+        windows.forEach(windowTop => {
+            const minimum = windowTop - OVERSCAN_PX;
+            const maximum = windowTop + viewportSize.height + OVERSCAN_PX;
+            const firstIndex = Math.max(0, lowerBound(minimum) - 1);
+            const endIndex = Math.min(displayItems.length, lowerBound(maximum) + 1);
+            for (let index = firstIndex; index < endIndex; index++) {
+                const visualBottom = visualTops[index] + layout.itemHeights[index];
+                if (visualBottom >= minimum && visualTops[index] <= maximum) visible.add(index);
             }
         });
-        return initialVisible;
-    }, [layout.itemHeights, layout.itemTops, targetScrollY, viewportSize.height, visualShifts]);
-    useLayoutEffect(() => {
-        // 目标滚动位置只用于首次填充 DOM。后续换行必须由 animator 根据每
-        // 行当前弹簧位置发布空间可见集合，否则会在弹簧尚未抵达目标前卸载
-        // 旧行并挂载目标行，形成换行尖峰。
-        if (
-            viewportSize.height <= 0 ||
-            initialVisibilityItemsRef.current === displayItems
-        ) return;
-        initialVisibilityItemsRef.current = displayItems;
-        spatialVisibilityRef.current = { items: displayItems, indices: initialVisibleIndices };
-        visibilityStore.set(displayItems, initialVisibleIndices);
-    }, [displayItems, initialVisibleIndices, visibilityStore, viewportSize.height]);
+        return [...visible].sort((left, right) => left - right);
+    }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, targetScrollY, viewportSize.height, visualShifts]);
 
-    const cachedItemHeights = useMemo(() => layout.itemHeights.map((_height, index) => {
-        const measurement = measurements.items === displayItems
-            ? measurements.measurements.get(index)
-            : undefined;
-        return measurement && Math.abs(measurement.width - viewportSize.width) < 0.5
-            ? measurement.height
-            : null;
-    }), [displayItems, layout.itemHeights, measurements, viewportSize.width]);
+    const fallbackVisibleIndicesRef = useRef<readonly number[]>(fallbackVisibleIndices);
+    useInsertionEffect(() => {
+        fallbackVisibleIndicesRef.current = fallbackVisibleIndices;
+    }, [fallbackVisibleIndices]);
+
+    const updateVisibleIndices = useCallback((indices: readonly number[]) => {
+        const previous = visibleIndicesRef.current;
+        if (
+            previous.length === indices.length &&
+            previous.every((value, index) => value === indices[index])
+        ) return;
+        const next = [...indices];
+        visibleIndicesRef.current = next;
+        setVisibleIndicesItems(displayItemsRef.current);
+        setVisibleIndices(next);
+    }, []);
+
+    // A new document or viewport starts with a target-based set so the first
+    // frame has content. The animator replaces it with the spring-position
+    // based spatial set as soon as its model is ready.
+    useLayoutEffect(() => {
+        let cancelled = false;
+        queueMicrotask(() => {
+            if (cancelled) return;
+            // The animator may already have published a spring-based set in
+            // this commit. Do not replace it with the target-window fallback.
+            if (visibleIndicesRef.current.length > 0) return;
+            if (viewportSize.width <= 0 || viewportSize.height <= 0) {
+                updateVisibleIndices([]);
+                return;
+            }
+            updateVisibleIndices(fallbackVisibleIndicesRef.current);
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [displayItems, updateVisibleIndices, viewportSize.height, viewportSize.width]);
 
     const measureItems = useCallback((updates: ReadonlyMap<number, ItemMeasurement>) => {
         if (updates.size === 0) return;
@@ -182,8 +212,13 @@ export function useFluidLyricsLayout({
         heightCacheRef.current = cache;
         filteredUpdates.forEach((measurement, index) => {
             const cached = cache.measurements.get(index);
-            if (cached && Math.abs(cached.width - measurement.width) < 0.5) return;
-            cache.measurements.set(index, measurement);
+            // A same-width ResizeObserver callback can be caused by content
+            // visibility/paint changes. Keep the trusted height until the
+            // actual layout width changes; otherwise later rows would move
+            // during a frame and restart their springs.
+            if (!cached || Math.abs(cached.width - measurement.width) >= 0.5) {
+                cache.measurements.set(index, measurement);
+            }
         });
         setMeasurements(previous => {
             const previousMeasurements = previous.items === displayItems
@@ -213,7 +248,7 @@ export function useFluidLyricsLayout({
         return () => {
             itemObserverRef.current?.unobserve(node);
             observedNodesRef.current.delete(node);
-            // 虚拟化只卸载 DOM；真实尺寸测量保留给轻量 row model 复用。
+            // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
         };
     }, []);
 
@@ -242,8 +277,8 @@ export function useFluidLyricsLayout({
 
         const update = () => {
             const nextSize = { width: element.clientWidth, height: element.clientHeight };
-            // 宽度变化时保留上一帧的真实行高，等行 ResizeObserver 批量替换。
-            // 若先清成统一估算值，多行歌词会在重测完成前短暂压到相邻行上。
+            // 保留上一帧的真实尺寸，避免宽度变化时所有行短暂退回统一估算
+            // 高度而发生重叠。布局提交后由下面的 layout effect 一次性重测。
             setViewportSize(previous =>
                 previous.width === nextSize.width && previous.height === nextSize.height
                     ? previous
@@ -253,9 +288,7 @@ export function useFluidLyricsLayout({
         update();
         const observer = new ResizeObserver(update);
         observer.observe(element);
-        return () => {
-            observer.disconnect();
-        };
+        return () => observer.disconnect();
     }, []);
 
     useLayoutEffect(() => {
@@ -263,8 +296,11 @@ export function useFluidLyricsLayout({
         const updates = new Map<number, ItemMeasurement>();
         observedNodesRef.current.forEach(node => {
             const index = nodeIndexesRef.current.get(node);
-            const bounds = node.getBoundingClientRect();
-            if (index !== undefined) updates.set(index, { height: bounds.height, width: bounds.width });
+            if (index === undefined) return;
+            const rect = node.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                updates.set(index, { height: rect.height, width: rect.width });
+            }
         });
         let cancelled = false;
         queueMicrotask(() => {
@@ -281,10 +317,20 @@ export function useFluidLyricsLayout({
         setTargetScrollY(maxScrollY);
     }, [maxScrollY, setTargetScrollY]);
 
+    const cachedItemHeights = useMemo(() => displayItems.map((_item, index) => {
+        const measurement = measurements.items === displayItems
+            ? measurements.measurements.get(index)
+            : undefined;
+        return measurement && Math.abs(measurement.width - viewportSize.width) < 0.5
+            ? measurement.height
+            : null;
+    }), [displayItems, measurements, viewportSize.width]);
+
     return {
         activeTargetScrollY,
         cachedItemHeights,
         contentHeight: layout.contentHeight,
+        fallbackVisibleIndices,
         itemHeights: layout.itemHeights,
         itemTops: layout.itemTops,
         observeItem,
@@ -292,6 +338,9 @@ export function useFluidLyricsLayout({
         setTargetScrollY,
         targetScrollY,
         topSpacerHeight,
+        visibleIndices: visibleIndicesItems === displayItems
+            ? visibleIndices
+            : [],
         updateVisibleIndices,
         viewportHeight: viewportSize.height,
     };

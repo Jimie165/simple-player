@@ -432,7 +432,16 @@ export function getActiveLyricsState(
 
     const currentMs = currentTime * 1000;
     const timelineIndex = getDisplayTimelineIndex(displayItems);
-    const interludeEntry = findEntryAtOrBefore(timelineIndex.interludes, currentMs);
+    // The calibrated audio clock can briefly be a few milliseconds below zero
+    // while a new track is being established. An opening interlude still owns
+    // that pre-roll; otherwise the ordinary fallback focuses the first lyric
+    // for one render and immediately sends it back out when the clock reaches
+    // zero.
+    const openingInterlude = timelineIndex.interludes[0];
+    const interludeEntry = openingInterlude?.displayIndex === 0 &&
+        currentMs < openingInterlude.endMs
+        ? openingInterlude
+        : findEntryAtOrBefore(timelineIndex.interludes, currentMs);
     const interludeIndex = interludeEntry && currentMs < interludeEntry.endMs
         ? interludeEntry.displayIndex
         : -1;

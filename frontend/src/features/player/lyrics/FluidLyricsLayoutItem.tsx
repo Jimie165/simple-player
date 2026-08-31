@@ -21,19 +21,19 @@ function FluidLyricsLayoutItem({
     useLayoutEffect(() => {
         const element = elementRef.current;
         if (!element) return;
-        return onAnimateMount(index, element);
-    }, [index, onAnimateMount]);
-
-    useLayoutEffect(() => {
-        const element = elementRef.current;
-        if (!element) return;
-        return onMount(index, element);
-    }, [index, onMount]);
+        const disposeAnimation = onAnimateMount(index, element);
+        const disposeMeasurement = onMount(index, element);
+        return () => {
+            disposeMeasurement();
+            disposeAnimation?.();
+        };
+    }, [index, onAnimateMount, onMount]);
 
     return (
         <div
             ref={elementRef}
             className="fluid-lyrics-row-shell absolute left-0 w-full"
+            data-fluid-lyrics-row-key={index}
             style={{ top }}
         >
             {children}
