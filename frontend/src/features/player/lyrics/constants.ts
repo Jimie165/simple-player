@@ -1,6 +1,7 @@
 export const topInsetPx = 12;
 export const sideLyricsFocusAlpha = 0.4;
 export const manualResumeFollowDelayMs = 2000;
+export const lineSeekSyncToleranceMs = 1000;
 export const interludeThresholdMs = 7000;
 export const interludeGapOpenDurationMs = 420;
 export const interludeNextLineFocusLeadMs = 600;

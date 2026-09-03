@@ -4,21 +4,21 @@ import type { DisplayItem } from '@/features/player/lyrics/types';
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
-const countLineSteps = (displayItems: DisplayItem[], startIndex: number, endIndex: number) => {
-    let steps = 0;
-    for (let index = startIndex; index < endIndex; index++) {
-        if (displayItems[index]?.type === 'line') steps++;
-    }
-    return steps;
-};
-
 interface FluidLyricsMotionArgs {
     activeDisplayIndex: number;
     displayItems: DisplayItem[];
-    focusNextLineByVisualEnd: boolean;
     isPlaying: boolean;
     isUserScrolling: boolean;
-    variant: 'side' | 'narrow';
+}
+
+interface FluidLyricsMotionDelayArgs extends FluidLyricsMotionArgs {
+    itemTops: readonly number[];
+    itemHeights: readonly number[];
+    visualShifts: readonly number[];
+    targetScrollY: number;
+    parentDisplayIndexMap: ReadonlyMap<number, number>;
+    backgroundHeights: Readonly<Record<number, number>>;
+    activeIndices: ReadonlySet<number>;
 }
 
 interface FluidLyricsRowVisualArgs {
@@ -93,46 +93,48 @@ export function getFluidLyricsSpringParams({
     };
 }
 
-/** 计算动画优先歌词原有的逐行牵拉延迟。 */
-export function getFluidLyricsMotionDelay({
+/** 只有目标底部进入视口的歌词组才累计牵引延迟。 */
+export function getFluidLyricsMotionDelays({
     activeDisplayIndex,
     displayItems,
-    focusNextLineByVisualEnd,
     isPlaying,
     isUserScrolling,
-    variant,
-}: FluidLyricsMotionArgs, displayIndex: number): number {
-    if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return 0;
+    itemTops,
+    itemHeights,
+    visualShifts,
+    targetScrollY,
+    parentDisplayIndexMap,
+    backgroundHeights,
+    activeIndices,
+}: FluidLyricsMotionDelayArgs): number[] {
+    const delays = new Array<number>(displayItems.length).fill(0);
+    if (isUserScrolling || !isPlaying || activeDisplayIndex < 0) return delays;
 
-    const previousItem = displayItems[activeDisplayIndex - 1];
-    const isVisualHandoff =
-        focusNextLineByVisualEnd &&
-        previousItem?.type === 'line' &&
-        typeof previousItem.line.visual_end_ms === 'number' &&
-        (typeof previousItem.line.end_time_ms !== 'number' || previousItem.line.visual_end_ms < previousItem.line.end_time_ms);
-    const visibleRowsAboveFocus = isVisualHandoff ? 2 : (variant === 'narrow' ? 3 : 4);
-    let topVisibleIndex = activeDisplayIndex;
-    let remainingRowsAboveFocus = visibleRowsAboveFocus;
-    while (topVisibleIndex > 0 && remainingRowsAboveFocus > 0) {
-        topVisibleIndex--;
-        if (displayItems[topVisibleIndex]?.type === 'line') remainingRowsAboveFocus--;
-    }
+    const groupBottoms = itemTops.map((top, index) =>
+        top + (visualShifts[index] ?? 0) + (itemHeights[index] ?? 0) - targetScrollY
+    );
+    parentDisplayIndexMap.forEach((parentIndex, index) => {
+        if (!activeIndices.has(index)) return;
+        groupBottoms[parentIndex] = Math.max(
+            groupBottoms[parentIndex], groupBottoms[index] + (backgroundHeights[index] ?? 0)
+        );
+    });
 
-    if (previousItem?.type === 'interlude') {
-        return displayIndex > activeDisplayIndex
-            ? (displayIndex - activeDisplayIndex) * 0.05
-            : 0;
-    }
-
-    if (displayIndex < topVisibleIndex) return 0;
-    const baseDelay = isVisualHandoff ? 0.055 : 0.05;
-    if (displayIndex <= activeDisplayIndex) {
-        return countLineSteps(displayItems, topVisibleIndex, displayIndex) * baseDelay;
-    }
-
-    const delayAtActive = countLineSteps(displayItems, topVisibleIndex, activeDisplayIndex) * baseDelay;
-    const rowsAfterActive = countLineSteps(displayItems, activeDisplayIndex + 1, displayIndex + 1);
-    const decay = 1 / 1.05;
-    const trailingDelay = baseDelay * (1 - Math.pow(decay, rowsAfterActive)) / (1 - decay);
-    return delayAtActive + trailingDelay;
+    let delay = 0;
+    let baseDelay = 0.05;
+    displayItems.forEach((item, index) => {
+        const parentIndex = parentDisplayIndexMap.get(index);
+        if (parentIndex !== undefined) {
+            delays[index] = delays[parentIndex];
+            return;
+        }
+        delays[index] = delay;
+        // 背景和声与父行只算一组，间奏占位不额外增加一个歌词组。
+        if (item.type === 'interlude') return;
+        if (groupBottoms[index] >= 0) {
+            delay += baseDelay;
+            if (index >= activeDisplayIndex) baseDelay /= 1.05;
+        }
+    });
+    return delays;
 }

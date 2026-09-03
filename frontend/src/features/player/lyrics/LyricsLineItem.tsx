@@ -68,6 +68,9 @@ function LyricsLineItem({
     onBackgroundHeight,
 }: LyricsLineItemProps) {
     const rowRef = useRef<HTMLButtonElement | null>(null);
+    const interactionRef = useRef<HTMLDivElement | null>(null);
+    const pressAnimationRef = useRef<Animation | null>(null);
+    useEffect(() => () => pressAnimationRef.current?.cancel(), []);
     const rowVisualStyle = getFluidLyricsRowVisualStyle({
         distanceFromActive,
         isActive,
@@ -96,6 +99,13 @@ function LyricsLineItem({
     const bgScaleInactive = 'transition-transform duration-[400ms] ease-in-out scale-80';
     const handleClick = () => {
         if (line.start_time_ms === null) return;
+        // 点击反馈独占内层 transform，不覆盖滚动或激活缩放；快速连点重播而不叠加。
+        pressAnimationRef.current?.cancel();
+        pressAnimationRef.current = interactionRef.current?.animate([
+            { transform: 'scale(0.95)', offset: 0 },
+            { transform: 'scale(1.01)', offset: 0.6 },
+            { transform: 'scale(1)', offset: 1 },
+        ], { duration: 450, easing: 'ease-out' }) ?? null;
         onSeek(line.start_time_ms / 1000);
     };
     // 背景和声：主行 70% 字号；字符颜色由 KaraokeText 的 --kb/--kfa 统一为 0.3，
@@ -134,10 +144,11 @@ function LyricsLineItem({
     }, [isBackground, onBackgroundHeight]);
     const className = clsx(
         'lyrics-motion-row w-full',
+        canSeek && (!isBackground || isActive) && 'lyrics-hover-target',
         // 背景和声行距压缩：顶部靠近主歌词
         isBackground
             ? 'pt-[clamp(0.2rem,0.5vw,0.4rem)] pb-[clamp(0.4rem,0.8vw,0.75rem)]'
-            : 'py-[clamp(0.7rem,1.3vw,1.25rem)]',
+            : 'py-[clamp(1rem,1.3vw,1.25rem)]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
         // 背景和声小字无发光/模糊效果
         isActive && !isBackground ? 'text-white drop-shadow-xl' : 'text-white',
@@ -199,7 +210,7 @@ function LyricsLineItem({
                     // 背景行虽然整体有容器透明度控制，但纯文本 fallback 需保持偏暗（text-white/30）以匹配 KaraokeText 的 --kb
                     isBackground
                         ? undefined
-                        : (isActive ? 'opacity-100' : 'opacity-30 hover:opacity-75')
+                        : (isActive ? 'opacity-100' : 'opacity-30')
                 )}
                 style={{
                     ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
@@ -266,11 +277,22 @@ function LyricsLineItem({
         </div>
     ) : content;
 
+    const interactiveContent = (
+        <div
+            ref={interactionRef}
+            className={clsx('lyrics-interaction-layer', isBackground && 'lyrics-interaction-background')}
+            style={{ transformOrigin: rowTransformOrigin }}
+        >
+            {renderedContent}
+        </div>
+    );
+
     if (fluidMotion) {
         return (
             <button
                 ref={rowRef}
                 type="button"
+                onPointerDown={() => pressAnimationRef.current?.cancel()}
                 onClick={handleClick}
                 disabled={!canSeek}
                 style={{
@@ -278,7 +300,7 @@ function LyricsLineItem({
                 }}
                 className={className}
             >
-                {renderedContent}
+                {interactiveContent}
             </button>
         );
     }
@@ -287,6 +309,7 @@ function LyricsLineItem({
         <button
             ref={rowRef}
             type="button"
+            onPointerDown={() => pressAnimationRef.current?.cancel()}
             onClick={handleClick}
             disabled={!canSeek}
             style={{
@@ -298,7 +321,7 @@ function LyricsLineItem({
             }}
             className={className}
         >
-            {renderedContent}
+            {interactiveContent}
         </button>
     );
 }

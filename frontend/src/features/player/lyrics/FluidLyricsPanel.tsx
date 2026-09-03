@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -10,8 +10,9 @@ import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
     manualResumeFollowDelayMs,
+    lineSeekSyncToleranceMs,
 } from '@/features/player/lyrics/constants';
-import { getFluidLyricsMotionDelay, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
+import { getFluidLyricsMotionDelays, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
 import {
     getInterludeFocusOffsetPx,
     getInterludeNeighborShiftPx,
@@ -47,7 +48,6 @@ const narrowScrollMaskStyle = {
 };
 
 const INTERLUDE_FOCUS_OFFSET_RATIO = 0.9;
-const lineSeekSyncToleranceMs = 1000;
 
 function FluidLyricsPanel({
     isOpen,
@@ -68,7 +68,6 @@ function FluidLyricsPanel({
     const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const previousTargetYRef = useRef(0);
     const pausedScrollRef = useRef(false);
-    const firstPositionDoneRef = useRef(false);
     const pendingLineSeekRef = useRef<{
         syncRevision: number;
         targetMs: number;
@@ -251,17 +250,15 @@ function FluidLyricsPanel({
     }, [setTargetScrollY]);
 
     useEffect(() => {
-        firstPositionDoneRef.current = false;
         pausedScrollRef.current = false;
         previousTargetYRef.current = 0;
         pendingLineSeekRef.current = null;
         const frame = requestAnimationFrame(() => {
             setPausedScroll(false);
             setIsUserScrolling(false);
-            updateTargetScrollY(0);
         });
         return () => cancelAnimationFrame(frame);
-    }, [isOpen, lines, updateTargetScrollY]);
+    }, [isOpen, lines]);
 
     useEffect(() => {
         if (!isPlaying) return;
@@ -270,15 +267,13 @@ function FluidLyricsPanel({
         return () => cancelAnimationFrame(frame);
     }, [isPlaying]);
 
-    useEffect(() => {
-        if (!isOpen || displayState || isUserScrolling) return;
-        if (!isPlaying && firstPositionDoneRef.current) return;
-        const frame = requestAnimationFrame(() => {
-            updateTargetScrollY(activeTargetScrollY);
-            firstPositionDoneRef.current = true;
-        });
-        return () => cancelAnimationFrame(frame);
-    }, [activeTargetScrollY, displayState, isOpen, isPlaying, isUserScrolling, updateTargetScrollY]);
+    const shouldAutoFollow = isOpen && !displayState && !isUserScrolling && !pausedScroll;
+    const animatorTargetScrollY = shouldAutoFollow ? activeTargetScrollY : targetScrollY;
+    useLayoutEffect(() => {
+        if (!shouldAutoFollow) return;
+        // 与本次激活、占位变化一起提交最终目标；ref 仅记录手动滚动的起点。
+        previousTargetYRef.current = activeTargetScrollY;
+    }, [activeTargetScrollY, shouldAutoFollow]);
 
     const scheduleResumeFollow = useCallback(() => {
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
@@ -333,7 +328,6 @@ function FluidLyricsPanel({
             if (pendingLineSeekRef.current !== pendingSeek) return;
             pendingLineSeekRef.current = null;
             // seek 已同步到新歌词行后再恢复跟随，避免旧播放位置先进入一次弹簧目标。
-            firstPositionDoneRef.current = false;
             setIsUserScrolling(false);
         });
         return () => cancelAnimationFrame(frame);
@@ -342,26 +336,28 @@ function FluidLyricsPanel({
         () => getFluidLyricsSpringParams({
             activeDisplayIndex,
             displayItems,
-            focusNextLineByVisualEnd,
             isPlaying,
             isUserScrolling,
-            variant,
         }),
-        [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]
+        [activeDisplayIndex, displayItems, isPlaying, isUserScrolling]
     );
-    const motionDelays = useMemo(() => {
-        const motionArgs = {
+    const motionDelays = useMemo(
+        () => getFluidLyricsMotionDelays({
             activeDisplayIndex,
             displayItems,
-            focusNextLineByVisualEnd,
             isPlaying,
             isUserScrolling,
-            variant,
-        };
-        return displayItems.map((_item, displayIndex) =>
-            getFluidLyricsMotionDelay(motionArgs, displayIndex)
-        );
-    }, [activeDisplayIndex, displayItems, focusNextLineByVisualEnd, isPlaying, isUserScrolling, variant]);
+            itemTops,
+            itemHeights,
+            visualShifts: visualInterludeShifts,
+            targetScrollY: animatorTargetScrollY,
+            parentDisplayIndexMap,
+            backgroundHeights,
+            activeIndices,
+        }),
+        [activeDisplayIndex, displayItems, isPlaying, isUserScrolling, itemTops, itemHeights,
+            visualInterludeShifts, animatorTargetScrollY, parentDisplayIndexMap, backgroundHeights, activeIndices]
+    );
     const getMotionDelay = useCallback(
         (displayIndex: number) => motionDelays[displayIndex] ?? 0,
         [motionDelays]
@@ -373,7 +369,7 @@ function FluidLyricsPanel({
         modelIdentity: displayItems,
         rowCount: displayItems.length,
         springParams: dynamicSpringParams,
-        targetScrollY,
+        targetScrollY: animatorTargetScrollY,
         visualShifts: visualInterludeShifts,
         isUserScrolling,
         pausedScroll,
@@ -385,7 +381,6 @@ function FluidLyricsPanel({
         viewportHeight,
         fallbackVisibleIndices,
         onVisibleIndicesChange: updateVisibleIndices,
-        syncRevision,
     });
 
     return (

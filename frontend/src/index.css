@@ -487,6 +487,32 @@ body {
   will-change: transform;
 }
 
+/* 高亮圆角与内容外扩均为 16；负 margin 保留文字宽度与位置。 */
+.lyrics-interaction-layer {
+  margin: -16px;
+  padding: 16px;
+  border-radius: 16px;
+  transform: scale(1);
+  transition: background-color 250ms ease, transform 450ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* 和声行紧贴主行，不把高亮背景扩展到相邻行。 */
+.lyrics-interaction-background {
+  margin-block: 0;
+  padding-block: 0;
+}
+
+/* 焦点可能在空格暂停后继续保留，不能让焦点状态维持悬停背景。 */
+.lyrics-hover-target:hover > .lyrics-interaction-layer {
+  background-color: rgb(255 255 255 / 8%);
+}
+
+.lyrics-hover-target:active > .lyrics-interaction-layer {
+  background-color: #ffffff05;
+  transform: scale(0.95);
+  transition: background-color 250ms ease, transform 120ms ease-out;
+}
+
 /* Equalizer Animation */
 @keyframes equalizer-jump {
   0% { transform: scaleY(0.33); }

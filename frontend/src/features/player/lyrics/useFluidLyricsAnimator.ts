@@ -20,6 +20,8 @@ const INACTIVE_SCALE = 0.98;
 const SPATIAL_OVERSCAN_PX = 300;
 
 interface RowAnimationState {
+    index: number;
+    parent: RowAnimationState | null;
     detachedAt: number | null;
     element: HTMLDivElement | null;
     scaleElement: HTMLElement | null;
@@ -52,10 +54,11 @@ interface FluidLyricsAnimatorArgs {
     viewportHeight: number;
     fallbackVisibleIndices: readonly number[];
     onVisibleIndicesChange: (indices: readonly number[]) => void;
-    syncRevision: number;
 }
 
 interface LatestTargets {
+    modelIdentity: object;
+    rowCount: number;
     activeDisplayIndex: number;
     activeIndices: Set<number>;
     getDelay: (displayIndex: number) => number;
@@ -75,6 +78,21 @@ interface LatestTargets {
 
 const getEffectiveIndex = (index: number, parentDisplayIndexMap?: Map<number, number>) =>
     parentDisplayIndexMap?.get(index) ?? index;
+
+const getRowTargetY = (
+    index: number,
+    visualShifts: readonly number[],
+    targetScrollY: number,
+    parentDisplayIndexMap?: Map<number, number>,
+) => {
+    const parentIndex = parentDisplayIndexMap?.get(index);
+    // 主行承担整组滚动；背景模型只动画组内偏移，避免两套纵向弹簧产生相位差。
+    return (visualShifts[index] ?? 0) - (parentIndex === undefined
+        ? targetScrollY : visualShifts[parentIndex] ?? 0);
+};
+
+const getRowY = (state: RowAnimationState) =>
+    state.translateY.getPosition() + (state.parent?.translateY.getPosition() ?? 0);
 
 // 激活行判定与 getRowVisualStyle 一致：activeIndices 含重叠双亮的非焦点行，
 // 使重叠时两行都放大到 ACTIVE_SCALE，而不是只有焦点行放大
@@ -107,7 +125,7 @@ export const getRowVisualStyle = (
     });
 };
 
-class FluidLyricsAnimator {
+export class FluidLyricsAnimator {
     private readonly rows = new Map<number, RowAnimationState>();
     private readonly animatingRows = new Set<number>();
     private modelIdentity: object | null = null;
@@ -134,6 +152,8 @@ class FluidLyricsAnimator {
         activeIndices: Set<number>,
         parentDisplayIndexMap?: Map<number, number>,
     ) {
+        // 行注册会检查模型是否仍存在；正常重渲染不重复重建整组。
+        if (this.modelIdentity === modelIdentity && this.rows.size === rowCount) return;
         if (this.modelIdentity !== modelIdentity) {
             this.resetRows();
             this.modelIdentity = modelIdentity;
@@ -142,6 +162,10 @@ class FluidLyricsAnimator {
         for (let index = 0; index < rowCount; index++) {
             this.ensureModel(index, getTargetY(index), getScaleTarget(index, activeIndices, parentDisplayIndexMap));
         }
+        this.rows.forEach((state, index) => {
+            const parentIndex = parentDisplayIndexMap?.get(index);
+            state.parent = parentIndex === undefined ? null : this.rows.get(parentIndex) ?? null;
+        });
         this.rows.forEach((_state, index) => {
             if (index < rowCount) return;
             this.rows.delete(index);
@@ -222,7 +246,6 @@ class FluidLyricsAnimator {
         getDelay: (index: number) => number,
         getRowVisual: (index: number, delay: number) => FluidLyricsRowVisualStyle,
         parentDisplayIndexMap?: Map<number, number>,
-        forcePosition = false,
     ) {
         this.rows.forEach((_state, index) => {
             const delay = getDelay(index);
@@ -232,7 +255,6 @@ class FluidLyricsAnimator {
                 getScaleTarget(index, activeIndices, parentDisplayIndexMap),
                 springParams,
                 delay,
-                forcePosition,
             );
             const state = this.rows.get(index);
             if (state?.element) this.renderRowVisual(state, getRowVisual(index, delay));
@@ -245,37 +267,18 @@ class FluidLyricsAnimator {
         scale: number,
         springParams: FluidSpringParams,
         delay: number,
-        forcePosition = false,
     ) {
         const state = this.rows.get(index);
         if (!state) return;
         state.targetTranslateY = translateY;
         state.targetScale = scale;
 
-        if (forcePosition) {
-            state.translateY.setPosition(translateY);
-            state.scale.setPosition(scale);
-            state.detachedAt = state.element ? null : state.detachedAt;
-            this.animatingRows.delete(index);
-            if (state.scaleElement) state.scaleElement.style.willChange = '';
-            // A seek is a synchronous relocation: do not leave a mounted row
-            // displaying its pre-seek transform until a motion frame arrives.
-            if (state.element) this.renderState(state, true);
-            return;
-        }
-
         if (!state.element) {
-            // Models created before their first mount start at the target.
-            // Detached models retain a pending delayed spring and are advanced
-            // from detachedAt when their DOM re-enters the spatial window.
-            if (state.detachedAt === null) {
-                state.translateY.setPosition(translateY);
-                state.scale.setPosition(scale);
-            } else {
-                state.translateY.setTarget(translateY, springParams, delay);
-                state.scale.setTarget(scale, SCALE_SPRING, 0);
-            }
-            if (state.detachedAt !== null && (state.translateY.isAnimating() || state.scale.isAnimating())) {
+            // 尚未显示过的远端行也推进轻量模型，避免大幅跳播首次挂载时已瞬移到终点。
+            // 只有 syncModels 创建新文档时，才直接初始化在目标位置。
+            state.translateY.setTarget(translateY, springParams, delay);
+            state.scale.setTarget(scale, SCALE_SPRING, 0);
+            if (state.translateY.isAnimating() || state.scale.isAnimating()) {
                 this.animatingRows.add(index);
                 this.start();
             } else {
@@ -317,10 +320,22 @@ class FluidLyricsAnimator {
             }
             state.translateY.advance(deltaSeconds);
             state.scale.advance(deltaSeconds);
-            const isAnimating = state.translateY.isAnimating() || state.scale.isAnimating();
+        });
+
+        // 先推进所有模型再绘制，和声始终读取父行在本帧的位置（包括最后一帧）。
+        this.rows.forEach((state, index) => {
+            if (!this.animatingRows.has(index) &&
+                !(state.parent && this.animatingRows.has(state.parent.index))) return;
+            const isAnimating = state.translateY.isAnimating() || state.scale.isAnimating() ||
+                (state.parent?.translateY.isAnimating() ?? false);
             // 阈值去重可能跳过弹簧尾部的微小变化；停止帧强制提交一次，
             // 保证 DOM transform 与已经吸附到目标值的弹簧模型完全一致。
             if (state.element) this.renderState(state, !isAnimating);
+        });
+        this.animatingRows.forEach(index => {
+            const state = this.rows.get(index);
+            if (!state) return;
+            const isAnimating = state.translateY.isAnimating() || state.scale.isAnimating();
             if (!isAnimating) {
                 this.animatingRows.delete(index);
                 if (state.scaleElement) state.scaleElement.style.willChange = '';
@@ -337,7 +352,7 @@ class FluidLyricsAnimator {
 
     private renderState(state: RowAnimationState, force = false) {
         if (state.element) {
-            const y = state.translateY.getPosition();
+            const y = getRowY(state);
             const transform = `translateY(${y.toFixed(1)}px)`;
             if (force || state.lastRenderedY !== transform) {
                 state.lastRenderedY = transform;
@@ -372,6 +387,8 @@ class FluidLyricsAnimator {
         if (current) return current;
 
         const state: RowAnimationState = {
+            index,
+            parent: null,
             detachedAt: null,
             element: null,
             scaleElement: null,
@@ -408,7 +425,7 @@ class FluidLyricsAnimator {
         for (let index = 0; index < spatialState.itemTops.length; index++) {
             const state = this.rows.get(index);
             if (!state) continue;
-            const top = spatialState.itemTops[index] + state.translateY.getPosition();
+            const top = spatialState.itemTops[index] + getRowY(state);
             const height = spatialState.itemHeights[index] ?? 0;
             if (top + height >= minimum && top <= maximum) next.push(index);
         }
@@ -456,10 +473,11 @@ export function useFluidLyricsAnimator({
     viewportHeight,
     fallbackVisibleIndices,
     onVisibleIndicesChange,
-    syncRevision,
 }: FluidLyricsAnimatorArgs) {
     const [animator] = useState(() => new FluidLyricsAnimator(frameScheduler));
     const latestTargetsRef = useRef<LatestTargets>({
+        modelIdentity,
+        rowCount,
         activeDisplayIndex,
         activeIndices,
         getDelay,
@@ -478,6 +496,8 @@ export function useFluidLyricsAnimator({
     });
     useInsertionEffect(() => {
         latestTargetsRef.current = {
+            modelIdentity,
+            rowCount,
             activeDisplayIndex,
             activeIndices,
             getDelay,
@@ -494,23 +514,32 @@ export function useFluidLyricsAnimator({
             fallbackVisibleIndices,
             onVisibleIndicesChange,
         };
-    }, [activeDisplayIndex, activeIndices, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, viewportHeight, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, modelIdentity, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, rowCount, springParams, targetScrollY, variant, viewportHeight, visualShifts]);
     useInsertionEffect(() => {
         const targets = latestTargetsRef.current;
         animator.syncModels(
             modelIdentity,
             rowCount,
-            index => (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
+            index => getRowTargetY(index, targets.visualShifts, targets.targetScrollY, targets.parentDisplayIndexMap),
             targets.activeIndices,
             targets.parentDisplayIndexMap,
         );
     }, [animator, modelIdentity, rowCount]);
     const registerAnimatedRow = useCallback((index: number, element: HTMLDivElement) => {
         const targets = latestTargetsRef.current;
+        // StrictMode 会重放 layout effect，但不会重放 insertion effect。
+        // 必须先恢复完整组（含未挂载的父行），再让背景行注册并绘制局部坐标。
+        animator.syncModels(
+            targets.modelIdentity,
+            targets.rowCount,
+            index => getRowTargetY(index, targets.visualShifts, targets.targetScrollY, targets.parentDisplayIndexMap),
+            targets.activeIndices,
+            targets.parentDisplayIndexMap,
+        );
         return animator.register(
             index,
             element,
-            (targets.visualShifts[index] ?? 0) - targets.targetScrollY,
+            getRowTargetY(index, targets.visualShifts, targets.targetScrollY, targets.parentDisplayIndexMap),
             getScaleTarget(index, targets.activeIndices, targets.parentDisplayIndexMap),
             targets.springParams,
             targets.getDelay(index),
@@ -527,17 +556,10 @@ export function useFluidLyricsAnimator({
         );
     }, [animator]);
 
-    const previousTargetScrollRef = useRef(targetScrollY);
-    const previousSyncRevisionRef = useRef(syncRevision);
-
     useLayoutEffect(() => {
-        const targetJump = Math.abs(targetScrollY - previousTargetScrollRef.current);
-        const didSync = previousSyncRevisionRef.current !== syncRevision;
-        previousTargetScrollRef.current = targetScrollY;
-        previousSyncRevisionRef.current = syncRevision;
-        const forcePosition = didSync && targetJump > SPATIAL_OVERSCAN_PX;
+        // 同一文档内的目标更新始终保留位置和速度，包括大幅跳播。
         animator.setMountedTargets(
-            index => (visualShifts[index] ?? 0) - targetScrollY,
+            index => getRowTargetY(index, visualShifts, targetScrollY, parentDisplayIndexMap),
             activeIndices,
             springParams,
             getDelay,
@@ -552,10 +574,9 @@ export function useFluidLyricsAnimator({
                 parentDisplayIndexMap,
             ),
             parentDisplayIndexMap,
-            forcePosition,
         );
         animator.setSpatialState(itemTops, itemHeights, viewportHeight, fallbackVisibleIndices, onVisibleIndicesChange);
-    }, [activeDisplayIndex, activeIndices, animator, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, springParams, syncRevision, targetScrollY, variant, viewportHeight, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, animator, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, springParams, targetScrollY, variant, viewportHeight, visualShifts]);
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 

@@ -15,6 +15,6 @@ export const performanceLyricsTimingStrategy: LyricsTimingStrategy = {
 export const animationLyricsTimingStrategy: LyricsTimingStrategy = {
     compressTightHandoffTail: true,
     focusNextLineByVisualEnd: true,
-    nextLineFocusLeadMs: 800,
+    nextLineFocusLeadMs: 600,
     enableLineLyricsEarlyFocus: true,
 };
