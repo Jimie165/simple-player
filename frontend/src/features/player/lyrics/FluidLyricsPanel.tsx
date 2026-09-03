@@ -67,6 +67,7 @@ function FluidLyricsPanel({
     const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
     const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
     const previousTargetYRef = useRef(0);
+    const manualScrollActiveRef = useRef(false);
     const pausedScrollRef = useRef(false);
     const pendingLineSeekRef = useRef<{
         syncRevision: number;
@@ -220,7 +221,6 @@ function FluidLyricsPanel({
 
     const {
         activeTargetScrollY,
-        cachedItemHeights,
         contentHeight,
         itemHeights,
         itemTops,
@@ -250,6 +250,10 @@ function FluidLyricsPanel({
     }, [setTargetScrollY]);
 
     useEffect(() => {
+        if (resumeTimeoutRef.current) {
+            clearTimeout(resumeTimeoutRef.current);
+            resumeTimeoutRef.current = null;
+        }
         pausedScrollRef.current = false;
         previousTargetYRef.current = 0;
         pendingLineSeekRef.current = null;
@@ -270,35 +274,24 @@ function FluidLyricsPanel({
     const shouldAutoFollow = isOpen && !displayState && !isUserScrolling && !pausedScroll;
     const animatorTargetScrollY = shouldAutoFollow ? activeTargetScrollY : targetScrollY;
     useLayoutEffect(() => {
-        if (!shouldAutoFollow) return;
-        // 与本次激活、占位变化一起提交最终目标；ref 仅记录手动滚动的起点。
-        previousTargetYRef.current = activeTargetScrollY;
-    }, [activeTargetScrollY, shouldAutoFollow]);
+        manualScrollActiveRef.current = isUserScrolling;
+        // 同步布局修正/边界钳制后的手动目标，避免下一次输入仍从旧位置累计。
+        previousTargetYRef.current = animatorTargetScrollY;
+    }, [animatorTargetScrollY, isUserScrolling]);
 
     const scheduleResumeFollow = useCallback(() => {
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
         resumeTimeoutRef.current = window.setTimeout(() => {
+            resumeTimeoutRef.current = null;
             setIsUserScrolling(false);
-            if (!isPlaying) {
+            if (!usePlayerStore.getState().isPlaying) {
                 pausedScrollRef.current = true;
                 setPausedScroll(true);
                 return;
             }
-            updateTargetScrollY(activeTargetScrollY);
+            // 自动跟随直接使用本次渲染的焦点，不回写两秒前捕获的旧目标。
         }, manualResumeFollowDelayMs);
-    }, [activeTargetScrollY, isPlaying, updateTargetScrollY]);
-
-    const handleManualDelta = useCallback((deltaY: number) => {
-        pendingLineSeekRef.current = null;
-        if (deltaY !== 0) onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
-        setIsUserScrolling(true);
-        if (!isPlaying) {
-            pausedScrollRef.current = true;
-            setPausedScroll(true);
-        }
-        updateTargetScrollY(previousTargetYRef.current + deltaY);
-        scheduleResumeFollow();
-    }, [isPlaying, onUserScrollDirection, scheduleResumeFollow, updateTargetScrollY]);
+    }, []);
 
     useEffect(() => () => {
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
@@ -362,7 +355,7 @@ function FluidLyricsPanel({
         (displayIndex: number) => motionDelays[displayIndex] ?? 0,
         [motionDelays]
     );
-    const registerAnimatedRow = useFluidLyricsAnimator({
+    const { registerAnimatedRow, beginManualScroll } = useFluidLyricsAnimator({
         activeDisplayIndex,
         activeIndices,
         getDelay: getMotionDelay,
@@ -382,6 +375,23 @@ function FluidLyricsPanel({
         fallbackVisibleIndices,
         onVisibleIndicesChange: updateVisibleIndices,
     });
+
+    const handleManualDelta = useCallback((deltaY: number) => {
+        if (!Number.isFinite(deltaY) || deltaY === 0) return;
+        pendingLineSeekRef.current = null;
+        if (!manualScrollActiveRef.current) {
+            manualScrollActiveRef.current = true;
+            previousTargetYRef.current = beginManualScroll();
+        }
+        onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
+        setIsUserScrolling(true);
+        if (!isPlaying) {
+            pausedScrollRef.current = true;
+            setPausedScroll(true);
+        }
+        updateTargetScrollY(previousTargetYRef.current + deltaY);
+        scheduleResumeFollow();
+    }, [beginManualScroll, isPlaying, onUserScrollDirection, scheduleResumeFollow, updateTargetScrollY]);
 
     return (
         <LyricsFrameSchedulerContext.Provider value={frameScheduler}>
@@ -470,7 +480,6 @@ function FluidLyricsPanel({
                                                     currentTime={renderCurrentMs / 1000}
                                                     preciseMsRef={preciseMsRef}
                                                     isPlaying={isPlaying}
-                                                    cachedRowHeight={cachedItemHeights[displayIndex]}
                                                     onSeek={handleLineSeek}
                                                     fluidMotion
                                                     motionDelay={getMotionDelay(displayIndex)}

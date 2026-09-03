@@ -57,6 +57,9 @@ export default function LyricsPanel({
     const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
     const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
+    const scrollerRef = useRef<HTMLElement | null>(null);
+    const userScrollingRef = useRef(false);
+    const totalListHeightRef = useRef<number | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
     const [topSpacerHeight, setTopSpacerHeight] = useState(0);
     const [bottomSpacerHeight, setBottomSpacerHeight] = useState(0);
@@ -114,7 +117,25 @@ export default function LyricsPanel({
         [bottomSpacerHeight]
     );
 
+    const setScroller = useCallback((element: HTMLElement | Window | null) => {
+        scrollerRef.current = element instanceof HTMLElement ? element : null;
+    }, []);
+    const handleTotalListHeightChanged = useCallback((height: number) => {
+        const previous = totalListHeightRef.current;
+        totalListHeightRef.current = height;
+        // 测量纠正只在自动跟随时重新对齐，手动浏览不能被新挂载行抢回。
+        if (previous !== null && Math.abs(previous - height) >= 0.5 && !userScrollingRef.current) {
+            setLayoutVersion(version => version + 1);
+        }
+    }, []);
+
     const handleUserInteraction = (direction?: 'up' | 'down', delta?: number) => {
+        if (!userScrollingRef.current) {
+            userScrollingRef.current = true;
+            const scroller = scrollerRef.current;
+            // 直接停止浏览器的平滑滚动，Virtuoso.scrollTo 在目标等于当前位置时会提前返回。
+            scroller?.scrollTo({ top: scroller.scrollTop, behavior: 'instant' });
+        }
         if (direction) onUserScrollDirection?.(direction, delta);
         setIsUserScrolling(true);
         lastAutoScrollIndexRef.current = null;
@@ -124,6 +145,7 @@ export default function LyricsPanel({
             clearTimeout(userScrollTimeoutRef.current);
         }
         userScrollTimeoutRef.current = setTimeout(() => {
+            userScrollingRef.current = false;
             setIsUserScrolling(false);
             userScrollTimeoutRef.current = null;
         }, manualResumeFollowDelayMs);
@@ -142,6 +164,7 @@ export default function LyricsPanel({
 
     useEffect(() => {
         firstScrollDoneRef.current = false;
+        totalListHeightRef.current = null;
         lastAutoScrollIndexRef.current = null;
         preferSmoothAutoScrollRef.current = false;
     }, [isOpen, lines]);
@@ -287,6 +310,7 @@ export default function LyricsPanel({
         }
         //歌词点击 Seek 时立即 resetScroll，避免 pointerdown 留下的手动滚动
         // 状态阻塞新激活行的高亮和跟随。
+        userScrollingRef.current = false;
         setIsUserScrolling(false);
         lastAutoScrollIndexRef.current = null;
         preferSmoothAutoScrollRef.current = true;
@@ -379,14 +403,21 @@ export default function LyricsPanel({
         }
 
         const scroll = () => {
-            virtuosoRef.current?.scrollToIndex({
+            if (userScrollingRef.current) return;
+            const virtuoso = virtuosoRef.current;
+            if (!virtuoso) return;
+            // 借用列表测量定位，但返回 null 阻止 scrollToIndex 的 listRefresh 重试链。
+            // 否则用户已经滚走后，旧定位仍会在下一次行高测量时把画面拉回。
+            virtuoso.scrollIntoView({
                 index: activeDisplayIndex,
-                align: 'center',
-                offset: getAutoScrollOffset(activeDisplayIndex),
-                behavior:
-                    firstScrollDoneRef.current || preferSmoothAutoScrollRef.current
-                        ? 'smooth'
-                        : 'auto',
+                calculateViewLocation: ({ itemTop, itemBottom, viewportTop, viewportBottom }) => {
+                    if (userScrollingRef.current) return null;
+                    virtuoso.scrollTo({
+                        top: (itemTop + itemBottom - (viewportBottom - viewportTop)) / 2 + getAutoScrollOffset(activeDisplayIndex),
+                        behavior: firstScrollDoneRef.current || preferSmoothAutoScrollRef.current ? 'smooth' : 'auto',
+                    });
+                    return null;
+                },
             });
             firstScrollDoneRef.current = true;
             lastAutoScrollIndexRef.current = activeDisplayIndex;
@@ -430,14 +461,11 @@ export default function LyricsPanel({
                 ) : (
                     <Virtuoso
                         ref={virtuosoRef}
+                        scrollerRef={setScroller}
+                        totalListHeightChanged={handleTotalListHeightChanged}
                         className="h-full [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-none]"
                         data={displayItems}
                         components={{ Header, Footer }}
-                        initialTopMostItemIndex={{
-                            index: activeDisplayIndex,
-                            align: 'center',
-                            offset: 0,
-                        }}
                         defaultItemHeight={90}
                         increaseViewportBy={{ top: 520, bottom: 520 }}
                         itemContent={(displayIndex, item) => {

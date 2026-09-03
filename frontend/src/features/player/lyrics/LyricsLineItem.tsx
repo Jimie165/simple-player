@@ -19,7 +19,6 @@ interface LyricsLineItemProps {
     currentTime: number;
     preciseMsRef: RefObject<number>;
     isPlaying?: boolean;
-    cachedRowHeight?: number | null;
     onSeek: (time: number) => void;
     fluidMotion?: boolean;
     motionDelay?: number;
@@ -58,7 +57,6 @@ function LyricsLineItem({
     currentTime,
     preciseMsRef,
     isPlaying,
-    cachedRowHeight = null,
     onSeek,
     fluidMotion = false,
     motionDelay = 0,
@@ -157,20 +155,11 @@ function LyricsLineItem({
             : 'text-left pl-[clamp(1.2rem,2.2vw,2rem)] origin-left',
         hasDuetLine && !isDuetRow ? 'pr-[15%]' : 'pr-[clamp(1.7rem,3vw,2.9rem)]'
     );
-    // Fluid scrolling depends on every row's real geometry. Intrinsic placeholders
-    // would shift later rows as they enter the viewport and restart their springs.
-    const hasCachedRowHeight = typeof cachedRowHeight === 'number' &&
-        Number.isFinite(cachedRowHeight) && cachedRowHeight > 0;
+    // 动画模式已有行级虚拟化；挂载行必须提供真实高度，不能用旧尺寸占位参与重测。
     const renderingIsolationStyle: CSSProperties = fluidMotion
         ? {
             contain: 'layout style paint',
             backfaceVisibility: 'hidden',
-            ...(hasCachedRowHeight
-                ? {
-                    contentVisibility: 'auto',
-                    containIntrinsicSize: `auto ${cachedRowHeight}px`,
-                }
-                : {}),
         }
         : {
             contentVisibility: 'auto',
@@ -340,7 +329,6 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
     prev.preciseMsRef === next.preciseMsRef &&
     prev.isPlaying === next.isPlaying &&
-    prev.cachedRowHeight === next.cachedRowHeight &&
     prev.onSeek === next.onSeek &&
     prev.fluidMotion === next.fluidMotion &&
     (

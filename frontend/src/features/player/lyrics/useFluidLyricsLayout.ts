@@ -48,10 +48,6 @@ export function useFluidLyricsLayout({
     const observedNodesRef = useRef(new Set<HTMLDivElement>());
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
-    const heightCacheRef = useRef<{
-        items: DisplayItem[];
-        measurements: Map<number, ItemMeasurement>;
-    }>({ items: displayItems, measurements: new Map() });
     const [measurements, setMeasurements] = useState<{
         items: DisplayItem[];
         measurements: Map<number, ItemMeasurement>;
@@ -206,20 +202,6 @@ export function useFluidLyricsLayout({
             }
         });
         if (filteredUpdates.size === 0) return;
-        const cache = heightCacheRef.current.items === displayItems
-            ? heightCacheRef.current
-            : { items: displayItems, measurements: new Map<number, ItemMeasurement>() };
-        heightCacheRef.current = cache;
-        filteredUpdates.forEach((measurement, index) => {
-            const cached = cache.measurements.get(index);
-            // A same-width ResizeObserver callback can be caused by content
-            // visibility/paint changes. Keep the trusted height until the
-            // actual layout width changes; otherwise later rows would move
-            // during a frame and restart their springs.
-            if (!cached || Math.abs(cached.width - measurement.width) >= 0.5) {
-                cache.measurements.set(index, measurement);
-            }
-        });
         setMeasurements(previous => {
             const previousMeasurements = previous.items === displayItems
                 ? previous.measurements
@@ -228,9 +210,11 @@ export function useFluidLyricsLayout({
             let changed = previous.items !== displayItems;
             filteredUpdates.forEach((measurement, index) => {
                 const previousMeasurement = nextMeasurements.get(index);
+                // 宽度稳定后仍可能发生换行/字号重排，不能把拉伸中的临时行高锁进缓存。
                 if (
                     previousMeasurement &&
-                    Math.abs(previousMeasurement.width - measurement.width) < 0.5
+                    Math.abs(previousMeasurement.width - measurement.width) < 0.5 &&
+                    Math.abs(previousMeasurement.height - measurement.height) < 0.5
                 ) return;
                 nextMeasurements.set(index, measurement);
                 changed = true;
@@ -297,9 +281,11 @@ export function useFluidLyricsLayout({
         observedNodesRef.current.forEach(node => {
             const index = nodeIndexesRef.current.get(node);
             if (index === undefined) return;
-            const rect = node.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-                updates.set(index, { height: rect.height, width: rect.width });
+            // 布局尺寸不包含播放器/点击动画的 transform 缩放。
+            const height = node.offsetHeight;
+            const width = node.offsetWidth;
+            if (width > 0 && height > 0) {
+                updates.set(index, { height, width });
             }
         });
         let cancelled = false;
@@ -309,7 +295,7 @@ export function useFluidLyricsLayout({
         return () => {
             cancelled = true;
         };
-    }, [measureItems, viewportSize.width]);
+    }, [measureItems, viewportSize.height, viewportSize.width]);
 
     useEffect(() => {
         maxScrollYRef.current = maxScrollY;
@@ -317,18 +303,8 @@ export function useFluidLyricsLayout({
         setTargetScrollY(maxScrollY);
     }, [maxScrollY, setTargetScrollY]);
 
-    const cachedItemHeights = useMemo(() => displayItems.map((_item, index) => {
-        const measurement = measurements.items === displayItems
-            ? measurements.measurements.get(index)
-            : undefined;
-        return measurement && Math.abs(measurement.width - viewportSize.width) < 0.5
-            ? measurement.height
-            : null;
-    }), [displayItems, measurements, viewportSize.width]);
-
     return {
         activeTargetScrollY,
-        cachedItemHeights,
         contentHeight: layout.contentHeight,
         fallbackVisibleIndices,
         itemHeights: layout.itemHeights,

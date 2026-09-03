@@ -145,6 +145,29 @@ export class FluidLyricsAnimator {
         this.frameScheduler = frameScheduler;
     }
 
+    beginManualScroll(visualShifts: readonly number[], fallbackScrollY: number) {
+        let scrollY = fallbackScrollY;
+        let nearestDistance = Infinity;
+        const spatial = this.spatialState;
+        if (spatial) {
+            this.rows.forEach((state, index) => {
+                if (!state.element || state.parent) return;
+                const center = spatial.itemTops[index] + getRowY(state) + (spatial.itemHeights[index] ?? 0) / 2;
+                const distance = Math.abs(center - spatial.viewportHeight / 2);
+                if (distance >= nearestDistance) return;
+                nearestDistance = distance;
+                scrollY = (visualShifts[index] ?? 0) - getRowY(state);
+            });
+        }
+        // 手动接管只停止旧滚动的速度和待执行延迟，保留每行当前坐标与激活缩放。
+        this.rows.forEach(state => {
+            const y = state.translateY.getPosition();
+            state.translateY.setPosition(y);
+            state.targetTranslateY = y;
+        });
+        return scrollY;
+    }
+
     syncModels(
         modelIdentity: object,
         rowCount: number,
@@ -580,5 +603,10 @@ export function useFluidLyricsAnimator({
 
     useLayoutEffect(() => () => animator.dispose(), [animator]);
 
-    return registerAnimatedRow;
+    const beginManualScroll = useCallback(() => {
+        const targets = latestTargetsRef.current;
+        return animator.beginManualScroll(targets.visualShifts, targets.targetScrollY);
+    }, [animator]);
+
+    return { registerAnimatedRow, beginManualScroll };
 }
