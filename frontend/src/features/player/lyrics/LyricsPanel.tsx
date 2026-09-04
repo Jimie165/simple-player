@@ -19,6 +19,7 @@ import {
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
 import { performanceLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
+import { PerformanceLyricsScroll } from '@/features/player/lyrics/performanceLyricsScroll';
 import type { DisplayItem, LyricsPanelProps } from '@/features/player/lyrics/types';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
@@ -58,6 +59,7 @@ export default function LyricsPanel({
     const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const scrollerRef = useRef<HTMLElement | null>(null);
+    const [autoScroll] = useState(() => new PerformanceLyricsScroll());
     const userScrollingRef = useRef(false);
     const totalListHeightRef = useRef<number | null>(null);
     const scrollAreaRef = useRef<HTMLDivElement | null>(null);
@@ -118,8 +120,9 @@ export default function LyricsPanel({
     );
 
     const setScroller = useCallback((element: HTMLElement | Window | null) => {
+        if (element !== scrollerRef.current) autoScroll.cancel();
         scrollerRef.current = element instanceof HTMLElement ? element : null;
-    }, []);
+    }, [autoScroll]);
     const handleTotalListHeightChanged = useCallback((height: number) => {
         const previous = totalListHeightRef.current;
         totalListHeightRef.current = height;
@@ -130,6 +133,7 @@ export default function LyricsPanel({
     }, []);
 
     const handleUserInteraction = (direction?: 'up' | 'down', delta?: number) => {
+        autoScroll.cancel();
         if (!userScrollingRef.current) {
             userScrollingRef.current = true;
             const scroller = scrollerRef.current;
@@ -150,6 +154,14 @@ export default function LyricsPanel({
             userScrollTimeoutRef.current = null;
         }, manualResumeFollowDelayMs);
     };
+
+    useEffect(() => {
+        if (!isPlaying || !isOpen) {
+            autoScroll.cancel();
+            lastAutoScrollIndexRef.current = null;
+        }
+        return () => autoScroll.cancel();
+    }, [autoScroll, isPlaying, isOpen, lines]);
 
     useEffect(() => {
         return () => {
@@ -383,6 +395,11 @@ export default function LyricsPanel({
     useEffect(() => {
         if (!isOpen || !hasTimestamps || lines.length === 0) return;
         if (!isPlaying) return;
+        if (activeDisplayIndex < 0) {
+            autoScroll.cancel();
+            lastAutoScrollIndexRef.current = null;
+            return;
+        }
         if (isUserScrolling) return;
         if (lastAutoScrollIndexRef.current === activeDisplayIndex) return;
 
@@ -412,10 +429,14 @@ export default function LyricsPanel({
                 index: activeDisplayIndex,
                 calculateViewLocation: ({ itemTop, itemBottom, viewportTop, viewportBottom }) => {
                     if (userScrollingRef.current) return null;
-                    virtuoso.scrollTo({
-                        top: (itemTop + itemBottom - (viewportBottom - viewportTop)) / 2 + getAutoScrollOffset(activeDisplayIndex),
-                        behavior: firstScrollDoneRef.current || preferSmoothAutoScrollRef.current ? 'smooth' : 'auto',
-                    });
+                    const scroller = scrollerRef.current;
+                    if (!scroller) return null;
+                    autoScroll.move(
+                        scroller,
+                        activeDisplayIndex,
+                        (itemTop + itemBottom - (viewportBottom - viewportTop)) / 2 + getAutoScrollOffset(activeDisplayIndex),
+                        firstScrollDoneRef.current || preferSmoothAutoScrollRef.current,
+                    );
                     return null;
                 },
             });
@@ -426,7 +447,7 @@ export default function LyricsPanel({
 
         const raf = requestAnimationFrame(scroll);
         return () => cancelAnimationFrame(raf);
-    }, [activeDisplayIndex, displayItems, getAutoScrollOffset, isOpen, hasTimestamps, lines.length, isUserScrolling, isPlaying, layoutVersion, recenterVersion]);
+    }, [activeDisplayIndex, autoScroll, displayItems, getAutoScrollOffset, isOpen, hasTimestamps, lines.length, isUserScrolling, isPlaying, layoutVersion, recenterVersion]);
 
     return (
         <div className="relative h-full w-full rounded-[22px] overflow-hidden">
