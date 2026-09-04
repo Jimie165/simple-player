@@ -33,6 +33,8 @@ interface TtmlWord {
 interface TtmlBackground {
     text: string;
     words: TtmlWord[];
+    translation: string | null;
+    romanization: string | null;
     start: number | null;
     end: number | null;
 }
@@ -131,12 +133,24 @@ function stripBackgroundParens(text: string): string {
     return text.replace(/^[(（]+/, '').replace(/[)）]+$/, '').trim();
 }
 
+function isSimplifiedChinese(element: Element): boolean {
+    for (let current: Element | null = element; current; current = current.parentElement) {
+        const language = getAttr(current, NS_XML, 'lang');
+        if (language === null) continue;
+        const parts = language.toLowerCase().split('-');
+        return parts[0] === 'zh' && (parts.includes('hans')
+            || (!parts.includes('hant') && (parts.includes('cn') || parts.includes('sg'))));
+    }
+    return false;
+}
+
 // 解析 <p> 的混合内容：主唱 span 逐字时间、纯文本、x-bg / x-translation / x-roman。
 // span 之间的空白并入前一个 word 的 text（保持 "You come" 类渲染兼容）。
 function parseContent(element: Element): TtmlContent {
     let text = '';
     const words: TtmlWord[] = [];
     let translation: string | null = null;
+    let translationIsSimplifiedChinese = false;
     let romanization: string | null = null;
     let background: TtmlBackground | null = null;
 
@@ -162,7 +176,13 @@ function parseContent(element: Element): TtmlContent {
             continue;
         }
         if (role === 'x-translation') {
-            translation = normalizeText(el.textContent, true);
+            const candidate = normalizeText(el.textContent, true);
+            const simplifiedChinese = isSimplifiedChinese(el);
+            // 每行只显示一种翻译，优先简体中文，否则保留首个非空译文。
+            if (candidate && (translation === null || (simplifiedChinese && !translationIsSimplifiedChinese))) {
+                translation = candidate;
+                translationIsSimplifiedChinese = simplifiedChinese;
+            }
             continue;
         }
         if (role === 'x-roman') {
@@ -192,34 +212,8 @@ function parseContent(element: Element): TtmlContent {
 // x-bg 内部同样按 span 拆词，并去掉首尾括号。
 // 背景行时间优先取自身 word 时间，外层 span begin/end 仅作回退。
 function parseBackground(element: Element): TtmlBackground {
-    let text = '';
-    const words: TtmlWord[] = [];
+    const { text, words, translation, romanization } = parseContent(element);
     const { begin: bgBegin, end: bgEnd } = getTiming(element);
-
-    for (const child of Array.from(element.childNodes)) {
-        if (child.nodeType === 3) {
-            const raw = child.textContent ?? '';
-            const isFormattingWhitespace = raw.includes('\n') && raw.trim() === '';
-            if (isFormattingWhitespace) continue;
-            const normalized = normalizeText(raw);
-            if (normalized.trim() === '') {
-                if (words.length > 0) words[words.length - 1].text += ' ';
-                text += normalized;
-                continue;
-            }
-            text += normalized;
-            continue;
-        }
-        if (child.nodeType !== 1) continue;
-        const el = child as Element;
-        const { begin, end } = getTiming(el);
-        const rawText = normalizeText(el.textContent);
-        text += rawText;
-        if (begin !== null && end !== null) {
-            const cleanText = rawText.trim();
-            if (cleanText.length > 0) words.push({ start: begin, end, text: cleanText });
-        }
-    }
 
     const cleanedText = stripBackgroundParens(normalizeText(text, true));
     if (words.length > 0) {
@@ -228,11 +222,13 @@ function parseBackground(element: Element): TtmlBackground {
         return {
             text: cleanedText,
             words,
+            translation,
+            romanization,
             start: words[0].start ?? bgBegin,
             end: words[words.length - 1].end ?? bgEnd,
         };
     }
-    return { text: cleanedText, words, start: bgBegin, end: bgEnd };
+    return { text: cleanedText, words, translation, romanization, start: bgBegin, end: bgEnd };
 }
 
 // Apple sidecar（translations / transliterations）中的 <text for="L1">，可内嵌 x-bg 译文
@@ -394,8 +390,8 @@ function parseBody(
                         : background.end,
                 text: background.text,
                 words: bgWords,
-                translation: sidecarTranslation?.background ?? null,
-                romanization: sidecarTransliteration?.background ?? null,
+                translation: background.translation ?? sidecarTranslation?.background ?? null,
+                romanization: background.romanization ?? sidecarTransliteration?.background ?? null,
                 agent_id: null,
                 // 背景和声跟随父行左右布局，避免右侧对唱行的和声跳到左侧。
                 is_duet: isDuet,
