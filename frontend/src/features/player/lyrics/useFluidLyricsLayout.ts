@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState } from 'react';
 import { sideLyricsFocusAlpha, topInsetPx } from '@/features/player/lyrics/constants';
 import type { DisplayItem } from '@/features/player/lyrics/types';
+import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
+import { getInterludeFocusOffsetPx, getInterludeNeighborShiftPx, getInterludeRowHeightPx } from '@/features/player/lyrics/layoutMetrics';
 
 const DEFAULT_LINE_HEIGHT_PX = 90;
 const NARROW_LYRICS_FOCUS_ALPHA = 0.15;
@@ -10,29 +12,168 @@ const OVERSCAN_PX = 300;
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
 
-interface FluidLyricsLayoutArgs {
-    activeDisplayIndex: number;
-    activeFocusOffset: number;
-    displayItems: DisplayItem[];
-    includeActiveWindow: boolean;
-    interludeRowHeight: number;
-    variant: 'side' | 'narrow';
-    visualShifts: number[];
-}
-
-interface ViewportSize {
-    width: number;
-    height: number;
-}
-
 interface ItemMeasurement {
     height: number;
     width: number;
 }
 
-/**
- * 为动画优先歌词维护轻量布局模型，只挂载视口与过渡窗口内的昂贵行内容。
- */
+interface MeasurementSnapshot {
+    items: DisplayItem[];
+    rows: ReadonlyMap<number, ItemMeasurement>;
+    flowHeights: ReadonlyMap<number, number>;
+    backgroundHeights: Readonly<Record<number, number>>;
+    viewport: ItemMeasurement;
+    interludeMetrics: ReturnType<typeof readInterludeMetrics>;
+}
+
+const readInterludeMetrics = () => ({
+    rowHeight: getInterludeRowHeightPx(),
+    neighborShift: getInterludeNeighborShiftPx(),
+    focusOffset: getInterludeFocusOffsetPx(),
+});
+
+const mergeVisibleIndices = (
+    current: readonly number[],
+    target: readonly number[],
+    count: number,
+    parents?: ReadonlyMap<number, number>,
+) => {
+    const visible = new Set(target);
+    current.forEach(index => visible.add(index));
+    parents?.forEach((parent, child) => {
+        if (visible.has(child)) visible.add(parent);
+    });
+    parents?.forEach((parent, child) => {
+        if (visible.has(parent)) visible.add(child);
+    });
+    return [...visible].filter(index => index >= 0 && index < count).sort((a, b) => a - b);
+};
+
+const sameIndices = (left: readonly number[], right: readonly number[]) =>
+    left.length === right.length && left.every((value, index) => value === right[index]);
+
+/** One observer and one snapshot for viewport, main rows and background rows. */
+export function useFluidLyricsMeasurements(displayItems: DisplayItem[]) {
+    const scrollAreaRef = useRef<HTMLDivElement | null>(null);
+    const observerRef = useRef<ResizeObserver | null>(null);
+    const nodesRef = useRef(new Map<Element, { index: number; items: DisplayItem[] }>());
+    const itemsRef = useRef(displayItems);
+    const [snapshot, setSnapshot] = useState<MeasurementSnapshot>(() => ({
+        items: displayItems, rows: new Map(), flowHeights: new Map(), backgroundHeights: {}, viewport: { width: 0, height: 0 },
+        interludeMetrics: readInterludeMetrics(),
+    }));
+    // Deduplicate deliveries even before React commits the previous batch.
+    const snapshotRef = useRef(snapshot);
+    useInsertionEffect(() => {
+        itemsRef.current = displayItems;
+        if (snapshotRef.current.items !== displayItems) {
+            snapshotRef.current = {
+                ...snapshotRef.current, items: displayItems, rows: new Map(),
+                flowHeights: new Map(), backgroundHeights: {},
+            };
+        }
+    }, [displayItems]);
+
+    const observeItem = useCallback((index: number, node: HTMLDivElement) => {
+        const item = displayItems[index];
+        // Preserve the previous background measurement box (the button, not
+        // the shell's inline formatting box), without its own observer/read.
+        const measuredNode = item?.type === 'line' && item.line.role === 'background'
+            ? node.querySelector<HTMLElement>('.lyrics-motion-row') ?? node : node;
+        nodesRef.current.set(measuredNode, { index, items: displayItems });
+        observerRef.current?.observe(measuredNode, { box: 'border-box' });
+        return () => {
+            observerRef.current?.unobserve(measuredNode);
+            nodesRef.current.delete(measuredNode);
+        };
+    }, [displayItems]);
+
+    useEffect(() => {
+        const observer = new ResizeObserver(entries => {
+            const previous = snapshotRef.current;
+            let viewport = previous.viewport;
+            let changedRows: Map<number, ItemMeasurement> | undefined;
+            let flowHeights: Map<number, number> | undefined;
+            let backgroundHeights: Record<number, number> | undefined;
+            let changedCount = 0;
+            entries.forEach(entry => {
+                if (entry.target === scrollAreaRef.current) {
+                    const { width, height } = entry.contentRect;
+                    if (width !== viewport.width || height !== viewport.height) viewport = { width, height };
+                    return;
+                }
+                const registration = nodesRef.current.get(entry.target);
+                if (!registration || registration.items !== itemsRef.current) return;
+                const { index } = registration;
+                const height = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
+                const width = entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width;
+                if (width <= 0 || height <= 0) return;
+                const oldSize = (changedRows ?? previous.rows).get(index);
+                // Fonts and wrapping can change height without changing width.
+                if (oldSize && Math.abs(oldSize.height - height) < 0.5 && Math.abs(oldSize.width - width) < 0.5) return;
+                changedRows ??= new Map(previous.rows);
+                changedRows.set(index, { height, width });
+                const item = registration.items[index];
+                if (item?.type === 'line' && item.line.role === 'background') {
+                    if (previous.backgroundHeights[index] !== height) {
+                        backgroundHeights ??= { ...previous.backgroundHeights };
+                        backgroundHeights[index] = height;
+                    }
+                } else if (previous.flowHeights.get(index) !== height) {
+                    flowHeights ??= new Map(previous.flowHeights);
+                    flowHeights.set(index, height);
+                }
+                changedCount++;
+            });
+            if (!changedRows && viewport === previous.viewport) return;
+            // Root-font/viewport-derived metrics are read after a size delivery,
+            // never at each playback boundary. Preserve identity if unchanged.
+            const metrics = readInterludeMetrics();
+            const oldMetrics = previous.interludeMetrics;
+            const interludeMetrics = metrics.rowHeight === oldMetrics.rowHeight &&
+                metrics.neighborShift === oldMetrics.neighborShift && metrics.focusOffset === oldMetrics.focusOffset
+                ? oldMetrics : metrics;
+            const next = {
+                items: itemsRef.current, rows: changedRows ?? previous.rows, viewport,
+                flowHeights: flowHeights ?? previous.flowHeights,
+                backgroundHeights: backgroundHeights ?? previous.backgroundHeights,
+                interludeMetrics,
+            };
+            snapshotRef.current = next;
+            getLyricsDebugSink()?.({ type: 'measurement-batch', entries: entries.length });
+            getLyricsDebugSink()?.({ type: 'measurement-change', changed: changedCount });
+            setSnapshot(next);
+        });
+        observerRef.current = observer;
+        nodesRef.current.forEach((_registration, node) => observer.observe(node, { box: 'border-box' }));
+        const viewport = scrollAreaRef.current;
+        if (viewport) observer.observe(viewport);
+        return () => {
+            observer.disconnect();
+            if (observerRef.current === observer) observerRef.current = null;
+        };
+    }, []);
+
+    const backgroundHeights = useMemo(() => snapshot.items === displayItems
+        ? snapshot.backgroundHeights : {}, [displayItems, snapshot.items, snapshot.backgroundHeights]);
+
+    return { snapshot, backgroundHeights, observeItem, scrollAreaRef };
+}
+
+interface FluidLyricsLayoutArgs {
+    activeDisplayIndex: number;
+    activeFocusOffset: number;
+    displayItems: DisplayItem[];
+    /** When true, the active follow target is the effective fallback window. */
+    includeActiveWindow: boolean;
+    interludeRowHeight: number;
+    variant: 'side' | 'narrow';
+    visualShifts: number[];
+    measurements: MeasurementSnapshot;
+    parentDisplayIndexMap?: ReadonlyMap<number, number>;
+}
+
+/** Derive geometry and the target window from the same measurement batch. */
 export function useFluidLyricsLayout({
     activeDisplayIndex,
     activeFocusOffset,
@@ -41,32 +182,21 @@ export function useFluidLyricsLayout({
     interludeRowHeight,
     variant,
     visualShifts,
+    measurements,
+    parentDisplayIndexMap,
 }: FluidLyricsLayoutArgs) {
-    const scrollAreaRef = useRef<HTMLDivElement | null>(null);
-    const itemObserverRef = useRef<ResizeObserver | null>(null);
-    const nodeIndexesRef = useRef(new WeakMap<Element, number>());
-    const observedNodesRef = useRef(new Set<HTMLDivElement>());
+    const viewportSize = measurements.viewport;
     const maxScrollYRef = useRef(0);
     const targetScrollYRef = useRef(0);
-    const [measurements, setMeasurements] = useState<{
-        items: DisplayItem[];
-        measurements: Map<number, ItemMeasurement>;
-    }>({ items: displayItems, measurements: new Map() });
-    const [viewportSize, setViewportSize] = useState<ViewportSize>({ width: 0, height: 0 });
     const [targetScrollY, setTargetScrollYState] = useState(0);
-    const [visibleIndices, setVisibleIndices] = useState<readonly number[]>([]);
-    const visibleIndicesRef = useRef<readonly number[]>([]);
-    const [visibleIndicesItems, setVisibleIndicesItems] = useState(displayItems);
+    const [springWindow, setSpringWindow] = useState<{ items: DisplayItem[]; indices: readonly number[] }>({
+        items: displayItems, indices: [],
+    });
+    const springWindowRef = useRef(springWindow);
     const displayItemsRef = useRef(displayItems);
-
     useInsertionEffect(() => {
         displayItemsRef.current = displayItems;
-        if (visibleIndicesItems === displayItems) return;
-        // Do not let a previous document's numeric indices render against a
-        // new document for one commit. The animator publishes the new spatial
-        // set after its models are synchronized.
-        visibleIndicesRef.current = [];
-    }, [displayItems, visibleIndicesItems]);
+    }, [displayItems]);
 
     const focusAlpha = variant === 'narrow' ? NARROW_LYRICS_FOCUS_ALPHA : sideLyricsFocusAlpha;
     const topSpacerHeight = viewportSize.height * focusAlpha;
@@ -75,31 +205,21 @@ export function useFluidLyricsLayout({
         : viewportSize.height * (1 - focusAlpha);
 
     const layout = useMemo(() => {
-        const measuredItems = measurements.items === displayItems
-            ? measurements.measurements
-            : new Map<number, ItemMeasurement>();
+        const measuredHeights = measurements.items === displayItems ? measurements.flowHeights : undefined;
         const itemTops = new Array<number>(displayItems.length);
         const itemHeights = new Array<number>(displayItems.length);
         let cursor = topSpacerHeight + topInsetPx;
-
         displayItems.forEach((item, index) => {
-            const estimatedHeight = item.type === 'interlude'
-                ? interludeRowHeight
-                : item.type === 'line' && item.line.role === 'background'
-                    ? 0
-                    : DEFAULT_LINE_HEIGHT_PX;
-            const height = measuredItems.get(index)?.height ?? estimatedHeight;
+            const isBackground = item.type === 'line' && item.line.role === 'background';
+            // Cache the real background height, but expand via visualShifts.
+            const height = isBackground ? 0 : measuredHeights?.get(index) ??
+                (item.type === 'interlude' ? interludeRowHeight : DEFAULT_LINE_HEIGHT_PX);
             itemTops[index] = cursor;
             itemHeights[index] = height;
             cursor += height;
         });
-
-        return {
-            contentHeight: cursor + bottomSpacerHeight,
-            itemHeights,
-            itemTops,
-        };
-    }, [bottomSpacerHeight, displayItems, interludeRowHeight, measurements, topSpacerHeight]);
+        return { contentHeight: cursor + bottomSpacerHeight, itemHeights, itemTops };
+    }, [bottomSpacerHeight, displayItems, interludeRowHeight, measurements.items, measurements.flowHeights, topSpacerHeight]);
 
     const maxScrollY = Math.max(0, layout.contentHeight - viewportSize.height);
     const activeTargetScrollY = useMemo(() => {
@@ -109,8 +229,7 @@ export function useFluidLyricsLayout({
         const visualShift = visualShifts[activeDisplayIndex] ?? 0;
         return clamp(
             Math.round(itemTop + itemHeight / 2 + visualShift + activeFocusOffset - viewportSize.height * focusAlpha),
-            0,
-            maxScrollY
+            0, maxScrollY,
         );
     }, [activeDisplayIndex, activeFocusOffset, focusAlpha, layout.itemHeights, layout.itemTops, maxScrollY, viewportSize.height, visualShifts]);
 
@@ -122,185 +241,58 @@ export function useFluidLyricsLayout({
     }, []);
 
     const fallbackVisibleIndices = useMemo(() => {
-        const windows = [targetScrollY];
-        if (includeActiveWindow) windows.push(activeTargetScrollY);
-
-        const visualTops = layout.itemTops.map((top, index) => top + (visualShifts[index] ?? 0));
-        const visible = new Set<number>();
-        const lowerBound = (value: number) => {
-            let low = 0;
-            let high = visualTops.length;
-            while (low < high) {
-                const middle = (low + high) >> 1;
-                if (visualTops[middle] < value) low = middle + 1;
-                else high = middle;
-            }
-            return low;
-        };
-
-        windows.forEach(windowTop => {
-            const minimum = windowTop - OVERSCAN_PX;
-            const maximum = windowTop + viewportSize.height + OVERSCAN_PX;
-            const firstIndex = Math.max(0, lowerBound(minimum) - 1);
-            const endIndex = Math.min(displayItems.length, lowerBound(maximum) + 1);
-            for (let index = firstIndex; index < endIndex; index++) {
-                const visualBottom = visualTops[index] + layout.itemHeights[index];
-                if (visualBottom >= minimum && visualTops[index] <= maximum) visible.add(index);
-            }
+        if (viewportSize.width <= 0 || viewportSize.height <= 0) return [];
+        const windowTop = includeActiveWindow ? activeTargetScrollY : clamp(targetScrollY, 0, maxScrollY);
+        const minimum = windowTop - OVERSCAN_PX;
+        const maximum = windowTop + viewportSize.height + OVERSCAN_PX;
+        const visible: number[] = [];
+        // Group shifts need not be monotonic. This also includes a tall wrapped
+        // row crossing the upper edge, which lowerBound(top) - 1 can miss.
+        layout.itemTops.forEach((top, index) => {
+            const visualTop = top + (visualShifts[index] ?? 0);
+            if (visualTop + layout.itemHeights[index] >= minimum && visualTop <= maximum) visible.push(index);
         });
-        return [...visible].sort((left, right) => left - right);
-    }, [activeTargetScrollY, displayItems, includeActiveWindow, layout.itemHeights, layout.itemTops, targetScrollY, viewportSize.height, visualShifts]);
+        return visible;
+    }, [activeTargetScrollY, includeActiveWindow, layout.itemHeights, layout.itemTops, maxScrollY, targetScrollY, viewportSize.height, viewportSize.width, visualShifts]);
 
-    const fallbackVisibleIndicesRef = useRef<readonly number[]>(fallbackVisibleIndices);
+    const targetWindowRef = useRef({ indices: fallbackVisibleIndices, parents: parentDisplayIndexMap });
     useInsertionEffect(() => {
-        fallbackVisibleIndicesRef.current = fallbackVisibleIndices;
-    }, [fallbackVisibleIndices]);
+        targetWindowRef.current = { indices: fallbackVisibleIndices, parents: parentDisplayIndexMap };
+    }, [fallbackVisibleIndices, parentDisplayIndexMap]);
 
-    const updateVisibleIndices = useCallback((indices: readonly number[]) => {
-        const previous = visibleIndicesRef.current;
-        if (
-            previous.length === indices.length &&
-            previous.every((value, index) => value === indices[index])
-        ) return;
-        const next = [...indices];
-        visibleIndicesRef.current = next;
-        setVisibleIndicesItems(displayItemsRef.current);
-        setVisibleIndices(next);
+    const updateSpringVisibleIndices = useCallback((indices: readonly number[]) => {
+        const previous = springWindowRef.current;
+        const items = displayItemsRef.current;
+        if (previous.items === items) {
+            if (sameIndices(previous.indices, indices)) return;
+            const target = targetWindowRef.current;
+            // Movement entirely within the already mounted target/group set
+            // needs no React commit. The animator republishes the current
+            // snapshot when the target changes, even if its springs did not.
+            if (sameIndices(
+                mergeVisibleIndices(previous.indices, target.indices, items.length, target.parents),
+                mergeVisibleIndices(indices, target.indices, items.length, target.parents),
+            )) return;
+        }
+        const next = { items, indices: [...indices] };
+        springWindowRef.current = next;
+        setSpringWindow(next);
     }, []);
 
-    // A new document or viewport starts with a target-based set so the first
-    // frame has content. The animator replaces it with the spring-position
-    // based spatial set as soon as its model is ready.
-    useLayoutEffect(() => {
-        let cancelled = false;
-        queueMicrotask(() => {
-            if (cancelled) return;
-            // The animator may already have published a spring-based set in
-            // this commit. Do not replace it with the target-window fallback.
-            if (visibleIndicesRef.current.length > 0) return;
-            if (viewportSize.width <= 0 || viewportSize.height <= 0) {
-                updateVisibleIndices([]);
-                return;
-            }
-            updateVisibleIndices(fallbackVisibleIndicesRef.current);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [displayItems, updateVisibleIndices, viewportSize.height, viewportSize.width]);
+    const visibleIndices = useMemo(() => {
+        if (viewportSize.width <= 0 || viewportSize.height <= 0) return [];
+        // Complete only groups intersecting either window, not remote active rows.
+        return mergeVisibleIndices(
+            springWindow.items === displayItems ? springWindow.indices : [],
+            fallbackVisibleIndices, displayItems.length, parentDisplayIndexMap,
+        );
+    }, [displayItems, fallbackVisibleIndices, parentDisplayIndexMap, springWindow, viewportSize.height, viewportSize.width]);
 
-    const measureItems = useCallback((updates: ReadonlyMap<number, ItemMeasurement>) => {
-        if (updates.size === 0) return;
-        // 背景行在布局模型中恒为 0 高度（间奏式折叠，不占位），
-        // 激活时的撑开由面板的 visualShifts 处理，因此忽略其测量。
-        const filteredUpdates = new Map<number, ItemMeasurement>();
-        updates.forEach((measurement, index) => {
-            const item = displayItems[index];
-            if (item?.type === 'line' && item.line.role === 'background') return;
-            if (measurement.height > 0 && measurement.width > 0) {
-                filteredUpdates.set(index, measurement);
-            }
-        });
-        if (filteredUpdates.size === 0) return;
-        setMeasurements(previous => {
-            const previousMeasurements = previous.items === displayItems
-                ? previous.measurements
-                : new Map<number, ItemMeasurement>();
-            const nextMeasurements = new Map(previousMeasurements);
-            let changed = previous.items !== displayItems;
-            filteredUpdates.forEach((measurement, index) => {
-                const previousMeasurement = nextMeasurements.get(index);
-                // 宽度稳定后仍可能发生换行/字号重排，不能把拉伸中的临时行高锁进缓存。
-                if (
-                    previousMeasurement &&
-                    Math.abs(previousMeasurement.width - measurement.width) < 0.5 &&
-                    Math.abs(previousMeasurement.height - measurement.height) < 0.5
-                ) return;
-                nextMeasurements.set(index, measurement);
-                changed = true;
-            });
-            if (!changed) return previous;
-            return { items: displayItems, measurements: nextMeasurements };
-        });
-    }, [displayItems]);
-
-    const observeItem = useCallback((index: number, node: HTMLDivElement) => {
-        nodeIndexesRef.current.set(node, index);
-        observedNodesRef.current.add(node);
-        itemObserverRef.current?.observe(node);
-
-        return () => {
-            itemObserverRef.current?.unobserve(node);
-            observedNodesRef.current.delete(node);
-            // 虚拟化只卸载 DOM；heights 中的真实测量保留给轻量 row model 复用。
-        };
-    }, []);
-
-    useEffect(() => {
-        const observer = new ResizeObserver(entries => {
-            const updates = new Map<number, ItemMeasurement>();
-            entries.forEach(entry => {
-                const index = nodeIndexesRef.current.get(entry.target);
-                const height = entry.borderBoxSize[0]?.blockSize ?? entry.contentRect.height;
-                const width = entry.borderBoxSize[0]?.inlineSize ?? entry.contentRect.width;
-                if (index !== undefined) updates.set(index, { height, width });
-            });
-            measureItems(updates);
-        });
-        itemObserverRef.current = observer;
-        observedNodesRef.current.forEach(node => observer.observe(node));
-        return () => {
-            observer.disconnect();
-            if (itemObserverRef.current === observer) itemObserverRef.current = null;
-        };
-    }, [measureItems]);
-
-    useEffect(() => {
-        const element = scrollAreaRef.current;
-        if (!element) return;
-
-        const update = () => {
-            const nextSize = { width: element.clientWidth, height: element.clientHeight };
-            // 保留上一帧的真实尺寸，避免宽度变化时所有行短暂退回统一估算
-            // 高度而发生重叠。布局提交后由下面的 layout effect 一次性重测。
-            setViewportSize(previous =>
-                previous.width === nextSize.width && previous.height === nextSize.height
-                    ? previous
-                    : nextSize
-            );
-        };
-        update();
-        const observer = new ResizeObserver(update);
-        observer.observe(element);
-        return () => observer.disconnect();
-    }, []);
-
-    useLayoutEffect(() => {
-        if (viewportSize.width <= 0) return;
-        const updates = new Map<number, ItemMeasurement>();
-        observedNodesRef.current.forEach(node => {
-            const index = nodeIndexesRef.current.get(node);
-            if (index === undefined) return;
-            // 布局尺寸不包含播放器/点击动画的 transform 缩放。
-            const height = node.offsetHeight;
-            const width = node.offsetWidth;
-            if (width > 0 && height > 0) {
-                updates.set(index, { height, width });
-            }
-        });
-        let cancelled = false;
-        queueMicrotask(() => {
-            if (!cancelled) measureItems(updates);
-        });
-        return () => {
-            cancelled = true;
-        };
-    }, [measureItems, viewportSize.height, viewportSize.width]);
-
-    useEffect(() => {
+    useInsertionEffect(() => {
         maxScrollYRef.current = maxScrollY;
-        if (targetScrollYRef.current <= maxScrollY) return;
-        setTargetScrollY(maxScrollY);
+    }, [maxScrollY]);
+    useEffect(() => {
+        if (targetScrollYRef.current > maxScrollY) setTargetScrollY(maxScrollY);
     }, [maxScrollY, setTargetScrollY]);
 
     return {
@@ -309,15 +301,11 @@ export function useFluidLyricsLayout({
         fallbackVisibleIndices,
         itemHeights: layout.itemHeights,
         itemTops: layout.itemTops,
-        observeItem,
-        scrollAreaRef,
         setTargetScrollY,
-        targetScrollY,
+        targetScrollY: clamp(targetScrollY, 0, maxScrollY),
         topSpacerHeight,
-        visibleIndices: visibleIndicesItems === displayItems
-            ? visibleIndices
-            : [],
-        updateVisibleIndices,
+        visibleIndices,
+        updateSpringVisibleIndices,
         viewportHeight: viewportSize.height,
     };
 }

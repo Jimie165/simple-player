@@ -1,9 +1,9 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useFluidLyricsInterlude } from '@/features/player/lyrics/useFluidLyricsInterlude';
-import { useFluidLyricsLayout } from '@/features/player/lyrics/useFluidLyricsLayout';
+import { useFluidLyricsLayout, useFluidLyricsMeasurements } from '@/features/player/lyrics/useFluidLyricsLayout';
 import { useFluidLyricsAnimator } from '@/features/player/lyrics/useFluidLyricsAnimator';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 import {
@@ -14,15 +14,7 @@ import {
 } from '@/features/player/lyrics/constants';
 import { getFluidLyricsMotionDelays, getFluidLyricsSpringParams } from '@/features/player/lyrics/fluidLyricsMotion';
 import {
-    getInterludeFocusOffsetPx,
-    getInterludeNeighborShiftPx,
-    getInterludeRowHeightPx,
-} from '@/features/player/lyrics/layoutMetrics';
-import {
     buildDisplayItems,
-    buildFluidLyricsRenderBoundaries,
-    getActiveLyricsState,
-    getFluidLyricsRenderKey,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
 import { animationLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
@@ -32,10 +24,12 @@ import {
     LyricsFrameSchedulerContext,
     LyricsFrameTaskRegistryContext,
 } from '@/features/player/lyrics/lyricsFrameScheduler';
+import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
 import FluidLyricsLayoutItem from '@/features/player/lyrics/FluidLyricsLayoutItem';
 import InterludeItem from '@/features/player/lyrics/InterludeItem';
 import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import type { LyricsPanelProps } from '@/features/player/lyrics/types';
+import { createFluidLyricsTimeline } from '@/features/player/lyrics/fluidLyricsTimeline';
 
 const sideScrollMaskStyle = {
     maskImage: 'linear-gradient(to bottom, transparent 0px, black 3.5rem, black calc(100% - 40px), transparent 100%)',
@@ -94,28 +88,22 @@ function FluidLyricsPanel({
         if (!lines.length) return '暂无歌词';
         return null;
     }, [status, lines.length]);
-    const focusNextLineByVisualEnd = timingStrategy.focusNextLineByVisualEnd;
     const displayItems = useMemo(
         () => buildDisplayItems(lines, hasTimestamps, timingStrategy),
         [hasTimestamps, lines, timingStrategy]
     );
-    const renderBoundaries = useMemo(
-        () => buildFluidLyricsRenderBoundaries(displayItems, lines, timingStrategy, isTtml),
+    const timeline = useMemo(
+        () => createFluidLyricsTimeline(displayItems, lines, timingStrategy, isTtml),
         [displayItems, lines, timingStrategy, isTtml]
-    );
-    const getRenderKey = useCallback(
-        (currentMs: number) => getFluidLyricsRenderKey(renderBoundaries, currentMs),
-        [renderBoundaries]
     );
     const { renderCurrentMs, preciseMsRef, syncRevision } = usePrecisePlaybackTime(
         currentTime,
-        getRenderKey,
+        timeline.getRenderKey,
         isPlaying,
         frameScheduler,
     );
-    const { focusIndex: activeDisplayIndex, activeIndices } = useMemo(
-        () => getActiveLyricsState(displayItems, lines, renderCurrentMs / 1000, timingStrategy, isTtml),
-        [displayItems, lines, renderCurrentMs, timingStrategy, isTtml]
+    const { focusIndex: activeDisplayIndex, activeIndices, karaokeActiveIndices } = useMemo(
+        () => timeline.getSnapshot(renderCurrentMs, true), [timeline, renderCurrentMs],
     );
     const {
         exitingInterludeIndex,
@@ -156,37 +144,19 @@ function FluidLyricsPanel({
         return map;
     }, [displayItems]);
 
-    const backgroundHeightsCacheRef = useRef<{
-        items: typeof displayItems;
-        heights: Record<number, number>;
-    }>({ items: displayItems, heights: {} });
-    const pendingBackgroundHeightsRef = useRef(new Map<number, number>());
-    const backgroundHeightFlushScheduledRef = useRef(false);
-    const [backgroundHeights, setBackgroundHeights] = useState<Record<number, number>>({});
-    const reportBackgroundHeight = useCallback((displayIndex: number, height: number) => {
-        const cache = backgroundHeightsCacheRef.current.items === displayItems
-            ? backgroundHeightsCacheRef.current
-            : { items: displayItems, heights: {} };
-        backgroundHeightsCacheRef.current = cache;
-        if (cache.heights[displayIndex] === height) return;
-        cache.heights[displayIndex] = height;
-        pendingBackgroundHeightsRef.current.set(displayIndex, height);
-        if (backgroundHeightFlushScheduledRef.current) return;
-        backgroundHeightFlushScheduledRef.current = true;
-        queueMicrotask(() => {
-            backgroundHeightFlushScheduledRef.current = false;
-            pendingBackgroundHeightsRef.current.clear();
-            if (backgroundHeightsCacheRef.current !== cache) return;
-            setBackgroundHeights({ ...cache.heights });
-        });
-    }, [displayItems]);
+    const { snapshot: measurements, backgroundHeights, observeItem, scrollAreaRef } = useFluidLyricsMeasurements(displayItems);
+    const interludeMetrics = measurements.interludeMetrics;
 
     const activeItem = displayItems[activeDisplayIndex];
 
+    // The layout fallback must use the same target that the animator follows.
+    // Keeping a stale manual target in the automatic-follow window pins old
+    // rows (usually the beginning of the song) in the DOM indefinitely.
+    const shouldAutoFollow = isOpen && !displayState && !isUserScrolling && !pausedScroll;
+
     const visualInterludeShifts = useMemo(() => {
         const shifts = new Array<number>(displayItems.length);
-        const rowHeight = getInterludeRowHeightPx();
-        const neighborShift = getInterludeNeighborShiftPx();
+        const { rowHeight, neighborShift } = interludeMetrics;
         const openInterludeIndices = new Set(
             [exitingInterludeIndex, openInterludeIndex].filter(
                 (displayIndex): displayIndex is number =>
@@ -217,31 +187,43 @@ function FluidLyricsPanel({
             }
         });
         return shifts;
-    }, [activeIndices, backgroundHeights, displayItems, exitingInterludeIndex, openInterludeIndex]);
+    }, [activeIndices, backgroundHeights, displayItems, exitingInterludeIndex, interludeMetrics, openInterludeIndex]);
 
     const {
         activeTargetScrollY,
         contentHeight,
         itemHeights,
         itemTops,
-        observeItem,
-        scrollAreaRef,
         setTargetScrollY,
         targetScrollY,
         visibleIndices,
-        updateVisibleIndices,
+        updateSpringVisibleIndices,
         viewportHeight,
         fallbackVisibleIndices,
     } = useFluidLyricsLayout({
         activeDisplayIndex,
         activeFocusOffset: activeItem?.type === 'interlude'
-            ? -getInterludeFocusOffsetPx() * INTERLUDE_FOCUS_OFFSET_RATIO
+            ? -interludeMetrics.focusOffset * INTERLUDE_FOCUS_OFFSET_RATIO
             : 0,
         displayItems,
-        includeActiveWindow: !isUserScrolling,
-        interludeRowHeight: getInterludeRowHeightPx(),
+        includeActiveWindow: shouldAutoFollow,
+        interludeRowHeight: interludeMetrics.rowHeight,
         variant,
         visualShifts: visualInterludeShifts,
+        measurements,
+        parentDisplayIndexMap,
+    });
+
+    // This is a panel-commit counter, deliberately separate from the
+    // MutationObserver batches collected by the profile script. It is only
+    // observable while a diagnostics sink is installed.
+    useLayoutEffect(() => {
+        getLyricsDebugSink()?.({
+            type: 'react-commit',
+            displayItemCount: displayItems.length,
+            visibleRowCount: visibleIndices.length,
+            activeDisplayIndex,
+        });
     });
 
     const updateTargetScrollY = useCallback((value: number) => {
@@ -271,7 +253,6 @@ function FluidLyricsPanel({
         return () => cancelAnimationFrame(frame);
     }, [isPlaying]);
 
-    const shouldAutoFollow = isOpen && !displayState && !isUserScrolling && !pausedScroll;
     const animatorTargetScrollY = shouldAutoFollow ? activeTargetScrollY : targetScrollY;
     useLayoutEffect(() => {
         manualScrollActiveRef.current = isUserScrolling;
@@ -297,20 +278,25 @@ function FluidLyricsPanel({
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
     }, []);
 
+    const seekContextRef = useRef({ keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek });
+    useInsertionEffect(() => {
+        seekContextRef.current = { keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek };
+    }, [keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek]);
     const handleLineSeek = useCallback((time: number) => {
-        keepCurrentInterludeForExit();
+        const context = seekContextRef.current;
+        context.keepCurrentInterludeForExit();
         if (resumeTimeoutRef.current) {
             clearTimeout(resumeTimeoutRef.current);
             resumeTimeoutRef.current = null;
         }
-        if (isUserScrolling) {
+        if (context.isUserScrolling) {
             pendingLineSeekRef.current = {
-                syncRevision,
+                syncRevision: context.syncRevision,
                 targetMs: time * 1000,
             };
         }
-        onSeek(time);
-    }, [isUserScrolling, keepCurrentInterludeForExit, onSeek, syncRevision]);
+        context.onSeek(time);
+    }, []);
 
     useEffect(() => {
         const pendingSeek = pendingLineSeekRef.current;
@@ -373,7 +359,8 @@ function FluidLyricsPanel({
         itemHeights,
         viewportHeight,
         fallbackVisibleIndices,
-        onVisibleIndicesChange: updateVisibleIndices,
+        onVisibleIndicesChange: updateSpringVisibleIndices,
+        syncRevision,
     });
 
     const handleManualDelta = useCallback((deltaY: number) => {
@@ -423,16 +410,7 @@ function FluidLyricsPanel({
                                     if (!item) return null;
                                     const interludeShift = visualInterludeShifts[displayIndex] ?? 0;
                                     const isActive = activeIndices.has(displayIndex);
-                                    const isKaraokeActive = item.type === 'line' && item.line.words?.length
-                                        ? isActive || (
-                                            focusNextLineByVisualEnd &&
-                                            typeof item.line.visual_end_ms === 'number' &&
-                                            typeof item.line.end_time_ms === 'number' &&
-                                            item.line.visual_end_ms < item.line.end_time_ms &&
-                                            renderCurrentMs >= item.line.visual_end_ms &&
-                                            renderCurrentMs < item.line.end_time_ms
-                                        )
-                                        : isActive;
+                                    const isKaraokeActive = karaokeActiveIndices.has(displayIndex);
 
                                     return (
                                         <FluidLyricsLayoutItem
@@ -480,17 +458,13 @@ function FluidLyricsPanel({
                                                     currentTime={renderCurrentMs / 1000}
                                                     preciseMsRef={preciseMsRef}
                                                     isPlaying={isPlaying}
+                                                    playbackSyncKey={syncRevision}
                                                     onSeek={handleLineSeek}
                                                     fluidMotion
                                                     motionDelay={getMotionDelay(displayIndex)}
                                                     variant={variant}
                                                     isBackground={item.line.role === 'background'}
                                                     hasDuetLine={hasDuetLine}
-                                                    onBackgroundHeight={
-                                                        item.line.role === 'background'
-                                                            ? (height) => reportBackgroundHeight(displayIndex, height)
-                                                            : undefined
-                                                    }
                                                 />
                                             )}
                                         </FluidLyricsLayoutItem>

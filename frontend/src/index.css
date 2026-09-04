@@ -444,7 +444,7 @@ body {
 
 /* 行失焦退出：由行级 class 统一触发，整行字符只靠移除 inline transform/--kg
    走一次 transition，不再为每字创建 CSS 动画 */
-.karaoke-char-exiting {
+.karaoke-text-exiting .karaoke-char {
   transition:
     transform 250ms ease-in-out,
     --kg 250ms ease-in-out;

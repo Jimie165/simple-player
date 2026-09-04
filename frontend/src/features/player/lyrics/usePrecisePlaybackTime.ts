@@ -12,7 +12,7 @@ const BACKGROUND_PAUSE_DELAY_MS = 10_000;
 
 export function usePrecisePlaybackTime(
     currentTime: number,
-    getRenderKey?: (currentMs: number) => number,
+    getRenderKey?: (currentMs: number, force?: boolean) => number | string,
     subscribeToPlayerTime = false,
     frameScheduler?: LyricsFrameScheduler,
 ) {
@@ -30,6 +30,7 @@ export function usePrecisePlaybackTime(
     const softNudgeRemainingMsRef = useRef(0);
     const softNudgeTimeLeftMsRef = useRef(0);
     const calibrationRequestRef = useRef(false);
+    const clockEpochRef = useRef(0);
     const isPlayingRef = useRef(isPlaying);
     const backgroundPauseTimerRef = useRef<number | null>(null);
     const backgroundPausedAtRef = useRef<number | null>(null);
@@ -38,7 +39,7 @@ export function usePrecisePlaybackTime(
 
     const publishRenderTime = useCallback((ms: number, force = false) => {
         if (getRenderKey) {
-            const renderKey = getRenderKey(ms);
+            const renderKey = getRenderKey(ms, force);
             if (!force && renderKey === lastRenderKeyRef.current) return;
             lastRenderKeyRef.current = renderKey;
         }
@@ -46,6 +47,7 @@ export function usePrecisePlaybackTime(
     }, [getRenderKey]);
 
     const hardSync = useCallback((ms: number) => {
+        clockEpochRef.current++;
         preciseMsRef.current = ms;
         softNudgeRemainingMsRef.current = 0;
         softNudgeTimeLeftMsRef.current = 0;
@@ -56,9 +58,17 @@ export function usePrecisePlaybackTime(
     const calibrateFromAudio = useCallback(async () => {
         if (calibrationRequestRef.current) return;
         calibrationRequestRef.current = true;
+        const epoch = clockEpochRef.current;
+        const requestedState = usePlayerStore.getState();
 
         try {
             const audioMs = (await audioService.getCurrentTime()) * 1000;
+            const state = usePlayerStore.getState();
+            // An older IPC reply must not overwrite a seek, pause or new song.
+            if (!Number.isFinite(audioMs) || epoch !== clockEpochRef.current ||
+                state.playbackSessionId !== requestedState.playbackSessionId ||
+                state.playbackRevision !== requestedState.playbackRevision ||
+                state.isPlaying !== requestedState.isPlaying) return;
             const driftMs = audioMs - preciseMsRef.current;
             const absDriftMs = Math.abs(driftMs);
 
@@ -77,6 +87,8 @@ export function usePrecisePlaybackTime(
             calibrationRequestRef.current = false;
         }
     }, [hardSync]);
+
+    useEffect(() => () => { clockEpochRef.current++; }, []);
 
     useEffect(() => {
         isPlayingRef.current = isPlaying;

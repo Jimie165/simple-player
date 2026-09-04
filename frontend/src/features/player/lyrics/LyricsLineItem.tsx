@@ -19,6 +19,7 @@ interface LyricsLineItemProps {
     currentTime: number;
     preciseMsRef: RefObject<number>;
     isPlaying?: boolean;
+    playbackSyncKey?: number;
     onSeek: (time: number) => void;
     fluidMotion?: boolean;
     motionDelay?: number;
@@ -57,6 +58,7 @@ function LyricsLineItem({
     currentTime,
     preciseMsRef,
     isPlaying,
+    playbackSyncKey,
     onSeek,
     fluidMotion = false,
     motionDelay = 0,
@@ -148,8 +150,8 @@ function LyricsLineItem({
             ? 'pt-[clamp(0.2rem,0.5vw,0.4rem)] pb-[clamp(0.4rem,0.8vw,0.75rem)]'
             : 'py-[clamp(1rem,1.3vw,1.25rem)]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
-        // 背景和声小字无发光/模糊效果
-        isActive && !isBackground ? 'text-white drop-shadow-xl' : 'text-white',
+        // 有译文时将阴影限制在主文字上，避免译文随激活状态改变阴影。
+        isActive && !isBackground && !line.translation ? 'text-white drop-shadow-xl' : 'text-white',
         isDuetRow
             ? 'text-right pl-[15%] origin-right'
             : 'text-left pl-[clamp(1.2rem,2.2vw,2rem)] origin-left',
@@ -187,6 +189,7 @@ function LyricsLineItem({
                 className={clsx(
                     'block font-bold leading-[1.38] tracking-wide relative',
                     mainTextClass,
+                    isActive && !isBackground && line.translation && 'drop-shadow-xl',
                     shouldRenderKaraoke
                         ? (isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
@@ -216,6 +219,7 @@ function LyricsLineItem({
                         currentMs={currentMs}
                         preciseMsRef={preciseMsRef}
                         isPlaying={isPlaying}
+                        playbackSyncKey={playbackSyncKey}
                         isActive={isKaraokeActive}
                         isFocused={isActive}
                         glowDisabled={isBackground}
@@ -227,23 +231,14 @@ function LyricsLineItem({
             </span>
             {line.translation && (
                 <span
-                    style={!shouldRenderKaraoke ? {
+                    style={isBackground && !shouldRenderKaraoke ? {
                         transitionDelay: `${motionDelay}s`,
                     } : undefined}
                     className={clsx(
-                        'block font-medium leading-[1.34] tracking-wide mt-1',
+                        'block font-medium leading-[1.34] tracking-wide mt-1 text-white/30',
                         translationTextClass,
-                        // 背景和声译文与主文字同步淡入淡出（含进入延迟）；未激活完全不可见
-                        isBackground
-                            ? (isActive ? bgTextActive : bgTextInactive)
-                            : 'transition-[opacity,color] duration-300 ease-in-out',
-                        isActive
-                            ? isBackground
-                                ? 'text-white/30'
-                                : 'text-white/65 opacity-95 drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]'
-                            : isBackground
-                                ? 'text-white/30'
-                                : 'text-white/32 opacity-80'
+                        // 译文不单独高亮；和声仍需随主文字出现和退出，避免残留。
+                        isBackground && (isActive ? bgTextActive : bgTextInactive)
                     )}
                 >
                     {line.translation}
@@ -322,13 +317,14 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.isUserScrolling === next.isUserScrolling &&
     prev.pausedScroll === next.pausedScroll &&
     (prev.fluidMotion && next.fluidMotion || prev.distanceFromActive === next.distanceFromActive) &&
-    prev.interludeShift === next.interludeShift &&
+    (prev.fluidMotion && next.fluidMotion || prev.interludeShift === next.interludeShift) &&
     prev.interludeShiftDurationMs === next.interludeShiftDurationMs &&
     prev.lineEndMs === next.lineEndMs &&
     prev.nextLineStartMs === next.nextLineStartMs &&
     prev.enableTightHandoffTailCompression === next.enableTightHandoffTailCompression &&
     prev.preciseMsRef === next.preciseMsRef &&
     prev.isPlaying === next.isPlaying &&
+    prev.playbackSyncKey === next.playbackSyncKey &&
     prev.onSeek === next.onSeek &&
     prev.fluidMotion === next.fluidMotion &&
     (
