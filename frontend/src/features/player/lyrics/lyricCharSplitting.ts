@@ -158,6 +158,9 @@ function getTightHandoffCompressionPlan(
 ) {
     if (lineEndMs === null || nextLineStartMs === null || chars.length === 0) return null;
 
+    // 重叠演唱不是换行交接，不能为了另一声部的起点压缩当前长音。
+    if (nextLineStartMs < lineEndMs) return null;
+
     const requiredCutMs = lineEndMs - (nextLineStartMs - targetHandoffLeadMs);
     if (requiredCutMs <= 0) return null;
 
