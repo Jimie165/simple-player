@@ -7,7 +7,8 @@ import {
     DragOverlay,
     closestCenter,
     KeyboardSensor,
-    PointerSensor,
+    MouseSensor,
+    TouchSensor,
     useSensor,
     useSensors,
     type DragStartEvent,
@@ -84,11 +85,12 @@ export default function AppleMusicQueue({
     }, [isOpen, scrollParent, scrollToTopSignal]);
 
     const sensors = useSensors(
-        useSensor(PointerSensor, {
+        useSensor(MouseSensor, {
             activationConstraint: {
                 distance: 8,
             },
         }),
+        useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
         useSensor(KeyboardSensor, {
             coordinateGetter: sortableKeyboardCoordinates,
         })

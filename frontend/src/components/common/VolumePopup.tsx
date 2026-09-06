@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
+import { useRangePointerDrag } from '@/hooks/useRangePointerDrag';
 
 interface VolumePopupProps {
     show: boolean;
@@ -27,10 +28,15 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
         onChange?.(val);
     };
 
-    const handleVolumeCommit = () => {
+    const handleVolumeCommit = (event: React.PointerEvent<HTMLInputElement>) => {
         setIsDragging(false);
-        void commitVolume(localVolume);
+        void commitVolume(Number(event.currentTarget.value));
     };
+
+    const pointerDrag = useRangePointerDrag(() => {
+        setLocalVolume(volume);
+        setIsDragging(true);
+    }, handleVolumeCommit);
 
     return (
         <div className={clsx(
@@ -62,12 +68,9 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                         type="range"
                         min="0" max="100"
                         value={displayVolume}
-                        onMouseDown={() => setIsDragging(true)}
-                        onTouchStart={() => setIsDragging(true)}
+                        {...pointerDrag}
                         onChange={handleVolumeChange}
-                        onMouseUp={handleVolumeCommit}
-                        onTouchEnd={handleVolumeCommit}
-                        className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer"
+                        className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer touch-none"
                     />
                 </div>
                 <span className="text-xs font-medium w-6 text-right tabular-nums text-neutral-900 dark:text-neutral-100">

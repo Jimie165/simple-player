@@ -195,18 +195,18 @@ export default function EditableContextMenu() {
     useEffect(() => {
         if (!menu) return;
 
-        const handlePointerDown = (event: MouseEvent) => {
+        const handlePointerDown = (event: PointerEvent) => {
             if (!menuRef.current?.contains(event.target as Node)) closeMenu();
         };
         const handleKeyDown = (event: KeyboardEvent) => {
             if (event.key === 'Escape') closeMenu();
         };
 
-        document.addEventListener('mousedown', handlePointerDown);
+        document.addEventListener('pointerdown', handlePointerDown);
         document.addEventListener('keydown', handleKeyDown);
         window.addEventListener('resize', closeMenu);
         return () => {
-            document.removeEventListener('mousedown', handlePointerDown);
+            document.removeEventListener('pointerdown', handlePointerDown);
             document.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('resize', closeMenu);
         };

@@ -45,7 +45,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
 
     // 点击外部关闭逻辑 (合并处理)
     useEffect(() => {
-        function handleClickOutside(event: MouseEvent) {
+        function handleClickOutside(event: PointerEvent) {
             // Ignore clicks inside Headless UI menus (Portals)
             const target = event.target as Element;
             if (target && target.closest && (target.closest('[role="menu"]') || target.closest('[role="dialog"]') || target.closest('[data-menu-portal="true"]'))) {
@@ -62,8 +62,8 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
                 setShowCompactMenu(false);
             }
         }
-        document.addEventListener("mousedown", handleClickOutside);
-        return () => document.removeEventListener("mousedown", handleClickOutside);
+        document.addEventListener("pointerdown", handleClickOutside);
+        return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, []);
 
     const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";

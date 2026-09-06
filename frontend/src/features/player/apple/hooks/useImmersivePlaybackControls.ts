@@ -27,6 +27,7 @@ export function useImmersivePlaybackControls({
 
     const handleVolumeSeekStart = () => {
         onNarrowActivity();
+        setLocalVolume(volume);
         setIsVolumeDragging(true);
     };
 

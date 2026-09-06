@@ -14,13 +14,13 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
     const [position, setPosition] = useState({ top: y, left: x });
 
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: PointerEvent) => {
             if (ref.current && !ref.current.contains(event.target as Node)) {
                 onClose();
             }
         };
-        // Use mousedown to capture click outside quickly
-        document.addEventListener('mousedown', handleClickOutside);
+        // Use pointerdown so touch also closes the menu immediately
+        document.addEventListener('pointerdown', handleClickOutside);
 
         // Handle window resize
         const handleResize = () => onClose();
@@ -28,7 +28,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
         window.addEventListener('app:close-cursor-menus', onClose);
 
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('pointerdown', handleClickOutside);
             window.removeEventListener('resize', handleResize);
             window.removeEventListener('app:close-cursor-menus', onClose);
         };
@@ -72,7 +72,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             <div
                 className="fixed inset-0 z-9998"
                 style={{ touchAction: 'none' }}
-                onMouseDown={(e) => {
+                onPointerDown={(e) => {
                     e.preventDefault();
                     onClose();
                 }}

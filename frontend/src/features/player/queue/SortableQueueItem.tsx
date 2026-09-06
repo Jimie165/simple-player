@@ -97,6 +97,7 @@ function SongRow({
                 className="relative rounded-sm overflow-hidden shrink-0 bg-neutral-800 shadow-sm group-hover:shadow-md transition-all cursor-pointer"
                 style={{ width: 'clamp(2.75rem, 4.25vw, 4.25rem)', height: 'clamp(2.75rem, 4.25vw, 4.25rem)' }}
                 onPointerDown={(event) => event.stopPropagation()}
+                onTouchStart={(event) => event.stopPropagation()}
                 onClick={(event) => {
                     event.stopPropagation();
                     onPlay();
@@ -126,6 +127,7 @@ song={song} className="w-full h-full object-cover" />
             <div
                 className="p-1 -mr-2"
                 onPointerDown={(event) => event.stopPropagation()}
+                onTouchStart={(event) => event.stopPropagation()}
                 onMouseEnter={() => setMenuReady(true)}
                 onFocus={() => setMenuReady(true)}
             >
@@ -186,7 +188,7 @@ function SortableQueueItemImpl({
         transition,
         zIndex: isDragging ? 100 : 'auto',
         opacity: isDragging ? 0 : 1,
-        touchAction: 'none' as const,
+        touchAction: 'pan-y' as const,
     };
 
     return (

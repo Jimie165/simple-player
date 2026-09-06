@@ -7,6 +7,7 @@ import { MdSdStorage, MdDelete, MdMemory, MdVideoSettings, MdFolderOpen, MdResto
 import clsx from 'clsx';
 import { getSelectedPath } from '@/utils/dialogSelection';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import { useRangePointerDrag } from '@/hooks/useRangePointerDrag';
 
 interface TranscodeCacheInfo {
     total_size_mb: number;
@@ -149,6 +150,8 @@ export default function TranscodeSettings() {
             setChangingDir(false);
         }
     };
+
+    const limitPointerDrag = useRangePointerDrag(undefined, handleLimitCommit);
 
     // 格式化硬件加速类型显示
     const getHwAccelLabel = (type: string) => {
@@ -339,10 +342,9 @@ export default function TranscodeSettings() {
                                 step={limitStep}
                                 value={limit}
                                 onChange={handleLimitChange}
-                                onMouseUp={handleLimitCommit}
-                                onTouchEnd={handleLimitCommit}
+                                {...limitPointerDrag}
                                 onBlur={handleLimitCommit}
-                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                                className="absolute inset-0 h-full w-full cursor-pointer opacity-0 touch-none"
                             />
                         </div>
 

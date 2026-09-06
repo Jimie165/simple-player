@@ -141,10 +141,10 @@ export default function CustomTooltip({
         };
     }, []);
 
-    // 全局 mousedown：任何点击都立即关闭 tooltip（兼容 React 重绘后 mouseleave 丢失的情况）
+    // 全局 pointerdown：触摸和鼠标点击都立即关闭 tooltip。
     useEffect(() => {
-        window.addEventListener('mousedown', hideTooltip);
-        return () => window.removeEventListener('mousedown', hideTooltip);
+        window.addEventListener('pointerdown', hideTooltip);
+        return () => window.removeEventListener('pointerdown', hideTooltip);
     }, [hideTooltip]);
 
     useEffect(() => {

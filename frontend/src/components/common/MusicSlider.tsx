@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { useRangePointerDrag } from '@/hooks/useRangePointerDrag';
 
 interface MusicSliderProps {
     value: number;
@@ -35,6 +36,7 @@ export default function MusicSlider({
     activeHeightClass = "group-active:h-3",
     thumbClassName
 }: MusicSliderProps) {
+    const pointerDrag = useRangePointerDrag(onMouseDown, onMouseUp);
     const percent = max > min ? ((value - min) / (max - min)) * 100 : 0;
 
     return (
@@ -77,14 +79,13 @@ export default function MusicSlider({
                 step={step}
                 value={value}
                 disabled={disabled}
-                onMouseDown={onMouseDown}
-                onMouseUp={onMouseUp}
+                {...pointerDrag}
                 onChange={(e) => onChange(Number(e.target.value))}
                 className={clsx(
-                    "absolute inset-0 w-full h-full opacity-0 z-10 appearance-none",
+                    "absolute inset-0 w-full h-full opacity-0 z-10 appearance-none touch-none",
                     disabled ? "cursor-not-allowed" : "cursor-pointer",
-                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-0 [&::-webkit-slider-thumb]:h-0",
-                    "[&::-moz-range-thumb]:w-0 [&::-moz-range-thumb]:h-0 [&::-moz-range-thumb]:border-0"
+                    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4",
+                    "[&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:border-0"
                 )}
             />
         </div>

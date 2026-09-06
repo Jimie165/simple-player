@@ -101,17 +101,17 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
 
     // Handle closing on click outside or events
     useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
+        const handleClickOutside = (event: PointerEvent) => {
             if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
                 onClose();
             }
         };
-        document.addEventListener('mousedown', handleClickOutside, true);
+        document.addEventListener('pointerdown', handleClickOutside, true);
         window.addEventListener('resize', onClose);
         window.addEventListener('app:close-cursor-menus', onClose);
 
         return () => {
-            document.removeEventListener('mousedown', handleClickOutside, true);
+            document.removeEventListener('pointerdown', handleClickOutside, true);
             window.removeEventListener('resize', onClose);
             window.removeEventListener('app:close-cursor-menus', onClose);
         };
@@ -173,7 +173,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                 <div
                     className="fixed inset-0 z-9998"
                     style={{ touchAction: 'none' }}
-                    onMouseDown={(e) => {
+                    onPointerDown={(e) => {
                         e.preventDefault();
                         onClose();
                     }}
@@ -198,7 +198,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                         opacity: position.opacity,
                         pointerEvents: position.opacity === 0 ? 'none' : 'auto'
                     }}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                     onClick={(e) => e.stopPropagation()}
                     onContextMenu={(e) => e.preventDefault()}
                 >

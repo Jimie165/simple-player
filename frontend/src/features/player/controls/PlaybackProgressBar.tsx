@@ -2,6 +2,7 @@ import type React from 'react';
 import clsx from 'clsx';
 import { formatTime } from '@/utils/time';
 import type { SongMetadata } from '@/types';
+import { useRangePointerDrag } from '@/hooks/useRangePointerDrag';
 
 interface PlaybackProgressBarProps {
     mode: 'full' | 'compact' | 'mini';
@@ -30,6 +31,7 @@ export function PlaybackProgressBar({
     handleSeekChange,
     handleSeekEnd,
 }: PlaybackProgressBarProps) {
+    const pointerDrag = useRangePointerDrag(handleSeekStart, handleSeekEnd);
     return (
         <div className={clsx(
             "z-20 col-start-2 col-end-4 row-start-1 mb-1 ml-[68px] flex self-end text-[10px] font-medium text-neutral-500 dark:text-white/50",
@@ -54,7 +56,7 @@ export function PlaybackProgressBar({
                     style={{ left: `${progressPercent}%`, marginLeft: '-6px' }}
                 />
                 {metadata && (
-                    <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} onMouseDown={handleSeekStart} onChange={handleSeekChange} onMouseUp={handleSeekEnd} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer" />
+                    <input type="range" min="0" max={metadata?.duration || 100} value={currentTime} {...pointerDrag} onChange={handleSeekChange} className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer touch-none" />
                 )}
             </div>
         </div>

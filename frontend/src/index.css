@@ -2,6 +2,17 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* WebView2 native caption hit testing also supports touch and pen dragging. */
+*[data-tauri-drag-region]:not([data-tauri-drag-region="false"]) {
+  app-region: drag;
+}
+
+/* Preserve the existing direct-target drag behavior and keep titlebar buttons clickable. */
+*[data-tauri-drag-region]:not([data-tauri-drag-region="false"]) > *,
+*[data-tauri-drag-region="false"] {
+  app-region: no-drag;
+}
+
 @theme {
   /* MD3 Color System (Blue Key) */
   --color-primary: var(--md-sys-color-primary);

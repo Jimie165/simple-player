@@ -171,7 +171,7 @@ function MenuContent({
                     <div
                         className="fixed inset-0 z-9998"
                         style={{ touchAction: 'none' }}
-                        onMouseDown={(e) => {
+                        onPointerDown={(e) => {
                             e.preventDefault();
                             close();
                         }}
@@ -190,7 +190,7 @@ function MenuContent({
                     transition
                     className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-9999 pointer-events-auto"
                     style={positionedStyle}
-                    onMouseDown={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
                 >
                     {resolvedGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>
@@ -362,7 +362,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
 
                                 // Close any open right-click (cursor) context menus before opening this menu.
                                 // Use a custom event so Headless UI's own outside-click listeners don't
-                                // see a synthetic mousedown and immediately close this menu again.
+                                // see a synthetic pointerdown and immediately close this menu again.
                                 if (!suppressCloseEvent) {
                                     window.dispatchEvent(new CustomEvent('app:close-cursor-menus'));
                                 }

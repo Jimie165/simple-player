@@ -107,8 +107,8 @@ export default function PlayQueuePopup({ show, onNavigateClose }: PlayQueuePopup
         e.preventDefault();
         e.stopPropagation();
 
-        // Simulate a mousedown to close other open menus
-        e.currentTarget.dispatchEvent(new MouseEvent('mousedown', {
+        // Simulate a pointerdown to close other open menus
+        e.currentTarget.dispatchEvent(new PointerEvent('pointerdown', {
             bubbles: true,
             cancelable: true,
             view: window

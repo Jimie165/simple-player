@@ -173,14 +173,15 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 exit={{ opacity: 0 }}
                 className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible ? 'cursor-none' : ''}`}
                 data-controls-visible={isControlsVisible}
-                onMouseMove={showControls}
-                onMouseLeave={() => {
-                    if (autoHideEnabled) {
+                onPointerMove={showControls}
+                onPointerDown={showControls}
+                onPointerLeave={(event) => {
+                    if (event.pointerType === 'mouse' && autoHideEnabled) {
                         setIsControlsVisible(false);
                     }
                 }}
                 onClick={() => setIsControlsVisible(true)}
-                onMouseEnter={showControls}
+                onPointerEnter={showControls}
             >
                 {/* 1. Video Layer */}
                 <video
@@ -345,7 +346,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                             >
                                                 {volume === 0 ? <MdVolumeOff className="text-2xl" /> : <MdVolumeUp className="text-2xl" />}
                                             </button>
-                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 transition-all duration-300 ease-out flex items-center">
+                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 group-focus-within/vol:w-24 any-pointer-coarse:w-24 transition-all duration-300 ease-out flex items-center">
                                                 <div className="w-20 pl-2">
                                                     <MusicSlider
                                                         value={volume}
