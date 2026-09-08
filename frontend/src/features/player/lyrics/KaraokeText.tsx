@@ -14,7 +14,7 @@ interface KaraokeTextProps {
     preciseMsRef: RefObject<number>;
     isActive: boolean;
     isFocused: boolean;
-    /** Fluid panels provide the playback state so paused rows do not keep a frame loop. */
+    /** Animated panels provide the playback state so paused rows do not keep a frame loop. */
     isPlaying?: boolean;
     playbackSyncKey?: number;
     glowDisabled?: boolean;

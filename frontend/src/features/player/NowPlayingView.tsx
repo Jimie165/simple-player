@@ -1,88 +1,261 @@
-import { useState, useEffect } from 'react';
-import clsx from 'clsx';
-import { MdMusicNote } from 'react-icons/md';
-import type { SongMetadata } from '@/types';
-import { resolveCover } from '@/utils/mediaPath';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
 import { useTheme } from '@/hooks/useTheme';
+import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
+import { PlayerBackground } from '@/features/player/now-playing/background/PlayerBackground';
+import NowPlayingTopBar from '@/features/player/now-playing/toolbar/NowPlayingTopBar';
+import {
+    NowPlayingNarrowPanelLayout,
+    NowPlayingStandardLayout,
+} from '@/features/player/now-playing/layouts/NowPlayingLayouts';
+import { useNowPlayingPanels } from '@/features/player/now-playing/hooks/useNowPlayingPanels';
+import { useCoverBackground } from '@/features/player/now-playing/hooks/useCoverBackground';
+import { useImmersiveFullscreen } from '@/features/player/now-playing/hooks/useImmersiveFullscreen';
+import { useImmersivePlaybackControls } from '@/features/player/now-playing/hooks/useImmersivePlaybackControls';
+import { useNarrowPanelControls } from '@/features/player/now-playing/hooks/useNarrowPanelControls';
+import { useLowFrequencyLevel } from '@/features/player/now-playing/hooks/useLowFrequencyLevel';
 
-interface NowPlayingViewProps {
-    metadata: SongMetadata | null;
-}
+export default function NowPlayingView({
+    onClose,
+    onOpened,
+    isOpen,
+    mainContentWidth,
+}: {
+    onClose: () => void;
+    onOpened: () => void;
+    isOpen: boolean;
+    mainContentWidth: number;
+}) {
+    const metadata = usePlayerStore(state => state.metadata);
+    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isShuffling = usePlayerStore(state => state.isShuffling);
+    const repeatMode = usePlayerStore(state => state.repeatMode);
+    const toggleRepeat = usePlayerStore(state => state.toggleRepeat);
+    const volume = usePlayerStore(state => state.volume);
+    const isQueueOpen = usePlayerStore(state => state.isQueueOpen);
+    const isLyricsOpen = usePlayerStore(state => state.isLyricsOpen);
+    const lyricsDocument = usePlayerStore(state => state.lyricsDocument);
+    const lyricsStatus = usePlayerStore(state => state.lyricsStatus);
+    const lyricsPath = usePlayerStore(state => state.lyricsPath);
+    const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
+    const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
 
-export default function NowPlayingView({ metadata }: NowPlayingViewProps) {
-    const { playerEffectMode } = useTheme();
+    const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
+    const push = useNavigationStore(state => state.push);
+    const { playNext, playPrev, seek, setVolume, togglePlayback, toggleShuffle } = usePlaybackActions();
+    const { playerEffectMode, reactiveBackgroundEnabled } = useTheme();
+    const lowFrequencyRef = useLowFrequencyLevel(
+        isOpen && isPlaying && playerEffectMode === 'animation' && reactiveBackgroundEnabled,
+    );
 
-    // Classic Mode Logic
-    const [coverUrl, setCoverUrl] = useState<string | null>(null);
+    const [marqueeResetToken, setMarqueeResetToken] = useState(0);
+    const isNarrowPanelLayout = mainContentWidth < 560 && (isQueueOpen || isLyricsOpen);
+    const coverScale = isPlaying ? 1 : 0.85;
+    const bgImageSrc = useCoverBackground(metadata);
+    const coverRef = useRef<HTMLDivElement>(null);
+    const coverShellRef = useRef<HTMLDivElement>(null);
+    const controlsRef = useRef<HTMLDivElement>(null);
+
+    const {
+        narrowControlsVisible,
+        narrowControlsRef,
+        revealNarrowControls,
+        handleNarrowPanelScroll,
+        handleNarrowActivity,
+        handleNarrowPointerMove,
+        handleNarrowControlsPointerEnter,
+        handleNarrowControlsPointerMove,
+        handleNarrowControlsPointerLeave,
+    } = useNarrowPanelControls({
+        isOpen,
+        isNarrowPanelLayout,
+        isQueueOpen,
+        isLyricsOpen,
+    });
+    const handleBeforeNarrowClose = useCallback(() => {
+        revealNarrowControls(false);
+    }, [revealNarrowControls]);
+
+    const {
+        queueMounted,
+        queueScrollToTopSignal,
+        lyricsMounted,
+        panelFlipTarget,
+        isPanelFlipping,
+        closingPanel,
+        handleToggleQueue,
+        handleToggleLyrics,
+    } = useNowPlayingPanels({
+        isOpen,
+        isQueueOpen,
+        isLyricsOpen,
+        lyricsStatus,
+        mainContentWidth,
+        isNarrowPanelLayout,
+        onBeforeNarrowClose: handleBeforeNarrowClose,
+    });
+
+    const {
+        displayVolume,
+        handleSeekChange,
+        handleSeekStart,
+        handleSeekEnd,
+        handleVolumeChange,
+        handleVolumeSeekStart,
+        handleVolumeSeekEnd,
+    } = useImmersivePlaybackControls({
+        volume,
+        setVolume,
+        setPlaybackTime,
+        seek,
+        onNarrowActivity: handleNarrowActivity,
+    });
+
+    const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
+    const handlePlayPrev = useCallback(() => {
+        void playPrev(usePlayerStore.getState().currentTime);
+    }, [playPrev]);
 
     useEffect(() => {
-        if (playerEffectMode !== 'performance') return;
+        if (!isOpen) return;
+        const frame = requestAnimationFrame(() => setMarqueeResetToken((v) => v + 1));
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen]);
 
-        let isMounted = true;
-        const loadCover = async () => {
-            if (!metadata) {
-                setCoverUrl(null);
-                return;
-            }
-            const url = await resolveCover(metadata);
-            if (isMounted) {
-                setCoverUrl(url);
+    useEffect(() => {
+        if (metadata?.path && metadata.path !== lyricsPath) {
+            requestLyricsForPath(metadata.path);
+        }
+        if (!metadata?.path && lyricsPath !== null) {
+            requestLyricsForPath(undefined);
+        }
+    }, [metadata?.path, lyricsPath, requestLyricsForPath]);
+
+    useEffect(() => {
+        if (!isOpen || isNarrowPanelLayout) return;
+
+        let observer: ResizeObserver | null = null;
+        const updateWidth = () => {
+            if (coverShellRef.current && controlsRef.current) {
+                const width = coverShellRef.current.getBoundingClientRect().width;
+                controlsRef.current.style.width = `${width}px`;
             }
         };
 
-        loadCover();
-        return () => { isMounted = false; };
-    }, [metadata, playerEffectMode]);
+        const timer = setTimeout(() => {
+            if (!coverShellRef.current || !controlsRef.current) return;
+            updateWidth();
+            observer = new ResizeObserver(() => {
+                requestAnimationFrame(updateWidth);
+            });
+            observer.observe(coverShellRef.current);
+            window.addEventListener('resize', updateWidth);
+        }, 0);
 
+        return () => {
+            clearTimeout(timer);
+            if (observer) observer.disconnect();
+            window.removeEventListener('resize', updateWidth);
+        };
+    }, [isOpen, isNarrowPanelLayout]);
 
-    if (playerEffectMode === 'animation') {
-        return null;
-    }
-
-    const hasCover = !!coverUrl;
+    const layoutProps = {
+        metadata,
+        bgImageSrc,
+        coverScale,
+        isPlaying,
+        isShuffling,
+        toggleShuffle,
+        playPrev: handlePlayPrev,
+        togglePlay: () => void togglePlayback(),
+        playNext,
+        toggleRepeat,
+        repeatMode,
+        handleSeekChange,
+        handleSeekStart,
+        handleSeekEnd,
+        localVolume: displayVolume,
+        handleVolumeChange,
+        handleVolumeSeekStart,
+        handleVolumeSeekEnd,
+        marqueeResetToken,
+        onClose,
+        push,
+        toggleFavorite,
+        isQueueOpen,
+        isLyricsOpen,
+        queueMounted,
+        lyricsMounted,
+        panelFlipTarget,
+        isPanelFlipping,
+        queueScrollToTopSignal,
+        lyricsDocument,
+        lyricsPath,
+        lyricsStatus,
+        seek,
+        handleToggleLyrics,
+        handleToggleQueue,
+    };
 
     return (
-        <div className="relative flex-1 w-full h-full overflow-hidden bg-white dark:bg-[#121212]">
-            {/* ... Classic View Content ... */}
-            {/* 顶部拖动区域 */}
-            <div
-                data-tauri-drag-region
-                className="absolute top-0 left-0 right-0 h-14 z-50"
+        <motion.div
+            initial={{ opacity: 0, y: '100%' }}
+            animate={{
+                opacity: isOpen ? 1 : 0,
+                y: isOpen ? 0 : '100%',
+                pointerEvents: isOpen ? 'auto' : 'none'
+            }}
+            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+            onAnimationComplete={() => {
+                if (isOpen) onOpened();
+            }}
+            style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
+            className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
+            onPointerDown={handleNarrowPointerMove}
+            onPointerMove={handleNarrowPointerMove}
+        >
+            <PlayerBackground
+                src={bgImageSrc}
+                active={isOpen}
+                variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'}
+                lowFrequencyRef={lowFrequencyRef}
             />
 
-            {/* 背景层 */}
-            <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-                {hasCover ? (
-                    <div className="absolute inset-0 scale-105">
-                        <img
-                            src={coverUrl!}
-                            alt="Background"
-                            className="w-full h-full object-cover blur-[60px] opacity-60 dark:opacity-40 transition-all duration-700"
-                        />
-                        <div className="absolute inset-0 bg-linear-to-t from-white/80 via-transparent to-white/30 dark:from-[#121212] dark:via-transparent dark:to-black/20" />
-                    </div>
-                ) : (
-                    <div className="w-full h-full bg-neutral-100 dark:bg-[#1c1c1c]" />
-                )}
-            </div>
+            <NowPlayingTopBar
+                isFullscreen={isFullscreen}
+                onClose={onClose}
+                toggleFullscreen={toggleFullscreen}
+            />
 
-            {/* 内容层 */}
-            <div className="absolute inset-0 z-10 flex items-end p-8 pb-12 sm:p-12 sm:pb-16">
-                <div className="relative group animate-in fade-in slide-in-from-bottom-12 zoom-in-95 duration-700 ease-out">
-                    <div className={clsx(
-                        "relative aspect-square rounded-lg shadow-2xl overflow-hidden",
-                        "w-48 sm:w-64 md:w-80 lg:w-96",
-                        "bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center"
-                    )}>
-                        {hasCover ? (
-                            <img src={coverUrl!} alt="Album Art" className="w-full h-full object-cover" />
-                        ) : (
-                            <MdMusicNote className="text-6xl text-neutral-400" />
-                        )}
-                    </div>
-                </div>
+            <div className="relative flex-1 min-h-0 w-full overflow-hidden">
+                <AnimatePresence initial={false}>
+                    {isNarrowPanelLayout ? (
+                        <NowPlayingNarrowPanelLayout
+                            {...layoutProps}
+                            closingPanel={closingPanel}
+                            narrowControlsVisible={narrowControlsVisible}
+                            narrowControlsRef={narrowControlsRef}
+                            handleNarrowPanelScroll={handleNarrowPanelScroll}
+                            handleNarrowControlsPointerEnter={handleNarrowControlsPointerEnter}
+                            handleNarrowControlsPointerMove={handleNarrowControlsPointerMove}
+                            handleNarrowControlsPointerLeave={handleNarrowControlsPointerLeave}
+                        />
+                    ) : (
+                        <NowPlayingStandardLayout
+                            {...layoutProps}
+                            mainContentWidth={mainContentWidth}
+                            coverRef={coverRef}
+                            coverShellRef={coverShellRef}
+                            controlsRef={controlsRef}
+                        />
+                    )}
+                </AnimatePresence>
             </div>
-        </div>
+        </motion.div>
     );
 }

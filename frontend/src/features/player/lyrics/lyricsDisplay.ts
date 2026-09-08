@@ -460,7 +460,7 @@ export function getActiveLyricsState(
 }
 
 
-export function buildFluidLyricsRenderBoundaries(
+export function buildAnimatedLyricsRenderBoundaries(
     displayItems: DisplayItem[],
     lines: LyricsLine[],
     timingStrategy?: LyricsTimingStrategy,
@@ -530,7 +530,7 @@ export function buildFluidLyricsRenderBoundaries(
     return [...boundaries].sort((left, right) => left - right);
 }
 
-export function getFluidLyricsRenderKey(boundaries: number[], currentMs: number) {
+export function getAnimatedLyricsRenderKey(boundaries: number[], currentMs: number) {
     let low = 0;
     let high = boundaries.length;
     while (low < high) {

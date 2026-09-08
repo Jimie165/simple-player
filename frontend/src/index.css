@@ -486,7 +486,7 @@ body {
   );
 }
 
-.fluid-lyrics-row-shell {
+.animated-lyrics-row-shell {
   /* Keep transition properties on the persistent line wrapper.  The
      wrapper is spatially mounted, so this does not create layers for the
      entire document and avoids per-frame transition string writes. */

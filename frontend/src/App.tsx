@@ -18,7 +18,7 @@ import Library from '@/features/library/Library';
 import { VideoLibrary } from '@/features/videos/VideoLibrary';
 import Settings from '@/features/settings/Settings';
 import PlayerControl from '@/features/player/PlayerControl';
-import AppleMusicPlayer from '@/features/player/AppleMusicPlayer';
+import NowPlayingView from '@/features/player/NowPlayingView';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PageId } from '@/types/index';
@@ -296,7 +296,7 @@ function App() {
       />
       <EditableContextMenu />
 
-      <AppleMusicPlayer
+      <NowPlayingView
         isOpen={isFullScreen}
         onClose={() => void closeFullScreenPlayer()}
         onOpened={handleFullScreenPlayerOpened}

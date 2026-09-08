@@ -2,7 +2,7 @@ import clsx from 'clsx';
 import { memo, useEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
-import { getFluidLyricsRowVisualStyle } from '@/features/player/lyrics/fluidLyricsMotion';
+import { getAnimatedLyricsRowVisualStyle } from '@/features/player/lyrics/animatedLyricsMotion';
 
 interface LyricsLineItemProps {
     line: LyricsLine;
@@ -21,7 +21,7 @@ interface LyricsLineItemProps {
     isPlaying?: boolean;
     playbackSyncKey?: number;
     onSeek: (time: number) => void;
-    fluidMotion?: boolean;
+    animatedMotion?: boolean;
     motionDelay?: number;
     variant?: 'side' | 'narrow';
     isBackground?: boolean;
@@ -60,7 +60,7 @@ function LyricsLineItem({
     isPlaying,
     playbackSyncKey,
     onSeek,
-    fluidMotion = false,
+    animatedMotion = false,
     motionDelay = 0,
     variant,
     isBackground = false,
@@ -71,7 +71,7 @@ function LyricsLineItem({
     const interactionRef = useRef<HTMLDivElement | null>(null);
     const pressAnimationRef = useRef<Animation | null>(null);
     useEffect(() => () => pressAnimationRef.current?.cancel(), []);
-    const rowVisualStyle = getFluidLyricsRowVisualStyle({
+    const rowVisualStyle = getAnimatedLyricsRowVisualStyle({
         distanceFromActive,
         isActive,
         isUserScrolling,
@@ -92,7 +92,7 @@ function LyricsLineItem({
     const bgTextInactive = 'transition-opacity duration-[400ms] ease-in-out opacity-0';
     // 背景和声行：简单淡入淡出 + 从小变大（对齐间奏三点入场：
     // scale 从 0.8 放大 + 淡入同步 + origin-left，出现过程即逐渐变大）。
-    // 独立 scale 层避免与 animator 的 scale 层（data-fluid-lyrics-scale）冲突。
+    // 独立 scale 层避免与 animator 的 scale 层（data-animated-lyrics-scale）冲突。
     // 过渡节奏与文字透明度一致：active 类 delay 200ms（等撑开空隙腾出再放大淡入），
     // inactive 无 delay（缩小淡出立即开始）。
     const bgScaleActive = 'transition-transform duration-[320ms] ease-in-out delay-[200ms] scale-100';
@@ -158,7 +158,7 @@ function LyricsLineItem({
         hasDuetLine && !isDuetRow ? 'pr-[15%]' : 'pr-[clamp(1.7rem,3vw,2.9rem)]'
     );
     // 动画模式已有行级虚拟化；挂载行必须提供真实高度，不能用旧尺寸占位参与重测。
-    const renderingIsolationStyle: CSSProperties = fluidMotion
+    const renderingIsolationStyle: CSSProperties = animatedMotion
         ? {
             contain: 'layout style paint',
             backfaceVisibility: 'hidden',
@@ -173,9 +173,9 @@ function LyricsLineItem({
     const rowTransformOrigin = isDuetRow ? 'right center' : 'left center';
     const content = (
         <div
-            data-fluid-lyrics-scale={fluidMotion ? '' : undefined}
+            data-animated-lyrics-scale={animatedMotion ? '' : undefined}
             className="lyrics-line-scale-layer"
-            style={fluidMotion ? {
+            style={animatedMotion ? {
                 transformOrigin: rowTransformOrigin,
                 backfaceVisibility: 'hidden',
             } : {
@@ -248,7 +248,7 @@ function LyricsLineItem({
     );
 
     // 背景和声行：独立层承载从小变大过渡（配合文字淡入淡出），
-    // 对齐间奏 origin-left，不与 animator 的 scale 层（data-fluid-lyrics-scale）冲突
+    // 对齐间奏 origin-left，不与 animator 的 scale 层（data-animated-lyrics-scale）冲突
     const renderedContent = isBackground ? (
         <div
             className={clsx(
@@ -271,7 +271,7 @@ function LyricsLineItem({
         </div>
     );
 
-    if (fluidMotion) {
+    if (animatedMotion) {
         return (
             <button
                 ref={rowRef}
@@ -316,8 +316,8 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.isKaraokeActive === next.isKaraokeActive &&
     prev.isUserScrolling === next.isUserScrolling &&
     prev.pausedScroll === next.pausedScroll &&
-    (prev.fluidMotion && next.fluidMotion || prev.distanceFromActive === next.distanceFromActive) &&
-    (prev.fluidMotion && next.fluidMotion || prev.interludeShift === next.interludeShift) &&
+    (prev.animatedMotion && next.animatedMotion || prev.distanceFromActive === next.distanceFromActive) &&
+    (prev.animatedMotion && next.animatedMotion || prev.interludeShift === next.interludeShift) &&
     prev.interludeShiftDurationMs === next.interludeShiftDurationMs &&
     prev.lineEndMs === next.lineEndMs &&
     prev.nextLineStartMs === next.nextLineStartMs &&
@@ -326,10 +326,10 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.isPlaying === next.isPlaying &&
     prev.playbackSyncKey === next.playbackSyncKey &&
     prev.onSeek === next.onSeek &&
-    prev.fluidMotion === next.fluidMotion &&
+    prev.animatedMotion === next.animatedMotion &&
     (
-        prev.fluidMotion &&
-        next.fluidMotion &&
+        prev.animatedMotion &&
+        next.animatedMotion &&
         (prev.line.words?.length ?? 0) > 0
         || prev.motionDelay === next.motionDelay
     ) &&

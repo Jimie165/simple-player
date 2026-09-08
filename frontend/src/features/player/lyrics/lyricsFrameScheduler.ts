@@ -273,6 +273,6 @@ export const useLyricsFrameScheduler = () => useContext(LyricsFrameSchedulerCont
 
 /**
  * Returns the panel-owned content registry. A null value is intentional:
- * non-fluid lyrics keep their existing standalone rendering path.
+ * non-animated lyrics keep their existing standalone rendering path.
  */
 export const useLyricsFrameTaskRegistry = () => useContext(LyricsFrameTaskRegistryContext);
