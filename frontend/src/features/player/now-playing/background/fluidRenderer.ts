@@ -52,12 +52,15 @@ void main() {
 
     color *= u_colorScale;
 
+    // 使用显示空间亮度平滑保护暗部，避免暗角把深色边缘继续压黑。
+    float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
+    float highlightWeight = smoothstep(0.18, 0.65, brightness);
+    float edgeWeight = smoothstep(0.3, 0.8, distance(v_uv, vec2(0.5)));
+    color *= 1.0 - 0.4 * edgeWeight * highlightWeight;
+
     float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
     color += vec3(dither);
 
-    float distanceFromCenter = distance(v_uv, vec2(0.5));
-    float vignette = smoothstep(0.8, 0.3, distanceFromCenter);
-    color *= 0.6 + vignette * 0.4;
     gl_FragColor = vec4(color, 1.0);
 }
 `;
