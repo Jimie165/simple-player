@@ -3,29 +3,35 @@ import { memo, useEffect, useRef } from 'react';
 import type { RefObject } from 'react';
 
 import type { LowFrequencyFrame } from '@/features/player/now-playing/background/audioResponse';
-import { BlurredCoverBackground } from '@/features/player/now-playing/background/BlurredCoverBackground';
 import { FluidRenderer } from '@/features/player/now-playing/background/fluidRenderer';
+import { IsolationRenderer } from '@/features/player/now-playing/background/isolationRenderer';
 
-function FluidCanvas({
+type BackgroundRenderer = FluidRenderer | IsolationRenderer;
+
+function BackgroundCanvas({
     src,
     active,
+    variant,
     lowFrequencyRef,
 }: {
     src: string;
     active: boolean;
+    variant: 'fluid' | 'isolation';
     lowFrequencyRef?: RefObject<LowFrequencyFrame>;
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const rendererRef = useRef<FluidRenderer | null>(null);
+    const rendererRef = useRef<BackgroundRenderer | null>(null);
 
     useEffect(() => {
         const canvas = canvasRef.current;
         if (!canvas) return;
-        let renderer: FluidRenderer;
+        let renderer: BackgroundRenderer;
         try {
-            renderer = new FluidRenderer(canvas, lowFrequencyRef);
+            renderer = variant === 'fluid'
+                ? new FluidRenderer(canvas, lowFrequencyRef)
+                : new IsolationRenderer(canvas);
         } catch (error) {
-            console.error('网格背景初始化失败', error);
+            console.error(`${variant === 'fluid' ? '网格' : 'Isolation'}背景初始化失败`, error);
             return;
         }
         rendererRef.current = renderer;
@@ -39,7 +45,7 @@ function FluidCanvas({
             renderer.dispose();
             rendererRef.current = null;
         };
-    }, [lowFrequencyRef]);
+    }, [lowFrequencyRef, variant]);
 
     useEffect(() => {
         void rendererRef.current?.setArtwork(src);
@@ -59,38 +65,29 @@ export const PlayerBackground = memo(({
     lowFrequencyRef,
 }: {
     src: string | null;
-    variant?: 'fluid' | 'blurred';
+    variant?: 'fluid' | 'isolation';
     active?: boolean;
     lowFrequencyRef?: RefObject<LowFrequencyFrame>;
 }) => (
     <div className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden bg-[#777a7c]">
-        {variant === 'fluid' ? (
-            <AnimatePresence mode="popLayout">
-                {src && (
-                    <motion.div
-                        key="fluid-background"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 1.2, ease: 'easeInOut' }}
-                        className="absolute inset-0"
-                    >
-                        <FluidCanvas
-                            src={src}
-                            active={active}
-                            lowFrequencyRef={lowFrequencyRef}
-                        />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        ) : (
-            <BlurredCoverBackground src={src} />
-        )}
-        {variant === 'blurred' && (
-            <>
-                <div className="absolute inset-0 z-10 bg-white/0.06" />
-                <div className="absolute inset-0 z-10 bg-[radial-gradient(circle_at_center,transparent_48%,rgba(12,15,18,0.12)_100%)]" />
-            </>
-        )}
+        <AnimatePresence mode="popLayout">
+            {src && (
+                <motion.div
+                    key={`${variant}-background`}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 1.2, ease: 'easeInOut' }}
+                    className="absolute inset-0"
+                >
+                    <BackgroundCanvas
+                        src={src}
+                        active={active}
+                        variant={variant}
+                        lowFrequencyRef={lowFrequencyRef}
+                    />
+                </motion.div>
+            )}
+        </AnimatePresence>
     </div>
 ));

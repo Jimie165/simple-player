@@ -222,7 +222,7 @@ export default function NowPlayingView({
             <PlayerBackground
                 src={bgImageSrc}
                 active={isOpen}
-                variant={playerEffectMode === 'animation' ? 'fluid' : 'blurred'}
+                variant={playerEffectMode === 'animation' ? 'fluid' : 'isolation'}
                 lowFrequencyRef={lowFrequencyRef}
             />
 
