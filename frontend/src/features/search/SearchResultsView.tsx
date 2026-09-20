@@ -26,7 +26,9 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const mainContentWidth = useMainContentWidth();
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [completedQuery, setCompletedQuery] = useState<string | null>(null);
+    // 防抖等待也属于加载阶段，只有当前关键词的请求结束后才展示结果或空态。
+    const loading = Boolean(query.trim()) && completedQuery !== query;
     const [error, setError] = useState<string | null>(null);
 
     // Player controls
@@ -39,6 +41,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
 
     useEffect(() => {
         let isCancelled = false;
+        setCompletedQuery(null);
 
         const performSearch = async () => {
             if (!query.trim()) {
@@ -48,7 +51,6 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 return;
             }
 
-            setLoading(true);
             setError(null);
 
             try {
@@ -68,7 +70,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                 }
             } finally {
                 if (!isCancelled) {
-                    setLoading(false);
+                    setCompletedQuery(query);
                 }
             }
         };
