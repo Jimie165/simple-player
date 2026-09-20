@@ -161,7 +161,11 @@ function prepareKaraokeCharRuntime(
     const longToneAmount = smoothstep(longToneRaw);
     const isLongTone = charItem.groupDurationMs > 800;
     const glowToneAmount = isLongTone
-        ? 0.3 + longToneAmount * 0.6
+        ? Math.min(
+            0.8,
+            getDurationEmphasisAmount(Math.max(1000, charItem.groupDurationMs), 3000) *
+            0.5 * (isLastWord ? 1.5 : 1)
+        )
         : 0;
     const charCount = Math.max(1, charItem.activeCharCountInWord);
     const charIndex = Math.max(0, charItem.activeCharIndexInWord);
@@ -242,13 +246,11 @@ function getKaraokeCharStyle(
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
     const translateY = regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
-    const glowReveal = isFillComplete
-        ? 1
-        : smoothstep(fillProgress);
 
     output.transform = `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`;
     output.fillStop = hasFillProgress || isFillComplete ? fillStop : -(fillEdgeWidth + 1);
-    output.glowAlpha = !isLongTone || glowDisabled ? 0 : glowPulse * glowReveal * 0.75;
+    // 辉光与缩放共用强调节奏，避免逐字填色把长音的辉光峰值推迟。
+    output.glowAlpha = !isLongTone || glowDisabled ? 0 : glowPulse;
     return output;
 }
 
@@ -810,7 +812,7 @@ function KaraokeTextBase({
                             {group.map(({ item: charItem, flatIndex }) => {
                                 const runtime = charRuntimes[flatIndex];
                                 if (!runtime) return null;
-                                const { isLongTone, longToneAmount, fillEdgeWidth } = runtime;
+                                const { isLongTone, longToneAmount, glowToneAmount, fillEdgeWidth } = runtime;
                                 const fillEdgeAlpha = fillAlpha >= 1
                                     ? 0.72 + longToneAmount * 0.2
                                     : fillAlpha;
@@ -830,6 +832,7 @@ function KaraokeTextBase({
                                         style={{
                                             '--kfe': fillEdgeWidth,
                                             '--kfem': fillEdgeMaskAlpha,
+                                            '--kgb': `${Math.min(0.3, glowToneAmount * 0.3)}em`,
                                         } as React.CSSProperties}
                                     >
                                         {charItem.char}

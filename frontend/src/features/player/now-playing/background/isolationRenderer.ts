@@ -136,15 +136,14 @@ void main() {
         mix(u_colors[2], u_colors[3], horizontal),
         1.0 - smoothstep(-0.3, 0.5, gradientPoint.y)
     );
+    // 在 OkLab 中仅压缩明度：L <= 0.6 不变，L = 1 平滑映射到 0.83。
+    // 二次曲线保持明度单调递增和起点斜率连续，避免高光层次反转或硬截断。
+    float highlightProgress = clamp((okLabColor.x - 0.6) / 0.4, 0.0, 1.0);
+    okLabColor.x -= 0.17 * highlightProgress * highlightProgress;
     vec3 color = okLabToSrgb(okLabColor);
 
-    float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
-    // 只压低 Isolation 的高亮区域，纯白最多降低 18%；暗色封面不受影响。
-    // 这也能处理暗角覆盖不到的画面中央，而不必恢复固定的全屏黑色遮罩。
-    float globalHighlightWeight = smoothstep(0.65, 0.95, brightness);
-    color *= 1.0 - 0.18 * globalHighlightWeight;
-
     // 与网格渐变保持相同的亮度自适应暗角：亮色边缘最多额外压暗 40%。
+    float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
     float highlightWeight = smoothstep(0.18, 0.65, brightness);
     float edgeWeight = smoothstep(0.3, 0.8, distance(uv, vec2(0.5)));
     color *= 1.0 - 0.4 * edgeWeight * highlightWeight;

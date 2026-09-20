@@ -438,7 +438,7 @@ body {
   transition: none;
   overflow: visible;
   color: rgba(255, 255, 255, var(--kb, 0.30));
-  text-shadow: 0 0 5px rgba(255, 255, 255, var(--kg, 0));
+  text-shadow: 0 0 var(--kgb, 5px) rgba(255, 255, 255, var(--kg, 0));
   
   /* 防止溢出排版盒的字符（如 j, g 等连笔部分）被遮罩切断。
      通过负 margin 保持布局不变，同时放大 padding box 给 mask 留出空间 */
