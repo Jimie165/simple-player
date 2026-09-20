@@ -183,6 +183,8 @@ export function NowPlayingNarrowPanelLayout({
                 }}
                 transition={{ duration: 0.22, ease: 'easeOut' }}
             >
+                {/* 覆盖控件间的空隙，阻止点击穿透；单独分层以保留控件与背景的混合。 */}
+                <div aria-hidden="true" className="absolute inset-0 z-20" />
                 <NowPlayingNarrowBottomControls
                     metadata={metadata}
                     handleSeekChange={handleSeekChange}
