@@ -563,3 +563,18 @@ body {
     transparent 100%
   );
 }
+
+/* Square cover actions share the same size, tint and icon proportions. */
+.cover-card-button {
+  @apply flex size-9 shrink-0 items-center justify-center rounded-full border-0 bg-white/25 text-white transition-colors duration-200 hover:bg-white/35 active:bg-white/20;
+}
+
+.cover-card-button > svg {
+  width: 20px;
+  height: 20px;
+}
+
+.cover-card-button > .cover-card-menu-icon {
+  width: 24px;
+  height: 24px;
+}

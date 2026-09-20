@@ -76,11 +76,11 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                 {/* Play Overlay & Context Menu Trigger */}
                 {!isSelectionMode && video.duration > 0 && (
                     <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <CardPlayButton onClick={() => onPlay(video)} />
+                        <CardPlayButton variant="cover" onClick={() => onPlay(video)} />
 
                         <SmartMusicContextMenu
                             className="absolute bottom-3 right-3"
-                            buttonClassName="w-10 h-10"
+                            variant="cover"
                             tooltipText="更多"
                             items={video}
                             context="video"

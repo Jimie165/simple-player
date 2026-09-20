@@ -70,7 +70,7 @@ export function NowPlayingNarrowHeader({
                 </OverflowMarquee>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 mix-blend-plus-lighter">
                 <button
                     onClick={() => {
                         if (metadata && typeof metadata.id === 'number') {
@@ -81,7 +81,7 @@ export function NowPlayingNarrowHeader({
                     aria-pressed={Boolean(metadata?.is_favorite)}
                     disabled={!metadata || typeof metadata.id !== 'number'}
                     className={clsx(
-                        'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center text-white mix-blend-plus-lighter',
+                        'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center text-white',
                         metadata && typeof metadata.id === 'number'
                             ? 'group/favorite cursor-pointer'
                             : 'opacity-30 cursor-default'

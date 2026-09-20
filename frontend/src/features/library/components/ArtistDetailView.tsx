@@ -274,13 +274,14 @@ export default function ArtistDetailView({
                                                                 <MdPerson className="text-6xl" />
                                                             </div>
                                                         )}
-                                                        <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                                             <CardPlayButton
+                                                                variant="cover"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     onPlayAlbum(album);
                                                                 }}
-                                                                className="static! inset-auto! translate-x-0! scale-125 hover:scale-[1.35]! active:scale-110!"
+                                                                className="static! inset-auto!"
                                                             />
                                                         </div>
                                                     </div>

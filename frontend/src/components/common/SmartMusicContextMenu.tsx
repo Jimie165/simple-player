@@ -9,7 +9,7 @@ interface SmartMusicContextMenuProps {
     playlistId?: number;
     className?: string;
     buttonClassName?: string;
-    variant?: 'glass' | 'clean';
+    variant?: 'glass' | 'clean' | 'cover';
     tooltipText?: string;
     onOpen?: () => void;
     suppressCloseEvent?: boolean;

@@ -59,7 +59,7 @@ export function FavoritesCardMenu({
     return (
         <MusicContextMenu
             className="absolute bottom-3 right-3"
-            buttonClassName="w-10 h-10"
+            variant="cover"
             tooltipText="更多"
             groups={menuItems}
             onOpen={() => {
@@ -114,7 +114,7 @@ export function PlaylistCardMenu({
     return (
         <MusicContextMenu
             className="absolute bottom-3 right-3"
-            buttonClassName="w-10 h-10"
+            variant="cover"
             tooltipText="更多"
             groups={menuItems}
             onOpen={() => {

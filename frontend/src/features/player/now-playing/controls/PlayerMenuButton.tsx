@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import { IoEllipsisHorizontal } from 'react-icons/io5';
 
 import type { SongMetadata } from '@/types';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
@@ -23,9 +22,16 @@ export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata
         <MusicContextMenu
             groups={filteredGroups}
             variant="clean"
-            buttonClassName="w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] rounded-full bg-white/10 ring-1 ring-white/10 hover:bg-white/20 flex items-center justify-center transition-all backdrop-blur-md text-white/50 hover:text-white"
+            buttonClassName="group/player-menu w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center hover:opacity-100!"
         >
-            <IoEllipsisHorizontal className="w-[60%] h-[60%]" />
+            <svg viewBox="0 0 60 60" className="block w-full h-full shrink-0 overflow-visible text-white" fill="currentColor" aria-hidden="true">
+                <circle cx="30" cy="30" r="30" className="opacity-10 group-hover/player-menu:opacity-20" />
+                <g className="opacity-80">
+                    <circle cx="18" cy="30" r="3.5" />
+                    <circle cx="30" cy="30" r="3.5" />
+                    <circle cx="42" cy="30" r="3.5" />
+                </g>
+            </svg>
         </MusicContextMenu>
     );
 }

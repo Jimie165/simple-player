@@ -45,7 +45,7 @@ export interface MusicContextMenuProps extends Partial<MusicMenuOptions> {
     groups?: MenuItemData[][];
     className?: string; // Wrapper class configuration
     buttonClassName?: string; // Button class configuration
-    variant?: 'glass' | 'clean'; // Visual variant
+    variant?: 'glass' | 'clean' | 'cover'; // Visual variant
     onOpen?: () => void; // Callback when menu is opened
     suppressCloseEvent?: boolean; // Prevent dispatching global close event on open
     tooltipText?: string; // Optional trigger tooltip
@@ -301,6 +301,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; origin: string } | null>(null);
 
     const getButtonClass = () => {
+        if (variant === 'cover') return `cover-card-button z-20 ${buttonClassName || ''}`;
         const baseClass = `flex items-center justify-center transition-colors z-20 ${buttonClassName || 'w-8 h-8'}`;
         if (variant === 'clean') {
             return `${baseClass} text-primary dark:text-primary-light hover:opacity-80`;
@@ -377,7 +378,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 e.stopPropagation();
                             }}
                         >
-                            {props.children || <MdMoreHoriz />}
+                            {props.children || <MdMoreHoriz className={variant === 'cover' ? 'cover-card-menu-icon' : undefined} />}
                         </MenuButton>
                     );
 

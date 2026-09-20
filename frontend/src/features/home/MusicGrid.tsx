@@ -205,10 +205,10 @@ export default function MusicGrid() {
 
                                         {!isSelectionMode && (
                                             <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <CardPlayButton onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
+                                                <CardPlayButton variant="cover" onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
                                                 <SmartMusicContextMenu
                                                     className="absolute bottom-3 right-3"
-                                                    buttonClassName="w-10 h-10"
+                                                    variant="cover"
                                                     tooltipText="更多"
                                                     items={item}
                                                     context="recent"

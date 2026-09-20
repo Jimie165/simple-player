@@ -1,7 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
-import { MdCheckBox, MdCheckBoxOutlineBlank, MdPlayArrow } from 'react-icons/md';
+import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
 import { Virtuoso } from 'react-virtuoso';
 
+import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import type { SongMetadata } from '@/types';
@@ -141,24 +142,16 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
 
                     {!isSelectionMode && (
                         <div className="absolute inset-0 z-20 pointer-events-none">
-                            <div className="absolute bottom-1 left-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity">
-                                <CustomTooltip text="播放">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            onPlayArtist(artist);
-                                        }}
-                                        aria-label="播放"
-                                        className="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-lg text-white hover:bg-white/30 hover:scale-105 transition-all"
-                                    >
-                                        <MdPlayArrow className="translate-x-0.5 text-xl" />
-                                    </button>
-                                </CustomTooltip>
-                            </div>
+                            <CardPlayButton
+                                variant="cover"
+                                onClick={() => onPlayArtist(artist)}
+                                className="bottom-[4%]! left-[4.5%]! z-30! invisible group-hover:visible pointer-events-auto [&_button]:backdrop-blur-md"
+                            />
 
                             <SmartMusicContextMenu
-                                className="absolute bottom-1 right-1 z-30 opacity-0 group-hover:opacity-100 pointer-events-auto transition-opacity"
-                                buttonClassName="w-10 h-10"
+                                className="absolute bottom-[4%] right-[4.5%] z-30 invisible group-hover:visible pointer-events-auto"
+                                variant="cover"
+                                buttonClassName="backdrop-blur-md"
                                 tooltipText="更多"
                                 items={artist}
                                 context="library"
