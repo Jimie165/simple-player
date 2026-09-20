@@ -1,11 +1,7 @@
 import clsx from 'clsx';
+import NowPlayingTransportIcon from '@/features/player/now-playing/controls/NowPlayingTransportIcon';
+import NowPlayingToggleIcon from '@/features/player/now-playing/controls/NowPlayingToggleIcon';
 import {
-    IoPause,
-    IoPlay,
-    IoPlayBack,
-    IoPlayForward,
-    IoRepeat,
-    IoShuffle,
     IoVolumeHigh,
     IoVolumeLow,
     IoVolumeMedium,
@@ -52,59 +48,52 @@ export function NowPlayingNarrowBottomControls({
 >) {
     return (
         <div className="flex flex-col gap-6">
-            <NowPlayingProgress
-                metadata={metadata}
-                onChange={handleSeekChange}
-                onMouseDown={handleSeekStart}
-                onMouseUp={handleSeekEnd}
-                variant="narrow"
-            />
+            <div className="relative z-30 mix-blend-plus-lighter">
+                <NowPlayingProgress
+                    metadata={metadata}
+                    onChange={handleSeekChange}
+                    onMouseDown={handleSeekStart}
+                    onMouseUp={handleSeekEnd}
+                    variant="narrow"
+                />
+            </div>
 
             <div className="flex items-center justify-between w-full">
                 <button
                     onClick={toggleShuffle}
                     className={clsx(
-                        'w-10 h-10 shrink-0 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10',
-                        isShuffling ? 'text-primary' : 'text-white/50 hover:text-white'
+                        'relative z-30 w-10 h-10 shrink-0 flex items-center justify-center rounded-lg transition-opacity text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
-                    <IoShuffle className="w-5 h-5" />
+                    <NowPlayingToggleIcon selected={isShuffling} icon="shuffle" />
                 </button>
 
-                <button onClick={playPrev} className="w-12 h-12 shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
-                    <IoPlayBack className="w-9 h-9" />
+                <button onClick={playPrev} className="relative z-30 w-12 h-12 shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
+                    <NowPlayingTransportIcon icon="previous" className="w-9 h-9" />
                 </button>
 
                 <button
                     onClick={togglePlay}
-                    className="shrink-0 w-16 h-16 rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
+                    className="relative z-30 shrink-0 w-16 h-16 rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
                 >
-                    {isPlaying ? <IoPause className="w-12 h-12" /> : <IoPlay className="w-12 h-12 ml-1" />}
+                    <NowPlayingTransportIcon icon={isPlaying ? 'pause' : 'play'} className={clsx('w-12 h-12', !isPlaying && 'ml-1')} />
                 </button>
 
-                <button onClick={playNext} className="w-12 h-12 shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
-                    <IoPlayForward className="w-9 h-9" />
+                <button onClick={playNext} className="relative z-30 w-12 h-12 shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
+                    <NowPlayingTransportIcon icon="next" className="w-9 h-9" />
                 </button>
 
                 <button
                     onClick={toggleRepeat}
                     className={clsx(
-                        'w-10 h-10 shrink-0 flex items-center justify-center rounded-lg transition-colors relative hover:bg-white/10',
-                        repeatMode !== 'off' ? 'text-primary' : 'text-white/50 hover:text-white'
+                        'z-30 w-10 h-10 shrink-0 flex items-center justify-center rounded-lg transition-opacity relative text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
-                    {repeatMode === 'one' ? (
-                        <div className="relative w-full h-full flex items-center justify-center">
-                            <IoRepeat className="w-5 h-5" />
-                            <span className="absolute top-1 right-1 text-[8px] font-bold">1</span>
-                        </div>
-                    ) : (
-                        <IoRepeat className="w-5 h-5" />
-                    )}
+                    <NowPlayingToggleIcon selected={repeatMode !== 'off'} icon="repeat" repeatOne={repeatMode === 'one'} />
                 </button>
             </div>
 
-            <div className="flex items-center gap-4 px-1 mt-1">
+            <div className="relative z-30 flex items-center gap-4 px-1 mt-1 mix-blend-plus-lighter">
                 {(() => {
                     if (localVolume === 0) return <IoVolumeOff className="text-white/50 text-sm" />;
                     if (localVolume <= 33) return <IoVolumeLow className="text-white/50 text-sm" />;

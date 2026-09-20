@@ -1,17 +1,12 @@
+import NowPlayingStarIcon from '@/features/player/now-playing/controls/NowPlayingStarIcon';
 import clsx from 'clsx';
+import NowPlayingTransportIcon from '@/features/player/now-playing/controls/NowPlayingTransportIcon';
+import NowPlayingToggleIcon from '@/features/player/now-playing/controls/NowPlayingToggleIcon';
 import {
-    IoPlay,
-    IoPause,
-    IoShuffle,
-    IoRepeat,
     IoVolumeOff,
     IoVolumeLow,
     IoVolumeMedium,
     IoVolumeHigh,
-    IoStar,
-    IoStarOutline,
-    IoPlayBack,
-    IoPlayForward,
 } from 'react-icons/io5';
 import MusicSlider from '@/components/common/MusicSlider';
 import { PlayerMenuWrapper } from '@/features/player/now-playing/controls/PlayerMenuButton';
@@ -55,12 +50,13 @@ export default function NowPlayingControlsSection({
             className="flex flex-col gap-2 shrink-0 transition-[width] duration-0 ease-linear"
             style={{ width: '100%' }}
         >
+            {/* 文字采用普通合成，避免加亮混合抬高字缘亮度、损失笔画细节。 */}
             <div className="flex items-center justify-between px-0.5 mt-2">
                 <div className="flex flex-col min-w-0 pr-4 w-[75%]">
                     <OverflowMarquee
                         resetToken={`title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
                         behavior="auto-then-hover"
-                        className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white drop-shadow-md leading-tight"
+                        className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white leading-tight"
                     >
                         <h1 className="whitespace-nowrap">
                             {metadata?.title || '未播放音乐'}
@@ -109,29 +105,31 @@ export default function NowPlayingControlsSection({
                         )}
                     </OverflowMarquee>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 mix-blend-plus-lighter">
                     <button
                         onClick={() => {
                             if (metadata && typeof metadata.id === 'number') {
                                 toggleFavorite(metadata);
                             }
                         }}
+                        aria-label={metadata?.is_favorite ? '取消收藏' : '收藏'}
+                        aria-pressed={Boolean(metadata?.is_favorite)}
                         disabled={!metadata || typeof metadata.id !== 'number'}
                         className={clsx(
-                            'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center transition-all backdrop-blur-md',
+                            'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center text-white',
                             metadata && typeof metadata.id === 'number'
-                                ? 'bg-white/10 ring-1 ring-white/10 hover:bg-white/20 text-white/50 hover:text-red-500 cursor-pointer'
-                                : 'bg-white/5 ring-1 ring-white/5 text-white/20 cursor-default'
+                                ? 'group/favorite cursor-pointer'
+                                : 'opacity-30 cursor-default'
                         )}
                     >
-                        {metadata?.is_favorite ? <IoStar className="w-[60%] h-[60%] text-red-500" /> : <IoStarOutline className="w-[60%] h-[60%]" />}
+                        <NowPlayingStarIcon selected={Boolean(metadata?.is_favorite)} />
                     </button>
 
                     <PlayerMenuWrapper metadata={metadata} onClose={onClose} />
                 </div>
             </div>
 
-            <div className="mt-2">
+            <div className="mt-2 mix-blend-plus-lighter">
                 <NowPlayingProgress
                     metadata={metadata}
                     onChange={handleSeekChange}
@@ -145,47 +143,38 @@ export default function NowPlayingControlsSection({
                 <button
                     onClick={toggleShuffle}
                     className={clsx(
-                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-colors hover:bg-white/10',
-                        isShuffling ? 'text-primary' : 'text-white/40 hover:text-white'
+                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-opacity text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
-                    <IoShuffle className="w-[60%] h-[60%]" />
+                    <NowPlayingToggleIcon selected={isShuffling} icon="shuffle" />
                 </button>
 
                 <button onClick={playPrev} className="w-[13.5%] shrink-0 aspect-square max-w-12 flex items-center justify-center text-white hover:scale-105 transition-all">
-                    <IoPlayBack className="w-[70%] h-[70%]" />
+                    <NowPlayingTransportIcon icon="previous" className="w-[70%] h-[70%]" />
                 </button>
 
                 <button
                     onClick={togglePlay}
                     className="shrink-0 w-[18%] max-w-16 aspect-square rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
                 >
-                    {isPlaying ? <IoPause className="w-[75%] h-[75%]" /> : <IoPlay className="w-[75%] h-[75%] ml-[4%]" />}
+                    <NowPlayingTransportIcon icon={isPlaying ? 'pause' : 'play'} className={clsx('w-[75%] h-[75%]', !isPlaying && 'ml-[4%]')} />
                 </button>
 
                 <button onClick={playNext} className="w-[13.5%] shrink-0 aspect-square max-w-12 flex items-center justify-center text-white hover:scale-105 transition-all">
-                    <IoPlayForward className="w-[70%] h-[70%]" />
+                    <NowPlayingTransportIcon icon="next" className="w-[70%] h-[70%]" />
                 </button>
 
                 <button
                     onClick={toggleRepeat}
                     className={clsx(
-                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-colors relative hover:bg-white/10',
-                        repeatMode !== 'off' ? 'text-primary' : 'text-white/40 hover:text-white'
+                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-opacity relative text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
-                    {repeatMode === 'one' ? (
-                        <div className="relative w-full h-full flex items-center justify-center">
-                            <IoRepeat className="w-[60%] h-[60%]" />
-                            <span className="absolute top-[18%] right-[18%] text-[8px] font-bold">1</span>
-                        </div>
-                    ) : (
-                        <IoRepeat className="w-[60%] h-[60%]" />
-                    )}
+                    <NowPlayingToggleIcon selected={repeatMode !== 'off'} icon="repeat" repeatOne={repeatMode === 'one'} />
                 </button>
             </div>
 
-            <div className="flex items-center gap-3 mt-6 px-1">
+            <div className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
                 {(() => {
                     if (localVolume === 0) return <IoVolumeOff className="text-white/40 text-xs" />;
                     if (localVolume <= 33) return <IoVolumeLow className="text-white/40 text-xs" />;

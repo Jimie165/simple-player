@@ -1,5 +1,5 @@
+import NowPlayingStarIcon from '@/features/player/now-playing/controls/NowPlayingStarIcon';
 import clsx from 'clsx';
-import { IoStar, IoStarOutline } from 'react-icons/io5';
 import OverflowMarquee from '@/components/common/OverflowMarquee';
 import { PlayerMenuWrapper } from '@/features/player/now-playing/controls/PlayerMenuButton';
 import type { NowPlayingControlsSectionProps } from '@/features/player/now-playing/controls/NowPlayingControlTypes';
@@ -20,7 +20,7 @@ export function NowPlayingNarrowHeader({
                 <OverflowMarquee
                     resetToken={`narrow-title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
                     behavior="auto-then-hover"
-                    className="text-[clamp(0.85rem,3.8vw,1.1rem)] font-bold text-white drop-shadow-md leading-tight"
+                    className="text-[clamp(0.85rem,3.8vw,1.1rem)] font-bold text-white leading-tight"
                 >
                     <h1 className="whitespace-nowrap">
                         {metadata?.title || '未播放音乐'}
@@ -70,22 +70,24 @@ export function NowPlayingNarrowHeader({
                 </OverflowMarquee>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
                 <button
                     onClick={() => {
                         if (metadata && typeof metadata.id === 'number') {
                             toggleFavorite(metadata);
                         }
                     }}
+                    aria-label={metadata?.is_favorite ? '取消收藏' : '收藏'}
+                    aria-pressed={Boolean(metadata?.is_favorite)}
                     disabled={!metadata || typeof metadata.id !== 'number'}
                     className={clsx(
-                        'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] flex-shrink-0 rounded-full flex items-center justify-center transition-all backdrop-blur-md',
+                        'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center text-white mix-blend-plus-lighter',
                         metadata && typeof metadata.id === 'number'
-                            ? 'bg-white/12 ring-1 ring-white/10 hover:bg-white/20 text-white/60 hover:text-red-500 cursor-pointer'
-                            : 'bg-white/5 ring-1 ring-white/5 text-white/20 cursor-default'
+                            ? 'group/favorite cursor-pointer'
+                            : 'opacity-30 cursor-default'
                     )}
                 >
-                    {metadata?.is_favorite ? <IoStar className="w-[60%] h-[60%] text-red-500" /> : <IoStarOutline className="w-[60%] h-[60%]" />}
+                    <NowPlayingStarIcon selected={Boolean(metadata?.is_favorite)} />
                 </button>
                 <PlayerMenuWrapper metadata={metadata} onClose={onClose} />
             </div>

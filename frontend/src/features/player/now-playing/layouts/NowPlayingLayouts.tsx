@@ -104,6 +104,7 @@ export function NowPlayingNarrowPanelLayout({
     handleNarrowControlsPointerMove: () => void;
     handleNarrowControlsPointerLeave: () => void;
 }) {
+    // 布局包装层不建立独立堆叠上下文，让控制区直接与播放器背景混合。
     return (
         <motion.div
             key="narrow-panel-layout"
@@ -114,7 +115,7 @@ export function NowPlayingNarrowPanelLayout({
                 transition: { duration: closingPanel ? 0.35 : 0.2, ease: 'easeOut' },
             }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
-            className="absolute inset-0 z-20 flex flex-col px-5 pb-5"
+            className="absolute inset-0 flex flex-col px-5 pb-5"
         >
             <div className="flex items-center gap-3 shrink-0 pt-1 pb-2">
                 <NowPlayingCover
@@ -169,7 +170,7 @@ export function NowPlayingNarrowPanelLayout({
 
             <motion.div
                 ref={narrowControlsRef}
-                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] z-30 flex flex-col gap-4"
+                className="absolute left-[clamp(1rem,5vw,2rem)] right-[clamp(1rem,5vw,2rem)] flex flex-col gap-4"
                 style={{ bottom: 'calc(clamp(1rem, 5vw, 2rem) - 12px)' }}
                 onPointerEnter={handleNarrowControlsPointerEnter}
                 onPointerMove={handleNarrowControlsPointerMove}
@@ -200,7 +201,7 @@ export function NowPlayingNarrowPanelLayout({
                     handleVolumeSeekStart={handleVolumeSeekStart}
                     handleVolumeSeekEnd={handleVolumeSeekEnd}
                 />
-                <div className="flex items-center justify-end mt-2">
+                <div className="relative z-30 flex items-center justify-end mt-2 mix-blend-plus-lighter">
                     <div className="flex items-center gap-2">
                         <NowPlayingLyricsToggle
                             isLyricsOpen={isLyricsOpen}
@@ -264,6 +265,7 @@ export function NowPlayingStandardLayout({
     coverShellRef: RefObject<HTMLDivElement | null>;
     controlsRef: RefObject<HTMLDivElement | null>;
 }) {
+    // 布局包装层不建立独立堆叠上下文，让控制区直接与播放器背景混合。
     return (
         <motion.div
             key="standard-layout"
@@ -271,10 +273,10 @@ export function NowPlayingStandardLayout({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
-            className="absolute inset-0 z-20 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]"
+            className="absolute inset-0 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]"
         >
             <div className={clsx(
-                "relative z-20 flex flex-col items-center justify-center mr-auto",
+                "relative flex flex-col items-center justify-center mr-auto",
                 mainContentWidth < 560
                     ? "w-full px-[clamp(1rem,4vw,3rem)]"
                     : [
@@ -349,7 +351,7 @@ export function NowPlayingStandardLayout({
                 onSeek={seek}
             />
 
-            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)]">
+            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)] mix-blend-plus-lighter">
                 <NowPlayingLyricsToggle
                     isLyricsOpen={isLyricsOpen}
                     hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
