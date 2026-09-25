@@ -54,6 +54,25 @@ type WordMotionWindow = {
     endMs: number;
 };
 
+type WordFillPlan = {
+    startMs: number;
+    durationMs: number;
+    startPx: number;
+    endPx: number;
+    featherPx: number;
+    bridgeFromPrevious: boolean;
+    bridgeToNext: boolean;
+    chainIndex: number;
+    voiced: IndexedCharItem[];
+};
+
+type FillTimelineSegment = {
+    startMs: number;
+    endMs: number;
+    startPx: number;
+    endPx: number;
+};
+
 type KaraokeRuntimeState = {
     flatChars: FlatCharItem[];
     wordGroups: IndexedCharItem[][];
@@ -81,6 +100,8 @@ type KaraokeRuntimeState = {
 
 const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
+const regularLiftMinDurationMs = 1000;
+const longToneThresholdMs = 1000;
 const syllableLiftEm = 0.078;
 const restingCharTransform = 'translate(0, 0) scale(1)';
 const cjkLayoutCharPattern = /^[\p{Unified_Ideograph}ࠀ-鿼]+$/u;
@@ -161,9 +182,9 @@ function prepareKaraokeCharRuntime(
     charItem: FlatCharItem,
     isLastWord: boolean,
 ): KaraokeCharRuntime {
-    const longToneRaw = clamp01((charItem.groupDurationMs - 800) / 760);
+    const longToneRaw = clamp01((charItem.groupDurationMs - longToneThresholdMs) / 760);
     const longToneAmount = smoothstep(longToneRaw);
-    const isLongTone = charItem.groupDurationMs > 800;
+    const isLongTone = charItem.groupDurationMs > longToneThresholdMs;
     const glowToneAmount = isLongTone
         ? Math.min(
             0.8,
@@ -233,7 +254,7 @@ function getKaraokeCharStyle(
         : (wordFillHeadPx - runtime.fillLeftPx + runtime.fillPaddingPx) / runtime.fillMaskWidthPx * 100;
     const elapsedMs = timeMs - time_ms;
     const hasStarted = elapsedMs > 0;
-    const attackMs = Math.max(800, durationMs);
+    const attackMs = Math.max(regularLiftMinDurationMs, durationMs);
     const regularLift = hasStarted
         ? Math.sin(
             (clamp01(elapsedMs / attackMs) * Math.PI) / 2
@@ -275,12 +296,12 @@ function getWordMotionWindow(
     let endMs = Number.NEGATIVE_INFINITY;
 
     group.forEach(({ item }) => {
-        const liftEndMs = item.time_ms + Math.max(800, item.durationMs);
+        const liftEndMs = item.time_ms + Math.max(regularLiftMinDurationMs, item.durationMs);
         const progressionStartMs =
             item.groupStartMs - animationHeadstartMs;
         const progressionEndMs =
             item.groupStartMs + item.groupDurationMs;
-        const hasLongToneMotion = item.groupDurationMs > 800;
+        const hasLongToneMotion = item.groupDurationMs > longToneThresholdMs;
         const emphasisDurationMs = getEmphasisDurationMs(
             item.groupDurationMs,
             isLastWord
@@ -517,23 +538,25 @@ function KaraokeTextBase({
             });
         }
 
-        // Keep one spatial fill head per timed word. Character transforms still
-        // use their own clocks; only the mask edge crosses character boundaries.
-        const wordFillWidths = wordGroups.map(group => {
-            if (group.filter(({ item }) => !whitespaceLayoutCharPattern.test(item.char)).length < 2) return 0;
+        // Build one line-wide fill coordinate system. Motion keeps using the
+        // parsed character clocks, while fill uses unclamped word durations.
+        let lineWidth = 0;
+        const wordFillPlans: Array<WordFillPlan | null> = wordGroups.map((group, wordIndex) => {
+            const voiced = group.filter(({ item }) => !whitespaceLayoutCharPattern.test(item.char));
             const firstElement = charElements[group[0].flatIndex];
-            if (!firstElement) return 0;
+            if (!firstElement) return null;
             const fontSize = parseFloat(getComputedStyle(firstElement).fontSize);
-            if (!Number.isFinite(fontSize) || fontSize <= 0) return 0;
+            if (!Number.isFinite(fontSize) || fontSize <= 0) return null;
             let width = 0;
             group.forEach(({ flatIndex }) => {
                 const element = charElements[flatIndex];
                 const charRuntime = charRuntimes[flatIndex];
                 if (!element || !charRuntime) return;
                 const maskWidth = element.offsetWidth;
+                if (maskWidth <= 0) return;
                 const padding = fontSize * 0.1;
                 const advance = Math.max(1, maskWidth - padding * 2);
-                charRuntime.fillLeftPx = width;
+                charRuntime.fillLeftPx = lineWidth + width;
                 charRuntime.fillWidthPx = advance;
                 charRuntime.fillMaskWidthPx = maskWidth;
                 charRuntime.fillPaddingPx = padding;
@@ -541,7 +564,81 @@ function KaraokeTextBase({
                 element.style.setProperty('--kfe', String(featherPx / maskWidth * 100));
                 width += advance;
             });
-            return width;
+            lineWidth += width;
+            if (voiced.length === 0) return null;
+            const first = voiced[0];
+            const last = voiced[voiced.length - 1];
+            const firstRuntime = charRuntimes[first.flatIndex];
+            const lastRuntime = charRuntimes[last.flatIndex];
+            const word = words[wordIndex];
+            if (!firstRuntime?.fillWidthPx || !lastRuntime?.fillWidthPx || !word) return null;
+            const parsedEndMs = word.end_time_ms !== undefined
+                ? word.end_time_ms
+                : wordIndex + 1 < words.length
+                    ? words[wordIndex + 1].start_time_ms
+                    : lineEndMs ?? word.start_time_ms + 600;
+            const nextWordStartMs = words[wordIndex + 1]?.start_time_ms;
+            const fillEndMs = nextWordStartMs !== undefined && nextWordStartMs >= word.start_time_ms
+                ? Math.min(parsedEndMs, nextWordStartMs)
+                : parsedEndMs;
+            const sourceDurationMs = Math.max(1, fillEndMs - word.start_time_ms);
+            const parsedSourceDurationMs = Math.max(1, parsedEndMs - word.start_time_ms);
+            const parsedDurationMs = wordIndex === words.length - 1 && word.end_time_ms === undefined
+                ? Math.min(800, Math.max(80, parsedSourceDurationMs))
+                : Math.max(80, parsedSourceDurationMs);
+            const compressedSpanMs = Math.max(1, last.item.nextStart - first.item.time_ms);
+            const featherPx = firstRuntime.fillMaskWidthPx * firstRuntime.fillEdgeWidth / 100;
+            return {
+                startMs: first.item.time_ms,
+                durationMs: Math.max(1,
+                    Math.min(sourceDurationMs, parsedDurationMs) * compressedSpanMs / parsedDurationMs),
+                startPx: firstRuntime.fillLeftPx,
+                endPx: lastRuntime.fillLeftPx + lastRuntime.fillWidthPx,
+                featherPx,
+                bridgeFromPrevious: false,
+                bridgeToNext: false,
+                chainIndex: -1,
+                voiced,
+            };
+        });
+        for (let index = 0; index < wordFillPlans.length - 1; index++) {
+            const current = wordFillPlans[index];
+            const next = wordFillPlans[index + 1];
+            if (!current || !next) continue;
+            const gapMs = next.startMs - current.startMs - current.durationMs;
+            if (gapMs >= 0 && gapMs <= 1) {
+                current.bridgeToNext = true;
+                next.bridgeFromPrevious = true;
+            }
+        }
+        let chainIndex = -1;
+        let previousFillPlan: WordFillPlan | null = null;
+        // One spatial cursor follows the line's timed syllables. Gaps hold its
+        // position; character boundaries never introduce an ease-in or ease-out.
+        const fillTimeline: FillTimelineSegment[] = [];
+        wordFillPlans.forEach(plan => {
+            if (!plan) return;
+            if (!plan.bridgeFromPrevious) chainIndex++;
+            plan.chainIndex = chainIndex;
+            const segmentDurationMs = plan.durationMs / plan.voiced.length;
+            plan.voiced.forEach(({ flatIndex }, index) => {
+                const charRuntime = charRuntimes[flatIndex];
+                if (!charRuntime) return;
+                const startPx = index === 0
+                    ? previousFillPlan
+                        ? previousFillPlan.endPx + (previousFillPlan.bridgeToNext ? 0 : previousFillPlan.featherPx)
+                        : plan.startPx - plan.featherPx
+                    : charRuntime.fillLeftPx;
+                const endPx = charRuntime.fillLeftPx + charRuntime.fillWidthPx +
+                    (index === plan.voiced.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
+                fillTimeline.push({
+                    startMs: plan.startMs + index * segmentDurationMs,
+                    endMs: plan.startMs + (index + 1) * segmentDurationMs,
+                    startPx,
+                    endPx,
+                });
+            });
+            previousFillPlan = plan;
         });
 
         const runtimeState = runtime;
@@ -578,6 +675,17 @@ function KaraokeTextBase({
             const changedWords = runtimeState.changedWordIndices;
             changedWords.length = 0;
             let evaluatedWordCount = 0;
+            let currentFillWordIndex = -1;
+            wordFillPlans.forEach((plan, wordIndex) => {
+                if (plan && timeMs >= plan.startMs) currentFillWordIndex = wordIndex;
+            });
+            const currentFillPlan = wordFillPlans[currentFillWordIndex];
+            let currentFillHeadPx = fillTimeline[0]?.startPx ?? 0;
+            for (const segment of fillTimeline) {
+                if (timeMs < segment.startMs) break;
+                const progress = clamp01((timeMs - segment.startMs) / (segment.endMs - segment.startMs));
+                currentFillHeadPx = segment.startPx + (segment.endPx - segment.startPx) * progress;
+            }
 
             const markChanged = (wordIndex: number) => {
                 if (runtimeState.wordPhaseChanges[wordIndex] !== 0) return;
@@ -594,39 +702,15 @@ function KaraokeTextBase({
             const applyWord = (wordIndex: number) => {
                 evaluatedWordCount++;
                 const group = wordGroups[wordIndex];
-                const wordFillWidth = wordFillWidths[wordIndex];
+                const fillPlan = wordFillPlans[wordIndex];
                 let wordFillHeadPx: number | null = null;
-                if (group && wordFillWidth > 0) {
-                    const firstVoiced = group.find(({ item }) => !whitespaceLayoutCharPattern.test(item.char));
-                    let lastVoiced: IndexedCharItem | undefined;
-                    for (let index = group.length - 1; index >= 0; index--) {
-                        if (!whitespaceLayoutCharPattern.test(group[index].item.char)) {
-                            lastVoiced = group[index];
-                            break;
-                        }
-                    }
-                    if (firstVoiced && lastVoiced) {
-                        const firstRuntime = charRuntimes[firstVoiced.flatIndex];
-                        if (firstRuntime) {
-                            const featherPx = firstRuntime.fillMaskWidthPx * firstRuntime.fillEdgeWidth / 100;
-                            if (timeMs < firstVoiced.item.time_ms) {
-                                wordFillHeadPx = -featherPx - 1;
-                            } else if (timeMs >= lastVoiced.item.time_ms + lastVoiced.item.durationMs) {
-                                const lastRuntime = charRuntimes[lastVoiced.flatIndex];
-                                if (lastRuntime) wordFillHeadPx = lastRuntime.fillLeftPx + lastRuntime.fillWidthPx + featherPx;
-                            } else {
-                                group.forEach(({ item, flatIndex }) => {
-                                    if (whitespaceLayoutCharPattern.test(item.char) || timeMs < item.time_ms) return;
-                                    const charRuntime = charRuntimes[flatIndex];
-                                    if (!charRuntime) return;
-                                    const isFirst = flatIndex === firstVoiced.flatIndex;
-                                    const isLast = flatIndex === lastVoiced.flatIndex;
-                                    wordFillHeadPx = charRuntime.fillLeftPx - (isFirst ? featherPx : 0) +
-                                        (charRuntime.fillWidthPx + (isFirst ? featherPx : 0) + (isLast ? featherPx : 0)) *
-                                        clamp01((timeMs - item.time_ms) / item.durationMs);
-                                });
-                            }
-                        }
+                if (fillPlan) {
+                    if (currentFillPlan && fillPlan.chainIndex === currentFillPlan.chainIndex) {
+                        wordFillHeadPx = currentFillHeadPx;
+                    } else if (wordIndex < currentFillWordIndex) {
+                        wordFillHeadPx = fillPlan.endPx + fillPlan.featherPx;
+                    } else {
+                        wordFillHeadPx = fillPlan.startPx - fillPlan.featherPx - 1;
                     }
                 }
                 group?.forEach(({ flatIndex }) => {
@@ -763,6 +847,8 @@ function KaraokeTextBase({
         };
     }, [
         preciseMsRef,
+        words,
+        lineEndMs,
         flatChars,
         wordGroups,
         wordMotionWindows,
