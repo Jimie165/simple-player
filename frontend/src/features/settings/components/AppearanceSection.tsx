@@ -43,6 +43,8 @@ export default function AppearanceSection() {
         isCustomColor,
         playerEffectMode,
         setPlayerEffectMode,
+        lyricFillMode,
+        setLyricFillMode,
         reactiveBackgroundEnabled,
         setReactiveBackgroundEnabled,
     } = useTheme();
@@ -136,6 +138,37 @@ export default function AppearanceSection() {
                             />
                         </span>
                     </button>
+                </div>
+                <div className="space-y-2">
+                    <h4 className="text-sm font-medium text-on-surface px-1">逐字歌词刷白方式</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <button
+                            type="button"
+                            onClick={() => setLyricFillMode('line')}
+                            className={clsx(
+                                "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
+                                lyricFillMode === 'line'
+                                    ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
+                                    : "settings-control border text-on-surface-variant"
+                            )}
+                        >
+                            <span>整行连续推进</span>
+                            {lyricFillMode === 'line' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setLyricFillMode('character')}
+                            className={clsx(
+                                "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
+                                lyricFillMode === 'character'
+                                    ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
+                                    : "settings-control border text-on-surface-variant"
+                            )}
+                        >
+                            <span>逐字符推进</span>
+                            {lyricFillMode === 'character' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                        </button>
+                    </div>
                 </div>
             </div>
 

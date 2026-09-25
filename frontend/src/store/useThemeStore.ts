@@ -4,6 +4,7 @@ import { generateThemeVariables, PRESET_COLORS } from '@/utils/themeColors';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 export type PlayerEffectMode = 'performance' | 'animation';
+export type LyricFillMode = 'line' | 'character';
 
 interface ThemeState {
     themeMode: ThemeMode;
@@ -11,11 +12,13 @@ interface ThemeState {
     isCustomColor: boolean;
     isDark: boolean; // Computed actual state
     playerEffectMode: PlayerEffectMode;
+    lyricFillMode: LyricFillMode;
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
+    setLyricFillMode: (mode: LyricFillMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
@@ -33,6 +36,7 @@ export const useThemeStore = create<ThemeState>()(
             isCustomColor: false,
             isDark: false,
             playerEffectMode: 'performance',
+            lyricFillMode: 'line',
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
 
@@ -44,6 +48,7 @@ export const useThemeStore = create<ThemeState>()(
             setPlayerEffectMode: (mode) => {
                 set({ playerEffectMode: mode, fullScreenMode: mode });
             },
+            setLyricFillMode: (mode) => set({ lyricFillMode: mode }),
 
             setFullScreenMode: (mode) => {
                 set({ playerEffectMode: mode, fullScreenMode: mode });
@@ -115,6 +120,7 @@ export const useThemeStore = create<ThemeState>()(
                 sourceColor: state.sourceColor,
                 isCustomColor: state.isCustomColor,
                 playerEffectMode: state.playerEffectMode,
+                lyricFillMode: state.lyricFillMode,
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
             }),
@@ -131,6 +137,7 @@ export const useThemeStore = create<ThemeState>()(
                     ...current,
                     ...persistedState,
                     playerEffectMode,
+                    lyricFillMode: persistedState?.lyricFillMode === 'character' ? 'character' : 'line',
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                 };

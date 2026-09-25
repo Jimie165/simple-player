@@ -486,6 +486,25 @@ body {
   );
 }
 
+.karaoke-text-character .karaoke-char::before {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    black 0%,
+    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
+    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    transparent 100%
+  );
+}
+
 .animated-lyrics-row-shell {
   /* Keep transition properties on the persistent line wrapper.  The
      wrapper is spatially mounted, so this does not create layers for the

@@ -17,6 +17,8 @@ export function useTheme() {
 
     const playerEffectMode = useThemeStore((state) => state.playerEffectMode);
     const setPlayerEffectMode = useThemeStore((state) => state.setPlayerEffectMode);
+    const lyricFillMode = useThemeStore((state) => state.lyricFillMode);
+    const setLyricFillMode = useThemeStore((state) => state.setLyricFillMode);
     const fullScreenMode = useThemeStore((state) => state.fullScreenMode);
     const setFullScreenMode = useThemeStore((state) => state.setFullScreenMode);
     const reactiveBackgroundEnabled = useThemeStore((state) => state.reactiveBackgroundEnabled);
@@ -37,6 +39,8 @@ export function useTheme() {
 
         playerEffectMode,
         setPlayerEffectMode,
+        lyricFillMode,
+        setLyricFillMode,
         fullScreenMode,
         setFullScreenMode,
         reactiveBackgroundEnabled,

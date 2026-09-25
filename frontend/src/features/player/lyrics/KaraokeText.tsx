@@ -4,6 +4,7 @@ import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplit
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
 import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
 import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
+import { useThemeStore } from '@/store/useThemeStore';
 
 interface KaraokeTextProps {
     words: LyricsWord[];
@@ -367,11 +368,13 @@ function KaraokeTextBase({
     glowDisabled = false,
     fillAlpha = 1,
 }: KaraokeTextProps) {
+    const lyricFillMode = useThemeStore(state => state.lyricFillMode);
     const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const contentRef = useRef<HTMLSpanElement | null>(null);
     const wasFocusedRef = useRef(isFocused);
     const runtimeRef = useRef<KaraokeRuntimeState | null>(null);
+    const previousFillModeRef = useRef(lyricFillMode);
     const isActiveRef = useRef(isActive);
     const isFocusedRef = useRef(isFocused);
     const glowDisabledRef = useRef(glowDisabled);
@@ -537,11 +540,22 @@ function KaraokeTextBase({
                 element?.style.setProperty('animation', 'none');
             });
         }
+        if (previousFillModeRef.current !== lyricFillMode) {
+            previousFillModeRef.current = lyricFillMode;
+            runtime.previousFillStops.fill(undefined);
+            runtime.needsVisualSync = true;
+        }
+
+        if (lyricFillMode === 'character') {
+            charElements.forEach((element, index) => {
+                if (element) element.style.setProperty('--kfe', String(charRuntimes[index]?.fillEdgeWidth ?? 26));
+            });
+        }
 
         // Build one line-wide fill coordinate system. Motion keeps using the
         // parsed character clocks, while fill uses unclamped word durations.
         let lineWidth = 0;
-        const wordFillPlans: Array<WordFillPlan | null> = wordGroups.map((group, wordIndex) => {
+        const wordFillPlans: Array<WordFillPlan | null> = lyricFillMode === 'line' ? wordGroups.map((group, wordIndex) => {
             const voiced = group.filter(({ item }) => !whitespaceLayoutCharPattern.test(item.char));
             const firstElement = charElements[group[0].flatIndex];
             if (!firstElement) return null;
@@ -600,7 +614,7 @@ function KaraokeTextBase({
                 chainIndex: -1,
                 voiced,
             };
-        });
+        }) : [];
         for (let index = 0; index < wordFillPlans.length - 1; index++) {
             const current = wordFillPlans[index];
             const next = wordFillPlans[index + 1];
@@ -853,6 +867,7 @@ function KaraokeTextBase({
         wordGroups,
         wordMotionWindows,
         charRuntimes,
+        lyricFillMode,
     ]);
 
     // Focus and play/pause changes should only change ownership of the stable
@@ -877,7 +892,7 @@ function KaraokeTextBase({
             unsubscribe?.();
             if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [charRuntimes, flatChars, frameRegistry, isActive, isPlaying, preciseMsRef, wordGroups, wordMotionWindows]);
+    }, [charRuntimes, flatChars, frameRegistry, isActive, isPlaying, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
 
     useLayoutEffect(() => {
         const wasFocused = wasFocusedRef.current;
@@ -944,7 +959,7 @@ function KaraokeTextBase({
     }, [glowDisabled, isActive, isPlaying, playbackSyncKey, preciseMsRef]);
 
     return (
-        <span ref={contentRef} style={{ display: 'block' }}>
+        <span ref={contentRef} className={lyricFillMode === 'character' ? 'karaoke-text-character' : undefined} style={{ display: 'block' }}>
             <span
                 style={{
                     display: 'block',
