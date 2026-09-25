@@ -1,10 +1,70 @@
-import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdGraphicEq, MdWeb } from 'react-icons/md';
+import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from '@headlessui/react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdExpandMore } from 'react-icons/md';
 import clsx from 'clsx';
 
 import { useTheme } from '@/hooks/useTheme';
 import CustomTooltip from '@/components/common/CustomTooltip';
 
 type ThemeMode = 'light' | 'dark' | 'system';
+
+function PopupChoice<T extends string>({
+    label,
+    value,
+    onChange,
+    options,
+}: {
+    label: string;
+    value: T;
+    onChange: (value: T) => void;
+    options: { value: T; label: string }[];
+}) {
+    return (
+        <Listbox value={value} onChange={onChange}>
+            {({ open }) => (
+                <div className="settings-card flex items-center justify-between gap-4 rounded-xl border px-4 py-3 text-sm text-on-surface">
+                    <span className="font-medium">{label}</span>
+                    <div className="relative shrink-0">
+                        <ListboxButton
+                            aria-label={label}
+                            className={clsx(
+                                "settings-control flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm text-on-surface transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+                                open ? "border-primary/50" : "border-outline-variant/30 hover:border-primary/30"
+                            )}
+                        >
+                            {options.find((option) => option.value === value)?.label}
+                            <MdExpandMore className={clsx("shrink-0 text-lg text-on-surface-variant transition-transform duration-200", open && "rotate-180")} />
+                        </ListboxButton>
+                        <AnimatePresence>
+                            {open && (
+                                <ListboxOptions
+                                    static
+                                    anchor="bottom end"
+                                    as={motion.div}
+                                    initial={{ opacity: 0, y: -8 }}
+                                    animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" } }}
+                                    exit={{ opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } }}
+                                    className="settings-card z-50 min-w-44 rounded-xl border border-outline-variant/30 py-1 shadow-xl focus:outline-none"
+                                >
+                                    {options.map((option) => (
+                                        <ListboxOption
+                                            key={option.value}
+                                            value={option.value}
+                                            className="flex cursor-pointer items-center justify-between gap-3 px-4 py-2 text-sm text-on-surface data-focus:bg-primary/5 data-selected:text-primary"
+                                        >
+                                            <span>{option.label}</span>
+                                            {value === option.value && <MdCheck className="shrink-0 text-primary" />}
+                                        </ListboxOption>
+                                    ))}
+                                </ListboxOptions>
+                            )}
+                        </AnimatePresence>
+                    </div>
+                </div>
+            )}
+        </Listbox>
+    );
+}
 
 function ThemeOption({
     val,
@@ -67,108 +127,59 @@ export default function AppearanceSection() {
             </div>
 
             {/* Player Effect Selection */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 px-1">
-                    <MdWeb className="text-primary text-lg" />
-                    <h4 className="text-sm font-medium text-on-surface">播放页效果</h4>
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <button
-                        onClick={() => setPlayerEffectMode('performance')}
-                        className={clsx(
-                            "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
-                            playerEffectMode === 'performance'
-                                ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
-                                : "settings-control border text-on-surface-variant"
-                        )}
-                    >
-                        <span>性能优先</span>
-                        {playerEffectMode === 'performance' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
-                    </button>
-                    <button
-                        onClick={() => setPlayerEffectMode('animation')}
-                        className={clsx(
-                            "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
-                            playerEffectMode === 'animation'
-                                ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
-                                : "settings-control border text-on-surface-variant"
-                        )}
-                    >
-                        <span>动画优先</span>
-                        {playerEffectMode === 'animation' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary shadow-[0_0_8px_rgba(var(--md-sys-color-primary),0.5)]" />}
-                    </button>
-                </div>
-                <div
-                    className={clsx(
-                        "settings-card flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left transition-opacity",
-                        playerEffectMode !== 'animation' && "opacity-45",
+            <div>
+                <PopupChoice
+                    label="播放页效果"
+                    value={playerEffectMode}
+                    onChange={setPlayerEffectMode}
+                    options={[{ value: 'performance', label: '性能优先' }, { value: 'animation', label: '动画优先' }]}
+                />
+                <AnimatePresence initial={false}>
+                    {playerEffectMode === 'animation' && (
+                        <motion.div
+                            key="reactive-background"
+                            initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                            animate={{ height: 'auto', opacity: 1, marginTop: 12 }}
+                            exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                            transition={{ duration: 0.22, ease: 'easeInOut' }}
+                            className="overflow-hidden"
+                        >
+                            <div className="settings-card flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left">
+                                <span>
+                                    <span className="block text-sm font-medium text-on-surface">音乐律动背景</span>
+                                    <span className="block text-xs text-on-surface-variant">背景会随低频和鼓点轻微律动</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-label="音乐律动背景"
+                                    aria-checked={reactiveBackgroundEnabled}
+                                    onClick={() => setReactiveBackgroundEnabled(!reactiveBackgroundEnabled)}
+                                    className="flex shrink-0 items-center justify-center rounded-full p-2 -mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                    <span className={clsx(
+                                        "relative block h-6 w-11 rounded-full transition-colors",
+                                        reactiveBackgroundEnabled ? "bg-primary" : "bg-outline-variant/50",
+                                    )}>
+                                        <span
+                                            className={clsx(
+                                                "absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
+                                                reactiveBackgroundEnabled ? "translate-x-5" : "translate-x-0",
+                                            )}
+                                        />
+                                    </span>
+                                </button>
+                            </div>
+                        </motion.div>
                     )}
-                >
-                    <span className="flex items-center gap-3">
-                        <MdGraphicEq className="text-xl text-primary" />
-                        <span>
-                            <span className="block text-sm font-medium text-on-surface">音乐律动背景</span>
-                            <span className="block text-xs text-on-surface-variant">背景会随低频和鼓点轻微律动</span>
-                        </span>
-                    </span>
-                    <button
-                        type="button"
-                        role="switch"
-                        aria-label="音乐律动背景"
-                        aria-checked={reactiveBackgroundEnabled}
-                        onClick={() => setReactiveBackgroundEnabled(!reactiveBackgroundEnabled)}
-                        disabled={playerEffectMode !== 'animation'}
-                        className="flex shrink-0 items-center justify-center rounded-full p-2 -mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed"
-                    >
-                        <span
-                            className={clsx(
-                                "relative block h-6 w-11 rounded-full transition-colors",
-                                reactiveBackgroundEnabled && playerEffectMode === 'animation'
-                                    ? "bg-primary"
-                                    : "bg-outline-variant/50",
-                            )}
-                        >
-                            <span
-                                className={clsx(
-                                    "absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform",
-                                    reactiveBackgroundEnabled && playerEffectMode === 'animation'
-                                        ? "translate-x-5"
-                                        : "translate-x-0",
-                                )}
-                            />
-                        </span>
-                    </button>
-                </div>
-                <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-on-surface px-1">逐字歌词刷白方式</h4>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <button
-                            type="button"
-                            onClick={() => setLyricFillMode('line')}
-                            className={clsx(
-                                "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
-                                lyricFillMode === 'line'
-                                    ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
-                                    : "settings-control border text-on-surface-variant"
-                            )}
-                        >
-                            <span>整行连续推进</span>
-                            {lyricFillMode === 'line' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => setLyricFillMode('character')}
-                            className={clsx(
-                                "flex items-center justify-between gap-4 rounded-xl px-4 py-3 text-left text-sm font-medium transition-all border",
-                                lyricFillMode === 'character'
-                                    ? "bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/10"
-                                    : "settings-control border text-on-surface-variant"
-                            )}
-                        >
-                            <span>逐字符推进</span>
-                            {lyricFillMode === 'character' && <div className="h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                        </button>
-                    </div>
+                </AnimatePresence>
+                <div className="mt-3">
+                    <PopupChoice
+                        label="逐字歌词刷白方式"
+                        value={lyricFillMode}
+                        onChange={setLyricFillMode}
+                        options={[{ value: 'line', label: '整行连续推进' }, { value: 'character', label: '逐字符推进' }]}
+                    />
                 </div>
             </div>
 
