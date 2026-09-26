@@ -5,6 +5,8 @@ import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
 import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
 import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
 import { useThemeStore } from '@/store/useThemeStore';
+import { applyCharacterFillStyles, getCharacterFillStop } from '@/features/player/lyrics/karaokeCharacterFill';
+import { createLineFill } from '@/features/player/lyrics/karaokeLineFill';
 
 interface KaraokeTextProps {
     words: LyricsWord[];
@@ -54,25 +56,6 @@ type KaraokeCharRuntime = {
 type WordMotionWindow = {
     startMs: number;
     endMs: number;
-};
-
-type WordFillPlan = {
-    startMs: number;
-    durationMs: number;
-    startPx: number;
-    endPx: number;
-    featherPx: number;
-    bridgeFromPrevious: boolean;
-    bridgeToNext: boolean;
-    chainIndex: number;
-    voiced: IndexedCharItem[];
-};
-
-type FillTimelineSegment = {
-    startMs: number;
-    endMs: number;
-    startPx: number;
-    endPx: number;
 };
 
 type KaraokeRuntimeState = {
@@ -226,7 +209,7 @@ function prepareKaraokeCharRuntime(
 function getKaraokeCharStyle(
     runtime: KaraokeCharRuntime,
     timeMs: number,
-    wordFillHeadPx: number | null,
+    fillStop: number,
     glowDisabled = false,
     output: KaraokeCharStyle = { transform: '', fillStop: 0, glowAlpha: 0 },
 ): KaraokeCharStyle {
@@ -235,7 +218,6 @@ function getKaraokeCharStyle(
         isLongTone,
         longToneAmount,
         glowToneAmount,
-        fillEdgeWidth,
         charCount,
         charIndex,
         emphasisDurationMs,
@@ -247,14 +229,6 @@ function getKaraokeCharStyle(
         durationMs,
         groupStartMs,
     } = charItem;
-    const fillRawProgress = (timeMs - time_ms) / durationMs;
-    const fillProgress = clamp01(fillRawProgress);
-    const isFillComplete = fillRawProgress >= 1;
-    const hasFillProgress = fillProgress > 0;
-
-    const fillStop = wordFillHeadPx === null
-        ? fillProgress * 100
-        : (wordFillHeadPx - runtime.fillLeftPx + runtime.fillPaddingPx) / runtime.fillMaskWidthPx * 100;
     const elapsedMs = timeMs - time_ms;
     const hasStarted = elapsedMs > 0;
     const attackMs = Math.max(regularLiftMinDurationMs, durationMs);
@@ -283,9 +257,7 @@ function getKaraokeCharStyle(
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
 
     output.transform = `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`;
-    output.fillStop = wordFillHeadPx !== null || hasFillProgress || isFillComplete
-        ? fillStop
-        : -(fillEdgeWidth + 1);
+    output.fillStop = fillStop;
     // 辉光与缩放共用强调节奏，避免逐字填色把长音的辉光峰值推迟。
     output.glowAlpha = !isLongTone || glowDisabled ? 0 : glowPulse;
     return output;
@@ -549,116 +521,12 @@ function KaraokeTextBase({
         }
 
         if (lyricFillMode === 'character') {
-            charElements.forEach((element, index) => {
-                if (element) element.style.setProperty('--kfe', String(charRuntimes[index]?.fillEdgeWidth ?? 26));
-            });
+            applyCharacterFillStyles(charElements, charRuntimes);
         }
 
-        // Build one line-wide fill coordinate system. Motion keeps using the
-        // parsed character clocks, while fill uses unclamped word durations.
-        let lineWidth = 0;
-        const wordFillPlans: Array<WordFillPlan | null> = lyricFillMode === 'line' ? wordGroups.map((group, wordIndex) => {
-            const voiced = group.filter(({ item }) => !whitespaceLayoutCharPattern.test(item.char));
-            const firstElement = charElements[group[0].flatIndex];
-            if (!firstElement) return null;
-            const fontSize = parseFloat(getComputedStyle(firstElement).fontSize);
-            if (!Number.isFinite(fontSize) || fontSize <= 0) return null;
-            let width = 0;
-            group.forEach(({ flatIndex }) => {
-                const element = charElements[flatIndex];
-                const charRuntime = charRuntimes[flatIndex];
-                if (!element || !charRuntime) return;
-                const maskWidth = element.offsetWidth;
-                if (maskWidth <= 0) return;
-                const padding = fontSize * 0.1;
-                const advance = Math.max(1, maskWidth - padding * 2);
-                charRuntime.fillLeftPx = lineWidth + width;
-                charRuntime.fillWidthPx = advance;
-                charRuntime.fillMaskWidthPx = maskWidth;
-                charRuntime.fillPaddingPx = padding;
-                const featherPx = fontSize * (0.16 + charRuntime.longToneAmount * 0.1);
-                charRuntime.fillFeatherPx = featherPx;
-                element.style.setProperty('--kfe', String(featherPx / maskWidth * 100));
-                width += advance;
-            });
-            lineWidth += width;
-            if (voiced.length === 0) return null;
-            const first = voiced[0];
-            const last = voiced[voiced.length - 1];
-            const firstRuntime = charRuntimes[first.flatIndex];
-            const lastRuntime = charRuntimes[last.flatIndex];
-            const word = words[wordIndex];
-            if (!firstRuntime?.fillWidthPx || !lastRuntime?.fillWidthPx || !word) return null;
-            const parsedEndMs = word.end_time_ms !== undefined
-                ? word.end_time_ms
-                : wordIndex + 1 < words.length
-                    ? words[wordIndex + 1].start_time_ms
-                    : lineEndMs ?? word.start_time_ms + 600;
-            const nextWordStartMs = words[wordIndex + 1]?.start_time_ms;
-            const fillEndMs = nextWordStartMs !== undefined && nextWordStartMs >= word.start_time_ms
-                ? Math.min(parsedEndMs, nextWordStartMs)
-                : parsedEndMs;
-            const sourceDurationMs = Math.max(1, fillEndMs - word.start_time_ms);
-            const parsedSourceDurationMs = Math.max(1, parsedEndMs - word.start_time_ms);
-            const parsedDurationMs = wordIndex === words.length - 1 && word.end_time_ms === undefined
-                ? Math.min(800, Math.max(80, parsedSourceDurationMs))
-                : Math.max(80, parsedSourceDurationMs);
-            const compressedSpanMs = Math.max(1, last.item.nextStart - first.item.time_ms);
-            // Start the visible gradient at the first character's content edge.
-            // Reusing the measured CSS feather avoids an invisible lead-in.
-            const featherPx = firstRuntime.fillFeatherPx;
-            return {
-                startMs: first.item.time_ms,
-                durationMs: Math.max(1,
-                    Math.min(sourceDurationMs, parsedDurationMs) * compressedSpanMs / parsedDurationMs),
-                startPx: firstRuntime.fillLeftPx,
-                endPx: lastRuntime.fillLeftPx + lastRuntime.fillWidthPx,
-                featherPx,
-                bridgeFromPrevious: false,
-                bridgeToNext: false,
-                chainIndex: -1,
-                voiced,
-            };
-        }) : [];
-        for (let index = 0; index < wordFillPlans.length - 1; index++) {
-            const current = wordFillPlans[index];
-            const next = wordFillPlans[index + 1];
-            if (!current || !next) continue;
-            const gapMs = next.startMs - current.startMs - current.durationMs;
-            if (gapMs >= 0 && gapMs <= 1) {
-                current.bridgeToNext = true;
-                next.bridgeFromPrevious = true;
-            }
-        }
-        let chainIndex = -1;
-        let previousFillPlan: WordFillPlan | null = null;
-        // One spatial cursor follows the line's timed syllables. Gaps hold its
-        // position; character boundaries never introduce an ease-in or ease-out.
-        const fillTimeline: FillTimelineSegment[] = [];
-        wordFillPlans.forEach(plan => {
-            if (!plan) return;
-            if (!plan.bridgeFromPrevious) chainIndex++;
-            plan.chainIndex = chainIndex;
-            const segmentDurationMs = plan.durationMs / plan.voiced.length;
-            plan.voiced.forEach(({ flatIndex }, index) => {
-                const charRuntime = charRuntimes[flatIndex];
-                if (!charRuntime) return;
-                const startPx = index === 0
-                    ? previousFillPlan
-                        ? previousFillPlan.endPx + (previousFillPlan.bridgeToNext ? 0 : previousFillPlan.featherPx)
-                        : plan.startPx - plan.featherPx
-                    : charRuntime.fillLeftPx;
-                const endPx = charRuntime.fillLeftPx + charRuntime.fillWidthPx +
-                    (index === plan.voiced.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
-                fillTimeline.push({
-                    startMs: plan.startMs + index * segmentDurationMs,
-                    endMs: plan.startMs + (index + 1) * segmentDurationMs,
-                    startPx,
-                    endPx,
-                });
-            });
-            previousFillPlan = plan;
-        });
+        const lineFill = lyricFillMode === 'line'
+            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs)
+            : null;
 
         const runtimeState = runtime;
         let debugWrites: { transform: number; fill: number; glow: number } | null = null;
@@ -694,17 +562,7 @@ function KaraokeTextBase({
             const changedWords = runtimeState.changedWordIndices;
             changedWords.length = 0;
             let evaluatedWordCount = 0;
-            let currentFillWordIndex = -1;
-            wordFillPlans.forEach((plan, wordIndex) => {
-                if (plan && timeMs >= plan.startMs) currentFillWordIndex = wordIndex;
-            });
-            const currentFillPlan = wordFillPlans[currentFillWordIndex];
-            let currentFillHeadPx = fillTimeline[0]?.startPx ?? 0;
-            for (const segment of fillTimeline) {
-                if (timeMs < segment.startMs) break;
-                const progress = clamp01((timeMs - segment.startMs) / (segment.endMs - segment.startMs));
-                currentFillHeadPx = segment.startPx + (segment.endPx - segment.startPx) * progress;
-            }
+            lineFill?.update(timeMs);
 
             const markChanged = (wordIndex: number) => {
                 if (runtimeState.wordPhaseChanges[wordIndex] !== 0) return;
@@ -721,24 +579,15 @@ function KaraokeTextBase({
             const applyWord = (wordIndex: number) => {
                 evaluatedWordCount++;
                 const group = wordGroups[wordIndex];
-                const fillPlan = wordFillPlans[wordIndex];
-                let wordFillHeadPx: number | null = null;
-                if (fillPlan) {
-                    if (currentFillPlan && fillPlan.chainIndex === currentFillPlan.chainIndex) {
-                        wordFillHeadPx = currentFillHeadPx;
-                    } else if (wordIndex < currentFillWordIndex) {
-                        wordFillHeadPx = fillPlan.endPx + fillPlan.featherPx;
-                    } else {
-                        wordFillHeadPx = fillPlan.startPx - fillPlan.featherPx - 1;
-                    }
-                }
                 group?.forEach(({ flatIndex }) => {
                     const charRuntime = charRuntimes[flatIndex];
                     if (!charRuntime) return;
+                    const fillStop = lineFill?.getFillStop(wordIndex, charRuntime)
+                        ?? getCharacterFillStop(charRuntime.item, charRuntime.fillEdgeWidth, timeMs);
                     const style = getKaraokeCharStyle(
                         charRuntime,
                         timeMs,
-                        wordFillHeadPx,
+                        fillStop,
                         glowDisabledRef.current,
                         runtimeState.scratchStyle,
                     );
