@@ -43,6 +43,7 @@ type KaraokeCharRuntime = {
     fillWidthPx: number;
     fillMaskWidthPx: number;
     fillPaddingPx: number;
+    fillFeatherPx: number;
     charCount: number;
     charIndex: number;
     emphasisDurationMs: number;
@@ -210,6 +211,7 @@ function prepareKaraokeCharRuntime(
         fillWidthPx: 0,
         fillMaskWidthPx: 0,
         fillPaddingPx: 0,
+        fillFeatherPx: 0,
         charCount,
         charIndex,
         emphasisDurationMs,
@@ -575,6 +577,7 @@ function KaraokeTextBase({
                 charRuntime.fillMaskWidthPx = maskWidth;
                 charRuntime.fillPaddingPx = padding;
                 const featherPx = fontSize * (0.16 + charRuntime.longToneAmount * 0.1);
+                charRuntime.fillFeatherPx = featherPx;
                 element.style.setProperty('--kfe', String(featherPx / maskWidth * 100));
                 width += advance;
             });
@@ -601,7 +604,9 @@ function KaraokeTextBase({
                 ? Math.min(800, Math.max(80, parsedSourceDurationMs))
                 : Math.max(80, parsedSourceDurationMs);
             const compressedSpanMs = Math.max(1, last.item.nextStart - first.item.time_ms);
-            const featherPx = firstRuntime.fillMaskWidthPx * firstRuntime.fillEdgeWidth / 100;
+            // Start the visible gradient at the first character's content edge.
+            // Reusing the measured CSS feather avoids an invisible lead-in.
+            const featherPx = firstRuntime.fillFeatherPx;
             return {
                 startMs: first.item.time_ms,
                 durationMs: Math.max(1,
