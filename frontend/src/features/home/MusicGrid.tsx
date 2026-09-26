@@ -33,7 +33,7 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
         const load = async () => {
             const playlistId = Number.parseInt(item.id.replace('playlist:', ''), 10);
             if (!Number.isInteger(playlistId)) return;
-            const paths = await libraryService.getPlaylistCoverPaths(playlistId);
+            const paths = await libraryService.getPlaylistCoverPaths(playlistId, useLibraryStore.getState().getPlaylistSettings(playlistId.toString()));
             if (!cancelled) setCoverPaths(paths);
         };
         void load();

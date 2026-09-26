@@ -191,11 +191,21 @@ pub fn get_playlist_cover_paths(
     app: AppHandle,
     db: State<'_, DbState>,
     playlist_id: i64,
+    ordered_cover_paths: Option<Vec<String>>,
 ) -> Result<Vec<String>, String> {
-    let candidates = {
+    let mut candidates = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         PlaylistRepo::get_cover_paths(&conn, playlist_id).map_err(|e| e.to_string())?
     };
+
+    if let Some(paths) = ordered_cover_paths {
+        // 按歌曲顺序排列候选封面后，再按图片内容去重并截取四张。
+        let mut positions = std::collections::HashMap::new();
+        for (index, path) in paths.iter().enumerate() {
+            positions.entry(path.as_str()).or_insert(index);
+        }
+        candidates.sort_by_key(|path| positions.get(path.as_str()).copied().unwrap_or(usize::MAX));
+    }
 
     Ok(take_unique_cover_paths(candidates, |path| {
         cover_content_fingerprint(&app, path)

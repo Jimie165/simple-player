@@ -1,6 +1,8 @@
 import { invoke } from '@tauri-apps/api/core';
 import type { SongMetadata, LibraryFolder, Playlist } from '@/types';
 import type { VideoMetadata } from '@/types/video';
+import { sortSongs } from '@/utils/songSort';
+import type { SortKey, SortOrder } from '@/utils/songSort';
 
 export interface UpdateSongDetailsRequest {
     id: number;
@@ -247,8 +249,15 @@ export const libraryService = {
         return invoke('get_playlist_songs', { playlistId });
     },
 
-    getPlaylistCoverPaths: async (playlistId: number): Promise<string[]> => {
-        return invoke('get_playlist_cover_paths', { playlistId });
+    getPlaylistCoverPaths: async (playlistId: number, settings: { sortKey: SortKey; sortOrder: SortOrder }): Promise<string[]> => {
+        if (settings.sortKey === 'manual' && settings.sortOrder === 'asc') {
+            return invoke('get_playlist_cover_paths', { playlistId });
+        }
+        const songs = await libraryService.getPlaylistSongs(playlistId);
+        const orderedCoverPaths = sortSongs(songs, settings.sortKey, settings.sortOrder)
+            .map(song => song.cover_path)
+            .filter((path): path is string => !!path);
+        return invoke('get_playlist_cover_paths', { playlistId, orderedCoverPaths });
     },
     markPlaylistAsPlayed: async (playlistId: number): Promise<void> => {
         return invoke('mark_playlist_as_played', { playlistId });

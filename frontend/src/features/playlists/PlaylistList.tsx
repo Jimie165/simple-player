@@ -170,7 +170,7 @@ export default function PlaylistList() {
         const loadCoverPaths = async () => {
             const entries = await Promise.all(playlists.map(async playlist => [
                 playlist.id,
-                await libraryService.getPlaylistCoverPaths(playlist.id),
+                await libraryService.getPlaylistCoverPaths(playlist.id, useLibraryStore.getState().getPlaylistSettings(playlist.id.toString())),
             ] as const));
             if (!cancelled) setPlaylistCoverPaths(Object.fromEntries(entries));
         };
