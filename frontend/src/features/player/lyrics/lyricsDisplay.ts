@@ -94,6 +94,38 @@ const getMainLyricEndMs = (line: LyricsLine): number | null => {
     return line.end_time_ms;
 };
 
+const coEndingToleranceMs = 50;
+
+// 同结束的对唱行共享下一组起点；不能把组内另一声部的起点当成词尾压缩目标。
+export function getLineCompressionHandoffStartMs(lines: LyricsLine[], lineIndex: number): number | null {
+    const nextStartMs = getLineEndMsByIndex(lines, lineIndex);
+    const line = lines[lineIndex];
+    const endMs = getMainLyricEndMs(line);
+    const startMs = line.start_time_ms;
+    if (line.role !== 'main' || startMs === null || endMs === null ||
+        nextStartMs === null || nextStartMs >= endMs) return nextStartMs;
+
+    const peers = lines.filter(other => other !== line && other.role === 'main' &&
+        other.start_time_ms !== null && other.start_time_ms > startMs && other.start_time_ms < endMs);
+    if (!peers.length || peers.some(peer => {
+        const peerEndMs = getMainLyricEndMs(peer);
+        return peerEndMs === null || Math.abs(peerEndMs - endMs) > coEndingToleranceMs;
+    })) return nextStartMs;
+
+    return lines.reduce<number | null>((next, other) => {
+        const candidate = other.role === 'main' ? other.start_time_ms : null;
+        return candidate !== null && candidate >= endMs && (next === null || candidate < next)
+            ? candidate : next;
+    }, null);
+}
+
+// TTML 的 <p> end 可能覆盖后续背景和声；主唱逐字动画以最后一词词尾为准。
+export const getLineKaraokeEndMs = (line: LyricsLine, nextLineStartMs: number | null): number | null => {
+    const lastWord = line.words.at(-1);
+    if (line.role === 'main' && typeof lastWord?.end_time_ms === 'number') return lastWord.end_time_ms;
+    return line.end_time_ms ?? nextLineStartMs;
+};
+
 const getBackgroundLyricEndMs = (line: LyricsLine): number | null => {
     let endMs = line.end_time_ms;
     for (const word of line.words) {
@@ -177,8 +209,17 @@ export function getTtmlLineWindows(
             } else {
                 // 链在此结束：如果本行和下一行是一起结束的（对唱组），同步使用下一行的退出时间
                 // （这能保证下一行触发词尾加速压缩时，本行也同步压缩，不会导致本行反而更晚结束）。
-                if (end <= next.end + 50) {
-                    windowEnd = windowEndMs[i + 1];
+                if (end <= next.end + coEndingToleranceMs) {
+                    const handoffStartMs = getLineCompressionHandoffStartMs(lines, mains[i].index);
+                    if (compressTail && Math.abs(end - next.end) <= coEndingToleranceMs &&
+                        handoffStartMs !== null && handoffStartMs >= end) {
+                        const ownVisualEndMs = getTightHandoffVisualEndMs(
+                            mains[i].line.words, getMainLyricEndMs(mains[i].line), handoffStartMs, true,
+                        );
+                        windowEnd = Math.max(ownVisualEndMs ?? end, windowEndMs[i + 1]);
+                    } else {
+                        windowEnd = windowEndMs[i + 1];
+                    }
                 } else {
                     windowEnd = Math.max(end, windowEndMs[i + 1]);
                 }
@@ -580,13 +621,11 @@ export function buildDisplayItems(
     let lastLyricLineIndex = -1;
     let pendingEndMs: number | null = null;
     const displayLines = lines.map((line, index) => {
-        const nextLineStartMs = getLineEndMsByIndex(lines, index);
+        const nextLineStartMs = getLineCompressionHandoffStartMs(lines, index);
         const hasWordTiming = Boolean(line.words?.length);
-        const effectiveLineEndMs = typeof line.end_time_ms === 'number'
-            ? line.end_time_ms
-            : hasWordTiming
-                ? nextLineStartMs
-                : null;
+        const effectiveLineEndMs = hasWordTiming
+            ? getLineKaraokeEndMs(line, nextLineStartMs)
+            : null;
 
         return {
             ...line,

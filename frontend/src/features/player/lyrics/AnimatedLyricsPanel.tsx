@@ -1,5 +1,6 @@
 import { memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
 import clsx from 'clsx';
+import { flushSync } from 'react-dom';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useAnimatedLyricsInterlude } from '@/features/player/lyrics/useAnimatedLyricsInterlude';
@@ -15,6 +16,8 @@ import {
 import { getAnimatedLyricsMotionDelays, getAnimatedLyricsSpringParams } from '@/features/player/lyrics/animatedLyricsMotion';
 import {
     buildDisplayItems,
+    getLineCompressionHandoffStartMs,
+    getLineKaraokeEndMs,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
 import { animationLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
@@ -66,6 +69,14 @@ function AnimatedLyricsPanel({
     const pendingLineSeekRef = useRef<{
         syncRevision: number;
         targetMs: number;
+    } | null>(null);
+    const seekExitFallbackRef = useRef<number | null>(null);
+    const [seekExit, setSeekExit] = useState<{
+        items: object;
+        indices: number[];
+        targetMs: number;
+        syncRevision: number;
+        startedAt: number;
     } | null>(null);
     const [isUserScrolling, setIsUserScrolling] = useState(false);
     const [pausedScroll, setPausedScroll] = useState(false);
@@ -213,6 +224,24 @@ function AnimatedLyricsPanel({
         measurements,
         parentDisplayIndexMap,
     });
+    const renderedIndices = useMemo(() => seekExit?.items === displayItems && seekExit.indices.length
+        ? [...new Set([...visibleIndices, ...seekExit.indices])].sort((left, right) => left - right)
+        : visibleIndices, [displayItems, seekExit, visibleIndices]);
+
+    useEffect(() => {
+        if (!seekExit || seekExit.items !== displayItems ||
+            seekExit.syncRevision === syncRevision ||
+            Math.abs(renderCurrentMs - seekExit.targetMs) > lineSeekSyncToleranceMs) return;
+        const remainingMs = Math.max(0, 450 - (performance.now() - seekExit.startedAt));
+        const timer = window.setTimeout(() => {
+            setSeekExit(current => current === seekExit ? null : current);
+        }, remainingMs);
+        return () => window.clearTimeout(timer);
+    }, [displayItems, renderCurrentMs, seekExit, syncRevision]);
+
+    useEffect(() => () => {
+        if (seekExitFallbackRef.current !== null) window.clearTimeout(seekExitFallbackRef.current);
+    }, []);
 
     // This is a panel-commit counter, deliberately separate from the
     // MutationObserver batches collected by the profile script. It is only
@@ -278,12 +307,27 @@ function AnimatedLyricsPanel({
         if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
     }, []);
 
-    const seekContextRef = useRef({ keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek });
+    const seekContextRef = useRef({ keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek, activeIndices, displayItems });
     useInsertionEffect(() => {
-        seekContextRef.current = { keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek };
-    }, [keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek]);
+        seekContextRef.current = { keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek, activeIndices, displayItems };
+    }, [keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek, activeIndices, displayItems]);
     const handleLineSeek = useCallback((time: number) => {
         const context = seekContextRef.current;
+        const targetMs = time * 1000;
+        const indices = [...context.activeIndices].filter(index => {
+            const item = context.displayItems[index];
+            return item?.type === 'line' && item.line.words.length > 0 && item.line.start_time_ms !== targetMs;
+        });
+        // Commit the exit state before the async seek can publish its new clock to the old row.
+        const exit = indices.length ? {
+            items: context.displayItems, indices, targetMs,
+            syncRevision: context.syncRevision, startedAt: performance.now(),
+        } : null;
+        flushSync(() => setSeekExit(exit));
+        if (seekExitFallbackRef.current !== null) window.clearTimeout(seekExitFallbackRef.current);
+        seekExitFallbackRef.current = exit ? window.setTimeout(() => {
+            setSeekExit(current => current === exit ? null : current);
+        }, 2500) : null;
         context.keepCurrentInterludeForExit();
         if (resumeTimeoutRef.current) {
             clearTimeout(resumeTimeoutRef.current);
@@ -405,7 +449,7 @@ function AnimatedLyricsPanel({
                                 data-animated-display-count={displayItems.length}
                                 style={{ height: contentHeight }}
                             >
-                                {visibleIndices.map(displayIndex => {
+                                {renderedIndices.map(displayIndex => {
                                     const item = displayItems[displayIndex];
                                     if (!item) return null;
                                     const interludeShift = visualInterludeShifts[displayIndex] ?? 0;
@@ -440,6 +484,7 @@ function AnimatedLyricsPanel({
                                                     line={item.line}
                                                     isActive={isActive}
                                                     isKaraokeActive={isKaraokeActive}
+                                                    isSeekExiting={seekExit?.items === displayItems && seekExit.indices.includes(displayIndex)}
                                                     isUserScrolling={isUserScrolling}
                                                     pausedScroll={pausedScroll}
                                                     distanceFromActive={
@@ -452,8 +497,8 @@ function AnimatedLyricsPanel({
                                                     }
                                                     interludeShift={interludeShift}
                                                     interludeShiftDurationMs={interludeGapOpenDurationMs}
-                                                    lineEndMs={typeof item.line.end_time_ms === 'number' ? item.line.end_time_ms : getLineEndMsByIndex(lines, item.lineIndex)}
-                                                    nextLineStartMs={item.line.words?.length ? getLineEndMsByIndex(lines, item.lineIndex) : null}
+                                                    lineEndMs={getLineKaraokeEndMs(item.line, getLineEndMsByIndex(lines, item.lineIndex))}
+                                                    nextLineStartMs={item.line.words?.length ? getLineCompressionHandoffStartMs(lines, item.lineIndex) : null}
                                                     enableTightHandoffTailCompression={timingStrategy.compressTightHandoffTail}
                                                     currentTime={renderCurrentMs / 1000}
                                                     preciseMsRef={preciseMsRef}

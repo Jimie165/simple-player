@@ -16,6 +16,7 @@ import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
 import {
     buildDisplayItems,
     getActiveLyricsState,
+    getLineKaraokeEndMs,
     getLineEndMsByIndex,
 } from '@/features/player/lyrics/lyricsDisplay';
 import { performanceLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
@@ -544,11 +545,7 @@ export default function LyricsPanel({
                                     }
                                     interludeShift={interludeShift}
                                     interludeShiftDurationMs={interludeGapOpenDurationMs}
-                                    lineEndMs={
-                                        typeof item.line.end_time_ms === 'number'
-                                            ? item.line.end_time_ms
-                                            : getLineEndMsByIndex(lines, item.lineIndex)
-                                    }
+                                    lineEndMs={getLineKaraokeEndMs(item.line, getLineEndMsByIndex(lines, item.lineIndex))}
                                     nextLineStartMs={
                                         item.line.words?.length
                                             ? getLineEndMsByIndex(lines, item.lineIndex)

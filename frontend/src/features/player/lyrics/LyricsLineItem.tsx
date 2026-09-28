@@ -8,6 +8,7 @@ interface LyricsLineItemProps {
     line: LyricsLine;
     isActive: boolean;
     isKaraokeActive?: boolean;
+    isSeekExiting?: boolean;
     isUserScrolling: boolean;
     pausedScroll: boolean;
     distanceFromActive: number;
@@ -47,6 +48,7 @@ function LyricsLineItem({
     line,
     isActive,
     isKaraokeActive = isActive,
+    isSeekExiting = false,
     isUserScrolling,
     pausedScroll,
     distanceFromActive,
@@ -193,16 +195,14 @@ function LyricsLineItem({
                     shouldRenderKaraoke
                         ? (isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
-                            : isActive
-                                ? 'transition-none'
-                                : 'transition-opacity duration-500 ease-in-out')
+                            : 'opacity-100')
                         : isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
                             : 'transition-[opacity,color] duration-500 ease-in-out',
-                    // 背景行虽然整体有容器透明度控制，但纯文本 fallback 需保持偏暗（text-white/30）以匹配 KaraokeText 的 --kb
+                    // 逐字行由暗底色和高光层交叉淡出；纯文本仍使用整行透明度。
                     isBackground
                         ? undefined
-                        : (isActive ? 'opacity-100' : 'opacity-30')
+                        : (!shouldRenderKaraoke && (isActive ? 'opacity-100' : 'opacity-30'))
                 )}
                 style={{
                     ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
@@ -222,6 +222,7 @@ function LyricsLineItem({
                         playbackSyncKey={playbackSyncKey}
                         isActive={isKaraokeActive}
                         isFocused={isActive}
+                        isSeekExiting={isSeekExiting}
                         glowDisabled={isBackground}
                         fillAlpha={isBackground ? 0.3 : 1}
                     />
@@ -314,6 +315,7 @@ const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLine
     prev.line === next.line &&
     prev.isActive === next.isActive &&
     prev.isKaraokeActive === next.isKaraokeActive &&
+    prev.isSeekExiting === next.isSeekExiting &&
     prev.isUserScrolling === next.isUserScrolling &&
     prev.pausedScroll === next.pausedScroll &&
     (prev.animatedMotion && next.animatedMotion || prev.distanceFromActive === next.distanceFromActive) &&

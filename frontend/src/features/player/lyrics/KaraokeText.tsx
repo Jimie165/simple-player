@@ -17,6 +17,7 @@ interface KaraokeTextProps {
     preciseMsRef: RefObject<number>;
     isActive: boolean;
     isFocused: boolean;
+    isSeekExiting?: boolean;
     /** Animated panels provide the playback state so paused rows do not keep a frame loop. */
     isPlaying?: boolean;
     playbackSyncKey?: number;
@@ -337,20 +338,23 @@ function KaraokeTextBase({
     preciseMsRef,
     isActive,
     isFocused,
+    isSeekExiting = false,
     isPlaying,
     playbackSyncKey,
     glowDisabled = false,
     fillAlpha = 1,
 }: KaraokeTextProps) {
     const lyricFillMode = useThemeStore(state => state.lyricFillMode);
+    const visualFocused = isFocused && !isSeekExiting;
     const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const contentRef = useRef<HTMLSpanElement | null>(null);
-    const wasFocusedRef = useRef(isFocused);
+    const wasFocusedRef = useRef(visualFocused);
     const runtimeRef = useRef<KaraokeRuntimeState | null>(null);
     const previousFillModeRef = useRef(lyricFillMode);
     const isActiveRef = useRef(isActive);
-    const isFocusedRef = useRef(isFocused);
+    const isFocusedRef = useRef(visualFocused);
+    const isSeekExitingRef = useRef(isSeekExiting);
     const glowDisabledRef = useRef(glowDisabled);
 
     useInsertionEffect(() => {
@@ -358,9 +362,10 @@ function KaraokeTextBase({
             runtimeRef.current.needsVisualSync = true;
         }
         isActiveRef.current = isActive;
-        isFocusedRef.current = isFocused;
+        isFocusedRef.current = visualFocused;
+        isSeekExitingRef.current = isSeekExiting;
         glowDisabledRef.current = glowDisabled;
-    }, [glowDisabled, isActive, isFocused]);
+    }, [glowDisabled, isActive, isSeekExiting, visualFocused]);
 
     useLayoutEffect(() => () => {
         const runtime = runtimeRef.current;
@@ -671,6 +676,7 @@ function KaraokeTextBase({
         };
 
         const tick = () => {
+            if (isSeekExitingRef.current) return;
             const audioMs = preciseMsRef.current;
             if (Number.isFinite(audioMs) && (audioMs !== runtimeState.lastTimeMs || runtimeState.needsVisualSync)) {
                 const hasPreviousTime =
@@ -693,7 +699,7 @@ function KaraokeTextBase({
         };
 
         const initialMs = preciseMsRef.current;
-        if (initialMs !== null) {
+        if (initialMs !== null && !isSeekExitingRef.current) {
             const hasTimelineJump = Number.isFinite(runtimeState.lastTimeMs) &&
                 (initialMs < runtimeState.lastTimeMs || initialMs - runtimeState.lastTimeMs > 200);
             const visualSync = runtimeState.needsVisualSync;
@@ -729,7 +735,7 @@ function KaraokeTextBase({
     // scheduler subscription set to churn at exactly the expensive boundary.
     useLayoutEffect(() => {
         const runtime = runtimeRef.current;
-        if (!runtime?.frameCallback || !isActiveRef.current || isPlaying === false) return;
+        if (!runtime?.frameCallback || !isActiveRef.current || isSeekExiting || isPlaying === false) return;
         const callback = runtime.frameCallback;
         let frame: number | null = null;
         let unsubscribe: (() => void) | undefined;
@@ -746,13 +752,13 @@ function KaraokeTextBase({
             unsubscribe?.();
             if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [charRuntimes, flatChars, frameRegistry, isActive, isPlaying, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
+    }, [charRuntimes, flatChars, frameRegistry, isActive, isPlaying, isSeekExiting, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
 
     useLayoutEffect(() => {
         const wasFocused = wasFocusedRef.current;
-        wasFocusedRef.current = isFocused;
+        wasFocusedRef.current = visualFocused;
 
-        if (isFocused) {
+        if (visualFocused) {
             const runtime = runtimeRef.current;
             // Stop the previous CSS owner before synchronizing the runtime,
             // including a paused reactivation at the very same media time.
@@ -802,15 +808,15 @@ function KaraokeTextBase({
         return () => {
             window.clearTimeout(releaseTimer);
         };
-    }, [flatChars, isFocused, preciseMsRef, wordGroups.length]);
+    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length]);
 
     // These events invalidate playback state, not the DOM runtime. In
     // particular a paused seek has no content frame to refresh the fill.
     useLayoutEffect(() => {
         const runtime = runtimeRef.current;
-        if (!runtime) return;
+        if (!runtime || isSeekExiting) return;
         runtime.syncNow?.();
-    }, [glowDisabled, isActive, isPlaying, playbackSyncKey, preciseMsRef]);
+    }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
     return (
         <span ref={contentRef} className={lyricFillMode === 'character' ? 'karaoke-text-character' : undefined} style={{ display: 'block' }}>
@@ -820,8 +826,8 @@ function KaraokeTextBase({
                     fontKerning: 'none',
                     fontVariantLigatures: 'none',
                     // 对于和声行（glowDisabled为true），强制基色保持偏暗，防止因任何状态抖动导致瞬间变成100%纯白
-                    '--kb': (isActive || glowDisabled) ? 0.30 : 1,
-                    '--kfa': fillAlpha,
+                    '--kb': 0.30,
+                    '--kfa': visualFocused ? fillAlpha : 0,
                 } as React.CSSProperties}
             >
                 {layoutGroups.map((group) => {
@@ -888,6 +894,7 @@ const KaraokeText = memo(KaraokeTextBase, (prev, next) => {
         prev.preciseMsRef === next.preciseMsRef &&
         prev.isActive === next.isActive &&
         prev.isFocused === next.isFocused &&
+        prev.isSeekExiting === next.isSeekExiting &&
         prev.isPlaying === next.isPlaying &&
         prev.playbackSyncKey === next.playbackSyncKey &&
         prev.glowDisabled === next.glowDisabled &&
