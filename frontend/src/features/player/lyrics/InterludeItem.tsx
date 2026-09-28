@@ -135,7 +135,12 @@ export default function InterludeItem({
         const getBreathScale = (durationMs: number) => {
             const cycleProgress =
                 (durationMs / (Math.PI * breatheDurationMs)) % 1;
-            const progress = getBreathProgress(cycleProgress);
+            const halfProgress = (cycleProgress * 2) % 1;
+            const acceleratedHalfProgress =
+                halfProgress + 0.5 * halfProgress * (1 - halfProgress) ** 2;
+            const acceleratedCycleProgress =
+                Math.floor(cycleProgress * 2) / 2 + acceleratedHalfProgress / 2;
+            const progress = getBreathProgress(acceleratedCycleProgress);
             const signedProgress = progress <= 0.5
                 ? 4 * progress - 1
                 : 3 - 4 * progress;
