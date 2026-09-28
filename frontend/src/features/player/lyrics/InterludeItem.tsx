@@ -8,14 +8,14 @@ import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrame
 
 const dotIndexes = [0, 1, 2];
 
-const TARGET_BREATHE_DURATION_MS = 1500;
+const TARGET_BREATHE_DURATION_MS = 1700;
 const BREATH_SCALE_CENTER = 0.93;
-const BREATH_SCALE_AMPLITUDE = 0.11;
-const EXIT_GROWTH_DURATION_MS = 420;
+const BREATH_SCALE_AMPLITUDE = 0.15;
+const EXIT_GROWTH_DURATION_MS = 1000;
 const EXIT_OPACITY_WINDOW_MS = 250;
 const EXIT_PHASE_MIN = 0.02;
 const EXIT_PHASE_MAX = 0.08;
-const EXIT_SCALE_MAX = 1.12;
+const EXIT_SCALE_MAX = BREATH_SCALE_CENTER + BREATH_SCALE_AMPLITUDE;
 const FORCED_EXIT_DURATION_MS = 250;
 
 const clamp = (value: number, min: number, max: number) =>
@@ -25,9 +25,17 @@ const clamp01 = (value: number) => clamp(value, 0, 1);
 const easeOutExpo = (value: number) =>
     value === 1 ? 1 : 1 - 2 ** (-10 * value);
 
-const easeOutSine = (value: number) =>
-    Math.sin(clamp01(value) * Math.PI / 2);
+const easeOutCubic = (value: number) => 1 - (1 - clamp01(value)) ** 3;
 const easeInCubic = (value: number) => value ** 3;
+
+const getBreathProgress = (cycleProgress: number) => {
+    // time warping keeps the dots nearly still at each extremum.
+    const angle = 4 * Math.PI * cycleProgress;
+    const sine = Math.sin(angle);
+    const cosine = Math.cos(angle);
+    return cycleProgress - 0.084 * sine + 0.008 * (1 - cosine) +
+        0.0046 * sine * (cosine - sine);
+};
 
 interface InterludeItemProps {
     isActive: boolean;
@@ -125,13 +133,14 @@ export default function InterludeItem({
         }
 
         const getBreathScale = (durationMs: number) => {
-            const angle =
-                1.5 * Math.PI - (durationMs / breatheDurationMs) * 2;
+            const cycleProgress =
+                (durationMs / (Math.PI * breatheDurationMs)) % 1;
+            const progress = getBreathProgress(cycleProgress);
+            const signedProgress = progress <= 0.5
+                ? 4 * progress - 1
+                : 3 - 4 * progress;
 
-            return (
-                BREATH_SCALE_CENTER +
-                BREATH_SCALE_AMPLITUDE * Math.sin(angle)
-            );
+            return BREATH_SCALE_CENTER + BREATH_SCALE_AMPLITUDE * signedProgress;
         };
         const dotsVisibleStartDurationMs = interludeGapOpenDurationMs;
         const dotsWhiteningDurationMs = Math.max(
@@ -150,11 +159,7 @@ export default function InterludeItem({
             const preciseMs = clamp(preciseMsRef.current, startMs, animationEndMs);
             const currentDurationMs = preciseMs - startMs;
             const remainingMs = animationEndMs - preciseMs;
-            const breathAngle =
-                1.5 * Math.PI - (currentDurationMs / breatheDurationMs) * 2;
-            let scale =
-                BREATH_SCALE_CENTER +
-                BREATH_SCALE_AMPLITUDE * Math.sin(breathAngle);
+            let scale = getBreathScale(currentDurationMs);
             let globalOpacity = 1;
 
             if (currentDurationMs < 2000) {
@@ -174,7 +179,7 @@ export default function InterludeItem({
                 const exitProgress = clamp01(
                     exitElapsedMs / exitMotionDurationMs
                 );
-                const easedExitProgress = easeOutSine(exitProgress);
+                const easedExitProgress = easeOutCubic(exitProgress);
 
                 scale =
                     exitStartScale +
@@ -260,7 +265,7 @@ export default function InterludeItem({
             >
                 <span
                     ref={dotsContainerRef}
-                    className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-left"
+                    className="flex items-center gap-[clamp(0.28rem,0.9vmin,0.56rem)] origin-center"
                 >
                     {dotIndexes.map(dotIndex => (
                         <span
