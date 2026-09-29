@@ -345,6 +345,7 @@ function KaraokeTextBase({
     fillAlpha = 1,
 }: KaraokeTextProps) {
     const lyricFillMode = useThemeStore(state => state.lyricFillMode);
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled && state.playerEffectMode === 'animation');
     const visualFocused = isFocused && !isSeekExiting;
     const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
@@ -819,15 +820,20 @@ function KaraokeTextBase({
     }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
     return (
-        <span ref={contentRef} className={lyricFillMode === 'character' ? 'karaoke-text-character' : undefined} style={{ display: 'block' }}>
+        <span ref={contentRef} className={[
+            lyricFillMode === 'character' ? 'karaoke-text-character' : '',
+            lyricLineBlendEnabled ? 'karaoke-text-background-blend' : '',
+        ].filter(Boolean).join(' ')} style={{ display: 'block' }}>
             <span
                 style={{
                     display: 'block',
                     fontKerning: 'none',
                     fontVariantLigatures: 'none',
                     // 对于和声行（glowDisabled为true），强制基色保持偏暗，防止因任何状态抖动导致瞬间变成100%纯白
-                    '--kb': 0.30,
+                    '--kb': lyricLineBlendEnabled && visualFocused ? 0.12 : 0.30,
                     '--kfa': visualFocused ? fillAlpha : 0,
+                    '--kfd': lyricLineBlendEnabled ? 0.4 : 0,
+                    '--kf': lyricLineBlendEnabled ? -100 : undefined,
                 } as React.CSSProperties}
             >
                 {layoutGroups.map((group) => {

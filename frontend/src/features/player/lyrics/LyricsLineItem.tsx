@@ -3,6 +3,7 @@ import { memo, useEffect, useRef, type CSSProperties, type RefObject } from 'rea
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 import { getAnimatedLyricsRowVisualStyle } from '@/features/player/lyrics/animatedLyricsMotion';
+import { useThemeStore } from '@/store/useThemeStore';
 
 interface LyricsLineItemProps {
     line: LyricsLine;
@@ -69,6 +70,7 @@ function LyricsLineItem({
     hasDuetLine = false,
     onBackgroundHeight,
 }: LyricsLineItemProps) {
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled) && animatedMotion;
     const rowRef = useRef<HTMLButtonElement | null>(null);
     const interactionRef = useRef<HTMLDivElement | null>(null);
     const pressAnimationRef = useRef<Animation | null>(null);
@@ -153,7 +155,7 @@ function LyricsLineItem({
             : 'py-[clamp(1rem,1.3vw,1.25rem)]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
         // 有译文时将阴影限制在主文字上，避免译文随激活状态改变阴影。
-        isActive && !isBackground && !line.translation ? 'text-white drop-shadow-xl' : 'text-white',
+        isActive && !isBackground && !line.translation && !lyricLineBlendEnabled ? 'text-white drop-shadow-xl' : 'text-white',
         isDuetRow
             ? 'text-right pl-[15%] origin-right'
             : 'text-left pl-[clamp(1.2rem,2.2vw,2rem)] origin-left',
@@ -191,7 +193,7 @@ function LyricsLineItem({
                 className={clsx(
                     'block font-bold leading-[1.38] tracking-wide relative',
                     mainTextClass,
-                    isActive && !isBackground && line.translation && 'drop-shadow-xl',
+                    isActive && !isBackground && line.translation && !lyricLineBlendEnabled && 'drop-shadow-xl',
                     shouldRenderKaraoke
                         ? (isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)

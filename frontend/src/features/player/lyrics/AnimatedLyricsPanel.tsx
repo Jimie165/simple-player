@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import { flushSync } from 'react-dom';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { useThemeStore } from '@/store/useThemeStore';
 import { useAnimatedLyricsInterlude } from '@/features/player/lyrics/useAnimatedLyricsInterlude';
 import { useAnimatedLyricsLayout, useAnimatedLyricsMeasurements } from '@/features/player/lyrics/useAnimatedLyricsLayout';
 import { useAnimatedLyricsAnimator } from '@/features/player/lyrics/useAnimatedLyricsAnimator';
@@ -56,6 +57,7 @@ function AnimatedLyricsPanel({
     variant = 'side',
 }: LyricsPanelProps) {
     const isPlaying = usePlayerStore(state => state.isPlaying);
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
     const isTtml = lyricsDocument?.origin === 'native-ttml';
@@ -427,14 +429,15 @@ function AnimatedLyricsPanel({
     return (
         <LyricsFrameSchedulerContext.Provider value={frameScheduler}>
             <LyricsFrameTaskRegistryContext.Provider value={contentRegistry}>
-                <div className="relative h-full w-full rounded-[22px] overflow-hidden" style={{ contain: 'strict' }}>
+                <div className="relative h-full w-full rounded-[22px] overflow-hidden" style={lyricLineBlendEnabled ? undefined : { contain: 'strict' }}>
                     <motion.div
                         ref={scrollAreaRef}
                         className={clsx(
-                            'relative z-10 mt-0 overflow-hidden touch-none',
+                            'relative mt-0 overflow-hidden touch-none',
+                            !lyricLineBlendEnabled && 'z-10',
                             variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
                         )}
-                        style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
+                        style={lyricLineBlendEnabled ? undefined : variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
                         onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
                         onWheel={(event: WheelEvent<HTMLDivElement>) => {
                             event.preventDefault();
@@ -460,6 +463,7 @@ function AnimatedLyricsPanel({
                                         <AnimatedLyricsLayoutItem
                                             key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
                                             index={displayIndex}
+                                            blendWithBackground={lyricLineBlendEnabled && item.type === 'line'}
                                             onAnimateMount={registerAnimatedRow}
                                             onMount={observeItem}
                                             top={itemTops[displayIndex]}

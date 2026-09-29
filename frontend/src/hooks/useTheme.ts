@@ -23,6 +23,8 @@ export function useTheme() {
     const setFullScreenMode = useThemeStore((state) => state.setFullScreenMode);
     const reactiveBackgroundEnabled = useThemeStore((state) => state.reactiveBackgroundEnabled);
     const setReactiveBackgroundEnabled = useThemeStore((state) => state.setReactiveBackgroundEnabled);
+    const lyricLineBlendEnabled = useThemeStore((state) => state.lyricLineBlendEnabled);
+    const setLyricLineBlendEnabled = useThemeStore((state) => state.setLyricLineBlendEnabled);
 
     return {
         theme: themeMode,
@@ -45,6 +47,8 @@ export function useTheme() {
         setFullScreenMode,
         reactiveBackgroundEnabled,
         setReactiveBackgroundEnabled,
+        lyricLineBlendEnabled,
+        setLyricLineBlendEnabled,
 
         presetColors: PRESET_COLORS
     };

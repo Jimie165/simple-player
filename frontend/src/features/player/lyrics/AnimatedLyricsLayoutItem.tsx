@@ -1,6 +1,7 @@
 import { memo, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 interface AnimatedLyricsLayoutItemProps {
+    blendWithBackground: boolean;
     children: ReactNode;
     index: number;
     onAnimateMount: (index: number, node: HTMLDivElement) => (() => void) | undefined;
@@ -10,6 +11,7 @@ interface AnimatedLyricsLayoutItemProps {
 
 /** 承载单个窗口化歌词项并把真实高度回传给轻量布局模型。 */
 function AnimatedLyricsLayoutItem({
+    blendWithBackground,
     children,
     index,
     onAnimateMount,
@@ -32,7 +34,7 @@ function AnimatedLyricsLayoutItem({
     return (
         <div
             ref={elementRef}
-            className="animated-lyrics-row-shell absolute left-0 w-full"
+            className={`animated-lyrics-row-shell absolute left-0 w-full${blendWithBackground ? ' mix-blend-plus-lighter' : ''}`}
             data-animated-lyrics-row-key={index}
             style={{ top }}
         >

@@ -63,7 +63,7 @@
 
 @property --kg {
   syntax: '<number>';
-  inherits: false;
+  inherits: true;
   initial-value: 0;
 }
 
@@ -474,16 +474,16 @@ body {
     black 0%,
     black calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%),
     rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
-    transparent 100%
+    rgba(0, 0, 0, var(--kfd, 0)) calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
+    rgba(0, 0, 0, var(--kfd, 0)) 100%
   );
   mask-image: linear-gradient(
     to right,
     black 0%,
     black calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%),
     rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
-    transparent 100%
+    rgba(0, 0, 0, var(--kfd, 0)) calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
+    rgba(0, 0, 0, var(--kfd, 0)) 100%
   );
 }
 
@@ -493,17 +493,34 @@ body {
     black 0%,
     black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
     rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
-    transparent 100%
+    rgba(0, 0, 0, var(--kfd, 0)) min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfd, 0)) 100%
   );
   mask-image: linear-gradient(
     to right,
     black 0%,
     black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
     rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    transparent min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
-    transparent 100%
+    rgba(0, 0, 0, var(--kfd, 0)) min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
+    rgba(0, 0, 0, var(--kfd, 0)) 100%
   );
+}
+
+.karaoke-text-background-blend .karaoke-char {
+  transition: color 300ms ease-out;
+  text-shadow: none;
+}
+
+.karaoke-text-background-blend .karaoke-char::before {
+  /* Keep the glow inside the bright layer's moving mask, as AMLL does. */
+  text-shadow: 0 0 var(--kgb, 5px) rgba(255, 255, 255, var(--kg, 0));
+}
+
+.karaoke-text-background-blend.karaoke-text-exiting .karaoke-char {
+  transition:
+    color 300ms ease-out,
+    transform 250ms ease-in-out,
+    --kg 250ms ease-in-out;
 }
 
 .animated-lyrics-row-shell {

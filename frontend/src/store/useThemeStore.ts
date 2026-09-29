@@ -15,12 +15,14 @@ interface ThemeState {
     lyricFillMode: LyricFillMode;
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
+    lyricLineBlendEnabled: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
     setLyricFillMode: (mode: LyricFillMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
+    setLyricLineBlendEnabled: (enabled: boolean) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -39,6 +41,7 @@ export const useThemeStore = create<ThemeState>()(
             lyricFillMode: 'line',
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
+            lyricLineBlendEnabled: false,
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
@@ -57,6 +60,7 @@ export const useThemeStore = create<ThemeState>()(
             setReactiveBackgroundEnabled: (enabled) => {
                 set({ reactiveBackgroundEnabled: enabled });
             },
+            setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
 
             setSourceColor: (hex, isCustom = false) => {
                 set({ sourceColor: hex, isCustomColor: isCustom });
@@ -123,6 +127,7 @@ export const useThemeStore = create<ThemeState>()(
                 lyricFillMode: state.lyricFillMode,
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
+                lyricLineBlendEnabled: state.lyricLineBlendEnabled,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -140,6 +145,7 @@ export const useThemeStore = create<ThemeState>()(
                     lyricFillMode: persistedState?.lyricFillMode === 'character' ? 'character' : 'line',
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
+                    lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
                 };
             },
         }

@@ -36,8 +36,9 @@ export default function NowPlayingLyricsPanel({
     onUserScrollDirection,
     narrowControlsVisible = true,
 }: NowPlayingLyricsPanelProps) {
-    const { playerEffectMode } = useTheme();
+    const { playerEffectMode, lyricLineBlendEnabled } = useTheme();
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
+    const blendAnimatedLyrics = lyricLineBlendEnabled && playerEffectMode === 'animation' && hasTimestamps;
     const isFlippingIn = panelFlipTarget === 'lyrics' && isPanelFlipping && isLyricsOpen;
     const isFlippingOut = panelFlipTarget === 'queue' && isPanelFlipping;
     const isVisible = isLyricsOpen && !isFlippingOut;
@@ -70,21 +71,25 @@ export default function NowPlayingLyricsPanel({
         <div
             className={clsx(
                 variant === 'side'
-                    ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col z-10 overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
-                    : 'absolute inset-0 w-full h-full flex flex-col z-10 overflow-hidden',
+                    ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
+                    : 'absolute inset-0 w-full h-full flex flex-col overflow-hidden',
+                !blendAnimatedLyrics && 'z-10',
                 isLyricsOpen ? 'pointer-events-auto' : 'pointer-events-none'
             )}
         >
             <div className="relative flex-1 overflow-hidden">
                 <motion.div
                     className={clsx(
-                        'absolute inset-0 origin-center transform-gpu',
+                        'absolute inset-0 origin-center',
+                        !blendAnimatedLyrics && 'transform-gpu',
                         !isVisible && 'pointer-events-none'
                     )}
                     initial="hidden"
                     animate={isVisible ? 'visible' : 'hidden'}
                     variants={variants}
-                    style={variant === 'narrow' ? {
+                    style={variant === 'narrow' && blendAnimatedLyrics ? {
+                        bottom: narrowControlsVisible ? '18rem' : 0,
+                    } : variant === 'narrow' ? {
                         maskImage: narrowControlsVisible
                             ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
                             : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',

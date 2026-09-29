@@ -107,6 +107,8 @@ export default function AppearanceSection() {
         setLyricFillMode,
         reactiveBackgroundEnabled,
         setReactiveBackgroundEnabled,
+        lyricLineBlendEnabled,
+        setLyricLineBlendEnabled,
     } = useTheme();
 
     return (
@@ -167,6 +169,30 @@ export default function AppearanceSection() {
                                                 reactiveBackgroundEnabled ? "translate-x-5" : "translate-x-0",
                                             )}
                                         />
+                                    </span>
+                                </button>
+                            </div>
+                            <div className="settings-card mt-3 flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left">
+                                <span>
+                                    <span className="block text-sm font-medium text-on-surface">歌词背景混合</span>
+                                    <span className="block text-xs text-on-surface-variant">让歌词与背后的画面以增亮方式混合</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-label="歌词背景混合"
+                                    aria-checked={lyricLineBlendEnabled}
+                                    onClick={() => setLyricLineBlendEnabled(!lyricLineBlendEnabled)}
+                                    className="flex shrink-0 items-center justify-center rounded-full p-2 -mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                >
+                                    <span className={clsx(
+                                        'relative block h-6 w-11 rounded-full transition-colors',
+                                        lyricLineBlendEnabled ? 'bg-primary' : 'bg-outline-variant/50',
+                                    )}>
+                                        <span className={clsx(
+                                            'absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+                                            lyricLineBlendEnabled ? 'translate-x-5' : 'translate-x-0',
+                                        )} />
                                     </span>
                                 </button>
                             </div>
