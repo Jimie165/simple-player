@@ -71,7 +71,7 @@ export default function NowPlayingToggleIcon({ selected, icon, repeatOne = false
     const artwork = icons[icon];
 
     return (
-        <svg data-selected={selected} viewBox={artwork.viewBox} className={`opacity-45 transition-opacity ${icon === 'shuffle' || icon === 'repeat' ? 'w-3/5 h-3/5' : 'w-4/5 h-4/5'}`} aria-hidden="true">
+        <svg data-selected={selected} viewBox={artwork.viewBox} className={`block shrink-0 overflow-visible opacity-45 transition-opacity ${icon === 'shuffle' || icon === 'repeat' ? 'w-3/5 h-3/5' : 'w-4/5 h-4/5'}`} aria-hidden="true">
             {!selected && (
                 <path d={artwork.background} fill="currentColor" className="opacity-0 transition-opacity group-hover/toggle:opacity-20" />
             )}
