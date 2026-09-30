@@ -435,6 +435,9 @@ body {
   display: inline-block;
   white-space: pre-wrap;
   transform-origin: center;
+  /* Keep the rasterization scope stable throughout the 2D float. */
+  will-change: transform;
+  transform: translateY(0em);
   transition: none;
   overflow: visible;
   color: rgba(255, 255, 255, var(--kb, 0.30));
@@ -512,7 +515,9 @@ body {
 }
 
 .karaoke-text-background-blend .karaoke-char::before {
-  /* Keep the glow inside the bright layer's moving mask, as AMLL does. */
+  /* Keep the glow inside the bright layer's moving mask. */
+  mix-blend-mode: plus-lighter;
+  transition: color 300ms ease-out;
   text-shadow: 0 0 var(--kgb, 5px) rgba(255, 255, 255, var(--kg, 0));
 }
 

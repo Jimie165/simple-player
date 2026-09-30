@@ -38,7 +38,7 @@ export default function NowPlayingLyricsPanel({
 }: NowPlayingLyricsPanelProps) {
     const { playerEffectMode, lyricLineBlendEnabled } = useTheme();
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
-    const blendAnimatedLyrics = lyricLineBlendEnabled && playerEffectMode === 'animation' && hasTimestamps;
+    const blendLyrics = lyricLineBlendEnabled && hasTimestamps;
     const isFlippingIn = panelFlipTarget === 'lyrics' && isPanelFlipping && isLyricsOpen;
     const isFlippingOut = panelFlipTarget === 'queue' && isPanelFlipping;
     const isVisible = isLyricsOpen && !isFlippingOut;
@@ -73,7 +73,7 @@ export default function NowPlayingLyricsPanel({
                 variant === 'side'
                     ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
                     : 'absolute inset-0 w-full h-full flex flex-col overflow-hidden',
-                !blendAnimatedLyrics && 'z-10',
+                !blendLyrics && 'z-10',
                 isLyricsOpen ? 'pointer-events-auto' : 'pointer-events-none'
             )}
         >
@@ -81,13 +81,16 @@ export default function NowPlayingLyricsPanel({
                 <motion.div
                     className={clsx(
                         'absolute inset-0 origin-center',
-                        !blendAnimatedLyrics && 'transform-gpu',
+                        // Blend the lyric group with the backdrop throughout
+                        // the reveal, keeping its child blend scope stable at opacity 1.
+                        blendLyrics && 'isolate mix-blend-plus-lighter',
+                        !blendLyrics && 'transform-gpu',
                         !isVisible && 'pointer-events-none'
                     )}
                     initial="hidden"
                     animate={isVisible ? 'visible' : 'hidden'}
                     variants={variants}
-                    style={variant === 'narrow' && blendAnimatedLyrics ? {
+                    style={variant === 'narrow' && blendLyrics ? {
                         bottom: narrowControlsVisible ? '18rem' : 0,
                     } : variant === 'narrow' ? {
                         maskImage: narrowControlsVisible

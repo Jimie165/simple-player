@@ -89,7 +89,7 @@ const animationHeadstartMs = 100;
 const regularLiftMinDurationMs = 1000;
 const longToneThresholdMs = 1000;
 const syllableLiftEm = 0.078;
-const restingCharTransform = 'translate(0, 0) scale(1)';
+const restingCharTransform = 'translateY(0em)';
 const cjkLayoutCharPattern = /^[\p{Unified_Ideograph}ࠀ-鿼]+$/u;
 const whitespaceLayoutCharPattern = /^\s+$/u;
 
@@ -257,7 +257,9 @@ function getKaraokeCharStyle(
     const translateY = regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
 
-    output.transform = `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`;
+    output.transform = isLongTone
+        ? `translate3d(${translateX.toFixed(4)}em, ${translateY.toFixed(4)}em, 0) scale(${scale.toFixed(4)})`
+        : `translateY(${translateY.toFixed(6)}em)`;
     output.fillStop = fillStop;
     // 辉光与缩放共用强调节奏，避免逐字填色把长音的辉光峰值推迟。
     output.glowAlpha = !isLongTone || glowDisabled ? 0 : glowPulse;
@@ -345,8 +347,16 @@ function KaraokeTextBase({
     fillAlpha = 1,
 }: KaraokeTextProps) {
     const lyricFillMode = useThemeStore(state => state.lyricFillMode);
-    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled && state.playerEffectMode === 'animation');
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const visualFocused = isFocused && !isSeekExiting;
+    // The active bright mask supplies its own dim tail; the resting copy fades out.
+    const baseAlpha = lyricLineBlendEnabled
+        ? (visualFocused ? 0 : (glowDisabled ? 0.08 : 0.2))
+        : (visualFocused && !glowDisabled ? 0.4 : 0.3);
+    const fillLayerAlpha = lyricLineBlendEnabled && !glowDisabled ? 0.85 : fillAlpha;
+    const dimMaskAlpha = lyricLineBlendEnabled
+        ? (glowDisabled ? 0.16 : 0.3) / fillLayerAlpha
+        : 0;
     const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const contentRef = useRef<HTMLSpanElement | null>(null);
@@ -779,7 +789,9 @@ function KaraokeTextBase({
             // 从未聚焦过（如初始非激活行）：无动画残留，直接归位
             charRefs.current.forEach((el) => {
                 if (!el) return;
-                el.style.transform = restingCharTransform;
+                el.style.transform = el.classList.contains('karaoke-char-long-tone')
+                    ? 'translate(0, 0) scale(1)'
+                    : restingCharTransform;
                 el.style.setProperty('--kg', '0');
             });
             return;
@@ -801,7 +813,9 @@ function KaraokeTextBase({
             exitContent?.classList.remove('karaoke-text-exiting');
             charRefs.current.forEach((el) => {
                 if (!el) return;
-                el.style.transform = restingCharTransform;
+                el.style.transform = el.classList.contains('karaoke-char-long-tone')
+                    ? 'translate(0, 0) scale(1)'
+                    : restingCharTransform;
                 el.style.setProperty('--kg', '0');
             });
         }, karaokeExitDurationMs);
@@ -829,10 +843,9 @@ function KaraokeTextBase({
                     display: 'block',
                     fontKerning: 'none',
                     fontVariantLigatures: 'none',
-                    // 对于和声行（glowDisabled为true），强制基色保持偏暗，防止因任何状态抖动导致瞬间变成100%纯白
-                    '--kb': lyricLineBlendEnabled && visualFocused ? 0.12 : 0.30,
-                    '--kfa': visualFocused ? fillAlpha : 0,
-                    '--kfd': lyricLineBlendEnabled ? 0.4 : 0,
+                    '--kb': baseAlpha,
+                    '--kfa': visualFocused ? fillLayerAlpha : 0,
+                    '--kfd': dimMaskAlpha,
                     '--kf': lyricLineBlendEnabled ? -100 : undefined,
                 } as React.CSSProperties}
             >
@@ -860,10 +873,11 @@ function KaraokeTextBase({
                                 const fillEdgeAlpha = fillAlpha >= 1
                                     ? 0.72 + longToneAmount * 0.2
                                     : fillAlpha;
-                                const baseAlpha = 0.30;
-                                const fillEdgeMaskAlpha = fillAlpha > baseAlpha
-                                    ? (fillEdgeAlpha - baseAlpha) / (fillAlpha * (1 - baseAlpha))
-                                    : 1;
+                                const fillEdgeMaskAlpha = lyricLineBlendEnabled
+                                    ? Math.min(fillEdgeAlpha, fillLayerAlpha) / fillLayerAlpha
+                                    : fillAlpha > baseAlpha
+                                        ? (fillEdgeAlpha - baseAlpha) / (fillLayerAlpha * (1 - baseAlpha))
+                                        : 1;
 
                                 return (
                                     <span

@@ -70,7 +70,7 @@ function LyricsLineItem({
     hasDuetLine = false,
     onBackgroundHeight,
 }: LyricsLineItemProps) {
-    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled) && animatedMotion;
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const rowRef = useRef<HTMLButtonElement | null>(null);
     const interactionRef = useRef<HTMLDivElement | null>(null);
     const pressAnimationRef = useRef<Animation | null>(null);
@@ -112,7 +112,7 @@ function LyricsLineItem({
         ], { duration: 450, easing: 'ease-out' }) ?? null;
         onSeek(line.start_time_ms / 1000);
     };
-    // 背景和声：主行 70% 字号；字符颜色由 KaraokeText 的 --kb/--kfa 统一为 0.3，
+    // 背景和声：主行 70% 字号；暗层按 40% 控制，刷白只略微提亮。
     // 此处 text-white/30 仅作继承兜底（无词时被 inline color 覆盖）
     const mainTextClass = isBackground
         ? 'text-[clamp(1.24rem,3.32vmin,2.3rem)] text-white/30'
@@ -208,7 +208,7 @@ function LyricsLineItem({
                 )}
                 style={{
                     ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
-                    // 强制给回退的纯文本应用 0.3 的透明度，以匹配 KaraokeText 内部的 --kb，防止闪烁
+                    // 没有逐字时间的和声保留纯文本透明度。
                     color: (isBackground && !shouldRenderKaraoke) ? 'rgba(255,255,255,0.3)' : undefined,
                 }}
             >
@@ -226,7 +226,7 @@ function LyricsLineItem({
                         isFocused={isActive}
                         isSeekExiting={isSeekExiting}
                         glowDisabled={isBackground}
-                        fillAlpha={isBackground ? 0.3 : 1}
+                        fillAlpha={isBackground ? (lyricLineBlendEnabled ? 0.22 : 0.3) : 1}
                     />
                 ) : (
                     line.text
