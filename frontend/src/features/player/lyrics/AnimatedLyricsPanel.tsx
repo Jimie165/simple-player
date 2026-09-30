@@ -437,7 +437,7 @@ function AnimatedLyricsPanel({
                             !lyricLineBlendEnabled && 'z-10',
                             variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
                         )}
-                        style={lyricLineBlendEnabled ? undefined : variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
+                        style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
                         onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
                         onWheel={(event: WheelEvent<HTMLDivElement>) => {
                             event.preventDefault();
