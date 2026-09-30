@@ -2,7 +2,6 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
-use tauri::Manager;
 use windows::Storage::FileProperties::{ThumbnailMode, ThumbnailOptions};
 use windows::Storage::StorageFile;
 use windows::Storage::Streams::{DataReader, IInputStream};
@@ -82,9 +81,7 @@ fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>
 ///
 /// 返回相对路径（如 `cache/video_thumbnails/{hash}.jpg`）
 pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Option<String>, String> {
-    let cache_dir = app
-        .path()
-        .app_cache_dir()
+    let cache_dir = crate::utils::paths::app_cache_dir(app)
         .map_err(|e| format!("app_cache_dir failed: {e}"))?;
     let thumbs_dir = get_thumbnails_dir(&cache_dir);
     fs::create_dir_all(&thumbs_dir).ok();

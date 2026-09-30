@@ -1,22 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
-import { appDataDir, appCacheDir } from '@tauri-apps/api/path';
+import { getAppDataDir, getAppCacheDir } from '@/utils/mediaPath';
 import type { BackendLyricsData, LyricsDocument, PlaybackSnapshot, SongMetadata } from '@/types';
 import { parseLyrics } from '@/utils/lyrics/parseLyrics';
-
-let cachedAppDataDir: string | null = null;
-let cachedAppCacheDir: string | null = null;
-
-async function getAppDataDir(): Promise<string> {
-    if (cachedAppDataDir) return cachedAppDataDir;
-    cachedAppDataDir = await appDataDir();
-    return cachedAppDataDir;
-}
-
-async function getAppCacheDir(): Promise<string> {
-    if (cachedAppCacheDir) return cachedAppCacheDir;
-    cachedAppCacheDir = await appCacheDir();
-    return cachedAppCacheDir;
-}
 
 export const audioService = {
     // 播放音频 (带元数据用于更新 SMTC)

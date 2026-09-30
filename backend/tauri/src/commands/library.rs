@@ -283,10 +283,8 @@ async fn scan_library_internal(
     restore_folder_id: Option<i64>,
     refresh_mode: MetadataRefreshMode,
 ) -> Result<Vec<SongMetadata>, String> {
-    let app_cache_dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
+    let app_cache_dir =
+        crate::utils::paths::app_cache_dir(&app_handle).map_err(|e| e.to_string())?;
 
     let (folders, ignored_dirs): (Vec<_>, Vec<String>) = {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
@@ -803,7 +801,7 @@ pub fn update_song_details(
         None
     };
     let app_data_dir = if artwork_changed {
-        Some(app.path().app_data_dir().map_err(|e| e.to_string())?)
+        Some(crate::utils::paths::app_data_dir(&app).map_err(|e| e.to_string())?)
     } else {
         None
     };
@@ -905,7 +903,7 @@ pub fn update_album_details(
         None
     };
     let app_data_dir = if artwork_changed {
-        Some(app.path().app_data_dir().map_err(|e| e.to_string())?)
+        Some(crate::utils::paths::app_data_dir(&app).map_err(|e| e.to_string())?)
     } else {
         None
     };

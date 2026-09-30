@@ -19,7 +19,7 @@ use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock};
 use tauri::async_runtime::Mutex as AsyncMutex;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, State};
 
 type SourcePrepareMutex = AsyncMutex<()>;
 
@@ -36,10 +36,7 @@ fn get_or_create_prepare_lock(source_hash: &str) -> Result<Arc<SourcePrepareMute
 }
 
 pub(crate) fn resolve_default_cache_root(app_handle: &AppHandle) -> Result<PathBuf, String> {
-    let mut dir = app_handle
-        .path()
-        .app_cache_dir()
-        .map_err(|e| e.to_string())?;
+    let mut dir = crate::utils::paths::app_cache_dir(app_handle).map_err(|e| e.to_string())?;
     if !dir.ends_with("cache") {
         dir = dir.join("cache");
     }

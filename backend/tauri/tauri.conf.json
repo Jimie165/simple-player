@@ -2,7 +2,7 @@
     "productName": "Simple Player",
     "mainBinaryName": "Simple Player",
     "version": "0.4.0",
-    "identifier": "com.maho.simpleplayer",
+    "identifier": "com.simpleplayer.desktop",
     "build": {
         "beforeDevCommand": "pnpm --filter simple-player-ui dev",
         "beforeBuildCommand": "pnpm --filter simple-player-ui build",
@@ -13,6 +13,7 @@
         "withGlobalTauri": true,
         "windows": [
             {
+                "create": false,
                 "title": "Simple Player",
                 "width": 1000,
                 "height": 700,
@@ -40,6 +41,7 @@
         }
     },
     "bundle": {
+        "publisher": "Jimie165",
         "active": true,
         "targets": "all",
         "externalBin": [

@@ -97,8 +97,10 @@ Vite 开发服务器固定使用 `5173` 端口；端口被占用时 `pnpm dev` �
 
 ## 数据与缓存
 
-- 媒体库、播放列表、播放队列及部分后端设置存储在 Tauri App Data 下的 `library.db`。
-- 封面、视频缩略图和默认转码文件存储在 Tauri App Cache 下。
+- 媒体库、播放列表、播放队列及部分后端设置存储在 `%APPDATA%/SimplePlayer/library.db`。
+- 封面、视频缩略图和默认转码文件存储在 `%LOCALAPPDATA%/SimplePlayer/cache/`；WebView 的本地偏好也保存在 `%LOCALAPPDATA%/SimplePlayer/` 下。
+- 首次启动时会复制原 `com.maho.simpleplayer` 目录的数据和缓存，保留旧目录，不覆盖已存在的 `SimplePlayer` 目录。迁移前请退出旧版应用；缓存较多时首次启动可能较慢。
+- Rust 通过 managed state 中的 `AppDirectories` 获取路径，前端通过 `get_app_directories` command 获取同一组路径。Tauri 原生 `appDataDir` / `appCacheDir` 仍按应用标识解析，不用于本项目的媒体数据。
 - 数据库中的应用生成文件使用 `cache/...` 或 `data/...` 相对路径，用户媒体文件保留原始绝对路径。
 - 转码缓存目录和容量可以在应用设置中调整。
 

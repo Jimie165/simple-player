@@ -25,9 +25,12 @@ fn main() {
         .manage(audio_state)
         .manage(modules::library::covers::SongArtworkState(Mutex::new(())))
         .setup(|app| {
+            let directories = utils::paths::AppDirectories::initialize(app)?;
+            let webview_directory = directories.cache.clone();
+            app.manage(directories);
             // 初始化数据库
-            let app_data_dir = app.path().app_data_dir()?;
-            let app_cache_dir = app.path().app_cache_dir()?;
+            let app_data_dir = crate::utils::paths::app_data_dir(app)?;
+            let app_cache_dir = crate::utils::paths::app_cache_dir(app)?;
 
             // 迁移 Roaming/cache 到 Local/cache
             migrate_cache_from_roaming(&app_data_dir, &app_cache_dir);
@@ -54,6 +57,9 @@ fn main() {
 
             // 注入数据库状态
             app.manage(DbState(Arc::new(Mutex::new(conn))));
+            tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
+                .data_directory(webview_directory)
+                .build()?;
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
 
@@ -91,6 +97,7 @@ fn main() {
             commands::player::get_audio_output,
             commands::player::set_audio_output,
             // File commands
+            commands::files::get_app_directories,
             commands::files::get_metadata,
             commands::files::get_original_metadata,
             commands::files::read_folder_audio_files,
@@ -167,7 +174,7 @@ fn migrate_old_config(app: &tauri::App, conn: &Connection) {
         library_folders: Vec<String>,
     }
 
-    let config_path = match app.path().app_config_dir() {
+    let config_path = match crate::utils::paths::app_data_dir(app) {
         Ok(path) => path.join("library.json"),
         Err(_) => return,
     };

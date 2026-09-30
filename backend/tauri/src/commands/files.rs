@@ -5,7 +5,15 @@ use crate::modules::library::video_thumbnails;
 use crate::modules::library::{self, SongMetadata};
 use crate::utils::path::normalize_db_path;
 use std::path::Path;
-use tauri::{Manager, State};
+use tauri::State;
+
+/// 前端与后端共用固定数据目录，避免封面和 SMTC 路径仍依赖应用标识。
+#[tauri::command]
+pub fn get_app_directories(
+    directories: State<'_, crate::utils::paths::AppDirectories>,
+) -> crate::utils::paths::AppDirectories {
+    directories.inner().clone()
+}
 
 #[tauri::command]
 pub fn get_metadata(
@@ -14,7 +22,7 @@ pub fn get_metadata(
     path: String,
 ) -> Result<SongMetadata, String> {
     // 使用 app_cache_dir 以支持封面缓存 (Local)
-    let app_cache_dir = app.path().app_cache_dir().ok();
+    let app_cache_dir = crate::utils::paths::app_cache_dir(&app).ok();
 
     // 1. 优先尝试视频元数据 (Video Scanner)
     // 这样做是为了防止 MP4 等容器格式被音频库 (Lofty) 抢先解析，导致无法生成视频缩略图
@@ -108,7 +116,7 @@ pub fn get_metadata(
 
 #[tauri::command]
 pub fn get_original_metadata(app: tauri::AppHandle, path: String) -> Result<SongMetadata, String> {
-    let app_cache_dir = app.path().app_cache_dir().ok();
+    let app_cache_dir = crate::utils::paths::app_cache_dir(&app).ok();
     library::get_metadata(&path, app_cache_dir.as_deref())
 }
 
@@ -130,7 +138,7 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
     all_paths.sort();
 
     let mut songs = Vec::new();
-    let app_cache_dir = app.path().app_cache_dir().ok();
+    let app_cache_dir = crate::utils::paths::app_cache_dir(&app).ok();
 
     for path in all_paths {
         // 1. 视频优先 (Video Scanner)

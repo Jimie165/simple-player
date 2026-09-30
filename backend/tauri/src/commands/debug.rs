@@ -12,19 +12,13 @@ pub struct PathDebugInfo {
 #[tauri::command]
 pub fn get_path_debug_info(app: tauri::AppHandle) -> Result<PathDebugInfo, String> {
     Ok(PathDebugInfo {
-        app_data_dir: app
-            .path()
-            .app_data_dir()
+        app_data_dir: crate::utils::paths::app_data_dir(&app)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|e| format!("Error: {}", e)),
-        app_cache_dir: app
-            .path()
-            .app_cache_dir()
+        app_cache_dir: crate::utils::paths::app_cache_dir(&app)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|e| format!("Error: {}", e)),
-        app_config_dir: app
-            .path()
-            .app_config_dir()
+        app_config_dir: crate::utils::paths::app_data_dir(&app)
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|e| format!("Error: {}", e)),
         app_log_dir: app

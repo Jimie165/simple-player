@@ -1,21 +1,29 @@
 // import { readFile } from '@tauri-apps/plugin-fs';
-import { appDataDir, appCacheDir, join } from '@tauri-apps/api/path';
-import { convertFileSrc } from '@tauri-apps/api/core';
+import { join } from '@tauri-apps/api/path';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import type { SongMetadata } from '@/types';
 
-let cachedAppDataDir: string | null = null;
-let cachedAppCacheDir: string | null = null;
-
-async function getAppDataDir(): Promise<string> {
-    if (cachedAppDataDir) return cachedAppDataDir;
-    cachedAppDataDir = await appDataDir();
-    return cachedAppDataDir;
+interface AppDirectories {
+    data: string;
+    cache: string;
 }
 
-async function getAppCacheDir(): Promise<string> {
-    if (cachedAppCacheDir) return cachedAppCacheDir;
-    cachedAppCacheDir = await appCacheDir();
-    return cachedAppCacheDir;
+let cachedAppDirectories: Promise<AppDirectories> | null = null;
+
+function getAppDirectories(): Promise<AppDirectories> {
+    cachedAppDirectories ??= invoke<AppDirectories>('get_app_directories').catch(error => {
+        cachedAppDirectories = null;
+        throw error;
+    });
+    return cachedAppDirectories;
+}
+
+export async function getAppDataDir(): Promise<string> {
+    return (await getAppDirectories()).data;
+}
+
+export async function getAppCacheDir(): Promise<string> {
+    return (await getAppDirectories()).cache;
 }
 
 /**
