@@ -92,7 +92,7 @@ export const checkForAppUpdate = async (): Promise<UpdateCheckResult> => {
 
     if (!response.ok) {
         if (response.status === 404) {
-            throw new Error('GitHub 上暂时没有可用的正式版本');
+            throw new Error('暂时没有可用的正式版本');
         }
         throw new Error(`检查更新失败（GitHub ${response.status}）`);
     }

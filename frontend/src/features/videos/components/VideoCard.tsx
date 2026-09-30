@@ -107,7 +107,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
 
             {/* Info */}
             <div className="flex flex-col gap-0.5 px-1 text-center">
-                <CustomTooltip text={video.title} className="block min-w-0">
+                <CustomTooltip text={video.title} onlyWhenOverflow className="block min-w-0">
                     <h3 className="font-medium truncate text-sm">{video.title}</h3>
                 </CustomTooltip>
                 <p className="text-xs opacity-60 truncate">

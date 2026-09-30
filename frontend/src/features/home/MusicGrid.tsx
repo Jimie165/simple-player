@@ -137,6 +137,7 @@ export default function MusicGrid() {
                         listStyle={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
                         itemContent={(_index, item) => {
                             const isSelected = selectedIds.has(item.id);
+                            const description = `${item.description}${!isVideoFile(item.path) && item.album ? ` — ${item.album}` : ''}`;
 
                             return (
                                 <div
@@ -224,7 +225,7 @@ export default function MusicGrid() {
                                     </div>
 
                                     <div className="flex flex-col gap-0.5 px-1">
-                                        <CustomTooltip text={item.title} className="block min-w-0">
+                                        <CustomTooltip text={item.title} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
                                             <span className={clsx(
                                                 "block truncate text-base font-semibold",
                                                 isSelected ? "text-primary" : "text-neutral-900 dark:text-neutral-50"
@@ -232,11 +233,9 @@ export default function MusicGrid() {
                                                 {item.title}
                                             </span>
                                         </CustomTooltip>
-                                        <CustomTooltip text={item.description} className="block min-w-0">
+                                        <CustomTooltip text={description} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
                                             <span className="block truncate text-sm text-neutral-500 dark:text-neutral-400">
-                                                {item.description}
-                                                {/* 如果是非视频且有专辑信息才显示专辑 */}
-                                                {!isVideoFile(item.path) && item.album && ` — ${item.album}`}
+                                                {description}
                                             </span>
                                         </CustomTooltip>
                                     </div>

@@ -172,13 +172,13 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                             </div>
 
                             <div className="flex flex-col gap-0.5 px-1">
-                                <CustomTooltip text={album.name} className="inline-block w-fit max-w-full min-w-0 align-top">
+                                <CustomTooltip text={album.name} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
                                     <span className="block truncate text-base font-semibold text-neutral-900 dark:text-neutral-50">
                                         {album.name}
                                     </span>
                                 </CustomTooltip>
                                 {!hideArtist && (
-                                    <CustomTooltip text={album.artist} className="inline-block w-fit max-w-full min-w-0 align-top">
+                                    <CustomTooltip text={album.artist} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
                                         <span
                                             className={clsx(
                                                 "block truncate text-sm text-neutral-500 dark:text-neutral-400",

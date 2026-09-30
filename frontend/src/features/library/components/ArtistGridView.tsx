@@ -170,7 +170,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 </div>
 
                 <div className="text-center w-full">
-                    <CustomTooltip text={artist.name} className="inline-block w-fit max-w-full min-w-0 align-top">
+                    <CustomTooltip text={artist.name} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
                         <h3 className="font-bold text-neutral-900 dark:text-neutral-50 truncate w-full">
                             {artist.name}
                         </h3>

@@ -8,6 +8,8 @@ interface CustomTooltipProps {
     children: React.ReactNode;
     show?: boolean;
     disabled?: boolean;
+    /** 仅在直接子元素中的文字被截断时显示。 */
+    onlyWhenOverflow?: boolean;
     placement?: 'top' | 'right' | 'bottom';
     className?: string;
 }
@@ -20,6 +22,7 @@ export default function CustomTooltip({
     children,
     show,
     disabled = false,
+    onlyWhenOverflow = false,
     placement = 'top',
     className
 }: CustomTooltipProps) {
@@ -28,6 +31,11 @@ export default function CustomTooltip({
     const [coords, setCoords] = useState({ top: 0, left: 0, arrowOffset: 0 });
     const triggerRef = useRef<HTMLDivElement>(null);
     const tooltipRef = useRef<HTMLDivElement>(null);
+
+    const isContentOverflowing = useCallback(() => {
+        const content = triggerRef.current?.firstElementChild;
+        return content instanceof HTMLElement && content.scrollWidth > content.clientWidth;
+    }, []);
 
     // 计算弹窗位置
     const updatePosition = useCallback(() => {
@@ -112,11 +120,13 @@ export default function CustomTooltip({
 
     const handleMouseEnter = () => {
         if (disabled || show === false) return;
+        if (onlyWhenOverflow && !isContentOverflowing()) return;
         if (leaveTimeoutRef.current) {
             clearTimeout(leaveTimeoutRef.current);
             leaveTimeoutRef.current = null;
         }
         hoverTimeoutRef.current = setTimeout(() => {
+            if (onlyWhenOverflow && !isContentOverflowing()) return;
             updatePosition();
             setIsRendered(true);
             // 给 React 渲染一帧的时间，然后再赋予 isVisible 去触发 opacity transition
@@ -176,15 +186,22 @@ export default function CustomTooltip({
     }, [show, updatePosition]);
 
     useEffect(() => {
+        const handleResize = () => {
+            if (onlyWhenOverflow && !isContentOverflowing()) {
+                hideTooltip();
+                return;
+            }
+            updatePosition();
+        };
         if (isVisible || show) {
-            window.addEventListener('resize', updatePosition);
+            window.addEventListener('resize', handleResize);
             window.addEventListener('scroll', updatePosition, true);
         }
         return () => {
-            window.removeEventListener('resize', updatePosition);
+            window.removeEventListener('resize', handleResize);
             window.removeEventListener('scroll', updatePosition, true);
         };
-    }, [isVisible, show, updatePosition]);
+    }, [isVisible, show, updatePosition, onlyWhenOverflow, isContentOverflowing, hideTooltip]);
 
     const shouldRender = isRendered || show === true;
 
