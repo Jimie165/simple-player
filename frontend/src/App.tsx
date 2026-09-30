@@ -182,7 +182,7 @@ function App() {
   const mainContent = (
     <div
       data-main-content-query
-      className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden shadow-sm relative z-0 transition-colors duration-300"
+      className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden relative z-0 transition-colors duration-300"
     >
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
@@ -233,7 +233,7 @@ function App() {
 
         <div className="flex flex-1 overflow-hidden relative">
           {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
-          <div className="absolute inset-0 flex">
+          <div className="app-shell-background absolute inset-0 flex">
             <Sidebar
               activeId={currentPage}
               onNavigate={handleNavigate}
@@ -246,7 +246,7 @@ function App() {
               onRequestClose={() => setSidebarCollapsed(true)}
             />
 
-            <div className="flex-1 flex flex-col min-w-0 relative bg-surface-container before:absolute before:inset-0 before:bg-primary/5 before:pointer-events-none">
+            <div className="flex-1 flex flex-col min-w-0 relative">
               {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
               {isSidebarOverlay && !sidebarCollapsed && (
                 <div
@@ -254,17 +254,6 @@ function App() {
                   onClick={() => setSidebarCollapsed(true)}
                 />
               )}
-
-              {/* 顶角填充：主内容区左上角为圆角，此处填充侧边栏主题色以实现视觉无缝衔接 */}
-              <div className="absolute top-0 left-0 w-8 h-8 bg-primary/5 dark:bg-primary/8 pointer-events-none">
-                <div
-                  className="absolute inset-0 opacity-0 dark:opacity-100 pointer-events-none"
-                  style={{
-                    backgroundImage:
-                      'linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%)'
-                  }}
-                />
-              </div>
 
               {/* Reuse mainContent variable content inline or wrapper */}
               {mainContent}

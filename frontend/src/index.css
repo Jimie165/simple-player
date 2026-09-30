@@ -234,6 +234,16 @@ body {
 
 /* Utilities */
 @layer utilities {
+  /* 侧栏与内容圆角外侧共用背景，避免接缝处重复叠色。 */
+  .app-shell-background {
+    background-color: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+  }
+
+  .dark .app-shell-background {
+    background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%);
+  }
+
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
