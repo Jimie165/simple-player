@@ -44,13 +44,13 @@ function PopupChoice<T extends string>({
                                     initial={{ opacity: 0, y: -8 }}
                                     animate={{ opacity: 1, y: 0, transition: { duration: 0.18, ease: "easeOut" } }}
                                     exit={{ opacity: 0, y: -8, transition: { duration: 0.15, ease: "easeIn" } }}
-                                    className="settings-card z-50 min-w-44 rounded-xl border border-outline-variant/30 py-1 shadow-xl focus:outline-none"
+                                    className="settings-card z-50 min-w-44 rounded-xl border border-outline-variant/30 p-1 shadow-xl focus:outline-none"
                                 >
                                     {options.map((option) => (
                                         <ListboxOption
                                             key={option.value}
                                             value={option.value}
-                                            className="flex cursor-pointer items-center justify-between gap-3 px-4 py-2 text-sm text-on-surface data-focus:bg-primary/5 data-selected:text-primary"
+                                            className="flex cursor-pointer items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm text-on-surface data-focus:bg-primary/5 data-selected:text-primary"
                                         >
                                             <span>{option.label}</span>
                                             {value === option.value && <MdCheck className="shrink-0 text-primary" />}
