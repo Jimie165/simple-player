@@ -232,9 +232,15 @@ function LyricsLineItem({
             </span>
             {line.translation && (
                 <span
-                    style={isBackground && !shouldRenderKaraoke ? {
-                        transitionDelay: `${motionDelay}s`,
-                    } : undefined}
+                    style={{
+                        ...(isBackground && !shouldRenderKaraoke ? {
+                            transitionDelay: `${motionDelay}s`,
+                        } : {}),
+                        // Match the active background vocal's unfilled brightness.
+                        color: lyricLineBlendEnabled && isBackground
+                            ? 'rgba(255,255,255,0.16)'
+                            : undefined,
+                    }}
                     className={clsx(
                         'block font-medium leading-[1.34] tracking-wide mt-1 text-white/30',
                         translationTextClass,
