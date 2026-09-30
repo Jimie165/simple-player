@@ -154,8 +154,7 @@ function LyricsLineItem({
             ? 'pt-[clamp(0.2rem,0.5vw,0.4rem)] pb-[clamp(0.4rem,0.8vw,0.75rem)]'
             : 'py-[clamp(1rem,1.3vw,1.25rem)]',
         canSeek ? 'cursor-pointer' : 'cursor-default',
-        // 有译文时将阴影限制在主文字上，避免译文随激活状态改变阴影。
-        isActive && !isBackground && !line.translation && !lyricLineBlendEnabled ? 'text-white drop-shadow-xl' : 'text-white',
+        'text-white',
         isDuetRow
             ? 'text-right pl-[15%] origin-right'
             : 'text-left pl-[clamp(1.2rem,2.2vw,2rem)] origin-left',
@@ -193,7 +192,6 @@ function LyricsLineItem({
                 className={clsx(
                     'block font-bold leading-[1.38] tracking-wide relative',
                     mainTextClass,
-                    isActive && !isBackground && line.translation && !lyricLineBlendEnabled && 'drop-shadow-xl',
                     shouldRenderKaraoke
                         ? (isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
