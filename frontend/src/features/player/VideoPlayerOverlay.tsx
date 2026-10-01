@@ -227,7 +227,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         <div className="absolute inset-0 z-0" data-tauri-drag-region />
 
                         {/* Left: Back + Title */}
-                        <div className="flex items-center gap-4 z-30 mr-4 min-w-0 flex-1">
+                        <div className={`flex items-center gap-4 z-30 mr-4 min-w-0 flex-1 ${systemService.isMacOS && !isFullscreen ? 'ml-20' : ''}`}>
                             <button
                                 onClick={handleClose}
                                 className="p-2 rounded-full hover:bg-white/10 text-white transition-colors"

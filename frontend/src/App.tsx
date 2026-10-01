@@ -35,8 +35,31 @@ import { Toaster } from 'react-hot-toast';
 import EditableContextMenu from '@/components/common/EditableContextMenu';
 import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
 import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
+import { systemService } from '@/services/systemService';
 
 function App() {
+  const [nativeFullscreen, setNativeFullscreen] = useState(false);
+  const showMacTitleBar = systemService.isMacOS && !nativeFullscreen;
+
+  useEffect(() => {
+    if (!systemService.isMacOS) return;
+    let cancelled = false;
+    const syncFullscreen = async () => {
+      try {
+        const fullscreen = await systemService.isMaximized();
+        if (!cancelled) setNativeFullscreen(fullscreen);
+      } catch (error) {
+        console.error('Failed to sync macOS fullscreen state', error);
+      }
+    };
+    void syncFullscreen();
+    const unlisten = systemService.onResize(syncFullscreen);
+    return () => {
+      cancelled = true;
+      void unlisten.then((cleanup) => cleanup()).catch(console.error);
+    };
+  }, []);
+
   const { init: initTheme } = useThemeStore();
   const simplifiedEffects = useThemeStore((state) => state.reducedVisualEffects || state.graphicsUnavailable);
   const playlist = useLibraryStore((state) => state.playlist);
@@ -231,7 +254,11 @@ function App() {
   );
 
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans">
+    <div className={`flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans ${showMacTitleBar ? '[--macos-titlebar-height:40px]' : '[--macos-titlebar-height:0px]'}`}>
+      {showMacTitleBar && (
+        <div data-tauri-drag-region aria-hidden="true" className="h-10 w-full shrink-0 bg-surface-container" />
+      )}
+      <div className="relative flex min-h-0 flex-1 flex-col">
       <PlaybackRuntime />
 
       <div
@@ -319,6 +346,7 @@ function App() {
           className: 'border border-outline-variant/20',
         }}
       />
+      </div>
     </div>
   );
 }

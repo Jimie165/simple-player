@@ -12,7 +12,9 @@
                 "resizable": true,
                 "fullscreen": false,
                 "decorations": true,
-                "titleBarStyle": "Visible",
+                "titleBarStyle": "Overlay",
+                "hiddenTitle": true,
+                "trafficLightPosition": { "x": 18, "y": 14 },
                 "transparent": false,
                 "shadow": true
             }

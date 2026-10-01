@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "tauri dev --config backend/tauri/tauri.conf.json",
-    "build": "tauri build --config backend/tauri/tauri.conf.json",
+    "dev": "tauri dev",
+    "build": "tauri build",
     "preview": "pnpm --filter simple-player-ui preview",
     "lint": "pnpm --filter simple-player-ui lint",
     "test": "echo \"Error: no test specified\" && exit 1",
