@@ -219,13 +219,10 @@ function App() {
       data-main-content-query
       className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden relative z-0 transition-colors duration-300"
     >
-      {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
+      {/* 透明拖动区域直接透出页面背景，避免顶部形成独立色块。 */}
       <div
         data-tauri-drag-region
-        className={`absolute top-0 left-0 right-0 h-12 z-40 border-b transition-colors duration-300 ${activePlaylistDetail
-          ? 'bg-transparent border-transparent'
-          : 'bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl border-outline-variant/5'
-          }`}
+        className="absolute top-0 left-0 right-0 h-12 z-40 bg-transparent"
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
