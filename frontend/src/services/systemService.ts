@@ -1,10 +1,14 @@
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { invoke } from '@tauri-apps/api/core';
 
 const appWindow = getCurrentWindow();
 const isMacOS = /Macintosh|Mac OS X/.test(navigator.userAgent);
 
 export const systemService = {
     isMacOS,
+    setWindowButtonsVisible: async (visible: boolean) => {
+        if (isMacOS) await invoke('set_macos_window_buttons_visible', { visible });
+    },
     minimize: () => appWindow.minimize(),
     toggleMaximize: async () => {
         if (isMacOS) {

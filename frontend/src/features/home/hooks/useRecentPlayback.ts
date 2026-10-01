@@ -276,6 +276,7 @@ export function useRecentPlayback() {
                     cover_path: item.cover_path,
                 };
                 await playVideoFile(item.path, meta);
+                useLibraryStore.getState().addToRecent({ ...item, lastPlayed: Date.now() });
             } catch (e) {
                 console.error("Failed to play recent video", e);
             }

@@ -5,3 +5,4 @@ pub mod player;
 pub mod playlist;
 pub mod queue;
 pub mod video;
+pub mod window;

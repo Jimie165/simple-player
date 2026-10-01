@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { systemService } from '@/services/systemService';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -117,6 +118,13 @@ export default function NowPlayingView({
     });
 
     const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
+    useEffect(() => {
+        void systemService.setWindowButtonsVisible(!isOpen).catch(console.error);
+    }, [isOpen, isFullscreen]);
+
+    useEffect(() => () => {
+        void systemService.setWindowButtonsVisible(true).catch(console.error);
+    }, []);
     const handlePlayPrev = useCallback(() => {
         void playPrev(usePlayerStore.getState().currentTime);
     }, [playPrev]);

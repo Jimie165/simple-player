@@ -8,6 +8,8 @@ const appWindow = vi.hoisted(() => ({
 }));
 
 vi.mock('@tauri-apps/api/window', () => ({ getCurrentWindow: () => appWindow }));
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock('@tauri-apps/api/core', () => ({ invoke }));
 
 beforeEach(() => {
     vi.resetModules();
@@ -15,6 +17,23 @@ beforeEach(() => {
 });
 
 describe('platform window controls', () => {
+    it('hides and restores native macOS buttons through the registered command', async () => {
+        vi.stubGlobal('navigator', { userAgent: 'Macintosh' });
+        const { systemService } = await import('@/services/systemService');
+        await systemService.setWindowButtonsVisible(false);
+        await systemService.setWindowButtonsVisible(true);
+        expect(invoke.mock.calls).toEqual([
+            ['set_macos_window_buttons_visible', { visible: false }],
+            ['set_macos_window_buttons_visible', { visible: true }],
+        ]);
+    });
+
+    it('does not change Windows decorations when opening the player', async () => {
+        vi.stubGlobal('navigator', { userAgent: 'Windows NT 10.0' });
+        const { systemService } = await import('@/services/systemService');
+        await systemService.setWindowButtonsVisible(false);
+        expect(invoke).not.toHaveBeenCalled();
+    });
     it('enters and exits macOS fullscreen without calling maximize', async () => {
         vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)' });
         const { systemService } = await import('@/services/systemService');

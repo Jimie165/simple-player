@@ -87,6 +87,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::window::set_macos_window_buttons_visible,
             modules::player::media_controls::update_macos_media,
             // Player commands
             commands::player::play_audio,
