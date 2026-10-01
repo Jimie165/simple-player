@@ -20,6 +20,7 @@ use windows::core::{HSTRING, factory};
 struct SmtcState {
     controls: SystemMediaTransportControls,
     duration: Option<f32>,
+    video_metadata: Option<super::media_controls::MediaInfo>,
     _button_token: i64,
     _position_token: i64,
 }
@@ -108,6 +109,7 @@ pub fn init(app_handle: AppHandle, hwnd: Option<HWND>) {
     *guard = Some(SmtcState {
         controls,
         duration: None,
+        video_metadata: None,
         _button_token: button_token,
         _position_token: position_token,
     });
@@ -118,7 +120,9 @@ pub fn set_playing(is_playing: bool) {
         return;
     };
     let guard = state.lock().unwrap();
-    if let Some(smtc) = guard.as_ref() {
+    if let Some(smtc) = guard.as_ref()
+        && smtc.video_metadata.is_none()
+    {
         let status = if is_playing {
             MediaPlaybackStatus::Playing
         } else {
@@ -137,7 +141,9 @@ pub fn set_position(position: f32) {
         return;
     };
 
-    update_timeline(&smtc.controls, smtc.duration, position);
+    if smtc.video_metadata.is_none() {
+        update_timeline(&smtc.controls, smtc.duration, position);
+    }
 }
 
 /// 将当前播放信息手动写入 Windows SMTC。
@@ -152,6 +158,7 @@ pub fn apply_metadata(
     let Some(smtc) = guard.as_mut() else {
         return Ok(());
     };
+    smtc.video_metadata = None;
     smtc.duration = Some(meta.duration as f32);
 
     let updater = smtc.controls.DisplayUpdater()?;
@@ -193,6 +200,61 @@ pub fn apply_metadata(
     updater.Update()?;
     update_timeline(&smtc.controls, smtc.duration, 0.0);
 
+    Ok(())
+}
+
+/// Keeps video metadata and position on the main window's existing SMTC identity.
+pub fn update_video(
+    app: &AppHandle,
+    metadata: Option<&super::media_controls::MediaInfo>,
+    playing: bool,
+    position: f64,
+) -> windows::core::Result<()> {
+    let Some(state) = SMTC_STATE.get() else {
+        return Ok(());
+    };
+    let mut guard = state.lock().unwrap();
+    let Some(smtc) = guard.as_mut() else {
+        return Ok(());
+    };
+    let Some(info) = metadata else {
+        if smtc.video_metadata.take().is_some() {
+            smtc.controls
+                .SetPlaybackStatus(MediaPlaybackStatus::Stopped)?;
+        }
+        return Ok(());
+    };
+    if smtc.video_metadata.as_ref() != Some(info) {
+        let updater = smtc.controls.DisplayUpdater()?;
+        updater.SetType(MediaPlaybackType::Video)?;
+        let properties = updater.VideoProperties()?;
+        properties.SetTitle(&HSTRING::from(&info.title))?;
+        properties.SetSubtitle(&HSTRING::from(&info.artist))?;
+        let thumbnail = info.cover_path.as_deref().and_then(|path| {
+            let full_path = if is_app_relative_path(path) {
+                resolve_app_path(app, path)
+            } else {
+                Some(PathBuf::from(path))
+            };
+            full_path
+                .and_then(|path| std::fs::read(path).ok())
+                .and_then(|bytes| bytes_to_stream_ref(&bytes))
+        });
+        if let Some(thumbnail) = thumbnail {
+            updater.SetThumbnail(&thumbnail)?;
+        } else {
+            updater.SetThumbnail(None)?;
+        }
+        updater.Update()?;
+        smtc.duration = Some(info.duration as f32);
+        smtc.video_metadata = Some(info.clone());
+    }
+    smtc.controls.SetPlaybackStatus(if playing {
+        MediaPlaybackStatus::Playing
+    } else {
+        MediaPlaybackStatus::Paused
+    })?;
+    update_timeline(&smtc.controls, smtc.duration, position as f32);
     Ok(())
 }
 

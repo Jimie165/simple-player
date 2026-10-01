@@ -72,7 +72,9 @@ function usePlaybackRuntime() {
             handler: (payload: T) => void | Promise<void>,
         ) => {
             const cleanup = await listen<T>(event, (eventData) => {
-                if (!disposed) void handler(eventData.payload);
+                if (!disposed && !(event.startsWith('smtc:') && usePlayerStore.getState().mediaKind === 'video')) {
+                    void handler(eventData.payload);
+                }
             });
             if (disposed) {
                 cleanup();

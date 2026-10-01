@@ -59,6 +59,10 @@ fn main() {
             app.manage(DbState(Arc::new(Mutex::new(conn))));
             tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
                 .data_directory(webview_directory)
+                // Native SMTC owns both audio and video; WebView2 must not publish a second session.
+                .additional_browser_args(
+                    "--disable-features=HardwareMediaKeyHandling,MediaSessionService",
+                )
                 .build()?;
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
@@ -81,6 +85,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            modules::player::media_controls::update_windows_video_media,
             // Player commands
             commands::player::play_audio,
             commands::player::load_audio,

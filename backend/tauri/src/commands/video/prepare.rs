@@ -182,11 +182,13 @@ pub async fn prepare_video_for_playback(
             eprintln!("[prepare_video_for_playback] 视频/音频兼容，执行 Remux...");
         }
         if try_remux(
+            &app_handle,
             &ffmpeg,
             &path,
             temp_full_path.to_str().unwrap(),
             audio_codec.clone(),
             &supported_audio_codecs,
+            duration,
         )? {
             eprintln!(
                 "[prepare_video_for_playback] Remux 成功，耗时: {:?}",
@@ -197,7 +199,7 @@ pub async fn prepare_video_for_playback(
                 VideoPrepareProgress {
                     path: path.clone(),
                     stage: "remux".to_string(),
-                    percent: Some(100.0),
+                    percent: Some(99.0),
                     message: Some("重新封装为 MP4".to_string()),
                 },
             );

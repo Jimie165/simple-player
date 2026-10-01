@@ -1,4 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { listen } from '@tauri-apps/api/event';
+import { usePlayerStore } from '@/store/usePlayerStore';
+import { mediaControlService } from '@/services/mediaControlService';
+import type { SystemMediaAction } from '@/services/mediaControlService';
 import { resolveMediaPath } from '@/utils/mediaPath';
 import { detectAv1Support, detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
 import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
@@ -165,94 +169,64 @@ export function useVideoPlayback({
         }
     }, [volume, videoRef]);
 
+    const systemPosition = isPlaying && !isDragging ? Math.floor(currentTime) : currentTime;
     useEffect(() => {
-        if (!isOpen || !metadata || !('mediaSession' in navigator)) return;
-
-        const artwork: MediaImage[] = [];
-        if (posterUrl) {
-            artwork.push({
-                src: posterUrl,
-                sizes: '512x512',
-                type: 'image/jpeg',
-            });
+        if (!isOpen || !metadata) {
+            void mediaControlService.updateVideo(null, false, 0).catch(console.error);
+            return;
         }
-
-        navigator.mediaSession.metadata = new MediaMetadata({
+        void mediaControlService.updateVideo({
             title: metadata.title || '未知视频',
             artist: 'Video',
             album: '',
-            artwork,
-        });
+            cover_path: coverPath,
+            duration: duration || metadata.duration || 0,
+        }, isPlaying, systemPosition).catch(console.error);
+    }, [isOpen, metadata, coverPath, duration, isPlaying, systemPosition]);
 
-        navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
-
-        navigator.mediaSession.setActionHandler('play', () => {
-            if (videoRef.current) {
-                videoRef.current.play();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-            if (videoRef.current) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-            if (videoQueueLength > 1) {
-                playPreviousVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-            if (videoQueueLength > 1) {
-                playNextVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (videoRef.current && details.seekTime !== undefined) {
-                videoRef.current.currentTime = details.seekTime;
-                setCurrentTime(details.seekTime);
-            }
-        });
-
-        const updatePositionState = () => {
-            if (videoRef.current && !isNaN(videoRef.current.duration) && videoRef.current.duration > 0) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration: videoRef.current.duration,
-                        playbackRate: videoRef.current.playbackRate,
-                        position: videoRef.current.currentTime,
-                    });
-                } catch {
-                    // Ignore unsupported platforms
-                }
+    useEffect(() => {
+        if (!isOpen) return;
+        let disposed = false;
+        const unlisten: Array<() => void> = [];
+        const handleAction = ({ action, position }: SystemMediaAction) => {
+            const video = videoRef.current;
+            if (disposed || !video || usePlayerStore.getState().mediaKind !== 'video') return;
+            switch (action) {
+                case 'play':
+                case 'toggle':
+                    if (action === 'play' || video.paused) {
+                        void video.play().catch(console.error);
+                        break;
+                    }
+                    video.pause();
+                    setIsPlaying(false);
+                    break;
+                case 'pause':
+                    video.pause();
+                    setIsPlaying(false);
+                    break;
+                case 'next': if (videoQueueLength > 1) playNextVideo(); break;
+                case 'previous': if (videoQueueLength > 1) playPreviousVideo(); break;
+                case 'seek':
+                    if (position !== null && Number.isFinite(position)) {
+                        video.currentTime = Math.max(0, Math.min(position, video.duration || position));
+                        setCurrentTime(video.currentTime);
+                    }
             }
         };
-
-        const positionInterval = setInterval(updatePositionState, 1000);
-        updatePositionState();
-
-        return () => {
-            clearInterval(positionInterval);
-            navigator.mediaSession.setActionHandler('play', null);
-            navigator.mediaSession.setActionHandler('pause', null);
-            navigator.mediaSession.setActionHandler('previoustrack', null);
-            navigator.mediaSession.setActionHandler('nexttrack', null);
-            navigator.mediaSession.setActionHandler('seekto', null);
+        const register = async <T,>(event: string, handler: (payload: T) => void) => {
+            const cleanup = await listen<T>(event, ({ payload }) => {
+                if (!disposed) handler(payload);
+            });
+            if (disposed) cleanup();
+            else unlisten.push(cleanup);
         };
-    }, [
-        isOpen,
-        metadata,
-        isPlaying,
-        videoQueueLength,
-        playPreviousVideo,
-        playNextVideo,
-        posterUrl,
-        videoRef,
-    ]);
+        for (const action of ['play', 'pause', 'next', 'previous'] as const) {
+            void register(`smtc:${action}`, () => handleAction({ action, position: null })).catch(console.error);
+        }
+        void register<number>('smtc:seek', (position) => handleAction({ action: 'seek', position })).catch(console.error);
+        return () => { disposed = true; unlisten.forEach(cleanup => cleanup()); };
+    }, [isOpen, videoRef, videoQueueLength, playNextVideo, playPreviousVideo]);
 
     const handleTogglePlay = useCallback(async () => {
         if (!videoRef.current) return;
