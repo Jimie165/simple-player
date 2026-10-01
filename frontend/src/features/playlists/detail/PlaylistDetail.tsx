@@ -261,12 +261,12 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         <div className="w-full min-h-full relative isolate">
             <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
 
-            {/* 顶部透明拖动区域 */}
+            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
             <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-60 bg-transparent transition-all duration-300",
+                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
                 isScrolled
-                    ? "opacity-100 pointer-events-auto"
-                    : "opacity-0 pointer-events-none"
+                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
+                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
             )} data-tauri-drag-region />
 
             <EditPlaylistDialog

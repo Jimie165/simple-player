@@ -12,6 +12,7 @@ import TitleBar from '@/components/layout/TitleBar';
 import Sidebar from '@/components/layout/Sidebar';
 import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
 import ScrollArea from '@/components/common/ScrollArea';
+import { useScrollBlur } from '@/hooks/useScrollBlur';
 
 import MusicGrid from '@/features/home/MusicGrid';
 import Library from '@/features/library/Library';
@@ -214,22 +215,28 @@ function App() {
     }
   };
 
+  const { isScrolled, topSentinelRef } = useScrollBlur();
+
   const mainContent = (
     <div
       data-main-content-query
       className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden relative z-0 transition-colors duration-300"
     >
-      {/* 透明拖动区域直接透出页面背景，避免顶部形成独立色块。 */}
+      {/* 顶部透明，滚动后用毛玻璃遮住进入拖动区域的内容。 */}
       <div
         data-tauri-drag-region
-        className="absolute top-0 left-0 right-0 h-12 z-40 bg-transparent"
+        className={`absolute top-0 left-0 right-0 h-12 z-40 border-b transition-colors duration-300 ${isScrolled && !activePlaylistDetail
+          ? 'bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl border-outline-variant/5'
+          : 'bg-transparent border-transparent'
+          }`}
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className={`pt-12 min-h-full pb-24 transition-colors duration-300 ${activePlaylistDetail
+        <div className={`relative pt-12 min-h-full pb-24 transition-colors duration-300 ${activePlaylistDetail
           ? 'bg-surface dark:bg-surface-container'
           : ''
           }`}>
+          <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none" />
           <AnimatePresence mode="wait">
             <motion.div
               key={currentPage}
