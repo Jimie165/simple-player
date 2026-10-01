@@ -21,6 +21,9 @@ struct SmtcState {
     controls: SystemMediaTransportControls,
     duration: Option<f32>,
     video_metadata: Option<super::media_controls::MediaInfo>,
+    music_metadata: Option<SongMetadata>,
+    music_playing: bool,
+    music_position: f32,
     _button_token: i64,
     _position_token: i64,
 }
@@ -110,6 +113,9 @@ pub fn init(app_handle: AppHandle, hwnd: Option<HWND>) {
         controls,
         duration: None,
         video_metadata: None,
+        music_metadata: None,
+        music_playing: false,
+        music_position: 0.0,
         _button_token: button_token,
         _position_token: position_token,
     });
@@ -119,10 +125,12 @@ pub fn set_playing(is_playing: bool) {
     let Some(state) = SMTC_STATE.get() else {
         return;
     };
-    let guard = state.lock().unwrap();
-    if let Some(smtc) = guard.as_ref()
-        && smtc.video_metadata.is_none()
-    {
+    let mut guard = state.lock().unwrap();
+    if let Some(smtc) = guard.as_mut() {
+        smtc.music_playing = is_playing;
+        if smtc.video_metadata.is_some() {
+            return;
+        }
         let status = if is_playing {
             MediaPlaybackStatus::Playing
         } else {
@@ -136,11 +144,12 @@ pub fn set_position(position: f32) {
     let Some(state) = SMTC_STATE.get() else {
         return;
     };
-    let guard = state.lock().unwrap();
-    let Some(smtc) = guard.as_ref() else {
+    let mut guard = state.lock().unwrap();
+    let Some(smtc) = guard.as_mut() else {
         return;
     };
 
+    smtc.music_position = position;
     if smtc.video_metadata.is_none() {
         update_timeline(&smtc.controls, smtc.duration, position);
     }
@@ -159,6 +168,16 @@ pub fn apply_metadata(
         return Ok(());
     };
     smtc.video_metadata = None;
+    smtc.music_metadata = Some(meta.clone());
+    smtc.music_position = 0.0;
+    publish_music_metadata(smtc, meta, app_handle)
+}
+
+fn publish_music_metadata(
+    smtc: &mut SmtcState,
+    meta: &SongMetadata,
+    app_handle: Option<&AppHandle>,
+) -> windows::core::Result<()> {
     smtc.duration = Some(meta.duration as f32);
 
     let updater = smtc.controls.DisplayUpdater()?;
@@ -219,8 +238,24 @@ pub fn update_video(
     };
     let Some(info) = metadata else {
         if smtc.video_metadata.take().is_some() {
-            smtc.controls
-                .SetPlaybackStatus(MediaPlaybackStatus::Stopped)?;
+            // Stopping alone leaves the previous video's display information visible.
+            if let Some(meta) = smtc.music_metadata.clone() {
+                publish_music_metadata(smtc, &meta, Some(app))?;
+                smtc.controls.SetPlaybackStatus(if smtc.music_playing {
+                    MediaPlaybackStatus::Playing
+                } else {
+                    MediaPlaybackStatus::Paused
+                })?;
+                update_timeline(&smtc.controls, smtc.duration, smtc.music_position);
+            } else {
+                let updater = smtc.controls.DisplayUpdater()?;
+                updater.ClearAll()?;
+                updater.Update()?;
+                smtc.duration = None;
+                update_timeline(&smtc.controls, None, 0.0);
+                smtc.controls
+                    .SetPlaybackStatus(MediaPlaybackStatus::Stopped)?;
+            }
         }
         return Ok(());
     };
