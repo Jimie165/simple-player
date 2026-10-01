@@ -1,13 +1,57 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 
 import type { LowFrequencyFrame } from '@/features/player/now-playing/background/audioResponse';
 import { FluidRenderer } from '@/features/player/now-playing/background/fluidRenderer';
 import { IsolationRenderer } from '@/features/player/now-playing/background/isolationRenderer';
 import { useThemeStore } from '@/store/useThemeStore';
+import { preprocessArtwork } from '@/features/player/now-playing/background/artworkPreprocess';
 
 type BackgroundRenderer = FluidRenderer | IsolationRenderer;
+
+function StaticBackground({ src }: { src: string }) {
+    const [artwork, setArtwork] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        image.onload = () => {
+            if (cancelled) return;
+            try {
+                // Blur the small bitmap once on the CPU, without CSS filters or WebGL.
+                const pixels = preprocessArtwork(image);
+                const small = document.createElement('canvas');
+                small.width = pixels.width;
+                small.height = pixels.height;
+                const smallContext = small.getContext('2d');
+                if (!smallContext) throw new Error('无法创建静态背景画布');
+                smallContext.putImageData(pixels, 0, 0);
+                const output = document.createElement('canvas');
+                output.width = output.height = 256;
+                const context = output.getContext('2d');
+                if (!context) throw new Error('无法创建静态背景输出画布');
+                context.imageSmoothingQuality = 'high';
+                context.drawImage(small, 0, 0, 256, 256);
+                setArtwork(output.toDataURL());
+            } catch (error) {
+                console.error('静态背景模糊失败', error);
+                setArtwork(src);
+            }
+        };
+        image.onerror = () => {
+            if (!cancelled) setArtwork(null);
+        };
+        image.src = src;
+        return () => {
+            cancelled = true;
+            image.onload = image.onerror = null;
+        };
+    }, [src]);
+
+    return artwork ? <img src={artwork} alt="" className="absolute inset-0 h-full w-full object-cover opacity-70" /> : null;
+}
 
 function BackgroundCanvas({
     src,
@@ -91,7 +135,7 @@ export const PlayerBackground = memo(({
                         transition={{ duration: 1.2, ease: 'easeInOut' }}
                         className="absolute inset-0"
                     >
-                        <img src={src} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
+                        <StaticBackground src={src} />
                         <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/20 to-black/40" />
                         {!simplifiedEffects && (
                             <BackgroundCanvas

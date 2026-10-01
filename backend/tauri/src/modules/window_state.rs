@@ -117,7 +117,9 @@ pub fn initialize(app: &tauri::App, db: Arc<Mutex<Connection>>) {
 }
 
 fn is_normal_window(window: &tauri::WebviewWindow) -> bool {
-    !window.is_minimized().unwrap_or(false) && !window.is_maximized().unwrap_or(false)
+    !window.is_minimized().unwrap_or(false)
+        && !window.is_maximized().unwrap_or(false)
+        && !window.is_fullscreen().unwrap_or(false)
 }
 
 fn configured_minimum_size(app: &tauri::App, window_label: &str) -> MinimumWindowSize {

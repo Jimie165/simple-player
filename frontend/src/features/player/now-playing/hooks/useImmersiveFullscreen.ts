@@ -1,20 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { systemService } from '@/services/systemService';
 
 export function useImmersiveFullscreen(isOpen: boolean) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const wasMaximizedBeforeFullscreenRef = useRef(false);
+    const enteredFullscreenRef = useRef(false);
 
     useEffect(() => {
+        let cancelled = false;
         const checkFullscreen = async () => {
             try {
                 const isFull = await getCurrentWindow().isFullscreen();
-                setIsFullscreen(isFull);
+                if (!cancelled) setIsFullscreen(isFull);
             } catch (e) {
                 console.error("Failed to check fullscreen status", e);
             }
         };
         checkFullscreen();
+        const unlisten = systemService.onResize(checkFullscreen);
+        return () => {
+            cancelled = true;
+            void unlisten.then((cleanup) => cleanup()).catch(console.error);
+        };
     }, [isOpen]);
 
     const toggleFullscreen = async () => {
@@ -23,6 +31,13 @@ export function useImmersiveFullscreen(isOpen: boolean) {
         try {
             const currentFullscreen = await appWindow.isFullscreen();
             const newState = !currentFullscreen;
+
+            if (systemService.isMacOS) {
+                await appWindow.setFullscreen(newState);
+                enteredFullscreenRef.current = newState;
+                setIsFullscreen(newState);
+                return;
+            }
 
             if (newState) {
                 const wasMaximized = await appWindow.isMaximized();
@@ -52,11 +67,14 @@ export function useImmersiveFullscreen(isOpen: boolean) {
 
     useEffect(() => {
         if (!isOpen && isFullscreen) {
+            // Closing the player must preserve fullscreen entered from the macOS title bar.
+            if (systemService.isMacOS && !enteredFullscreenRef.current) return;
             let cancelled = false;
             const closeFullscreen = async () => {
                 const appWindow = getCurrentWindow();
                 try {
                     await appWindow.setFullscreen(false);
+                    enteredFullscreenRef.current = false;
                     if (wasMaximizedBeforeFullscreenRef.current) {
                         await appWindow.maximize();
                         wasMaximizedBeforeFullscreenRef.current = false;

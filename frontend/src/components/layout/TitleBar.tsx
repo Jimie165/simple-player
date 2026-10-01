@@ -6,6 +6,7 @@ export default function TitleBar() {
     const [isMaximized, setIsMaximized] = useState(false);
 
     useEffect(() => {
+        if (systemService.isMacOS) return;
         const checkMaximized = async () => {
             setIsMaximized(await systemService.isMaximized());
         };
@@ -23,6 +24,8 @@ export default function TitleBar() {
         };
     }, []);
 
+    if (systemService.isMacOS) return null;
+
     return (
         // 修改点 1: 添加 pr-3 (右侧留白)，gap-1 (按钮间距)
         <div className="fixed top-0 right-0 z-100 flex h-10 items-center pr-3 gap-1">
@@ -38,6 +41,7 @@ export default function TitleBar() {
             {/* 最大化/还原 */}
             <button
                 onClick={systemService.toggleMaximize}
+                aria-label={systemService.isMacOS ? (isMaximized ? '退出全屏' : '进入全屏') : (isMaximized ? '还原窗口' : '最大化窗口')}
                 className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
             >
                 {isMaximized ? (

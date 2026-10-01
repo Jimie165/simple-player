@@ -53,7 +53,7 @@ export function useVideoControls() {
         const isFull = await win.isFullscreen();
 
         if (!isFull) {
-            if (await win.isMaximized()) {
+            if (!systemService.isMacOS && await win.isMaximized()) {
                 await win.unmaximize();
                 setIsMaximized(false);
             }

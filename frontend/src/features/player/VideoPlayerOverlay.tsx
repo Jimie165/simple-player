@@ -242,7 +242,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         </div>
 
                         {/* Right: Window Controls */}
-                        {!isFullscreen && (
+                        {!systemService.isMacOS && !isFullscreen && (
                             <div className="flex items-start gap-1 z-30 shrink-0 -mt-1 -mr-2">
                                 <button
                                     onClick={systemService.minimize}
