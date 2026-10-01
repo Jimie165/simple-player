@@ -302,7 +302,7 @@ async fn scan_library_internal(
     let mut all_songs = Vec::new();
 
     for folder in folders {
-        let files = library::scan_audio_files_recursive(&folder.path, &ignored_dirs);
+        let files = library::scan_audio_files_recursive(&folder.path, &ignored_dirs)?;
         let mut work_items: Vec<SongWorkItem> = Vec::new();
 
         {
@@ -311,7 +311,7 @@ async fn scan_library_internal(
                 .map_err(|e| e.to_string())?;
             for stale in stale_songs {
                 if stale.status == "active" {
-                    let _ = SongRepo::archive(&conn, stale.id);
+                    SongRepo::archive(&conn, stale.id).map_err(|error| error.to_string())?;
                 }
             }
 
@@ -400,7 +400,7 @@ async fn scan_library_internal(
                     let cover_path = meta.cover_path.clone();
 
                     if let Some(existing_id) = result.item.existing_id {
-                        let _ = SongRepo::update_metadata(
+                        SongRepo::update_metadata(
                             &conn,
                             existing_id,
                             &meta.title,
@@ -416,17 +416,19 @@ async fn scan_library_internal(
                             meta.track_total,
                             meta.disc_number,
                             meta.disc_total,
-                        );
+                        )
+                        .map_err(|error| format!("无法保存歌曲 {}：{error}", result.item.path))?;
 
                         if result.item.should_restore {
-                            let _ = SongRepo::restore(&conn, existing_id);
+                            SongRepo::restore(&conn, existing_id)
+                                .map_err(|error| error.to_string())?;
                         }
 
                         if let Ok(Some(updated)) = SongRepo::get_by_path(&conn, &result.item.path) {
                             all_songs.push(SongMetadata::from_db_song(&updated));
                         }
                     } else {
-                        let _ = SongRepo::upsert(
+                        SongRepo::upsert(
                             &conn,
                             &result.item.path,
                             &meta.title,
@@ -443,7 +445,8 @@ async fn scan_library_internal(
                             meta.track_total,
                             meta.disc_number,
                             meta.disc_total,
-                        );
+                        )
+                        .map_err(|error| format!("无法保存歌曲 {}：{error}", result.item.path))?;
 
                         if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &result.item.path)
                         {
@@ -463,7 +466,7 @@ async fn scan_library_internal(
                         .unwrap_or("Unknown")
                         .to_string();
 
-                    let _ = SongRepo::upsert(
+                    SongRepo::upsert(
                         &conn,
                         &result.item.path,
                         &filename,
@@ -480,7 +483,8 @@ async fn scan_library_internal(
                         None,
                         None,
                         None,
-                    );
+                    )
+                    .map_err(|error| format!("无法保存歌曲 {}：{error}", result.item.path))?;
 
                     if let Ok(Some(inserted)) = SongRepo::get_by_path(&conn, &result.item.path) {
                         all_songs.push(SongMetadata::from_db_song(&inserted));
@@ -488,7 +492,7 @@ async fn scan_library_internal(
                 } else if let Some(existing_id) = result.item.existing_id
                     && result.item.should_restore
                 {
-                    let _ = SongRepo::restore(&conn, existing_id);
+                    SongRepo::restore(&conn, existing_id).map_err(|error| error.to_string())?;
                 }
             }
         }
@@ -547,7 +551,7 @@ pub async fn add_library_folder(
             load_music_ignored_dirs(&conn)
         };
         let available_paths: HashSet<String> =
-            library::scan_audio_files_recursive(&folder, &ignored_dirs)
+            library::scan_audio_files_recursive(&folder, &ignored_dirs)?
                 .into_iter()
                 .collect();
 
@@ -584,7 +588,7 @@ pub async fn add_library_folder(
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         load_music_ignored_dirs(&conn)
     };
-    let files = library::scan_audio_files_recursive(&folder, &ignored_dirs);
+    let files = library::scan_audio_files_recursive(&folder, &ignored_dirs)?;
     {
         let conn = db.0.lock().map_err(|e| e.to_string())?;
         insert_placeholder_songs(&conn, added_folder_id, &files)?;

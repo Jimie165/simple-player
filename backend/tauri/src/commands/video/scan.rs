@@ -8,7 +8,6 @@ use crate::modules::database::{FolderRepo, LibraryFolder, Video};
 use crate::modules::library::video_scanner;
 use crate::modules::library::video_thumbnails;
 use crate::utils::path::normalize_folder_path;
-use rusqlite::params;
 use serde::Serialize;
 use std::collections::HashSet;
 use std::path::Path;
@@ -508,24 +507,9 @@ pub fn remove_video_folder(
     folder: String,
 ) -> Result<Vec<LibraryFolder>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
-    let folder_id: i64 = conn
-        .query_row(
-            "SELECT id FROM library_folders WHERE path = ?1 AND folder_type = 'video'",
-            params![folder],
-            |row| row.get(0),
-        )
-        .map_err(|_| format!("未找到视频文件夹记录：{}", folder))?;
-
-    conn.execute(
-        "UPDATE videos SET status = 'archived', updated_at = datetime('now') WHERE folder_id = ?1",
-        params![folder_id],
-    )
-    .map_err(|e| e.to_string())?;
-    conn.execute(
-        "DELETE FROM library_folders WHERE id = ?1 AND folder_type = 'video'",
-        params![folder_id],
-    )
-    .map_err(|e| e.to_string())?;
+    if !FolderRepo::remove_video(&conn, &folder).map_err(|error| error.to_string())? {
+        return Err(format!("未找到视频文件夹记录：{}", folder));
+    }
 
     let folders = FolderRepo::get_by_type(&conn, "video").map_err(|e| e.to_string())?;
     Ok(folders)

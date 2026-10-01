@@ -55,6 +55,10 @@ pub async fn prepare_video_for_playback(
     // 1. 计算源文件哈希
     eprintln!("[prepare_video_for_playback] 开始处理视频: {}", path);
 
+    let ffmpeg = resolve_ffmpeg_binary(&app_handle, "ffmpeg")
+        .ok_or_else(|| "应用包中未找到 FFmpeg，请重新下载完整的应用包".to_string())?;
+    let ffprobe = resolve_ffmpeg_binary(&app_handle, "ffprobe")
+        .ok_or_else(|| "应用包中未找到 FFprobe，请重新下载完整的应用包".to_string())?;
     let source_hash = compute_source_hash(&path)?;
     eprintln!("[prepare_video_for_playback] 源文件哈希: {}", source_hash);
     let source_prepare_lock = get_or_create_prepare_lock(&source_hash)?;
@@ -121,10 +125,6 @@ pub async fn prepare_video_for_playback(
     eprintln!("[prepare_video_for_playback] 缓存目录创建成功");
 
     // 7. 获取 FFmpeg
-    let ffmpeg =
-        resolve_ffmpeg_binary(&app_handle, "ffmpeg").unwrap_or_else(|| "ffmpeg".to_string());
-    let ffprobe =
-        resolve_ffmpeg_binary(&app_handle, "ffprobe").unwrap_or_else(|| "ffprobe".to_string());
     eprintln!("[prepare_video_for_playback] FFmpeg: {}", ffmpeg);
     eprintln!("[prepare_video_for_playback] FFprobe: {}", ffprobe);
 

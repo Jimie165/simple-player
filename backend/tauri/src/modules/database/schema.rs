@@ -1,7 +1,7 @@
 use rusqlite::{Connection, Result};
 
 /// 当前数据库版本
-const SCHEMA_VERSION: i32 = 16;
+const SCHEMA_VERSION: i32 = 17;
 
 /// 获取当前数据库版本
 fn get_db_version(conn: &Connection) -> Result<i32> {
@@ -118,6 +118,11 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
 
     if current_version < 16 {
         migrate_v16(conn)?;
+        set_db_version(conn, 16)?;
+    }
+
+    if current_version < 17 {
+        migrate_v17(conn)?;
         set_db_version(conn, SCHEMA_VERSION)?;
     }
 
@@ -614,9 +619,65 @@ fn migrate_v16(conn: &Connection) -> Result<()> {
 
     Ok(())
 }
+/// Recover directories whose membership was overwritten when added to both libraries.
+fn migrate_v17(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "UPDATE library_folders SET folder_type = 'mixed'
+         WHERE (folder_type = 'video' AND EXISTS (SELECT 1 FROM songs WHERE folder_id = library_folders.id))
+            OR (folder_type = 'music' AND EXISTS (SELECT 1 FROM videos WHERE folder_id = library_folders.id))",
+        [],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn migration_v17_recovers_overwritten_membership_without_changing_media_ids() {
+        let conn = Connection::open_in_memory().unwrap();
+        init_schema(&conn).unwrap();
+        conn.execute_batch(
+            "INSERT INTO library_folders (id, path, folder_type) VALUES (101, '/both-video', 'video'), (102, '/both-music', 'music'), (103, '/video-only', 'video');
+             INSERT INTO songs (id, path, title, artist, album, duration, folder_id) VALUES (201, '/both-video/song.flac', 'Song', 'Artist', 'Album', 10, 101);
+             INSERT INTO videos (id, path, title, folder_id) VALUES (301, '/both-music/video.mp4', 'Video', 102), (302, '/video-only/video.mp4', 'Video', 103);"
+        ).unwrap();
+        set_db_version(&conn, 16).unwrap();
+        init_schema(&conn).unwrap();
+        init_schema(&conn).unwrap();
+        assert_eq!(get_db_version(&conn).unwrap(), 17);
+        for id in [101, 102] {
+            let kind: String = conn
+                .query_row(
+                    "SELECT folder_type FROM library_folders WHERE id = ?1",
+                    [id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(kind, "mixed");
+        }
+        let kind: String = conn
+            .query_row(
+                "SELECT folder_type FROM library_folders WHERE id = 103",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(kind, "video");
+        let song_folder: i64 = conn
+            .query_row("SELECT folder_id FROM songs WHERE id = 201", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(song_folder, 101);
+        let video_folder: i64 = conn
+            .query_row("SELECT folder_id FROM videos WHERE id = 301", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(video_folder, 102);
+    }
 
     #[test]
     fn migration_v13_defaults_existing_songs_to_zero() {
