@@ -644,7 +644,7 @@ impl AudioState {
                 }
 
                 let mut recovery: Option<(String, Option<SongMetadata>, bool, f32, u64)> = None;
-                let (ended, position, session_id) = {
+                let (ended, _smtc_position, session_id) = {
                     let player_lock = player_arc.lock().unwrap();
                     let Some(handle) = player_lock.as_ref() else {
                         break;
@@ -704,7 +704,7 @@ impl AudioState {
                 }
 
                 #[cfg(target_os = "windows")]
-                smtc::set_position(position);
+                smtc::set_position(_smtc_position);
 
                 if ended {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {

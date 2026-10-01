@@ -1,10 +1,45 @@
 use std::path::Path;
 
-/// 将路径规范化为 Windows 格式（反斜杠）
-/// 用于调用 Windows API 或外部程序（如 ffmpeg）
-#[cfg(target_os = "windows")]
-pub fn normalize_windows_path(path: &str) -> String {
-    path.replace('/', "\\")
+/// 外部程序使用平台原生路径
+pub fn normalize_native_path(path: &str) -> String {
+    if cfg!(target_os = "windows") {
+        path.replace('/', "\\")
+    } else {
+        path.to_string()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn native_media_path_resolves_existing_file() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "simple-player-native-path-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&directory).unwrap();
+        #[cfg(target_os = "windows")]
+        let file = directory.join("中文 movie clip.mkv");
+        // Unix 文件名允许反斜杠；不能把它当作 Windows 分隔符转换。
+        #[cfg(not(target_os = "windows"))]
+        let file = directory.join("中文 movie\\clip.mkv");
+        std::fs::write(&file, b"media").unwrap();
+        #[cfg(target_os = "windows")]
+        let input = normalize_db_path(&file);
+        #[cfg(not(target_os = "windows"))]
+        let input = file.to_str().unwrap().to_string();
+        let resolved = normalize_native_path(&input);
+        let exists = Path::new(&resolved).is_file();
+        std::fs::remove_file(&file).unwrap();
+        std::fs::remove_dir(&directory).unwrap();
+        assert!(exists, "Native media path no longer resolves: {resolved}");
+    }
 }
 
 /// 将路径规范化为数据库存储格式（正斜杠）

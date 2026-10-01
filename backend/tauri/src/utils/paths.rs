@@ -4,7 +4,9 @@ use serde::Serialize;
 use std::fs;
 #[cfg(any(target_os = "windows", test))]
 use std::io;
-use std::path::{Path, PathBuf};
+#[cfg(any(target_os = "windows", test))]
+use std::path::Path;
+use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 #[derive(Clone, Serialize)]

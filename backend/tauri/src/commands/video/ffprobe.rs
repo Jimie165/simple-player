@@ -1,12 +1,12 @@
 // FFprobe 工具函数
 // ============================================================================
 
-use crate::utils::path::normalize_windows_path;
+use crate::utils::path::normalize_native_path;
 use std::process::Stdio;
 
 /// 获取视频时长
 pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f64>, String> {
-    let input_os = normalize_windows_path(input_path);
+    let input_os = normalize_native_path(input_path);
     let mut cmd = std::process::Command::new(ffprobe);
     #[cfg(target_os = "windows")]
     {
@@ -42,7 +42,7 @@ pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f6
 
 /// 获取视频编码格式
 pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option<String>, String> {
-    let input_os = normalize_windows_path(input_path);
+    let input_os = normalize_native_path(input_path);
     let mut cmd = std::process::Command::new(ffprobe);
     #[cfg(target_os = "windows")]
     {
@@ -81,7 +81,7 @@ pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option
 
 /// 获取音频编码格式
 pub fn run_ffprobe_audio_codec(ffprobe: &str, input_path: &str) -> Result<Option<String>, String> {
-    let input_os = normalize_windows_path(input_path);
+    let input_os = normalize_native_path(input_path);
     let mut cmd = std::process::Command::new(ffprobe);
     #[cfg(target_os = "windows")]
     {
@@ -140,7 +140,7 @@ pub fn try_remux(
     audio_codec: Option<String>,
     supported_audio_codecs: &[String],
 ) -> Result<bool, String> {
-    let input_os = normalize_windows_path(input_path);
+    let input_os = normalize_native_path(input_path);
     let is_mkv = input_path.to_lowercase().ends_with(".mkv");
     // 智能 remux：只取第一个视频流(copy)和音频流(aac)，忽略其他流（如字幕）
     // 这样可以避免因字幕或特殊音轨导致的 MP4 封装失败

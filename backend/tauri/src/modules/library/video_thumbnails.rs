@@ -15,7 +15,7 @@ use windows::core::Interface;
 
 use crate::utils::ffmpeg::resolve_ffmpeg_binary;
 #[cfg(target_os = "windows")]
-use crate::utils::path::normalize_windows_path;
+use crate::utils::path::normalize_native_path;
 use crate::utils::paths::VIDEO_THUMBNAILS_DIR;
 
 /// 获取视频缩略图缓存目录
@@ -109,7 +109,7 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
 
     #[cfg(target_os = "windows")]
     {
-        let file_path = normalize_windows_path(video_path);
+        let file_path = normalize_native_path(video_path);
 
         let (bytes, mime) = match read_thumbnail_bytes(&file_path, 512) {
             Ok(v) => v,
