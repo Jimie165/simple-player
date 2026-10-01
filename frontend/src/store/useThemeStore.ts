@@ -16,7 +16,6 @@ interface ThemeState {
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
-    reducedVisualEffects: boolean;
     graphicsUnavailable: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
@@ -25,7 +24,6 @@ interface ThemeState {
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
-    setReducedVisualEffects: (enabled: boolean) => void;
     setGraphicsUnavailable: () => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
@@ -46,7 +44,6 @@ export const useThemeStore = create<ThemeState>()(
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
-            reducedVisualEffects: false,
             graphicsUnavailable: false,
 
             setThemeMode: (mode) => {
@@ -67,7 +64,6 @@ export const useThemeStore = create<ThemeState>()(
                 set({ reactiveBackgroundEnabled: enabled });
             },
             setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
-            setReducedVisualEffects: (enabled) => set({ reducedVisualEffects: enabled }),
             setGraphicsUnavailable: () => set({ graphicsUnavailable: true }),
 
             setSourceColor: (hex, isCustom = false) => {
@@ -136,7 +132,6 @@ export const useThemeStore = create<ThemeState>()(
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
-                reducedVisualEffects: state.reducedVisualEffects,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -149,13 +144,14 @@ export const useThemeStore = create<ThemeState>()(
 
                 return {
                     ...current,
-                    ...persistedState,
+                    themeMode: persistedState?.themeMode ?? current.themeMode,
+                    sourceColor: persistedState?.sourceColor ?? current.sourceColor,
+                    isCustomColor: persistedState?.isCustomColor ?? current.isCustomColor,
                     playerEffectMode,
                     lyricFillMode: persistedState?.lyricFillMode === 'character' ? 'character' : 'line',
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
-                    reducedVisualEffects: persistedState?.reducedVisualEffects === true,
                     graphicsUnavailable: false,
                 };
             },

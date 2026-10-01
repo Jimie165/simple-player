@@ -28,6 +28,9 @@ cpal = "0.17.3"
 symphonia = { version = "0.5.5", features = ["all"] }
 rodio = "0.22.2"
 
+[target.'cfg(target_os = "macos")'.dependencies]
+souvlaki = { version = "0.8.3", default-features = false }
+
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.61"
 features = [

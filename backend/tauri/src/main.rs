@@ -25,6 +25,8 @@ fn main() {
         .manage(audio_state)
         .manage(modules::library::covers::SongArtworkState(Mutex::new(())))
         .setup(|app| {
+            #[cfg(target_os = "macos")]
+            app.manage(modules::player::media_controls::macos::MediaState::default());
             let directories = utils::paths::AppDirectories::initialize(app)?;
             #[cfg(target_os = "windows")]
             let webview_directory = directories.cache.clone();
@@ -85,6 +87,7 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            modules::player::media_controls::update_macos_media,
             // Player commands
             commands::player::play_audio,
             commands::player::load_audio,

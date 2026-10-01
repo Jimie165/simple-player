@@ -122,7 +122,7 @@ export const PlayerBackground = memo(({
     active?: boolean;
     lowFrequencyRef?: RefObject<LowFrequencyFrame>;
 }) => {
-    const simplifiedEffects = useThemeStore((state) => state.reducedVisualEffects || state.graphicsUnavailable);
+    const simplifiedEffects = useThemeStore((state) => state.graphicsUnavailable);
     return (
         <div className="pointer-events-none absolute inset-0 z-0 select-none overflow-hidden bg-[#24262c]">
             <AnimatePresence mode="popLayout">

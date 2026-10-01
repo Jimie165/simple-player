@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 
 import { audioService } from '@/services/audioService';
+import { mediaControlService } from '@/services/mediaControlService';
+import type { SystemMediaAction } from '@/services/mediaControlService';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PlaybackSnapshot } from '@/types';
@@ -23,6 +25,18 @@ function usePlaybackRuntime() {
     const setPlaybackSnapshot = usePlayerStore(state => state.setPlaybackSnapshot);
     const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
     const resetPlaybackClock = usePlayerStore(state => state.resetPlaybackClock);
+    const systemPosition = isPlaying && !isSeeking ? Math.floor(currentTime) : currentTime;
+
+    useEffect(() => {
+        if (mediaKind === 'video') return;
+        void mediaControlService.update(mediaKind === 'audio' && metadata ? {
+            title: metadata.title,
+            artist: metadata.artist,
+            album: metadata.album,
+            cover_path: metadata.cover_path ?? null,
+            duration: metadata.duration,
+        } : null, isPlaying, systemPosition).catch(console.error);
+    }, [metadata, mediaKind, isPlaying, systemPosition]);
     const {
         handlePlaybackEnded,
         pausePlayback,
@@ -82,6 +96,20 @@ function usePlaybackRuntime() {
         };
 
         void register('smtc:next', () => callbacksRef.current.playNext());
+        void register<SystemMediaAction>('macos-media:action', async ({ action, position }) => {
+            const state = usePlayerStore.getState();
+            if (state.mediaKind === 'video' || !state.metadata) return;
+            const callbacks = callbacksRef.current;
+            switch (action) {
+                case 'play': await callbacks.resumePlayback(); break;
+                case 'pause': await callbacks.pausePlayback(); break;
+                case 'toggle': await (state.isPlaying ? callbacks.pausePlayback() : callbacks.resumePlayback()); break;
+                case 'next': await callbacks.playNext(); break;
+                case 'previous': await callbacks.playPrev(currentTimeRef.current); break;
+                case 'seek':
+                    if (position !== null && Number.isFinite(position)) await callbacks.seek(Math.max(0, position));
+            }
+        });
         void register('smtc:previous', () => callbacksRef.current.playPrev(currentTimeRef.current));
         void register('smtc:play', () => callbacksRef.current.resumePlayback());
         void register('smtc:pause', () => callbacksRef.current.pausePlayback());

@@ -4,7 +4,6 @@ import { MdAdd, MdBrightness6, MdCheck, MdColorLens, MdExpandMore } from 'react-
 import clsx from 'clsx';
 
 import { useTheme } from '@/hooks/useTheme';
-import { useThemeStore } from '@/store/useThemeStore';
 import CustomTooltip from '@/components/common/CustomTooltip';
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -95,9 +94,6 @@ function ThemeOption({
 }
 
 export default function AppearanceSection() {
-    const reducedVisualEffects = useThemeStore((state) => state.reducedVisualEffects);
-    const setReducedVisualEffects = useThemeStore((state) => state.setReducedVisualEffects);
-    const graphicsUnavailable = useThemeStore((state) => state.graphicsUnavailable);
     const {
         theme,
         setTheme,
@@ -130,20 +126,6 @@ export default function AppearanceSection() {
                     <ThemeOption val="dark" label="深色模式" current={theme} onSelect={setTheme} />
                     <ThemeOption val="system" label="跟随系统" current={theme} onSelect={setTheme} />
                 </div>
-            </div>
-
-            <div className="space-y-2">
-                <PopupChoice
-                    label="简化视觉效果"
-                    value={reducedVisualEffects ? 'enabled' : 'disabled'}
-                    onChange={(value) => setReducedVisualEffects(value === 'enabled')}
-                    options={[{ value: 'disabled', label: '关闭' }, { value: 'enabled', label: '开启' }]}
-                />
-                <p className="px-1 text-xs text-on-surface-variant">
-                    {graphicsUnavailable
-                        ? '图形效果不可用，已自动使用静态背景和实色面板。重启应用后重新检测。'
-                        : '使用静态封面背景，关闭顶栏、播放器、菜单等区域的毛玻璃。适合虚拟机或图形显示异常时开启。'}
-                </p>
             </div>
 
             {/* Player Effect Selection */}

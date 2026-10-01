@@ -39,7 +39,7 @@ import { systemService } from '@/services/systemService';
 
 function App() {
   const [nativeFullscreen, setNativeFullscreen] = useState(false);
-  const showMacTitleBar = systemService.isMacOS && !nativeFullscreen;
+  const reserveMacControls = systemService.isMacOS && !nativeFullscreen;
 
   useEffect(() => {
     if (!systemService.isMacOS) return;
@@ -61,7 +61,7 @@ function App() {
   }, []);
 
   const { init: initTheme } = useThemeStore();
-  const simplifiedEffects = useThemeStore((state) => state.reducedVisualEffects || state.graphicsUnavailable);
+  const simplifiedEffects = useThemeStore((state) => state.graphicsUnavailable);
   const playlist = useLibraryStore((state) => state.playlist);
   const currentSongIndex = useLibraryStore((state) => state.currentSongIndex);
   const setMetadata = usePlayerStore((state) => state.setMetadata);
@@ -254,10 +254,7 @@ function App() {
   );
 
   return (
-    <div className={`flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans ${showMacTitleBar ? '[--macos-titlebar-height:40px]' : '[--macos-titlebar-height:0px]'}`}>
-      {showMacTitleBar && (
-        <div data-tauri-drag-region aria-hidden="true" className="h-10 w-full shrink-0 bg-surface-container" />
-      )}
+    <div className={`flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans ${reserveMacControls ? '[--macos-sidebar-inset:40px]' : '[--macos-sidebar-inset:0px]'}`}>
       <div className="relative flex min-h-0 flex-1 flex-col">
       <PlaybackRuntime />
 

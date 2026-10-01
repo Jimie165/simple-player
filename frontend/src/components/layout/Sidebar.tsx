@@ -82,7 +82,8 @@ export default function Sidebar({
                     }}
                 />
                 {/* 3. Inner Fixed Content (always 280px to prevent wrapping) */}
-                <div className="relative z-10 w-70 flex flex-col flex-1 h-full min-h-0">
+                <div data-tauri-drag-region aria-hidden="true" className="absolute inset-x-0 top-0 z-20 h-[var(--macos-sidebar-inset,0px)]" />
+                <div className="relative z-10 w-70 flex flex-col flex-1 h-full min-h-0 pt-[var(--macos-sidebar-inset,0px)]">
 
                     {/* Header */}
                     <div className="flex flex-col gap-1 pb-2 shrink-0">

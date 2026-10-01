@@ -214,7 +214,7 @@ export default function NowPlayingView({
             onAnimationComplete={() => {
                 if (isOpen) onOpened();
             }}
-            style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden', top: 'calc(0px - var(--macos-titlebar-height, 0px))' }}
+            style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}
             onPointerMove={handleNarrowPointerMove}

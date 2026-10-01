@@ -84,7 +84,7 @@ jobs:
       - name: Check frontend and Rust formatting
         run: |
           pnpm lint
-          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts
+          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts tests/mediaControlService.test.ts
           cargo fmt --manifest-path backend/Cargo.toml -- --check
       - name: Build ad-hoc signed test app
         # The Intel runner already has the correct native target. Share its release

@@ -3,6 +3,11 @@ import { resolveMediaPath } from '@/utils/mediaPath';
 import { detectAv1Support, detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
 import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
 import { useMkvPrepare } from '@/features/player/hooks/useMkvPrepare';
+import { listen } from '@tauri-apps/api/event';
+import { systemService } from '@/services/systemService';
+import { mediaControlService } from '@/services/mediaControlService';
+import type { SystemMediaAction } from '@/services/mediaControlService';
+import { usePlayerStore } from '@/store/usePlayerStore';
 
 type VideoMetadataLike = {
     path?: string;
@@ -176,7 +181,7 @@ export function useVideoPlayback({
     }, [volume, videoRef]);
 
     useEffect(() => {
-        if (!isOpen || !metadata || !('mediaSession' in navigator)) return;
+        if (systemService.isMacOS || !isOpen || !metadata || !('mediaSession' in navigator)) return;
 
         const artwork: MediaImage[] = [];
         if (posterUrl) {
@@ -264,6 +269,54 @@ export function useVideoPlayback({
         posterUrl,
         videoRef,
     ]);
+
+    const systemPosition = isPlaying && !isDragging ? Math.floor(currentTime) : currentTime;
+    useEffect(() => {
+        if (!isOpen || !metadata) return;
+        void mediaControlService.update({
+            title: metadata.title || '未知视频',
+            artist: 'Video',
+            album: '',
+            cover_path: metadata.thumbnail_path || metadata.cover_path || null,
+            duration: duration || metadata.duration || 0,
+        }, isPlaying, systemPosition).catch(console.error);
+    }, [isOpen, metadata, duration, isPlaying, systemPosition]);
+
+    useEffect(() => {
+        if (!systemService.isMacOS || !isOpen) return;
+        let disposed = false;
+        let unlisten: (() => void) | undefined;
+        void listen<SystemMediaAction>('macos-media:action', ({ payload: { action, position } }) => {
+            const video = videoRef.current;
+            if (disposed || !video || usePlayerStore.getState().mediaKind !== 'video') return;
+            switch (action) {
+                case 'play':
+                case 'toggle':
+                    if (action === 'play' || video.paused) {
+                        void video.play().then(() => setIsPlaying(true)).catch(console.error);
+                        break;
+                    }
+                    video.pause();
+                    setIsPlaying(false);
+                    break;
+                case 'pause':
+                    video.pause();
+                    setIsPlaying(false);
+                    break;
+                case 'next': if (videoQueueLength > 1) playNextVideo(); break;
+                case 'previous': if (videoQueueLength > 1) playPreviousVideo(); break;
+                case 'seek':
+                    if (position !== null && Number.isFinite(position)) {
+                        video.currentTime = Math.max(0, Math.min(position, video.duration || position));
+                        setCurrentTime(video.currentTime);
+                    }
+            }
+        }).then((cleanup) => {
+            if (disposed) cleanup();
+            else unlisten = cleanup;
+        }).catch(console.error);
+        return () => { disposed = true; unlisten?.(); };
+    }, [isOpen, videoRef, videoQueueLength, playNextVideo, playPreviousVideo]);
 
     const handleTogglePlay = useCallback(async () => {
         if (!videoRef.current) return;
