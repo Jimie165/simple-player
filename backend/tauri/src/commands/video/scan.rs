@@ -124,7 +124,7 @@ fn process_video_metadata_parallel(
             handles.push(s.spawn(move || {
                 let mut out = Vec::new();
                 for item in bucket {
-                    let meta = video_scanner::get_video_metadata(&item.path).ok();
+                    let meta = video_scanner::get_video_metadata(&app_handle, &item.path).ok();
                     let thumbnail_path = meta.as_ref().and_then(|m| {
                         video_thumbnails::ensure_video_thumbnail(&app_handle, &m.path)
                             .ok()

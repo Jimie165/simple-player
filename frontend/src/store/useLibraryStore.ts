@@ -14,6 +14,7 @@ import {
     toggleShuffleListFn,
 } from '@/store/actions/queueActions';
 import { isFavoriteFn, refreshFavoritesFn, toggleFavoriteFn } from '@/store/actions/favoriteActions';
+import { mediaPathKey } from '@/utils/mediaPath';
 
 type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 type SortOrder = 'asc' | 'desc';
@@ -195,12 +196,12 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             // Create lookup maps for faster access
             const songMap = new Map<string, SongMetadata>();
             allSongs.forEach((s: SongMetadata) => {
-                if (s.path) songMap.set(s.path.replace(/[\\/]/g, '/').toLowerCase(), s);
+                if (s.path) songMap.set(mediaPathKey(s.path), s);
             });
 
             const videoMap = new Map<string, VideoMetadata>();
             allVideos.forEach((v: VideoMetadata) => {
-                if (v.path) videoMap.set(v.path.replace(/[\\/]/g, '/').toLowerCase(), v);
+                if (v.path) videoMap.set(mediaPathKey(v.path), v);
             });
 
             const playlistIds = new Set(
@@ -209,7 +210,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
 
             const newRecent = recentHistory.map(item => {
                 if (item.type === 'file' || item.type === 'video') {
-                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    const normPath = mediaPathKey(item.path);
 
                     // Try finding in videos
                     if (item.type === 'video') {
@@ -250,12 +251,12 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                 }
 
                 if (item.type === 'video') {
-                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    const normPath = mediaPathKey(item.path);
                     return videoMap.has(normPath);
                 }
 
                 if (item.type === 'file' && item.isLibraryItem) {
-                    const normPath = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    const normPath = mediaPathKey(item.path);
                     return songMap.has(normPath) || videoMap.has(normPath);
                 }
 

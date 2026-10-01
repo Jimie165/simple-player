@@ -10,6 +10,14 @@ interface AppDirectories {
 
 let cachedAppDirectories: Promise<AppDirectories> | null = null;
 
+/** Windows 路径忽略大小写；保留 macOS 大小写敏感卷上的文件身份。 */
+export function mediaPathKey(path: string): string {
+    if (/^[a-z]:[\\/]/i.test(path) || path.startsWith('\\\\') || path.startsWith('//')) {
+        return path.replace(/\\/g, '/').toLowerCase();
+    }
+    return path;
+}
+
 function getAppDirectories(): Promise<AppDirectories> {
     cachedAppDirectories ??= invoke<AppDirectories>('get_app_directories').catch(error => {
         cachedAppDirectories = null;

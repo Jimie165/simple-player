@@ -8,8 +8,10 @@ use std::time::SystemTime;
 
 /// 计算源文件哈希（规范化路径 + 文件大小 + mtime）
 pub fn compute_source_hash(path: &str) -> Result<String, String> {
-    // 1. 规范化路径（统一为正斜杠、小写）
-    let normalized = normalize_db_path(Path::new(path)).to_lowercase();
+    // macOS 可以使用大小写敏感的卷，不能把不同源文件合并为同一缓存键。
+    let normalized = normalize_db_path(Path::new(path));
+    #[cfg(target_os = "windows")]
+    let normalized = normalized.to_lowercase();
 
     // 2. 获取文件元数据
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;

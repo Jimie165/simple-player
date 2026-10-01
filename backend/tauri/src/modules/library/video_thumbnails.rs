@@ -2,13 +2,19 @@ use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;
+#[cfg(target_os = "windows")]
 use windows::Storage::FileProperties::{ThumbnailMode, ThumbnailOptions};
+#[cfg(target_os = "windows")]
 use windows::Storage::StorageFile;
+#[cfg(target_os = "windows")]
 use windows::Storage::Streams::{DataReader, IInputStream};
+#[cfg(target_os = "windows")]
 use windows::core::HSTRING;
+#[cfg(target_os = "windows")]
 use windows::core::Interface;
 
 use crate::utils::ffmpeg::resolve_ffmpeg_binary;
+#[cfg(target_os = "windows")]
 use crate::utils::path::normalize_windows_path;
 use crate::utils::paths::VIDEO_THUMBNAILS_DIR;
 
@@ -17,6 +23,7 @@ fn get_thumbnails_dir(app_data_dir: &Path) -> PathBuf {
     app_data_dir.join(VIDEO_THUMBNAILS_DIR)
 }
 
+#[cfg(target_os = "windows")]
 fn extension_from_mime(mime: &str) -> &'static str {
     match mime {
         "image/jpeg" => "jpg",
@@ -27,6 +34,7 @@ fn extension_from_mime(mime: &str) -> &'static str {
     }
 }
 
+#[cfg(target_os = "windows")]
 fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>, String), String> {
     let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(file_path))
         .map_err(|e| format!("GetFileFromPathAsync failed: {e}"))?
@@ -99,36 +107,54 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
         }
     }
 
-    let file_path = normalize_windows_path(video_path);
+    #[cfg(target_os = "windows")]
+    {
+        let file_path = normalize_windows_path(video_path);
 
-    let (bytes, mime) = match read_thumbnail_bytes(&file_path, 512) {
-        Ok(v) => v,
-        Err(_) => match read_thumbnail_bytes(&file_path, 256) {
+        let (bytes, mime) = match read_thumbnail_bytes(&file_path, 512) {
             Ok(v) => v,
-            Err(_) => match read_thumbnail_bytes(&file_path, 128) {
+            Err(_) => match read_thumbnail_bytes(&file_path, 256) {
                 Ok(v) => v,
-                Err(_) => {
-                    // Fallback to ffmpeg
-                    if let Some(ffmpeg_path) = resolve_ffmpeg_binary(app, "ffmpeg") {
-                        let out_path_jpg = thumbs_dir.join(format!("{hash}.jpg"));
-                        if generate_thumbnail_with_ffmpeg(&ffmpeg_path, &file_path, &out_path_jpg) {
-                            return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
+                Err(_) => match read_thumbnail_bytes(&file_path, 128) {
+                    Ok(v) => v,
+                    Err(_) => {
+                        // Fallback to ffmpeg
+                        if let Some(ffmpeg_path) = resolve_ffmpeg_binary(app, "ffmpeg") {
+                            let out_path_jpg = thumbs_dir.join(format!("{hash}.jpg"));
+                            if generate_thumbnail_with_ffmpeg(
+                                &ffmpeg_path,
+                                &file_path,
+                                &out_path_jpg,
+                            ) {
+                                return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
+                            }
                         }
+                        return Ok(None);
                     }
-                    return Ok(None);
-                }
+                },
             },
-        },
-    };
+        };
 
-    let ext = extension_from_mime(mime.as_str());
-    let out_path: PathBuf = thumbs_dir.join(format!("{hash}.{ext}"));
+        let ext = extension_from_mime(mime.as_str());
+        let out_path: PathBuf = thumbs_dir.join(format!("{hash}.{ext}"));
 
-    if !Path::new(&out_path).exists() {
-        let _ = fs::write(&out_path, bytes);
+        if !Path::new(&out_path).exists() {
+            let _ = fs::write(&out_path, bytes);
+        }
+
+        Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)))
     }
 
-    Ok(Some(format!("{}/{}.{}", VIDEO_THUMBNAILS_DIR, hash, ext)))
+    #[cfg(not(target_os = "windows"))]
+    {
+        if let Some(ffmpeg_path) = resolve_ffmpeg_binary(app, "ffmpeg") {
+            let output = thumbs_dir.join(format!("{hash}.jpg"));
+            if generate_thumbnail_with_ffmpeg(&ffmpeg_path, video_path, &output) {
+                return Ok(Some(format!("{}/{}.jpg", VIDEO_THUMBNAILS_DIR, hash)));
+            }
+        }
+        Ok(None)
+    }
 }
 
 fn generate_thumbnail_with_ffmpeg(ffmpeg_path: &str, input_path: &str, output_path: &Path) -> bool {

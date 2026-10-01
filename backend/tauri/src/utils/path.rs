@@ -2,6 +2,7 @@ use std::path::Path;
 
 /// 将路径规范化为 Windows 格式（反斜杠）
 /// 用于调用 Windows API 或外部程序（如 ffmpeg）
+#[cfg(target_os = "windows")]
 pub fn normalize_windows_path(path: &str) -> String {
     path.replace('/', "\\")
 }

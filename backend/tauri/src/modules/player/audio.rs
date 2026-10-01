@@ -20,6 +20,7 @@ use tauri::{AppHandle, Emitter};
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::HWND;
 
+#[cfg(target_os = "windows")]
 use super::smtc;
 use crate::modules::library::SongMetadata;
 
@@ -403,10 +404,12 @@ impl AudioState {
         };
         Self::dispose_playback(previous);
 
+        #[cfg(target_os = "windows")]
         if let Some(meta) = metadata.as_ref() {
             let app_handle = self.app_handle.lock().ok().and_then(|h| h.clone());
             let _ = smtc::apply_metadata(meta, app_handle.as_ref());
         }
+        #[cfg(target_os = "windows")]
         smtc::set_playing(autoplay);
 
         if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
@@ -691,6 +694,7 @@ impl AudioState {
                             Ok(()) => {}
                             Err(err) => {
                                 eprintln!("Failed to recover audio output: {err}");
+                                #[cfg(target_os = "windows")]
                                 smtc::set_playing(false);
                                 let _ = app_handle.emit("audio:output-error", err);
                             }
@@ -699,10 +703,12 @@ impl AudioState {
                     break;
                 }
 
+                #[cfg(target_os = "windows")]
                 smtc::set_position(position);
 
                 if ended {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
+                        #[cfg(target_os = "windows")]
                         smtc::set_playing(false);
                         let _ = app_handle.emit(
                             "audio:state-changed",
@@ -787,10 +793,13 @@ impl AudioState {
         };
         Self::dispose_playback(previous);
 
+        #[cfg(target_os = "windows")]
         if let Some(meta) = metadata.as_ref() {
             let _ = smtc::apply_metadata(meta, Some(&app_handle));
         }
+        #[cfg(target_os = "windows")]
         smtc::set_playing(autoplay);
+        #[cfg(target_os = "windows")]
         smtc::set_position(position);
         Self::emit_output_changed(&app_handle, &active_device_name);
         let state_snapshot = snapshot_from_parts(&player_arc, &volume_arc);
@@ -834,6 +843,7 @@ impl AudioState {
     pub fn pause(&self) -> Result<PlaybackSnapshot, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             handle.player.pause();
+            #[cfg(target_os = "windows")]
             smtc::set_playing(false);
         }
         let snapshot = self.snapshot();
@@ -846,6 +856,7 @@ impl AudioState {
     pub fn resume(&self) -> Result<PlaybackSnapshot, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             handle.player.play();
+            #[cfg(target_os = "windows")]
             smtc::set_playing(true);
         }
         let snapshot = self.snapshot();
@@ -880,8 +891,8 @@ impl AudioState {
                 .player
                 .try_seek(position)
                 .map_err(|e| format!("Failed to seek audio: {}", e))?;
-            let actual = handle.player.get_pos().as_secs_f32();
-            smtc::set_position(actual);
+            #[cfg(target_os = "windows")]
+            smtc::set_position(handle.player.get_pos().as_secs_f32());
         }
         let snapshot = self.snapshot();
         if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
@@ -1020,6 +1031,7 @@ impl AudioState {
     pub fn get_position(&self) -> Result<f32, String> {
         if let Some(handle) = self.player.lock().unwrap().as_ref() {
             let position = handle.player.get_pos().as_secs_f32();
+            #[cfg(target_os = "windows")]
             smtc::set_position(position);
             return Ok(position);
         }

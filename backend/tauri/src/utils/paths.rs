@@ -1,7 +1,10 @@
+#[cfg(any(target_os = "windows", test))]
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
+use std::fs;
+#[cfg(any(target_os = "windows", test))]
+use std::io;
 use std::path::{Path, PathBuf};
-use std::{fs, io};
 use tauri::{AppHandle, Manager};
 
 #[derive(Clone, Serialize)]
@@ -14,11 +17,16 @@ impl AppDirectories {
     /// 固定目录与应用标识分离；迁移完成后才创建 WebView，保留其本地偏好。
     pub fn initialize(app: &tauri::App) -> Result<Self, Box<dyn std::error::Error>> {
         let roaming = app.path().data_dir()?;
+        #[cfg(target_os = "windows")]
         let local = app.path().local_data_dir()?;
+        // macOS 的 local_data_dir 与 data_dir 相同，缓存必须使用独立目录。
+        #[cfg(not(target_os = "windows"))]
+        let local = app.path().cache_dir()?;
         let directories = Self {
             data: roaming.join("SimplePlayer"),
             cache: local.join("SimplePlayer"),
         };
+        #[cfg(target_os = "windows")]
         migrate_app_directories(&roaming, &local, &directories)?;
         fs::create_dir_all(&directories.data)?;
         fs::create_dir_all(&directories.cache)?;
@@ -34,6 +42,7 @@ pub fn app_cache_dir<M: Manager<tauri::Wry>>(app: &M) -> tauri::Result<PathBuf> 
     Ok(app.state::<AppDirectories>().cache.clone())
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn migrate_app_directories(
     roaming: &Path,
     local: &Path,
@@ -45,6 +54,7 @@ fn migrate_app_directories(
     Ok(())
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn copy_directory_once(
     source: &Path,
     target: &Path,
@@ -83,6 +93,7 @@ fn copy_directory_once(
     result
 }
 
+#[cfg(any(target_os = "windows", test))]
 fn copy_directory(source: &Path, target: &Path, snapshot_database: bool) -> io::Result<()> {
     fs::create_dir_all(target)?;
     for entry in fs::read_dir(source)? {

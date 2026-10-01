@@ -1,22 +1,7 @@
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
-#[cfg(all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"))]
-const WINDOWS_TARGET_TRIPLE: &str = "x86_64-pc-windows-msvc";
-#[cfg(all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"))]
-const WINDOWS_TARGET_TRIPLE: &str = "x86_64-pc-windows-gnu";
-#[cfg(all(target_os = "windows", target_arch = "aarch64", target_env = "msvc"))]
-const WINDOWS_TARGET_TRIPLE: &str = "aarch64-pc-windows-msvc";
-#[cfg(not(any(
-    all(target_os = "windows", target_arch = "x86_64", target_env = "msvc"),
-    all(target_os = "windows", target_arch = "x86_64", target_env = "gnu"),
-    all(target_os = "windows", target_arch = "aarch64", target_env = "msvc")
-)))]
-const WINDOWS_TARGET_TRIPLE: &str = "x86_64-pc-windows-msvc";
-
-fn windows_target_triple() -> &'static str {
-    WINDOWS_TARGET_TRIPLE
-}
+const TARGET_TRIPLE: &str = env!("SIMPLE_PLAYER_TARGET");
 
 /// 解析 ffmpeg 系列二进制文件路径
 ///
@@ -51,11 +36,11 @@ pub fn resolve_ffmpeg_binary(app: &AppHandle, base_name: &str) -> Option<String>
 
     // 2. 开发环境 binaries 目录（带平台标识）
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    candidates.push(manifest_dir.join("binaries").join(format!(
-        "{base_name}-{}{}",
-        windows_target_triple(),
-        ext
-    )));
+    candidates.push(
+        manifest_dir
+            .join("binaries")
+            .join(format!("{base_name}-{}{}", TARGET_TRIPLE, ext)),
+    );
     candidates.push(
         manifest_dir
             .join("binaries")
@@ -64,11 +49,10 @@ pub fn resolve_ffmpeg_binary(app: &AppHandle, base_name: &str) -> Option<String>
 
     // 3. 当前工作目录 binaries
     if let Ok(cwd) = std::env::current_dir() {
-        candidates.push(cwd.join("binaries").join(format!(
-            "{base_name}-{}{}",
-            windows_target_triple(),
-            ext
-        )));
+        candidates.push(
+            cwd.join("binaries")
+                .join(format!("{base_name}-{}{}", TARGET_TRIPLE, ext)),
+        );
         candidates.push(cwd.join("binaries").join(format!("{base_name}{ext}")));
     }
 

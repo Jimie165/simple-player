@@ -2,6 +2,7 @@ import type { SongMetadata } from '@/types';
 
 import { libraryService } from '@/services/libraryService';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { mediaPathKey } from '@/utils/mediaPath';
 
 type PlayerStoreUpdate = Partial<{
     pathMap: Map<string, number>;
@@ -18,7 +19,7 @@ export function isFavoriteFn(
 ): boolean {
     if (song.id && typeof song.id === 'number') return favoriteSet.has(song.id);
     if (song.path) {
-        const normalizedPath = song.path.replace(/[\\/]/g, '/').toLowerCase();
+        const normalizedPath = mediaPathKey(song.path);
         const id = pathMap.get(normalizedPath);
         if (id) return favoriteSet.has(id);
     }
@@ -34,7 +35,7 @@ export async function refreshFavoritesFn(pathMap: Map<string, number>) {
         const allSongs = await libraryService.getLibrarySongs();
         nextPathMap = new Map<string, number>();
         allSongs.forEach(song => {
-            if (song.path && song.id) nextPathMap.set(song.path.replace(/[\\/]/g, '/').toLowerCase(), song.id);
+            if (song.path && song.id) nextPathMap.set(mediaPathKey(song.path), song.id);
         });
     }
 
@@ -58,7 +59,7 @@ export async function toggleFavoriteFn(
     if (song.id && typeof song.id === 'number') {
         songId = song.id;
     } else if (songPath) {
-        const normalizedPath = songPath.replace(/[\\/]/g, '/').toLowerCase();
+        const normalizedPath = mediaPathKey(songPath);
         songId = get().pathMap.get(normalizedPath);
 
         if (!songId) {
@@ -66,7 +67,7 @@ export async function toggleFavoriteFn(
                 const allSongs = await libraryService.getLibrarySongs();
                 const found = allSongs.find(item => {
                     if (!item.path) return false;
-                    const normalized = item.path.replace(/[\\/]/g, '/').toLowerCase();
+                    const normalized = mediaPathKey(item.path);
                     return normalized === normalizedPath && typeof item.id === 'number';
                 });
                 if (found?.id && typeof found.id === 'number') {

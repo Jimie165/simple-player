@@ -106,10 +106,11 @@ fn parse_frame_rate(fr_str: &str) -> Option<f64> {
 // The tuple directly represents the five optional values extracted from one ffprobe response.
 #[allow(clippy::type_complexity)]
 fn get_video_details_ffprobe(
+    ffprobe: &str,
     path: &str,
 ) -> Result<(i64, Option<u32>, Option<u32>, Option<f64>, Option<u8>), String> {
     // ffprobe -v quiet -print_format json -show_format -show_streams input.mp4
-    let mut cmd = Command::new("ffprobe");
+    let mut cmd = Command::new(ffprobe);
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
@@ -167,7 +168,7 @@ fn get_video_details_ffprobe(
     Ok((duration, width, height, frame_rate, channels))
 }
 
-pub fn get_video_metadata(path: &str) -> Result<RawVideoMetadata, String> {
+pub fn get_video_metadata(app: &tauri::AppHandle, path: &str) -> Result<RawVideoMetadata, String> {
     let path_obj = Path::new(path);
 
     // 关键修正：首先检查是否真的是视频文件
@@ -185,8 +186,10 @@ pub fn get_video_metadata(path: &str) -> Result<RawVideoMetadata, String> {
     let size = fs::metadata(path_obj).map(|m| m.len()).unwrap_or(0);
 
     // Get details using new JSON parser
+    let ffprobe = crate::utils::ffmpeg::resolve_ffmpeg_binary(app, "ffprobe")
+        .ok_or_else(|| "FFprobe sidecar not found".to_string())?;
     let (duration, width, height, frame_rate, channels) =
-        get_video_details_ffprobe(path).unwrap_or((0, None, None, None, None));
+        get_video_details_ffprobe(&ffprobe, path).unwrap_or((0, None, None, None, None));
 
     Ok(RawVideoMetadata {
         path: path.to_string(),

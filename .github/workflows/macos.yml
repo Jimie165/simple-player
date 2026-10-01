@@ -1,0 +1,86 @@
+name: macOS Intel test build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [macos-support]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/macos.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.11.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - run: pnpm install --frozen-lockfile
+
+      # Static Intel builds avoid a dependency on Homebrew libraries on the test machine.
+      - name: Prepare FFmpeg and FFprobe sidecars
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir=$(mktemp -d)
+          for binary in ffmpeg ffprobe; do
+            archive="$archive_dir/$binary.zip"
+            curl --fail --location --retry 3 "https://evermeet.cx/ffmpeg/$binary-9.0.2.zip" --output "$archive"
+            if [ "$binary" = ffmpeg ]; then
+              checksum=4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5
+            else
+              checksum=24a9c968cd4da72d99c7245e914b921815835eb6dff01d99868031aebaf1d439
+            fi
+            printf '%s  %s\n' "$checksum" "$archive" | shasum -a 256 --check
+            unzip -q "$archive" -d "$archive_dir/$binary"
+            destination="backend/tauri/binaries/$binary-x86_64-apple-darwin"
+            install -m 755 "$archive_dir/$binary/$binary" "$destination"
+            "$destination" -version
+            file "$destination" | grep -q 'x86_64'
+            if otool -L "$destination" | grep -E '/(usr/local|opt/homebrew|opt/local)/'; then
+              echo 'Sidecar depends on libraries absent from the test machine.' >&2
+              exit 1
+            fi
+          done
+
+      - name: Check frontend and Rust
+        run: |
+          pnpm lint
+          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts
+          cargo fmt --manifest-path backend/Cargo.toml -- --check
+          cargo check --manifest-path backend/Cargo.toml --locked
+          cargo test --manifest-path backend/Cargo.toml --locked
+      - name: Build ad-hoc signed test app
+        run: pnpm build --target x86_64-apple-darwin --bundles app
+      - name: Archive app preserving permissions and bundle metadata
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            'backend/target/x86_64-apple-darwin/release/bundle/macos/Simple Player.app' \
+            'Simple-Player-macos-x86_64.zip'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Simple-Player-macos-x86_64
+          path: Simple-Player-macos-x86_64.zip
+          if-no-files-found: error
+          retention-days: 14

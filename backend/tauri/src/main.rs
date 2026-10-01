@@ -26,6 +26,7 @@ fn main() {
         .manage(modules::library::covers::SongArtworkState(Mutex::new(())))
         .setup(|app| {
             let directories = utils::paths::AppDirectories::initialize(app)?;
+            #[cfg(target_os = "windows")]
             let webview_directory = directories.cache.clone();
             app.manage(directories);
             // 初始化数据库
@@ -57,9 +58,12 @@ fn main() {
 
             // 注入数据库状态
             app.manage(DbState(Arc::new(Mutex::new(conn))));
-            tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?
-                .data_directory(webview_directory)
-                .build()?;
+            let window_builder =
+                tauri::WebviewWindowBuilder::from_config(app, &app.config().app.windows[0])?;
+            // WKWebView 使用系统管理的数据存储；自定义目录仅保留给 WebView2。
+            #[cfg(target_os = "windows")]
+            let window_builder = window_builder.data_directory(webview_directory);
+            window_builder.build()?;
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
 

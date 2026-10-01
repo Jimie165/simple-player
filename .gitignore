@@ -6,6 +6,7 @@
 *.dll
 *.so
 *.dylib
+backend/tauri/binaries/*-apple-darwin
 
 # Node.js / pnpm
 node_modules/

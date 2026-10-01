@@ -1,0 +1,27 @@
+{
+    "app": {
+        "windows": [
+            {
+                "create": false,
+                "title": "Simple Player",
+                "width": 1000,
+                "height": 700,
+                "minWidth": 600,
+                "minHeight": 500,
+                "visible": false,
+                "resizable": true,
+                "fullscreen": false,
+                "decorations": false,
+                "transparent": false,
+                "shadow": true
+            }
+        ]
+    },
+    "bundle": {
+        "targets": ["app", "dmg"],
+        "macOS": {
+            "minimumSystemVersion": "12.0",
+            "signingIdentity": "-"
+        }
+    }
+}

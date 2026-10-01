@@ -26,7 +26,7 @@ pub fn get_metadata(
 
     // 1. 优先尝试视频元数据 (Video Scanner)
     // 这样做是为了防止 MP4 等容器格式被音频库 (Lofty) 抢先解析，导致无法生成视频缩略图
-    let mut meta = if let Ok(video_meta) = video_scanner::get_video_metadata(&path) {
+    let mut meta = if let Ok(video_meta) = video_scanner::get_video_metadata(&app, &path) {
         // 尝试生成视频缩略图
         let thumbnail_path = video_thumbnails::ensure_video_thumbnail(&app, &path)
             .ok()
@@ -142,7 +142,7 @@ pub fn read_folder_audio_files(app: tauri::AppHandle, folder: String) -> Vec<Son
 
     for path in all_paths {
         // 1. 视频优先 (Video Scanner)
-        if let Ok(video_meta) = video_scanner::get_video_metadata(&path) {
+        if let Ok(video_meta) = video_scanner::get_video_metadata(&app, &path) {
             // 生成缩略图
             let thumbnail_path = video_thumbnails::ensure_video_thumbnail(&app, &path)
                 .ok()
