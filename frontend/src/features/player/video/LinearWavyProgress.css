@@ -1,0 +1,15 @@
+/* Keep wave motion independent from incoming progress updates. */
+.video-prepare-wave {
+    animation: video-prepare-wave-shift 1s linear infinite;
+}
+
+@keyframes video-prepare-wave-shift {
+    from { transform: translateX(0); }
+    to { transform: translateX(-40px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .video-prepare-wave {
+        animation: none;
+    }
+}
