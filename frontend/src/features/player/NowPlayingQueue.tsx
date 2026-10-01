@@ -330,7 +330,7 @@ export default function NowPlayingQueue({
                                         width: draggedItemWidth ? `${draggedItemWidth}px` : 'auto',
                                     }}
                                 >
-                                    <div className="group flex items-center gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.5rem,1.5vw,1rem)] py-[clamp(0.375rem,1vw,0.75rem)] bg-white/10 rounded-md shadow-xl backdrop-blur-sm">
+                                    <div className="graphics-fallback-dark group flex items-center gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.5rem,1.5vw,1rem)] py-[clamp(0.375rem,1vw,0.75rem)] bg-white/10 rounded-md shadow-xl backdrop-blur-sm">
                                         <div
                                             className="relative rounded-sm overflow-hidden shrink-0 bg-neutral-800"
                                             style={{ width: 'clamp(2.75rem, 4.25vw, 4.25rem)', height: 'clamp(2.75rem, 4.25vw, 4.25rem)' }}

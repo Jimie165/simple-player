@@ -16,6 +16,8 @@ interface ThemeState {
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
+    reducedVisualEffects: boolean;
+    graphicsUnavailable: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
@@ -23,6 +25,8 @@ interface ThemeState {
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
+    setReducedVisualEffects: (enabled: boolean) => void;
+    setGraphicsUnavailable: () => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -42,6 +46,8 @@ export const useThemeStore = create<ThemeState>()(
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
+            reducedVisualEffects: false,
+            graphicsUnavailable: false,
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
@@ -61,6 +67,8 @@ export const useThemeStore = create<ThemeState>()(
                 set({ reactiveBackgroundEnabled: enabled });
             },
             setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
+            setReducedVisualEffects: (enabled) => set({ reducedVisualEffects: enabled }),
+            setGraphicsUnavailable: () => set({ graphicsUnavailable: true }),
 
             setSourceColor: (hex, isCustom = false) => {
                 set({ sourceColor: hex, isCustomColor: isCustom });
@@ -128,6 +136,7 @@ export const useThemeStore = create<ThemeState>()(
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
+                reducedVisualEffects: state.reducedVisualEffects,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -146,6 +155,8 @@ export const useThemeStore = create<ThemeState>()(
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
+                    reducedVisualEffects: persistedState?.reducedVisualEffects === true,
+                    graphicsUnavailable: false,
                 };
             },
         }

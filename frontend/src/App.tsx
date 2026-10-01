@@ -38,11 +38,23 @@ import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
 
 function App() {
   const { init: initTheme } = useThemeStore();
+  const simplifiedEffects = useThemeStore((state) => state.reducedVisualEffects || state.graphicsUnavailable);
   const playlist = useLibraryStore((state) => state.playlist);
   const currentSongIndex = useLibraryStore((state) => state.currentSongIndex);
   const setMetadata = usePlayerStore((state) => state.setMetadata);
 
   useEffect(() => initTheme(), [initTheme]);
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('simplified-effects', simplifiedEffects);
+    return () => document.documentElement.classList.remove('simplified-effects');
+  }, [simplifiedEffects]);
+
+  useEffect(() => {
+    if (!CSS.supports('backdrop-filter', 'blur(1px)') && !CSS.supports('-webkit-backdrop-filter', 'blur(1px)')) {
+      useThemeStore.getState().setGraphicsUnavailable();
+    }
+  }, []);
 
   useEffect(() => {
     useLibraryStore.getState().refreshFavorites();

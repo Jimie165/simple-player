@@ -13,8 +13,11 @@ Apple Silicon 代码路径已使用实际 target triple，但尚未提供 ARM si
 4. 把里面的 `Simple-Player-macos-x86_64.zip` 传入 macOS，在 macOS 内解压并运行 `Simple Player.app`。
    应用 ZIP 由 `ditto` 创建，保留权限和包结构；不要在 Windows 上解开应用包后复制零散文件。
 
-CI 使用 Intel runner、静态 FFmpeg/FFprobe 9.0.2 和固定下载校验值。
-它运行 lint、媒体路径身份测试、Rust 格式/编译/测试，并生成 `.app` 测试包。
+CI 使用 Intel runner、Rust 1.98.1、静态 FFmpeg/FFprobe 9.0.2 和固定下载校验值。
+它运行 lint、媒体路径/图形回退偏好测试、Rust 格式检查、release 构建和 release 测试，并生成 `.app` 测试包。
+构建与测试共用原生 Intel target 的 release 依赖，避免分别编译 check、debug 和显式 target 的依赖。
+pnpm、Rust 依赖和 sidecar 均使用缓存；首次冷构建仍需下载、编译，后续命中缓存时才会更快。
+同一分支的新构建会取消尚未完成的旧构建；应用 ZIP 上传时不再重复压缩。
 没有创建 GitHub Release，也不要求 Apple Developer 凭据。
 测试包使用 ad-hoc 签名，没有 Developer ID 签名和公证，下载后可能被 Gatekeeper 拦截。
 仅对自己构建并确认来源的测试包，按系统设置中的“仍要打开”流程处理；不要关闭全局安全检查。
@@ -43,6 +46,14 @@ pnpm build --target x86_64-apple-darwin --bundles app
 
 Tauri 自动合并 `backend/tauri/tauri.macos.conf.json`。
 本地默认也可生成 DMG；CI 初期仅生成应用 ZIP，减少虚拟机测试前的打包工作。
+
+## 虚拟机图形回退
+
+如果背景变灰，或顶栏、底部播放器、右键菜单等毛玻璃显示异常，在 **设置 → 外观与主题 → 简化视觉效果** 中选择 **开启**。
+该偏好会保存；正在播放使用静态封面和暗色遮罩，毛玻璃面板改为适合浅色/深色主题的实色背景。
+静态背景不依赖 WebGL 或 CSS 模糊，切歌仍会更新封面。
+不支持 backdrop-filter、WebGL 初始化失败或上下文丢失时也会自动回退，自动检测结果仅对本次运行有效。
+虚拟机可能报告支持图形 API 却实际显示异常，此时需要手动开启；真实 Mac 上可关闭此选项恢复原有效果。
 
 ## 验收清单
 
