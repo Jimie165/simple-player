@@ -40,8 +40,28 @@ pub fn run_ffprobe_duration(ffprobe: &str, input_path: &str) -> Result<Option<f6
     Ok(duration)
 }
 
-/// 获取视频编码格式
-pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option<String>, String> {
+#[derive(serde::Deserialize)]
+pub struct VideoStreamInfo {
+    pub codec_name: String,
+    pub pix_fmt: Option<String>,
+}
+
+/// 检查实际像素格式，避免把 10 位 H.264 误判为 WebKit 可播放的视频。
+pub fn is_macos_compatible_video_stream(stream: &VideoStreamInfo) -> bool {
+    match stream.codec_name.as_str() {
+        "h264" | "avc" => stream.pix_fmt.as_deref() == Some("yuv420p"),
+        "hevc" | "h265" | "av1" => {
+            matches!(stream.pix_fmt.as_deref(), Some("yuv420p" | "yuv420p10le"))
+        }
+        _ => false,
+    }
+}
+
+/// 获取视频编码和像素格式。
+pub fn run_ffprobe_video_stream(
+    ffprobe: &str,
+    input_path: &str,
+) -> Result<Option<VideoStreamInfo>, String> {
     let input_os = normalize_native_path(input_path);
     let mut cmd = std::process::Command::new(ffprobe);
     #[cfg(target_os = "windows")]
@@ -56,9 +76,9 @@ pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option
             "-select_streams",
             "v:0",
             "-show_entries",
-            "stream=codec_name",
+            "stream=codec_name,pix_fmt",
             "-of",
-            "default=nw=1:nk=1",
+            "json",
             &input_os,
         ])
         .stdout(Stdio::piped())
@@ -70,13 +90,13 @@ pub fn run_ffprobe_video_codec(ffprobe: &str, input_path: &str) -> Result<Option
         return Ok(None);
     }
 
-    let s = String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .to_lowercase();
-    if s.is_empty() {
-        return Ok(None);
+    #[derive(serde::Deserialize)]
+    struct ProbeOutput {
+        streams: Vec<VideoStreamInfo>,
     }
-    Ok(Some(s))
+    let probe: ProbeOutput =
+        serde_json::from_slice(&output.stdout).map_err(|e| format!("解析视频编码信息失败: {e}"))?;
+    Ok(probe.streams.into_iter().next())
 }
 
 /// 获取音频编码格式
@@ -161,11 +181,12 @@ pub fn try_remux(
     ]);
 
     // Override logic: explicit check
-    let should_copy_audio = matches!(audio_codec.as_deref(), Some("aac") | None)
-        || (audio_codec.is_some()
-            && supported_audio_codecs
-                .iter()
-                .any(|c| c == audio_codec.as_ref().unwrap()));
+    let should_copy_audio = !cfg!(target_os = "macos")
+        && (matches!(audio_codec.as_deref(), Some("aac") | None)
+            || (audio_codec.is_some()
+                && supported_audio_codecs
+                    .iter()
+                    .any(|c| c == audio_codec.as_ref().unwrap())));
 
     if should_copy_audio {
         args.extend(vec!["-c:a".to_string(), "copy".to_string()]);
@@ -184,6 +205,12 @@ pub fn try_remux(
         if matches!(video_codec, Some("hevc" | "h265")) {
             args.extend(["-tag:v".to_string(), "hvc1".to_string()]);
         }
+        args.extend([
+            "-profile:a".to_string(),
+            "aac_low".to_string(),
+            "-ar".to_string(),
+            "48000".to_string(),
+        ]);
         args.extend(["-movflags".to_string(), "+faststart".to_string()]);
     }
     args.push(output_path.to_string());
@@ -211,4 +238,31 @@ pub fn try_remux(
     }
 
     Ok(output.status.success())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{VideoStreamInfo, is_macos_compatible_video_stream};
+
+    #[test]
+    fn macos_requires_supported_chroma_and_bit_depth() {
+        for (codec, pixels, expected) in [
+            ("h264", "yuv420p", true),
+            ("h264", "yuv420p10le", false),
+            ("h264", "yuv422p", false),
+            ("h264", "yuv444p", false),
+            ("hevc", "yuv420p10le", true),
+            ("hevc", "yuv444p10le", false),
+        ] {
+            let stream = VideoStreamInfo {
+                codec_name: codec.into(),
+                pix_fmt: Some(pixels.into()),
+            };
+            assert_eq!(is_macos_compatible_video_stream(&stream), expected);
+        }
+        assert!(!is_macos_compatible_video_stream(&VideoStreamInfo {
+            codec_name: "h264".into(),
+            pix_fmt: None,
+        }));
+    }
 }

@@ -121,6 +121,14 @@ pub fn transcode_with_hw(
 
     // 添加音频和容器参数
     if cfg!(target_os = "macos") {
+        ffmpeg_args.extend([
+            "-profile:a".to_string(),
+            "aac_low".to_string(),
+            "-ac".to_string(),
+            "2".to_string(),
+            "-ar".to_string(),
+            "48000".to_string(),
+        ]);
         ffmpeg_args.extend(["-movflags".to_string(), "+faststart".to_string()]);
     }
     ffmpeg_args.extend(vec![

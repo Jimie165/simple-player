@@ -3,8 +3,8 @@
 
 use super::cache::{get_setting, resolve_transcoded_video_dir};
 use super::ffprobe::{
-    is_browser_compatible_video_codec, run_ffprobe_audio_codec, run_ffprobe_duration,
-    run_ffprobe_video_codec, try_remux,
+    is_browser_compatible_video_codec, is_macos_compatible_video_stream, run_ffprobe_audio_codec,
+    run_ffprobe_duration, run_ffprobe_video_stream, try_remux,
 };
 use super::transcode::{VideoPrepareProgress, transcode_with_hw};
 use crate::DbState;
@@ -48,7 +48,7 @@ fn playback_cache_hash(source_hash: &str, macos: bool) -> String {
         return source_hash.to_string();
     }
     use sha2::{Digest, Sha256};
-    let digest = Sha256::digest(format!("{source_hash}:macos-hvc1-v1").as_bytes());
+    let digest = Sha256::digest(format!("{source_hash}:macos-mp4-v2").as_bytes());
     format!("{digest:x}")[..32].to_string()
 }
 
@@ -84,7 +84,7 @@ pub async fn prepare_video_for_playback(
         .ok_or_else(|| "应用包中未找到 FFmpeg，请重新下载完整的应用包".to_string())?;
     let ffprobe = resolve_ffmpeg_binary(&app_handle, "ffprobe")
         .ok_or_else(|| "应用包中未找到 FFprobe，请重新下载完整的应用包".to_string())?;
-    // macOS's hvc1 outputs must not reuse caches made by the old pipeline.
+    // Compatibility changes must not reuse MP4 files made by the old macOS pipeline.
     let source_hash = playback_cache_hash(&compute_source_hash(&path)?, cfg!(target_os = "macos"));
     eprintln!("[prepare_video_for_playback] 源文件哈希: {}", source_hash);
     let source_prepare_lock = get_or_create_prepare_lock(&source_hash)?;
@@ -166,7 +166,10 @@ pub async fn prepare_video_for_playback(
 
     // 8. 获取视频时长
     let duration = run_ffprobe_duration(&ffprobe, &path).unwrap_or(None);
-    let video_codec = run_ffprobe_video_codec(&ffprobe, &path).unwrap_or(None);
+    let video_stream = run_ffprobe_video_stream(&ffprobe, &path).unwrap_or(None);
+    let video_codec = video_stream
+        .as_ref()
+        .map(|stream| stream.codec_name.clone());
     let audio_codec = run_ffprobe_audio_codec(&ffprobe, &path).unwrap_or(None);
     if let Some(codec) = &video_codec {
         eprintln!("[prepare_video_for_playback] 视频编码: {}", codec);
@@ -189,17 +192,22 @@ pub async fn prepare_video_for_playback(
     let is_compatible = video_codec
         .as_deref()
         .map(|codec| is_browser_compatible_video_codec(codec, supports_hevc, supports_av1))
-        .unwrap_or(false);
+        .unwrap_or(false)
+        && (!cfg!(target_os = "macos")
+            || video_stream
+                .as_ref()
+                .is_some_and(is_macos_compatible_video_stream));
     eprintln!(
         "[prepare_video_for_playback] 浏览器兼容性检查: {}",
         is_compatible
     );
 
-    let audio_compatible = matches!(audio_codec.as_deref(), Some("aac") | None)
-        || (audio_codec.is_some()
-            && supported_audio_codecs
-                .iter()
-                .any(|c| c == audio_codec.as_ref().unwrap()));
+    let audio_compatible = !cfg!(target_os = "macos")
+        && (matches!(audio_codec.as_deref(), Some("aac") | None)
+            || (audio_codec.is_some()
+                && supported_audio_codecs
+                    .iter()
+                    .any(|c| c == audio_codec.as_ref().unwrap())));
 
     let codec_info = if is_compatible {
         if !audio_compatible {
