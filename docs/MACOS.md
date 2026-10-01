@@ -1,24 +1,26 @@
 # macOS 适配与测试
 
-当前目标是 Intel（`x86_64-apple-darwin`）、macOS 12 及以上的基础运行。
+当前构建目标是 Intel（`x86_64-apple-darwin`）和 Apple Silicon（`aarch64-apple-darwin`），支持 macOS 12 及以上。
 适配代码仍需通过 macOS CI 编译并在 macOS 环境验收，不能把 Windows 检查通过当作 macOS 已验证。
-Apple Silicon 代码路径已使用实际 target triple，但尚未提供 ARM sidecar 下载和构建任务，也未做实机测试。
+Intel 版本已在 VMware 中完成基础功能测试；Apple Silicon 已提供 ARM64 sidecar 下载和构建任务，仍需 CI 构建及真实设备验收。
 
 ## Windows 开发、云端构建
 
 1. 将 `macos-support` 分支提交并推送到 GitHub。
-2. 在 Actions 中打开 **macOS Intel test build**，等待该分支的任务完成。
-   后续修改相关文件并推送会自动构建，也可通过 Run workflow 手动选择分支。
-3. 按需要下载 `Simple-Player-macos-x86_64`（应用 ZIP）或 `Simple-Player-macos-x86_64-DMG`（安装包）artifact，解压外层 artifact ZIP。
-4. 应用 ZIP：将里面的 `Simple-Player-macos-x86_64.zip` 传入 macOS，在 macOS 内解压并直接运行 `Simple Player.app`。
+2. 在 Actions 中打开 **macOS checks and builds**，通过 **Run workflow** 选择该分支并手动运行，等待两种架构的打包任务完成。
+   修改相关文件并推送只会自动运行 lint、TypeScript 类型检查、前端定向测试和 Rust 格式检查；需要新安装包时再手动运行。
+3. Intel 下载 `Simple-Player-macos-x86_64`（应用 ZIP）或 `Simple-Player-macos-x86_64-DMG`（安装包）；Apple Silicon 下载对应的 `Simple-Player-macos-aarch64` 或 `Simple-Player-macos-aarch64-DMG`。解压外层 artifact ZIP。
+4. 应用 ZIP：将里面的 `Simple-Player-macos-<架构>.zip` 传入对应架构的 macOS，在 macOS 内解压并直接运行 `Simple Player.app`。
    DMG：将里面的 `.dmg` 文件传入 macOS，双击打开，将 `Simple Player.app` 拖入 `Applications`，然后从“应用程序”启动。
    两种格式都保留应用权限和包结构；不要拆开应用包后复制零散文件。应用 ZIP 直接运行时，数据仍使用系统的应用数据和缓存目录。
 
-CI 使用 Intel runner、Rust 1.98.1、静态 FFmpeg/FFprobe 9.0.2 和固定下载校验值。
-它运行 lint、媒体路径/图形回退及媒体控制测试、Rust 格式检查、release 构建和 release 测试，并生成应用 ZIP 和 DMG 安装包。
-构建与测试共用原生 Intel target 的 release 依赖，避免分别编译 check、debug 和显式 target 的依赖。
+CI 使用 `macos-15-intel` 和 `macos-15` ARM64 原生 runner、Rust 1.98.1；Intel 使用 Evermeet 静态 FFmpeg/FFprobe 9.0.2，Apple Silicon 使用 OSXExperts 静态 9.0，两者均固定下载校验值。
+自动检查和手动打包都会运行 lint、TypeScript 类型检查、媒体路径/图形回退及媒体控制测试和 Rust 格式检查。
+只有手动运行才准备 sidecar、执行 release 构建及 Rust release 测试，并生成应用 ZIP 和 DMG 安装包；自动推送检查不编译 Rust 后端。
+日常推送只运行一次 Intel 检查，手动打包并行运行两种架构，分别缓存依赖和 sidecar；一个架构失败不会自动取消另一个。
+每种架构的构建与测试共用原生 target 的 release 依赖，避免分别编译 check、debug 和显式 target 的依赖。
 pnpm、Rust 依赖和 sidecar 均使用缓存；首次冷构建仍需下载、编译，后续命中缓存时才会更快。
-同一分支的新构建会取消尚未完成的旧构建；应用 ZIP 和 DMG 上传时不再重复压缩。
+同一分支的新自动检查会取消旧自动检查，新手动打包会取消旧手动打包；推送不会取消正在执行的手动打包。应用 ZIP 和 DMG 上传时不再重复压缩。
 没有创建 GitHub Release，也不要求 Apple Developer 凭据。
 测试包使用 ad-hoc 签名，没有 Developer ID 签名和公证，下载后可能被 Gatekeeper 拦截。
 仅对自己构建并确认来源的测试包，按系统设置中的“仍要打开”流程处理；不要关闭全局安全检查。
@@ -44,6 +46,8 @@ Intel 构建命令：
 pnpm install --frozen-lockfile
 pnpm build --target x86_64-apple-darwin --bundles app
 ```
+
+在 Apple Silicon Mac 上准备 ARM64 sidecar 后，可运行 `pnpm build --target aarch64-apple-darwin --bundles app,dmg`。
 
 Tauri 自动合并 `backend/tauri/tauri.macos.conf.json`。
 根目录脚本让 Tauri 自动发现 `backend/tauri`，不要把基础 `tauri.conf.json` 作为 `--config` 再次传入：该参数会在平台配置之后合并，覆盖 macOS 的原生标题栏和非透明窗口设置。
@@ -81,5 +85,7 @@ macOS 使用 Overlay 原生红绿灯，隐藏系统标题文字及应用内自�
 - [Tauri sidecar 命名与打包](https://v2.tauri.app/develop/sidecar/)
 - [Tauri macOS 签名与公证](https://v2.tauri.app/distribute/sign/macos/)
 - [Intel FFmpeg 静态构建](https://evermeet.cx/ffmpeg/)
+- [Apple Silicon FFmpeg 静态构建](https://www.osxexperts.net/index.html)
+- [GitHub runner 架构和标签](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
 当前 FFmpeg 构建启用 GPL/version3。正式分发前应随包提供适用的许可证、第三方声明和相应源码获取方式；测试 artifact 不是正式发布包。

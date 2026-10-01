@@ -15,7 +15,8 @@ macOS 测试构建使用对应架构的可执行文件：
 - Apple Silicon：`ffmpeg-aarch64-apple-darwin`、`ffprobe-aarch64-apple-darwin`
 
 文件必须具有可执行权限；发布包不能依赖测试机安装 Homebrew 或 FFmpeg。
-`.github/workflows/macos.yml` 下载固定版本并校验 SHA-256，目前只生成 Intel 测试包。
+`.github/workflows/macos.yml` 手动运行时生成 Intel 和 Apple Silicon 测试包，下载固定版本并校验 ZIP 的 SHA-256。
+Intel 使用 Evermeet FFmpeg/FFprobe 9.0.2，Apple Silicon 使用 OSXExperts 9.0 静态构建（最低 macOS 12），ARM64 sidecar 执行前会进行 ad-hoc 签名。
 视频扫描和缩略图通过应用的 sidecar 路径解析函数查找工具，不能仅依赖系统 PATH。
 
 这些 macOS 二进制文件不提交到仓库。测试与开发步骤见 [macOS 适配说明](../../../docs/MACOS.md)。
