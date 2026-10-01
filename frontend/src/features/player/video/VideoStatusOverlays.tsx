@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { LinearWavyProgress } from '@/features/player/video/LinearWavyProgress';
 
 interface VideoStatusOverlaysProps {
     isBuffering: boolean;
@@ -32,15 +33,10 @@ export function VideoStatusOverlays({
                     <div className="flex flex-col items-center max-w-sm w-full px-6">
                         <div className="text-lg font-medium mb-3 tracking-wide">正在准备播放</div>
 
-                        <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3 relative">
-                            {preparePercent !== null ? (
-                                <motion.div
-                                    className="h-full bg-primary rounded-full"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${Math.max(0, Math.min(100, preparePercent))}%` }}
-                                    transition={{ duration: 0.3 }}
-                                />
-                            ) : (
+                        {preparePercent !== null ? (
+                            <LinearWavyProgress key="determinate" percent={preparePercent} />
+                        ) : (
+                            <div key="indeterminate" className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mb-3 relative">
                                 <motion.div
                                     className="h-full bg-primary/80 rounded-full w-1/3 absolute left-0"
                                     animate={{
@@ -52,8 +48,8 @@ export function VideoStatusOverlays({
                                         ease: "easeInOut"
                                     }}
                                 />
-                            )}
-                        </div>
+                            </div>
+                        )}
 
                         <div className="flex justify-end w-full text-white/70 text-xs font-medium">
                             <span>
