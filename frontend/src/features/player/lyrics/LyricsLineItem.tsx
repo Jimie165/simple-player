@@ -224,7 +224,7 @@ function LyricsLineItem({
                         isFocused={isActive}
                         isSeekExiting={isSeekExiting}
                         glowDisabled={isBackground}
-                        fillAlpha={isBackground ? (lyricLineBlendEnabled ? 0.22 : 0.3) : 1}
+                        fillAlpha={isBackground ? 0.3 : 1}
                     />
                 ) : (
                     line.text
