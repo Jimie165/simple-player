@@ -36,4 +36,32 @@ describe('native media session bridge', () => {
         await mediaControlService.update(null, false, 0);
         expect(mocks.invoke).not.toHaveBeenCalled();
     });
+
+    it('does not let a later pause or video snapshot overtake an in-flight update', async () => {
+        let finish: (() => void) | undefined;
+        mocks.invoke.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+        const first = mediaControlService.update({
+            title: 'First', artist: 'Video', album: '', cover_path: 'cache/first.jpg', duration: 10,
+        }, true, 0);
+        await Promise.resolve();
+        const second = mediaControlService.update({
+            title: 'Second', artist: 'Video', album: '', cover_path: 'cache/second.jpg', duration: 20,
+        }, false, 2);
+        await Promise.resolve();
+        expect(mocks.invoke).toHaveBeenCalledTimes(1);
+        finish?.();
+        await Promise.all([first, second]);
+        expect(mocks.invoke).toHaveBeenLastCalledWith('update_macos_media', {
+            metadata: { title: 'Second', artist: 'Video', album: '', cover_path: 'cache/second.jpg', duration: 20 },
+            playing: false, position: 2,
+        });
+    });
+
+    it('continues publishing after a failed update', async () => {
+        mocks.invoke.mockRejectedValueOnce(new Error('session unavailable'));
+        await expect(mediaControlService.update(null, false, 0)).rejects.toThrow('session unavailable');
+        await mediaControlService.update(null, false, 1);
+        expect(mocks.invoke).toHaveBeenCalledTimes(2);
+    });
+
 });

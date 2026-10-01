@@ -171,7 +171,7 @@ export function useVideoPlayback({
     }, [volume, videoRef]);
 
     useEffect(() => {
-        if (systemService.isMacOS || !isOpen || !metadata || !('mediaSession' in navigator)) return;
+        if (!isOpen || !metadata || !('mediaSession' in navigator)) return;
 
         const artwork: MediaImage[] = [];
         if (posterUrl) {
@@ -190,6 +190,15 @@ export function useVideoPlayback({
         });
 
         navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+
+        // WKWebView also publishes video metadata. Give it the current artwork,
+        // while native command events remain the sole custom action handlers on macOS.
+        if (systemService.isMacOS) {
+            return () => {
+                navigator.mediaSession.metadata = null;
+                navigator.mediaSession.playbackState = 'none';
+            };
+        }
 
         navigator.mediaSession.setActionHandler('play', () => {
             if (videoRef.current) {
@@ -266,10 +275,10 @@ export function useVideoPlayback({
             title: metadata.title || '未知视频',
             artist: 'Video',
             album: '',
-            cover_path: metadata.thumbnail_path || metadata.cover_path || null,
+            cover_path: coverPath,
             duration: duration || metadata.duration || 0,
         }, isPlaying, systemPosition).catch(console.error);
-    }, [isOpen, metadata, duration, isPlaying, systemPosition]);
+    }, [isOpen, metadata, coverPath, duration, isPlaying, systemPosition]);
 
     useEffect(() => {
         if (!systemService.isMacOS || !isOpen) return;
@@ -282,7 +291,7 @@ export function useVideoPlayback({
                 case 'play':
                 case 'toggle':
                     if (action === 'play' || video.paused) {
-                        void video.play().then(() => setIsPlaying(true)).catch(console.error);
+                        void video.play().catch(console.error);
                         break;
                     }
                     video.pause();

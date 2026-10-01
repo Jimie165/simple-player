@@ -39,8 +39,7 @@ pub fn update_macos_media(
 pub mod macos {
     use super::MediaInfo;
     use souvlaki::{
-        MediaControlEvent, MediaControls, MediaMetadata, MediaPlayback, MediaPosition,
-        PlatformConfig,
+        MediaControlEvent, MediaControls, MediaPlayback, MediaPosition, PlatformConfig,
     };
     use std::{path::PathBuf, sync::Mutex, time::Duration};
     use tauri::{Emitter, Manager};
@@ -51,6 +50,7 @@ pub mod macos {
     struct Session {
         controls: MediaControls,
         metadata: Option<MediaInfo>,
+        artwork: Option<Vec<u8>>,
     }
 
     #[derive(Clone, serde::Serialize)]
@@ -97,39 +97,32 @@ pub mod macos {
             *current = Some(Session {
                 controls,
                 metadata: None,
+                artwork: None,
             });
         }
         let session = current.as_mut().ok_or("Media controls unavailable")?;
-        if session.metadata != metadata {
-            let cover_url = metadata
-                .as_ref()
-                .and_then(|info| info.cover_path.as_deref())
-                .and_then(|path| {
-                    let path = if crate::utils::paths::is_app_relative_path(path) {
-                        crate::utils::paths::resolve_app_path(app, path)?
-                    } else {
-                        PathBuf::from(path)
-                    };
-                    if !path.is_file() {
-                        return None;
-                    }
-                    url::Url::from_file_path(path)
-                        .ok()
-                        .map(|url| url.to_string())
-                });
-            let info = metadata.as_ref();
-            session
-                .controls
-                .set_metadata(MediaMetadata {
-                    title: info.map(|info| info.title.as_str()),
-                    artist: info.map(|info| info.artist.as_str()),
-                    album: info.map(|info| info.album.as_str()),
-                    cover_url: cover_url.as_deref(),
-                    duration: info.and_then(|info| seconds(info.duration)),
-                })
-                .map_err(|error| format!("{error:?}"))?;
-            session.metadata = metadata;
+        let cover_path = metadata
+            .as_ref()
+            .and_then(|info| info.cover_path.as_deref())
+            .and_then(|path| {
+                if crate::utils::paths::is_app_relative_path(path) {
+                    crate::utils::paths::resolve_app_path(app, path)
+                } else {
+                    Some(PathBuf::from(path))
+                }
+            });
+        if session.metadata != metadata || (session.artwork.is_none() && cover_path.is_some()) {
+            session.artwork = cover_path.and_then(|path| std::fs::read(path).ok());
         }
+        // Publish one complete snapshot on the main thread. Souvlaki's asynchronous
+        // artwork writer can overwrite a later position or a different video's cover.
+        publish_now_playing(
+            metadata.as_ref(),
+            session.artwork.as_deref(),
+            playing,
+            position,
+        )?;
+        session.metadata = metadata;
         let progress = seconds(position).map(MediaPosition);
         let playback = if session.metadata.is_none() {
             MediaPlayback::Stopped
@@ -145,6 +138,80 @@ pub mod macos {
         if session.metadata.is_none() {
             // Dropping on the main thread detaches the native command handlers.
             *current = None;
+        }
+        Ok(())
+    }
+
+    fn publish_now_playing(
+        info: Option<&MediaInfo>,
+        artwork: Option<&[u8]>,
+        playing: bool,
+        position: f64,
+    ) -> Result<(), String> {
+        use block2::RcBlock;
+        use objc2::{
+            AnyThread, msg_send,
+            rc::{Allocated, Retained},
+            runtime::{AnyClass, AnyObject},
+        };
+        use objc2_app_kit::NSImage;
+        use objc2_foundation::{NSData, NSMutableDictionary, NSNumber, NSSize, NSString};
+
+        #[link(name = "MediaPlayer", kind = "framework")]
+        unsafe extern "C" {
+            static MPMediaItemPropertyTitle: &'static NSString;
+            static MPMediaItemPropertyArtist: &'static NSString;
+            static MPMediaItemPropertyAlbumTitle: &'static NSString;
+            static MPMediaItemPropertyArtwork: &'static NSString;
+            static MPMediaItemPropertyPlaybackDuration: &'static NSString;
+            static MPNowPlayingInfoPropertyElapsedPlaybackTime: &'static NSString;
+            static MPNowPlayingInfoPropertyPlaybackRate: &'static NSString;
+        }
+        let center_class =
+            AnyClass::get(c"MPNowPlayingInfoCenter").ok_or("MPNowPlayingInfoCenter unavailable")?;
+        // The command dispatches here only on the AppKit main thread; dictionaries
+        // and the artwork block retain their values after this snapshot is submitted.
+        unsafe {
+            let center: Retained<AnyObject> = msg_send![center_class, defaultCenter];
+            let Some(info) = info else {
+                let _: () = msg_send![&*center, setNowPlayingInfo: std::ptr::null::<AnyObject>()];
+                return Ok(());
+            };
+            let dictionary = NSMutableDictionary::<NSString, AnyObject>::new();
+            dictionary.insert(MPMediaItemPropertyTitle, &NSString::from_str(&info.title));
+            dictionary.insert(MPMediaItemPropertyArtist, &NSString::from_str(&info.artist));
+            dictionary.insert(
+                MPMediaItemPropertyAlbumTitle,
+                &NSString::from_str(&info.album),
+            );
+            dictionary.insert(
+                MPMediaItemPropertyPlaybackDuration,
+                &NSNumber::numberWithDouble(info.duration.max(0.0)),
+            );
+            dictionary.insert(
+                MPNowPlayingInfoPropertyElapsedPlaybackTime,
+                &NSNumber::numberWithDouble(position.max(0.0)),
+            );
+            dictionary.insert(
+                MPNowPlayingInfoPropertyPlaybackRate,
+                &NSNumber::numberWithDouble(if playing { 1.0 } else { 0.0 }),
+            );
+            if let Some(bytes) = artwork {
+                let data = NSData::with_bytes(bytes);
+                if let Some(image) = NSImage::initWithData(NSImage::alloc(), &data) {
+                    let size = image.size();
+                    let handler = RcBlock::new(move |_: NSSize| -> *mut NSImage {
+                        Retained::as_ptr(&image).cast_mut()
+                    });
+                    let class = AnyClass::get(c"MPMediaItemArtwork")
+                        .ok_or("MPMediaItemArtwork unavailable")?;
+                    let allocated: Allocated<AnyObject> = msg_send![class, alloc];
+                    let native_artwork: Retained<AnyObject> =
+                        msg_send![allocated, initWithBoundsSize: size, requestHandler: &*handler];
+                    dictionary.insert(MPMediaItemPropertyArtwork, &native_artwork);
+                }
+            }
+            let _: () = msg_send![&*center, setNowPlayingInfo: &*dictionary];
         }
         Ok(())
     }

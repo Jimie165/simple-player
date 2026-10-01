@@ -109,7 +109,7 @@ jobs:
         run: |
           pnpm lint
           pnpm --filter simple-player-ui exec tsc -b --noEmit
-          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts tests/mediaControlService.test.ts
+          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts tests/mediaControlService.test.ts tests/videoSource.test.ts
           cargo fmt --manifest-path backend/Cargo.toml -- --check
       - name: Build ad-hoc signed app and DMG
         if: github.event_name == 'workflow_dispatch'

@@ -139,6 +139,7 @@ pub fn try_remux(
     output_path: &str,
     audio_codec: Option<String>,
     supported_audio_codecs: &[String],
+    video_codec: Option<&str>,
 ) -> Result<bool, String> {
     let input_os = normalize_native_path(input_path);
     let is_mkv = input_path.to_lowercase().ends_with(".mkv");
@@ -179,10 +180,13 @@ pub fn try_remux(
         ]);
     }
 
-    args.extend(vec![
-        // 本地播放不需要 faststart (moov 前置)，移除以节省大文件重写 IO 时间
-        output_path.to_string(),
-    ]);
+    if cfg!(target_os = "macos") {
+        if matches!(video_codec, Some("hevc" | "h265")) {
+            args.extend(["-tag:v".to_string(), "hvc1".to_string()]);
+        }
+        args.extend(["-movflags".to_string(), "+faststart".to_string()]);
+    }
+    args.push(output_path.to_string());
 
     let mut cmd = std::process::Command::new(ffmpeg);
     #[cfg(target_os = "windows")]

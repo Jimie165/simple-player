@@ -30,7 +30,10 @@ rodio = "0.22.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 souvlaki = { version = "0.8.3", default-features = false }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWindow", "NSButton", "NSView", "NSResponder", "NSControl"] }
+objc2 = "0.6.4"
+objc2-foundation = { version = "0.3.2", default-features = false, features = ["std", "NSString", "NSDictionary", "NSValue", "NSData", "NSGeometry"] }
+block2 = "0.6.2"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWindow", "NSButton", "NSView", "NSResponder", "NSControl", "NSImage"] }
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.61"

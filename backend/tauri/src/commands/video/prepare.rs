@@ -43,6 +43,31 @@ pub(crate) fn resolve_default_cache_root(app_handle: &AppHandle) -> Result<PathB
     Ok(dir)
 }
 
+fn playback_cache_hash(source_hash: &str, macos: bool) -> String {
+    if !macos {
+        return source_hash.to_string();
+    }
+    use sha2::{Digest, Sha256};
+    let digest = Sha256::digest(format!("{source_hash}:macos-hvc1-v1").as_bytes());
+    format!("{digest:x}")[..32].to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::playback_cache_hash;
+
+    #[test]
+    fn macos_compatibility_outputs_do_not_reuse_old_or_windows_cache_files() {
+        let original = "0123456789abcdef0123456789abcdef";
+        assert_eq!(playback_cache_hash(original, false), original);
+        let macos = playback_cache_hash(original, true);
+        assert_ne!(macos, original);
+        assert_ne!(&macos[..16], &original[..16]);
+        assert_eq!(macos.len(), original.len());
+        assert_eq!(macos, playback_cache_hash(original, true));
+    }
+}
+
 #[tauri::command]
 pub async fn prepare_video_for_playback(
     db: State<'_, DbState>,
@@ -59,7 +84,8 @@ pub async fn prepare_video_for_playback(
         .ok_or_else(|| "应用包中未找到 FFmpeg，请重新下载完整的应用包".to_string())?;
     let ffprobe = resolve_ffmpeg_binary(&app_handle, "ffprobe")
         .ok_or_else(|| "应用包中未找到 FFprobe，请重新下载完整的应用包".to_string())?;
-    let source_hash = compute_source_hash(&path)?;
+    // macOS's hvc1 outputs must not reuse caches made by the old pipeline.
+    let source_hash = playback_cache_hash(&compute_source_hash(&path)?, cfg!(target_os = "macos"));
     eprintln!("[prepare_video_for_playback] 源文件哈希: {}", source_hash);
     let source_prepare_lock = get_or_create_prepare_lock(&source_hash)?;
     let _prepare_guard = source_prepare_lock.lock().await;
@@ -187,6 +213,7 @@ pub async fn prepare_video_for_playback(
             temp_full_path.to_str().unwrap(),
             audio_codec.clone(),
             &supported_audio_codecs,
+            video_codec.as_deref(),
         )? {
             eprintln!(
                 "[prepare_video_for_playback] Remux 成功，耗时: {:?}",
