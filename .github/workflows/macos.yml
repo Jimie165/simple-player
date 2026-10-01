@@ -1,0 +1,143 @@
+name: macOS checks and builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [macos-support]
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/macos.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: macOS ${{ matrix.arch }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Pushes run one check job; manual builds produce both architectures.
+        arch: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64", "aarch64"]' || '["x86_64"]') }}
+    runs-on: ${{ matrix.arch == 'aarch64' && 'macos-15' || 'macos-15-intel' }}
+    timeout-minutes: 60
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '12.0'
+      SIDECAR_VERSION: ${{ matrix.arch == 'aarch64' && '9.0' || '9.0.2' }}
+      SIDECAR_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v5
+        with:
+          version: '11.11.0'
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@1.98.1
+        with:
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          workspaces: backend
+          shared-key: macos-${{ matrix.arch == 'aarch64' && 'arm64' || 'intel' }}-native-release
+          cache-on-failure: true
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache@v5
+        if: github.event_name == 'workflow_dispatch'
+        id: sidecars
+        with:
+          path: |
+            backend/tauri/binaries/ffmpeg-${{ matrix.arch }}-apple-darwin
+            backend/tauri/binaries/ffprobe-${{ matrix.arch }}-apple-darwin
+          key: macos-${{ matrix.arch == 'aarch64' && 'arm64' || 'intel' }}-sidecars-${{ env.SIDECAR_VERSION }}-v1
+
+      # Static builds avoid a dependency on Homebrew libraries on the test machine.
+      - name: Prepare FFmpeg and FFprobe sidecars
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_dir=$(mktemp -d)
+          trap 'rm -rf "$archive_dir"' EXIT
+          for binary in ffmpeg ffprobe; do
+            destination="backend/tauri/binaries/$binary-${{ matrix.arch }}-apple-darwin"
+            if [ '${{ steps.sidecars.outputs.cache-hit }}' != 'true' ]; then
+              archive="$archive_dir/$binary.zip"
+              if [ '${{ matrix.arch }}' = aarch64 ]; then
+                url="https://www.osxexperts.net/${binary}9arm.zip"
+                if [ "$binary" = ffmpeg ]; then
+                  checksum=d0c06c5c68ce48af3143b262f7a9118a7c9f67de1e237fcc24ffb14df9c67af9
+                else
+                  checksum=0c94fbdd8917022f28115eca512196cf4648732bc9e5db9ec8896c7e519d02aa
+                fi
+              else
+                url="https://evermeet.cx/ffmpeg/$binary-$SIDECAR_VERSION.zip"
+                if [ "$binary" = ffmpeg ]; then
+                  checksum=4acc0be580f9b2788029eb7bd4d645ff87968911b0a62aeeb3940d42d54558d5
+                else
+                  checksum=24a9c968cd4da72d99c7245e914b921815835eb6dff01d99868031aebaf1d439
+                fi
+              fi
+              curl --fail --location --retry 3 "$url" --output "$archive"
+              printf '%s  %s\n' "$checksum" "$archive" | shasum -a 256 --check
+              unzip -q "$archive" -d "$archive_dir/$binary"
+              install -m 755 "$archive_dir/$binary/$binary" "$destination"
+            fi
+            if [ '${{ matrix.arch }}' = aarch64 ]; then
+              codesign --force --sign - "$destination"
+            fi
+            "$destination" -version
+            file "$destination" | grep -q "$SIDECAR_ARCH"
+            if otool -L "$destination" | grep -E '/(usr/local|opt/homebrew|opt/local)/'; then
+              echo 'Sidecar depends on libraries absent from the test machine.' >&2
+              exit 1
+            fi
+          done
+
+      - name: Check frontend and Rust formatting
+        run: |
+          pnpm lint
+          pnpm --filter simple-player-ui exec tsc -b --noEmit
+          pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts tests/mediaControlService.test.ts tests/videoSource.test.ts
+          cargo fmt --manifest-path backend/Cargo.toml -- --check
+      - name: Build ad-hoc signed app and DMG
+        if: github.event_name == 'workflow_dispatch'
+        # Each runner already has the correct native target. Share its release
+        # dependencies with tests instead of compiling check/debug/explicit-target trees.
+        run: pnpm build --bundles app,dmg
+      - name: Test Rust using release dependencies
+        if: github.event_name == 'workflow_dispatch'
+        run: cargo test --manifest-path backend/Cargo.toml --release --locked
+      - name: Archive app preserving permissions and bundle metadata
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          ditto -c -k --sequesterRsrc --keepParent \
+            'backend/target/release/bundle/macos/Simple Player.app' \
+            'Simple-Player-macos-${{ matrix.arch }}.zip'
+      - uses: actions/upload-artifact@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: Simple-Player-macos-${{ matrix.arch }}
+          path: Simple-Player-macos-${{ matrix.arch }}.zip
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        if: github.event_name == 'workflow_dispatch'
+        with:
+          name: Simple-Player-macos-${{ matrix.arch }}-DMG
+          path: backend/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
