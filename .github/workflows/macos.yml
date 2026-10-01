@@ -115,7 +115,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         # Each runner already has the correct native target. Share its release
         # dependencies with tests instead of compiling check/debug/explicit-target trees.
-        run: pnpm build --bundles app,dmg
+        run: pnpm build --bundles app,dmg --verbose
       - name: Test Rust using release dependencies
         if: github.event_name == 'workflow_dispatch'
         run: cargo test --manifest-path backend/Cargo.toml --release --locked
