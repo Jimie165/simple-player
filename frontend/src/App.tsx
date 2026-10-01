@@ -254,7 +254,7 @@ function App() {
   );
 
   return (
-    <div className={`flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans ${reserveMacControls ? '[--macos-sidebar-inset:40px]' : '[--macos-sidebar-inset:0px]'}`}>
+    <div className={`flex h-screen w-screen flex-col overflow-hidden bg-surface-container text-on-surface font-sans ${reserveMacControls ? '[--macos-sidebar-inset:32px]' : '[--macos-sidebar-inset:0px]'}`}>
       <div className="relative flex min-h-0 flex-1 flex-col">
       <PlaybackRuntime />
 

@@ -77,7 +77,7 @@ export default function AudioOutputSection() {
                 <div className="flex flex-col gap-1">
                     <span className="text-base font-medium text-on-surface">输出设备</span>
                     <span className="text-sm text-on-surface-variant">
-                        选择「跟随系统默认」时，切换 Windows 默认输出会自动跟随。
+                        选择「跟随系统默认」时，切换系统默认输出会自动跟随。
                     </span>
                 </div>
                 <Listbox
