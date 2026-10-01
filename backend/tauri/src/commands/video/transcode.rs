@@ -149,13 +149,24 @@ pub fn transcode_with_hw(
         cmd.creation_flags(0x08000000);
     }
 
-    let mut child = cmd
+    let child = cmd
         .args(&ffmpeg_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| e.to_string())?;
 
+    monitor_ffmpeg_progress(app, child, input_path, duration, "transcode")
+}
+
+/// Drain both FFmpeg pipes while reporting progress for encoding and remuxing.
+pub(super) fn monitor_ffmpeg_progress(
+    app: &AppHandle,
+    mut child: std::process::Child,
+    input_path: &str,
+    duration: Option<f64>,
+    stage: &str,
+) -> Result<(), String> {
     let stdout = child
         .stdout
         .take()
@@ -213,11 +224,12 @@ pub fn transcode_with_hw(
                 && d > 0.0
             {
                 let sec = (ms as f64) / 1_000_000.0;
-                let percent = (sec / d).clamp(0.0, 1.0) * 100.0;
-                if last_percent
-                    .map(|p| (percent - p).abs() >= 1.0)
-                    .unwrap_or(true)
-                {
+                // Remuxed packet timestamps can go backwards as streams interleave.
+                // 100% is reserved for prepare's final event after the cache is published.
+                let percent = ((sec / d).clamp(0.0, 1.0) * 100.0)
+                    .min(99.0)
+                    .max(last_percent.unwrap_or(0.0));
+                if last_percent.map(|p| percent > p).unwrap_or(true) {
                     last_percent = Some(percent);
                     let message = match (last_speed.as_deref(), last_fps.as_deref()) {
                         (Some(speed), Some(fps)) => Some(format!("speed {speed}, fps {fps}")),
@@ -229,7 +241,7 @@ pub fn transcode_with_hw(
                         "video:prepare-progress",
                         VideoPrepareProgress {
                             path: path_for_events.clone(),
-                            stage: "transcode".to_string(),
+                            stage: stage.to_string(),
                             percent: Some(percent),
                             message,
                         },

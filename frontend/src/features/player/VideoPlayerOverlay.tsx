@@ -172,7 +172,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible ? 'cursor-none' : ''}`}
+                className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible && !isPreparing ? 'cursor-none' : ''}`}
                 data-controls-visible={isControlsVisible}
                 onPointerMove={showControls}
                 onPointerDown={showControls}
@@ -217,11 +217,11 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                 />
 
                 {/* 3. Controls Layer */}
-                <div className="col-start-1 row-start-1 w-full h-full z-10 flex flex-col justify-between pointer-events-none">
+                <div className={`col-start-1 row-start-1 w-full h-full ${isPreparing && !error ? 'z-50' : 'z-10'} flex flex-col justify-between pointer-events-none`}>
                     {/* Top Bar */}
                     <motion.div
                         initial={false}
-                        animate={{ opacity: isControlsVisible ? 1 : 0 }}
+                        animate={{ opacity: isPreparing || isControlsVisible ? 1 : 0 }}
                         transition={{ duration: 0.2 }}
                         className="h-20 bg-linear-to-b from-black/70 to-transparent flex items-start justify-between p-4 pointer-events-auto relative"
                     >
@@ -232,6 +232,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         <div className={`flex items-center gap-4 z-30 mr-4 min-w-0 flex-1 ${systemService.isMacOS && !isFullscreen ? 'ml-20' : ''}`}>
                             <button
                                 onClick={handleClose}
+                                aria-label="返回"
                                 className="p-2 rounded-full hover:bg-white/10 text-white transition-colors"
                             >
                                 <MdArrowBack className="text-2xl" />
@@ -269,12 +270,12 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                     </motion.div>
 
                     {/* Drag Region (Center filling space) -> Now Click Region */}
-                    <div className="flex-1 w-full pointer-events-auto"
+                    <div className={`flex-1 w-full ${isPreparing ? 'pointer-events-none' : 'pointer-events-auto'}`}
                         onClick={handleSmartClick}
                     />
 
                     {/* Bottom Controls */}
-                    {!useNativeControls && (
+                    {!useNativeControls && !isPreparing && (
                         <motion.div
                             initial={false}
                             animate={{ opacity: isControlsVisible ? 1 : 0 }}

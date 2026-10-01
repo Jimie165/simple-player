@@ -171,7 +171,7 @@ export function useVideoPlayback({
     }, [volume, videoRef]);
 
     useEffect(() => {
-        if (!isOpen || !metadata || !('mediaSession' in navigator)) return;
+        if (!systemService.isMacOS || !isOpen || !metadata || !('mediaSession' in navigator)) return;
 
         const artwork: MediaImage[] = [];
         if (posterUrl) {
@@ -191,71 +191,10 @@ export function useVideoPlayback({
 
         navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
 
-        // WKWebView also publishes video metadata. Give it the current artwork,
-        // while native command events remain the sole custom action handlers on macOS.
-        if (systemService.isMacOS) {
-            return () => {
-                navigator.mediaSession.metadata = null;
-                navigator.mediaSession.playbackState = 'none';
-            };
-        }
-
-        navigator.mediaSession.setActionHandler('play', () => {
-            if (videoRef.current) {
-                videoRef.current.play();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('pause', () => {
-            if (videoRef.current) {
-                videoRef.current.pause();
-                setIsPlaying(false);
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
-            if (videoQueueLength > 1) {
-                playPreviousVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
-            if (videoQueueLength > 1) {
-                playNextVideo();
-            }
-        });
-
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-            if (videoRef.current && details.seekTime !== undefined) {
-                videoRef.current.currentTime = details.seekTime;
-                setCurrentTime(details.seekTime);
-            }
-        });
-
-        const updatePositionState = () => {
-            if (videoRef.current && !isNaN(videoRef.current.duration) && videoRef.current.duration > 0) {
-                try {
-                    navigator.mediaSession.setPositionState({
-                        duration: videoRef.current.duration,
-                        playbackRate: videoRef.current.playbackRate,
-                        position: videoRef.current.currentTime,
-                    });
-                } catch {
-                    // Ignore unsupported platforms
-                }
-            }
-        };
-
-        const positionInterval = setInterval(updatePositionState, 1000);
-        updatePositionState();
-
+        // WKWebView mirrors artwork; native events handle transport actions.
         return () => {
-            clearInterval(positionInterval);
-            navigator.mediaSession.setActionHandler('play', null);
-            navigator.mediaSession.setActionHandler('pause', null);
-            navigator.mediaSession.setActionHandler('previoustrack', null);
-            navigator.mediaSession.setActionHandler('nexttrack', null);
-            navigator.mediaSession.setActionHandler('seekto', null);
+            navigator.mediaSession.metadata = null;
+            navigator.mediaSession.playbackState = 'none';
         };
     }, [
         isOpen,
@@ -270,8 +209,11 @@ export function useVideoPlayback({
 
     const systemPosition = isPlaying && !isDragging ? Math.floor(currentTime) : currentTime;
     useEffect(() => {
-        if (!isOpen || !metadata) return;
-        void mediaControlService.update({
+        if (!isOpen || !metadata) {
+            void mediaControlService.updateVideo(null, false, 0).catch(console.error);
+            return;
+        }
+        void mediaControlService.updateVideo({
             title: metadata.title || '未知视频',
             artist: 'Video',
             album: '',
@@ -281,10 +223,10 @@ export function useVideoPlayback({
     }, [isOpen, metadata, coverPath, duration, isPlaying, systemPosition]);
 
     useEffect(() => {
-        if (!systemService.isMacOS || !isOpen) return;
+        if (!isOpen) return;
         let disposed = false;
-        let unlisten: (() => void) | undefined;
-        void listen<SystemMediaAction>('macos-media:action', ({ payload: { action, position } }) => {
+        const unlisten: Array<() => void> = [];
+        const handleAction = ({ action, position }: SystemMediaAction) => {
             const video = videoRef.current;
             if (disposed || !video || usePlayerStore.getState().mediaKind !== 'video') return;
             switch (action) {
@@ -309,11 +251,23 @@ export function useVideoPlayback({
                         setCurrentTime(video.currentTime);
                     }
             }
-        }).then((cleanup) => {
+        };
+        const register = async <T,>(event: string, handler: (payload: T) => void) => {
+            const cleanup = await listen<T>(event, ({ payload }) => {
+                if (!disposed) handler(payload);
+            });
             if (disposed) cleanup();
-            else unlisten = cleanup;
-        }).catch(console.error);
-        return () => { disposed = true; unlisten?.(); };
+            else unlisten.push(cleanup);
+        };
+        if (systemService.isMacOS) {
+            void register<SystemMediaAction>('macos-media:action', handleAction).catch(console.error);
+        } else {
+            for (const action of ['play', 'pause', 'next', 'previous'] as const) {
+                void register(`smtc:${action}`, () => handleAction({ action, position: null })).catch(console.error);
+            }
+            void register<number>('smtc:seek', (position) => handleAction({ action: 'seek', position })).catch(console.error);
+        }
+        return () => { disposed = true; unlisten.forEach(cleanup => cleanup()); };
     }, [isOpen, videoRef, videoQueueLength, playNextVideo, playPreviousVideo]);
 
     const handleTogglePlay = useCallback(async () => {

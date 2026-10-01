@@ -153,13 +153,16 @@ pub fn is_browser_compatible_video_codec(
 }
 
 /// 尝试快速 remux（仅重新封装，不转码视频）
+#[allow(clippy::too_many_arguments)]
 pub fn try_remux(
+    app: &tauri::AppHandle,
     ffmpeg: &str,
     input_path: &str,
     output_path: &str,
     audio_codec: Option<String>,
     supported_audio_codecs: &[String],
     video_codec: Option<&str>,
+    duration: Option<f64>,
 ) -> Result<bool, String> {
     let input_os = normalize_native_path(input_path);
     let is_mkv = input_path.to_lowercase().ends_with(".mkv");
@@ -213,6 +216,11 @@ pub fn try_remux(
         ]);
         args.extend(["-movflags".to_string(), "+faststart".to_string()]);
     }
+    args.extend([
+        "-progress".to_string(),
+        "pipe:1".to_string(),
+        "-nostats".to_string(),
+    ]);
     args.push(output_path.to_string());
 
     let mut cmd = std::process::Command::new(ffmpeg);
@@ -222,22 +230,20 @@ pub fn try_remux(
         cmd.creation_flags(0x08000000);
     }
 
-    // output() drains stderr while FFmpeg runs; an unread pipe can fill and hang remuxing.
-    let output = cmd
+    let child = cmd
         .args(&args)
-        .stdout(Stdio::null())
+        .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
+        .spawn()
         .map_err(|e| format!("无法启动 FFmpeg ({ffmpeg}): {e}"))?;
 
-    if !output.status.success() {
-        eprintln!(
-            "FFmpeg 重封装失败: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+    match super::transcode::monitor_ffmpeg_progress(app, child, input_path, duration, "remux") {
+        Ok(()) => Ok(true),
+        Err(error) => {
+            eprintln!("FFmpeg 重封装失败: {error}");
+            Ok(false)
+        }
     }
-
-    Ok(output.status.success())
 }
 
 #[cfg(test)]

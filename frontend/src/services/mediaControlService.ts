@@ -18,6 +18,16 @@ export interface SystemMediaAction {
 let pendingUpdate: Promise<unknown> = Promise.resolve();
 
 export const mediaControlService = {
+    async updateVideo(metadata: SystemMediaInfo | null, playing: boolean, position: number) {
+        if (systemService.isMacOS) return this.update(metadata, playing, position);
+        const update = pendingUpdate.then(() => invoke('update_windows_video_media', {
+            metadata,
+            playing,
+            position: Number.isFinite(position) ? Math.max(0, position) : 0,
+        }));
+        pendingUpdate = update.catch(() => undefined);
+        await update;
+    },
     async update(metadata: SystemMediaInfo | null, playing: boolean, position: number) {
         if (!systemService.isMacOS) return;
         const update = pendingUpdate.then(() => invoke('update_macos_media', {
