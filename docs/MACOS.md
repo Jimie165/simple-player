@@ -4,20 +4,21 @@
 适配代码仍需通过 macOS CI 编译并在 macOS 环境验收，不能把 Windows 检查通过当作 macOS 已验证。
 Apple Silicon 代码路径已使用实际 target triple，但尚未提供 ARM sidecar 下载和构建任务，也未做实机测试。
 
-## Windows 开发、云端构建、VMware 测试
+## Windows 开发、云端构建
 
 1. 将 `macos-support` 分支提交并推送到 GitHub。
 2. 在 Actions 中打开 **macOS Intel test build**，等待该分支的任务完成。
    后续修改相关文件并推送会自动构建，也可通过 Run workflow 手动选择分支。
-3. 下载 `Simple-Player-macos-x86_64` artifact，解压外层 artifact ZIP。
-4. 把里面的 `Simple-Player-macos-x86_64.zip` 传入 macOS，在 macOS 内解压并运行 `Simple Player.app`。
-   应用 ZIP 由 `ditto` 创建，保留权限和包结构；不要在 Windows 上解开应用包后复制零散文件。
+3. 按需要下载 `Simple-Player-macos-x86_64`（应用 ZIP）或 `Simple-Player-macos-x86_64-DMG`（安装包）artifact，解压外层 artifact ZIP。
+4. 应用 ZIP：将里面的 `Simple-Player-macos-x86_64.zip` 传入 macOS，在 macOS 内解压并直接运行 `Simple Player.app`。
+   DMG：将里面的 `.dmg` 文件传入 macOS，双击打开，将 `Simple Player.app` 拖入 `Applications`，然后从“应用程序”启动。
+   两种格式都保留应用权限和包结构；不要拆开应用包后复制零散文件。应用 ZIP 直接运行时，数据仍使用系统的应用数据和缓存目录。
 
 CI 使用 Intel runner、Rust 1.98.1、静态 FFmpeg/FFprobe 9.0.2 和固定下载校验值。
-它运行 lint、媒体路径/图形回退偏好测试、Rust 格式检查、release 构建和 release 测试，并生成 `.app` 测试包。
+它运行 lint、媒体路径/图形回退及媒体控制测试、Rust 格式检查、release 构建和 release 测试，并生成应用 ZIP 和 DMG 安装包。
 构建与测试共用原生 Intel target 的 release 依赖，避免分别编译 check、debug 和显式 target 的依赖。
 pnpm、Rust 依赖和 sidecar 均使用缓存；首次冷构建仍需下载、编译，后续命中缓存时才会更快。
-同一分支的新构建会取消尚未完成的旧构建；应用 ZIP 上传时不再重复压缩。
+同一分支的新构建会取消尚未完成的旧构建；应用 ZIP 和 DMG 上传时不再重复压缩。
 没有创建 GitHub Release，也不要求 Apple Developer 凭据。
 测试包使用 ad-hoc 签名，没有 Developer ID 签名和公证，下载后可能被 Gatekeeper 拦截。
 仅对自己构建并确认来源的测试包，按系统设置中的“仍要打开”流程处理；不要关闭全局安全检查。
@@ -46,7 +47,7 @@ pnpm build --target x86_64-apple-darwin --bundles app
 
 Tauri 自动合并 `backend/tauri/tauri.macos.conf.json`。
 根目录脚本让 Tauri 自动发现 `backend/tauri`，不要把基础 `tauri.conf.json` 作为 `--config` 再次传入：该参数会在平台配置之后合并，覆盖 macOS 的原生标题栏和非透明窗口设置。
-本地默认也可生成 DMG；CI 初期仅生成应用 ZIP，减少虚拟机测试前的打包工作。
+本地默认也可生成 DMG；CI 使用 `pnpm build --bundles app,dmg`，在同一次编译后生成应用和 DMG，并用 `ditto` 将应用归档为 ZIP，分别上传两种产物。
 
 ## 图形回退
 
@@ -73,7 +74,6 @@ macOS 使用 Overlay 原生红绿灯，隐藏系统标题文字及应用内自�
 - 大小写敏感卷上同目录的 `Track.flac` 与 `track.flac` 应保持独立。
 - 保留崩溃或命令错误日志；可在终端直接运行 `"Simple Player.app/Contents/MacOS/Simple Player"` 查看输出。
 
-VMware 的音视频卡顿或硬件编码不可用，仍需在真实 Mac 上复核；Apple Silicon 需另行验收。
 
 ## 构建来源
 

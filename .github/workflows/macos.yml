@@ -86,10 +86,10 @@ jobs:
           pnpm lint
           pnpm --filter simple-player-ui test -- tests/mediaPath.test.ts tests/graphicsFallback.test.ts tests/systemService.test.ts tests/mediaControlService.test.ts
           cargo fmt --manifest-path backend/Cargo.toml -- --check
-      - name: Build ad-hoc signed test app
+      - name: Build ad-hoc signed app and DMG
         # The Intel runner already has the correct native target. Share its release
         # dependencies with tests instead of compiling check/debug/explicit-target trees.
-        run: pnpm build --bundles app
+        run: pnpm build --bundles app,dmg
       - name: Test Rust using release dependencies
         run: cargo test --manifest-path backend/Cargo.toml --release --locked
       - name: Archive app preserving permissions and bundle metadata
@@ -101,6 +101,13 @@ jobs:
         with:
           name: Simple-Player-macos-x86_64
           path: Simple-Player-macos-x86_64.zip
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@v6
+        with:
+          name: Simple-Player-macos-x86_64-DMG
+          path: backend/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
