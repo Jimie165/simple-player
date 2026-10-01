@@ -89,6 +89,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         onWaiting,
         onCanPlay,
         onPlaying,
+        onPause,
         onError,
     } = useVideoPlayback({
         isOpen,
@@ -198,6 +199,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                     onWaiting={onWaiting}
                     onCanPlay={onCanPlay}
                     onPlaying={onPlaying}
+                    onPause={onPause}
                     onError={onError}
                     onClick={handleSmartClick}
                 >

@@ -5,7 +5,7 @@ export function isMkvPath(path?: string | null): boolean {
 }
 
 export function buildVideoSrc(path?: string | null, preparedPath?: string | null): string {
-    if (!path) return '';
+    if (!path || (isMkvPath(path) && !preparedPath)) return '';
     const resolvedPath = preparedPath ?? path;
     return convertFileSrc(resolvedPath, 'asset');
 }

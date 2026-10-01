@@ -3,6 +3,7 @@ import { resolveMediaPath } from '@/utils/mediaPath';
 import { detectAv1Support, detectHevcSupport, detectSupportedAudioCodecs } from '@/features/player/utils/codecDetection';
 import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
 import { useMkvPrepare } from '@/features/player/hooks/useMkvPrepare';
+import { useVideoStore } from '@/store/useVideoStore';
 
 type VideoMetadataLike = {
     path?: string;
@@ -48,7 +49,10 @@ export function useVideoPlayback({
     const [error, setError] = useState<string | null>(null);
     const [showError, setShowError] = useState(false);
     const [isBuffering, setIsBuffering] = useState(true);
-    const [posterUrl, setPosterUrl] = useState<string | undefined>(undefined);
+    const [poster, setPoster] = useState<{ source: string; cover: string; url: string } | null>(null);
+    const libraryThumbnail = useVideoStore(state => state.videos.find(video => video.path === metadata?.path)?.thumbnail_path);
+    const coverPath = libraryThumbnail || metadata?.thumbnail_path || metadata?.cover_path || null;
+    const posterUrl = poster?.source === metadata?.path && poster?.cover === coverPath ? poster?.url : undefined;
     const lastClickTimeRef = useRef<number>(0);
 
     const isMkv = useMemo(() => isMkvPath(metadata?.path), [metadata?.path]);
@@ -87,37 +91,24 @@ export function useVideoPlayback({
 
     useEffect(() => {
         let active = true;
-        const loadPoster = async () => {
-            if (!metadata) {
-                if (active) requestAnimationFrame(() => setPosterUrl(undefined));
-                return;
-            }
-            const path = metadata.thumbnail_path || metadata.cover_path;
-            if (path) {
-                try {
-                    const url = await resolveMediaPath(path);
-                    if (active && url) requestAnimationFrame(() => setPosterUrl(url));
-                } catch (e) {
-                    console.error('Failed to resolve poster:', e);
-                }
-            } else {
-                if (active) requestAnimationFrame(() => setPosterUrl(undefined));
-            }
-        };
-        loadPoster();
-        return () => {
-            active = false;
-        };
-    }, [metadata]);
+        const source = metadata?.path;
+        if (source && coverPath) {
+            void resolveMediaPath(coverPath).then(url => {
+                if (active && url) setPoster({ source, cover: coverPath, url });
+            }).catch(console.error);
+        }
+        return () => { active = false; };
+    }, [metadata?.path, coverPath]);
 
     useEffect(() => {
         const srcReady = !isMkv || !!preparedPath;
         if (isOpen && metadata?.path && videoRef.current && srcReady) {
-            const frame = requestAnimationFrame(() => setIsPlaying(true));
             videoRef.current.currentTime = 0;
             videoRef.current.load();
-            videoRef.current.play().catch(() => setIsPlaying(false));
-            return () => cancelAnimationFrame(frame);
+            const video = videoRef.current;
+            let active = true;
+            void video.play().catch(() => { if (active) setIsPlaying(false); });
+            return () => { active = false; };
         }
     }, [isOpen, metadata?.path, preparedPath, isMkv, videoRef]);
 
@@ -137,7 +128,6 @@ export function useVideoPlayback({
                     e.preventDefault();
                     if (videoRef.current.paused) {
                         videoRef.current.play();
-                        setIsPlaying(true);
                         showControls();
                     } else {
                         videoRef.current.pause();
@@ -199,7 +189,6 @@ export function useVideoPlayback({
         navigator.mediaSession.setActionHandler('play', () => {
             if (videoRef.current) {
                 videoRef.current.play();
-                setIsPlaying(true);
             }
         });
 
@@ -270,7 +259,6 @@ export function useVideoPlayback({
 
         if (videoRef.current.paused) {
             await videoRef.current.play();
-            setIsPlaying(true);
             showControls();
         } else {
             videoRef.current.pause();
@@ -336,10 +324,19 @@ export function useVideoPlayback({
     }, [isPlaying, showControls, videoRef]);
 
     const onLoadStart = useCallback(() => {
+        if (!videoSrc) return;
         setIsBuffering(true);
+        setIsPlaying(false);
+        setCurrentTime(0);
+        setDuration(metadata?.duration || 0);
         setError(null);
         setShowError(false);
-    }, []);
+    }, [videoSrc, metadata?.duration]);
+
+    const onPause = useCallback(() => {
+        setIsPlaying(false);
+        setIsControlsVisible(true);
+    }, [setIsControlsVisible]);
 
     const onWaiting = useCallback(() => {
         setIsBuffering(true);
@@ -359,6 +356,7 @@ export function useVideoPlayback({
     }, [error]);
 
     const onError = useCallback((e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+        if (!videoSrc || isPreparing) return;
         const target = e.target as HTMLVideoElement;
         const err = target.error;
         let msg = '未知播放错误';
@@ -385,7 +383,7 @@ export function useVideoPlayback({
                 setShowError(true);
             }
         }, 500);
-    }, [error, metadata?.path, videoRef]);
+    }, [error, metadata?.path, videoRef, videoSrc, isPreparing]);
 
     return {
         isPlaying,
@@ -416,6 +414,7 @@ export function useVideoPlayback({
         onWaiting,
         onCanPlay,
         onPlaying,
+        onPause,
         onError,
     };
 }

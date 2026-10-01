@@ -50,7 +50,10 @@ pub fn scan_audio_files(dir_path: &str) -> Vec<String> {
 ///
 /// `ignored_dir_names` 中匹配的目录（按目录名比较，大小写不敏感）会被整个剪枝掉。
 /// 根目录本身不会被剪枝，即使它的名字命中了忽略列表。
-pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) -> Vec<String> {
+pub fn scan_audio_files_recursive(
+    dir_path: &str,
+    ignored_dir_names: &[String],
+) -> Result<Vec<String>, String> {
     let mut audio_files = Vec::new();
     let walker = WalkDir::new(dir_path).into_iter().filter_entry(|entry| {
         if entry.depth() == 0 {
@@ -68,7 +71,8 @@ pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) 
         }
         true
     });
-    for entry in walker.filter_map(|e| e.ok()) {
+    for entry in walker {
+        let entry = entry.map_err(|error| format!("无法扫描音乐目录 {dir_path}：{error}"))?;
         if !entry.file_type().is_file() {
             continue;
         }
@@ -78,7 +82,7 @@ pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) 
         audio_files.push(normalize_db_path(entry.path()));
     }
     audio_files.sort();
-    audio_files
+    Ok(audio_files)
 }
 
 /// 检查路径是否是音频文件
@@ -86,4 +90,35 @@ pub fn scan_audio_files_recursive(dir_path: &str, ignored_dir_names: &[String]) 
 pub fn is_audio_file(path: &str) -> bool {
     let path = Path::new(path);
     path.extension().map(has_audio_extension).unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rescan_discovers_new_flac_and_retains_directory_filters() {
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory =
+            std::env::temp_dir().join(format!("simple-player-scan-{}-{nonce}", std::process::id()));
+        fs::create_dir_all(directory.join("ignored")).unwrap();
+        fs::write(directory.join("first.flac"), b"fixture").unwrap();
+        let path = directory.to_str().unwrap();
+        assert_eq!(
+            scan_audio_files_recursive(path, &["ignored".into()])
+                .unwrap()
+                .len(),
+            1
+        );
+        fs::write(directory.join("新歌曲.FLAC"), b"fixture").unwrap();
+        fs::write(directory.join("ignored/skip.flac"), b"fixture").unwrap();
+        let scanned = scan_audio_files_recursive(path, &["ignored".into()]).unwrap();
+        assert_eq!(scanned.len(), 2);
+        assert!(scanned.iter().any(|path| path.ends_with("新歌曲.FLAC")));
+        fs::remove_dir_all(&directory).unwrap();
+        assert!(scan_audio_files_recursive(path, &[]).is_err());
+    }
 }

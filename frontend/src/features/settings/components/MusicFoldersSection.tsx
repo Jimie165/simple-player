@@ -14,6 +14,7 @@ import { getSelectedPath } from '@/utils/dialogSelection';
 const FOLDER_PREVIEW_COUNT = 3;
 
 export default function MusicFoldersSection() {
+    const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const triggerLibraryUpdate = useLibraryStore((s) => s.triggerLibraryUpdate);
     const [musicFolders, setMusicFolders] = useState<LibraryFolder[]>([]);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
@@ -26,7 +27,7 @@ export default function MusicFoldersSection() {
     const reloadFolders = useCallback(async () => {
         try {
             const all = await libraryService.getFolders();
-            setMusicFolders(all.filter((f) => f.folder_type === 'music'));
+            setMusicFolders(all.filter((f) => f.folder_type === 'music' || f.folder_type === 'mixed'));
         } catch (e) {
             console.error('Failed to load folders', e);
         }
@@ -34,7 +35,7 @@ export default function MusicFoldersSection() {
 
     useEffect(() => {
         reloadFolders();
-    }, [reloadFolders]);
+    }, [reloadFolders, libraryVersion]);
 
     const handleAddFolder = async () => {
         if (isAddingFolder) return;

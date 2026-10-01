@@ -28,7 +28,7 @@ export function useMkvPrepare({
     supportedAudioCodecs,
     onPrepareError,
 }: UseMkvPrepareOptions): UseMkvPrepareResult {
-    const [preparedPath, setPreparedPath] = useState<string | null>(null);
+    const [prepared, setPrepared] = useState<{ source: string; path: string } | null>(null);
     const [prepareStage, setPrepareStage] = useState<string | null>(null);
     const [preparePercent, setPreparePercent] = useState<number | null>(null);
     const [isPreparing, setIsPreparing] = useState(false);
@@ -44,25 +44,25 @@ export function useMkvPrepare({
 
         const run = async () => {
             if (!isOpen || !sourcePath || !isMkv) {
-                setPreparedPath(null);
+                setPrepared(null);
                 setIsPreparing(false);
                 setPrepareStage(null);
                 setPreparePercent(null);
                 return;
             }
 
-            setPreparedPath(null);
+            setPrepared(null);
             setIsPreparing(true);
             setPrepareStage('start');
             setPreparePercent(null);
 
-            unlistenFn = await listen<{ path: string; stage: string; percent?: number }>('video:prepare-progress', (event) => {
-                if (event.payload.path !== sourcePath) return;
-                setPrepareStage(event.payload.stage);
-                setPreparePercent(event.payload.percent ?? null);
-            });
-
             try {
+                unlistenFn = await listen<{ path: string; stage: string; percent?: number }>('video:prepare-progress', (event) => {
+                    if (cancelled || event.payload.path !== sourcePath) return;
+                    setPrepareStage(event.payload.stage);
+                    setPreparePercent(event.payload.percent ?? null);
+                });
+                if (cancelled) { unlistenFn(); return; }
                 console.log('[VideoPlayer] 开始准备视频:', sourcePath);
                 const outPath = await invoke<string>('prepare_video_for_playback', {
                     path: sourcePath,
@@ -72,7 +72,7 @@ export function useMkvPrepare({
                 });
                 console.log('[VideoPlayer] 视频准备完成:', outPath);
                 if (cancelled) return;
-                setPreparedPath(outPath);
+                setPrepared({ source: sourcePath, path: outPath });
             } catch (error) {
                 console.error('[VideoPlayer] 视频准备失败:', error);
                 if (cancelled) return;
@@ -93,7 +93,7 @@ export function useMkvPrepare({
     }, [isOpen, sourcePath, isMkv, supportsHevc, supportsAv1, supportedAudioCodecs]);
 
     return {
-        preparedPath,
+        preparedPath: prepared && prepared.source === sourcePath ? prepared.path : null,
         prepareStage,
         preparePercent,
         isPreparing,

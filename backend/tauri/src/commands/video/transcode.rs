@@ -79,9 +79,10 @@ pub fn transcode_with_hw(
                 }
             }
         }
-        _ => {
+        _ if prefer_hw_decode => {
             ffmpeg_args.extend(vec!["-hwaccel".to_string(), "auto".to_string()]);
         }
+        _ => {}
     }
 
     if !using_hw_decode {

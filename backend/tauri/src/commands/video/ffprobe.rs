@@ -191,12 +191,20 @@ pub fn try_remux(
         cmd.creation_flags(0x08000000);
     }
 
-    let status = cmd
+    // output() drains stderr while FFmpeg runs; an unread pipe can fill and hang remuxing.
+    let output = cmd
         .args(&args)
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
-        .status()
-        .map_err(|e| e.to_string())?;
+        .output()
+        .map_err(|e| format!("无法启动 FFmpeg ({ffmpeg}): {e}"))?;
 
-    Ok(status.success())
+    if !output.status.success() {
+        eprintln!(
+            "FFmpeg 重封装失败: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    Ok(output.status.success())
 }
