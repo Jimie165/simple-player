@@ -25,8 +25,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Pushes run one check job; manual builds produce both architectures.
-        arch: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64", "aarch64"]' || '["x86_64"]') }}
+        # Pushes check ARM64; manual builds produce both architectures.
+        arch: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64", "aarch64"]' || '["aarch64"]') }}
     runs-on: ${{ matrix.arch == 'aarch64' && 'macos-15' || 'macos-15-intel' }}
     timeout-minutes: 60
     env:
