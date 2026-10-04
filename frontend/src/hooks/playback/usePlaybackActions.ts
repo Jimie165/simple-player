@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { audioService } from '@/services/audioService';
+import { handleMissingSong } from '@/hooks/playback/handleMissingSong';
 import type { RecentItem, SongMetadata } from '@/types';
 
 export interface PlayOptions {
@@ -103,6 +104,7 @@ export function usePlaybackActions() {
                 await requestLyricsForPath(metadata.path);
             }
         } catch (error) {
+            if (handleMissingSong(error, metadata)) return;
             console.error('Toggle play failed', error);
             setPlaybackSnapshot({
                 session_id: state.playbackSessionId,
@@ -124,22 +126,30 @@ export function usePlaybackActions() {
         const state = usePlayerStore.getState();
         if (!state.metadata?.path || state.mediaKind === 'video') return;
 
-        const snapshot = state.isAudioLoaded
-            ? await audioService.resume()
-            : await audioService.play(state.metadata.path, state.metadata);
-        setMediaKind('audio');
-        setPlaybackSnapshot(snapshot);
-        if (!state.isAudioLoaded) await requestLyricsForPath(state.metadata.path);
+        try {
+            const snapshot = state.isAudioLoaded
+                ? await audioService.resume()
+                : await audioService.play(state.metadata.path, state.metadata);
+            setMediaKind('audio');
+            setPlaybackSnapshot(snapshot);
+            if (!state.isAudioLoaded) await requestLyricsForPath(state.metadata.path);
+        } catch (error) {
+            if (!handleMissingSong(error, state.metadata)) throw error;
+        }
     }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot]);
 
     const restartCurrent = useCallback(async (song: SongMetadata) => {
         if (!song.path) return;
-        const snapshot = await audioService.play(song.path, song);
-        setMetadata(song);
-        resetPlaybackClock(song.path);
-        setMediaKind('audio');
-        setPlaybackSnapshot(snapshot);
-        requestLyricsForPath(song.path);
+        try {
+            const snapshot = await audioService.play(song.path, song);
+            setMetadata(song);
+            resetPlaybackClock(song.path);
+            setMediaKind('audio');
+            setPlaybackSnapshot(snapshot);
+            requestLyricsForPath(song.path);
+        } catch (error) {
+            if (!handleMissingSong(error, song)) throw error;
+        }
     }, [requestLyricsForPath, resetPlaybackClock, setMediaKind, setMetadata, setPlaybackSnapshot]);
 
     const applyQueueItemPlayback = useCallback(async (
@@ -184,6 +194,7 @@ export function usePlaybackActions() {
             setPlaybackSnapshot({ ...snapshot, status: autoPlay ? 'playing' : 'paused' });
             requestLyricsForPath(song.path);
         } catch (error) {
+            if (handleMissingSong(error, song)) return;
             console.error('Queue play failed', error);
         }
     }, [
@@ -267,6 +278,7 @@ export function usePlaybackActions() {
                 if (recentItem) addToRecent(recentItem);
             }
         } catch (error) {
+            if (handleMissingSong(error, song)) return;
             console.error('Play failed', error);
             setPlaybackSnapshot({
                 session_id: usePlayerStore.getState().playbackSessionId,
@@ -379,10 +391,15 @@ export function usePlaybackActions() {
         const { isAudioLoaded, metadata } = usePlayerStore.getState();
 
         if (!isAudioLoaded && metadata?.path) {
-            const snapshot = await audioService.load(metadata.path, metadata);
-            setMediaKind('audio');
-            setPlaybackSnapshot(snapshot);
-            requestLyricsForPath(metadata.path);
+            try {
+                const snapshot = await audioService.load(metadata.path, metadata);
+                setMediaKind('audio');
+                setPlaybackSnapshot(snapshot);
+                requestLyricsForPath(metadata.path);
+            } catch (error) {
+                if (handleMissingSong(error, metadata)) return usePlayerStore.getState().currentTime;
+                throw error;
+            }
         }
 
         setSeeking(true);

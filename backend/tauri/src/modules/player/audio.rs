@@ -446,7 +446,14 @@ impl AudioState {
         start_position: f32,
         session_id: u64,
     ) -> Result<PlaybackHandle, String> {
-        let file = File::open(&path).map_err(|e| format!("Failed to open audio file: {}", e))?;
+        let file = File::open(&path).map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                // Stable error code for the frontend; OS messages are localized.
+                "AUDIO_FILE_NOT_FOUND".to_string()
+            } else {
+                format!("Failed to open audio file: {}", e)
+            }
+        })?;
         let source =
             Decoder::try_from(file).map_err(|e| format!("Failed to decode audio file: {}", e))?;
 
@@ -1032,6 +1039,26 @@ mod tests {
     use super::*;
     use core::num::NonZero;
     use rodio::buffer::SamplesBuffer;
+
+    #[test]
+    fn missing_audio_file_returns_code_without_loading_playback() {
+        let state = AudioState::new();
+        let path = std::env::temp_dir()
+            .join(format!("simple-player-missing-{}", std::process::id()))
+            .join("missing.mp3")
+            .to_string_lossy()
+            .into_owned();
+
+        assert_eq!(
+            state.play_file(path.clone(), None).err().as_deref(),
+            Some("AUDIO_FILE_NOT_FOUND")
+        );
+        assert_eq!(
+            state.load_file(path, None).err().as_deref(),
+            Some("AUDIO_FILE_NOT_FOUND")
+        );
+        assert!(matches!(state.get_snapshot().status, PlaybackStatus::Idle));
+    }
 
     #[test]
     fn low_frequency_frame_preserves_bass_and_beat_channels() {
