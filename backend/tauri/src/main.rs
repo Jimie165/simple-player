@@ -155,6 +155,7 @@ fn main() {
             commands::video::scan::get_video_folders,
             commands::video::scan::remove_video_folder,
             commands::video::query::get_all_videos,
+            commands::video::query::video_file_exists,
             commands::video::query::search_videos,
             commands::video::query::toggle_video_favorite,
             commands::video::query::batch_delete_videos,

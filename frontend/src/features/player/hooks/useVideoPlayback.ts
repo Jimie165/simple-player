@@ -8,8 +8,11 @@ import { detectAv1Support, detectHevcSupport, detectSupportedAudioCodecs } from 
 import { buildVideoSrc, inferVideoMimeType, isMkvPath } from '@/features/player/utils/videoSource';
 import { useMkvPrepare } from '@/features/player/hooks/useMkvPrepare';
 import { useVideoStore } from '@/store/useVideoStore';
+import { videoService } from '@/services/videoService';
+import { handleMissingVideo } from '@/features/player/video/handleMissingVideo';
 
 type VideoMetadataLike = {
+    id?: number;
     path?: string;
     title?: string;
     duration?: number;
@@ -58,6 +61,47 @@ export function useVideoPlayback({
     const coverPath = libraryThumbnail || metadata?.thumbnail_path || metadata?.cover_path || null;
     const posterUrl = poster?.source === metadata?.path && poster?.cover === coverPath ? poster?.url : undefined;
     const lastClickTimeRef = useRef<number>(0);
+    const activeVideoPathRef = useRef<string | undefined>(undefined);
+    const videoRequestIdRef = useRef(0);
+    const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        const requestId = ++videoRequestIdRef.current;
+        activeVideoPathRef.current = isOpen ? metadata?.path : undefined;
+        return () => {
+            videoRequestIdRef.current = requestId + 1;
+            activeVideoPathRef.current = undefined;
+            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        };
+    }, [isOpen, metadata?.path]);
+
+    const handleVideoFailure = useCallback(async (failure: unknown, message: string, immediate = false) => {
+        const path = metadata?.path;
+        const requestId = videoRequestIdRef.current;
+        if (!path) return;
+        let missing = failure instanceof Error && failure.message === 'VIDEO_FILE_NOT_FOUND';
+        if (!missing) {
+            try {
+                missing = !await videoService.fileExists(path);
+            } catch (checkError) {
+                console.error('Failed to check video file', checkError);
+            }
+        }
+        // The user may have switched videos or closed the player during the check.
+        if (activeVideoPathRef.current !== path || videoRequestIdRef.current !== requestId) return;
+        setIsBuffering(false);
+        setIsPlaying(false);
+        setError(missing ? '找不到视频文件' : message);
+        if (missing) handleMissingVideo({ ...metadata, path });
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        if (missing || immediate) {
+            setShowError(true);
+        } else {
+            errorTimerRef.current = setTimeout(() => {
+                if (activeVideoPathRef.current === path && videoRef.current?.error) setShowError(true);
+            }, 500);
+        }
+    }, [metadata, videoRef]);
 
     const isMkv = useMemo(() => isMkvPath(metadata?.path), [metadata?.path]);
 
@@ -78,15 +122,12 @@ export function useVideoPlayback({
         supportsAv1,
         supportedAudioCodecs,
         onPrepareError: (prepareError) => {
-            requestAnimationFrame(() => {
-                setError(String(prepareError));
-                setShowError(true);
-            });
+            void handleVideoFailure(prepareError, String(prepareError), true);
         },
     });
 
     const videoSrc = useMemo(() => {
-        return buildVideoSrc(metadata?.path, preparedPath);
+        return preparedPath ? buildVideoSrc(metadata?.path, preparedPath) : '';
     }, [metadata?.path, preparedPath]);
 
     const videoMimeType = useMemo(() => {
@@ -105,7 +146,7 @@ export function useVideoPlayback({
     }, [metadata?.path, coverPath]);
 
     useEffect(() => {
-        const srcReady = !isMkv || !!preparedPath;
+        const srcReady = !!preparedPath;
         if (isOpen && metadata?.path && videoRef.current && srcReady) {
             videoRef.current.currentTime = 0;
             videoRef.current.load();
@@ -351,13 +392,9 @@ export function useVideoPlayback({
             }
         }
         console.error('Video Error:', err, 'Path:', metadata?.path);
-        setError(msg);
-        setTimeout(() => {
-            if (videoRef.current && (videoRef.current.error || error)) {
-                setShowError(true);
-            }
-        }, 500);
-    }, [error, metadata?.path, videoRef, videoSrc, isPreparing]);
+        if (target !== videoRef.current) return;
+        void handleVideoFailure(err, msg);
+    }, [handleVideoFailure, metadata?.path, videoRef, videoSrc, isPreparing]);
 
     return {
         isPlaying,
