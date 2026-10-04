@@ -299,7 +299,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             {/* Header Section */}
             <div className="relative w-full z-20 -mt-10">
 
-                <div className="absolute top-16 right-6 z-50 flex items-center gap-1">
+                <div className="absolute top-12 right-6 z-50 flex items-center gap-1">
                     <PlaylistSearchControl
                         isSearchOpen={isSearchOpen}
                         setIsSearchOpen={setIsSearchOpen}
@@ -321,11 +321,11 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     />
                 </div>
 
-                <div className="relative z-10 p-8 pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
+                <div className="relative z-10 p-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
                         <div className={clsx(
-                            "w-48 h-48 md:w-56 md:h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
+                            "w-56 h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
                             isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
