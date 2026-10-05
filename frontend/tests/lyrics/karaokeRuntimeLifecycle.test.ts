@@ -3,6 +3,7 @@ import { isValidElement, type ReactNode } from 'react';
 import type { LyricsDebugEvent } from '@/features/player/lyrics/lyricsDebug';
 
 const hooks = vi.hoisted(() => ({
+    floatMode: 'character' as 'character' | 'word',
     cursor: 0,
     slots: [] as unknown[],
     insertion: [] as Array<() => void>,
@@ -44,13 +45,14 @@ const registry = {
 };
 vi.mock('@/features/player/lyrics/lyricsFrameScheduler', () => ({ useLyricsFrameTaskRegistry: () => registry }));
 vi.mock('@/store/useThemeStore', () => ({
-    useThemeStore: (selector: (state: { lyricFillMode: 'character' }) => unknown) =>
-        selector({ lyricFillMode: 'character' }),
+    useThemeStore: (selector: (state: { lyricFillMode: 'character'; lyricFloatMode: 'character' | 'word' }) => unknown) =>
+        selector({ lyricFillMode: 'character', lyricFloatMode: hooks.floatMode }),
 }));
 
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
 
 class NodeDouble {
+    offsetWidth = 24;
     values: Record<string, string> = {};
     writes: string[] = [];
     classes = new Set<string>();
@@ -74,6 +76,7 @@ class NodeDouble {
 describe('DOM-owned karaoke runtime', () => {
     afterEach(() => {
         for (const slot of hooks.slots) (slot as { cleanup?: () => void }).cleanup?.();
+        hooks.floatMode = 'character';
         hooks.cursor = 0; hooks.slots.length = 0;
         hooks.insertion.length = 0; hooks.layout.length = 0; hooks.callbacks.clear();
         vi.useRealTimers(); vi.unstubAllGlobals();
@@ -82,6 +85,7 @@ describe('DOM-owned karaoke runtime', () => {
     const setup = () => {
         vi.useFakeTimers();
         vi.stubGlobal('window', globalThis);
+        vi.stubGlobal('getComputedStyle', () => ({ fontSize: '20px' }));
         const events: LyricsDebugEvent[] = [];
         vi.stubGlobal('__SIMPLE_PLAYER_LYRICS_DEBUG__', (event: LyricsDebugEvent) => events.push(event));
         const props = {
@@ -95,12 +99,14 @@ describe('DOM-owned karaoke runtime', () => {
             hooks.cursor = 0; hooks.insertion.length = 0; hooks.layout.length = 0;
             const tree = KaraokeText.type(props);
             let charIndex = 0;
+            let wordIndex = 0;
             const visit = (node: ReactNode) => {
                 if (Array.isArray(node)) { node.forEach(visit); return; }
-                if (!isValidElement<{ children?: ReactNode; ref?: { current: HTMLSpanElement | null } | ((node: HTMLSpanElement) => void); 'data-c'?: string }>(node)) return;
+                if (!isValidElement<{ children?: ReactNode; className?: string; ref?: { current: HTMLSpanElement | null } | ((node: HTMLSpanElement) => void); 'data-c'?: string }>(node)) return;
                 const { ref, children } = node.props;
                 if (ref) {
-                    const key = node.props['data-c'] === undefined ? 'content' : `char-${charIndex++}`;
+                    const key = node.props.className === 'karaoke-word-motion' ? `word-${wordIndex++}`
+                        : node.props['data-c'] === undefined ? 'content' : `char-${charIndex++}`;
                     if (!nodes.has(key)) nodes.set(key, new NodeDouble());
                     const element = nodes.get(key)! as unknown as HTMLSpanElement;
                     if (typeof ref === 'function') ref(element); else ref.current = element;
@@ -117,6 +123,95 @@ describe('DOM-owned karaoke runtime', () => {
         render();
         return { props, render, frame, events, nodes, char: (index = 0) => nodes.get(`char-${index}`)! };
     };
+
+    it('moves and fills one timed group with paused seek synchronization', () => {
+        hooks.floatMode = 'word';
+        const { props, render, frame, nodes, char } = setup();
+        render({ words: [{ text: 'hello', start_time_ms: 1000, end_time_ms: 2000 }], isActive: true, isFocused: true });
+        frame(1300);
+        const word = nodes.get('word-0')!;
+        expect(word.values.transform).not.toBe('translateY(0.000000em)');
+        expect(char().values.transform).toBeUndefined();
+        expect(char(1).values.transform).toBeUndefined();
+        expect(Number(word.values['--kf'])).toBeGreaterThan(0);
+        expect(Number(word.values['--kf'])).toBeLessThan(100);
+        expect(char().values['--kf']).toBeUndefined();
+        expect(char(1).values['--kf']).toBeUndefined();
+        const fillWrites = nodes.get('word-0')!.writes.filter(name => name === '--kf').length;
+        frame(1400);
+        expect(word.writes.filter(name => name === '--kf')).toHaveLength(fillWrites + 1);
+        const before = word.values.transform;
+        render({ isPlaying: false });
+        expect(hooks.callbacks.size).toBe(0);
+        expect(word.values.transform).toBe(before);
+        props.preciseMsRef.current = 500;
+        render({ playbackSyncKey: 1 });
+        expect(word.values.transform).toBe('translateY(0.000000em)');
+        expect(Number(word.values['--kf'])).toBeLessThan(0);
+        render({ isFocused: false });
+        expect(word.values.transform).toBe('');
+        vi.advanceTimersByTime(250);
+        expect(word.values.transform).toBe('translateY(0em)');
+    });
+
+    it('delays word lift by 100ms without delaying fill and completes the delayed motion', () => {
+        hooks.floatMode = 'word';
+        const { render, frame, nodes } = setup();
+        render({ words: [{ text: 'a', start_time_ms: 1000, end_time_ms: 1400 }], isActive: true, isFocused: true });
+        const word = nodes.get('word-0')!;
+        frame(1050);
+        expect(word.values.transform).toBe('translateY(0.000000em)');
+        expect(Number(word.values['--kf'])).toBeGreaterThan(0);
+        frame(1100);
+        expect(word.values.transform).toBe('translateY(0.000000em)');
+        frame(1150);
+        expect(word.values.transform).not.toBe('translateY(0.000000em)');
+        for (let time = 1200; time <= 2100; time += 100) frame(time);
+        expect(word.values.transform).toBe('translateY(-0.078000em)');
+    });
+
+    it('keeps staggered character emphasis inside a floating long-tone group', () => {
+        hooks.floatMode = 'word';
+        const { props, render, frame, nodes, char } = setup();
+        render({ words: [{ text: 'hello', start_time_ms: 1000, end_time_ms: 4000 }], isActive: true, isFocused: true });
+        frame(1800);
+        const word = nodes.get('word-0')!;
+        expect(word.values.transform).toMatch(/^translateY\(/);
+        expect(word.values.transform).not.toContain('scale');
+        expect(char().values.transform).toContain('scale');
+        expect(char().values.transform).not.toBe(char(4).values.transform);
+        expect(Number(char().values['--kg'])).toBeGreaterThan(Number(char(4).values['--kg']));
+        const before = char().values.transform;
+        render({ isPlaying: false });
+        expect(hooks.callbacks.size).toBe(0);
+        expect(char().values.transform).toBe(before);
+        render({ isFocused: false });
+        expect(word.values.transform).toBe('');
+        expect(char().values.transform).toBe('');
+        render({ isFocused: true });
+        expect(char().values.transform).toBe(before);
+        props.preciseMsRef.current = 500;
+        render({ playbackSyncKey: 1 });
+        expect(Number(char().values['--kg'])).toBe(0);
+        expect(char().values.transform).toContain('scale(1.0000)');
+    });
+
+    it('adds no character lift to the word height while long-tone glow fades', () => {
+        hooks.floatMode = 'word';
+        const { render, frame, char } = setup();
+        render({ words: [{ text: 'hello', start_time_ms: 1000, end_time_ms: 4000 }], isActive: true, isFocused: true });
+        const verticalOffset = () => Number(char().values.transform.match(/translate3d\([^,]+, ([-\d.]+)em/)?.[1]);
+        frame(2800);
+        const peak = verticalOffset();
+        const peakGlow = Number(char().values['--kg']);
+        expect(peak).toBe(0);
+        frame(3800);
+        expect(verticalOffset()).toBe(peak);
+        expect(Number(char().values['--kg'])).toBeLessThan(peakGlow);
+        frame(4700);
+        expect(verticalOffset()).toBe(peak);
+        expect(Number(char().values['--kg'])).toBe(0);
+    });
 
     it('initializes before activation and keeps the callback and runtime across pause/resume', () => {
         const { props, render, events, frame, char } = setup();

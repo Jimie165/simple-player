@@ -65,6 +65,7 @@ type KaraokeRuntimeState = {
     wordMotionWindows: WordMotionWindow[];
     charRuntimes: Array<KaraokeCharRuntime | undefined>;
     previousTransforms: Array<string | undefined>;
+    previousWordTransforms: Array<string | undefined>;
     previousFillStops: Array<number | undefined>;
     previousGlowAlphas: Array<number | undefined>;
     wordPhaseCodes: Uint8Array;
@@ -86,6 +87,7 @@ type KaraokeRuntimeState = {
 
 const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
+const wordFloatDelayMs = 100;
 const regularLiftMinDurationMs = 1000;
 const longToneThresholdMs = 1000;
 const syllableLiftEm = 0.078;
@@ -213,6 +215,7 @@ function getKaraokeCharStyle(
     fillStop: number,
     glowDisabled = false,
     output: KaraokeCharStyle = { transform: '', fillStop: 0, glowAlpha: 0 },
+    emphasisOnly = false,
 ): KaraokeCharStyle {
     const {
         item: charItem,
@@ -254,7 +257,11 @@ function getKaraokeCharStyle(
     const centerOffset = charCount / 2 - charIndex;
     const translateX =
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
-    const translateY = regularLift * -syllableLiftEm;
+    // The word container owns all vertical lift so long tones settle at
+    // the same height as ordinary words.
+    const translateY = emphasisOnly
+        ? 0
+        : regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
 
     output.transform = isLongTone
@@ -346,6 +353,9 @@ function KaraokeTextBase({
     glowDisabled = false,
     fillAlpha = 1,
 }: KaraokeTextProps) {
+    const lyricFloatMode = useThemeStore(state => state.lyricFloatMode);
+    const wordFloat = lyricFloatMode === 'word';
+    const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const lyricFillMode = useThemeStore(state => state.lyricFillMode);
     const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const visualFocused = isFocused && !isSeekExiting;
@@ -413,6 +423,7 @@ function KaraokeTextBase({
     }, [flatChars]);
 
     const layoutGroups = useMemo(() => {
+        if (wordFloat) return wordGroups;
         const groups: IndexedCharItem[][] = [];
         let currentGroup: IndexedCharItem[] = [];
         const flushCurrentGroup = () => {
@@ -441,16 +452,21 @@ function KaraokeTextBase({
         });
         flushCurrentGroup();
         return groups;
-    }, [flatChars]);
+    }, [flatChars, wordFloat, wordGroups]);
 
     const wordMotionWindows = useMemo(
-        () => wordGroups.map((group, wordIndex) =>
-            getWordMotionWindow(
-                group,
-                wordIndex === wordGroups.length - 1
-            )
-        ),
-        [wordGroups]
+        () => wordGroups.map((group, wordIndex) => {
+            const window = getWordMotionWindow(group, wordIndex === wordGroups.length - 1);
+            if (wordFloat) {
+                const startMs = group[0].item.time_ms;
+                const endMs = Math.max(...group.map(({ item }) => item.nextStart));
+                // Keep ticking until the delayed group lift reaches its final height.
+                window.endMs = Math.max(window.endMs,
+                    startMs + wordFloatDelayMs + Math.max(regularLiftMinDurationMs, endMs - startMs));
+            }
+            return window;
+        }),
+        [wordGroups, wordFloat]
     );
 
     // All values that only depend on the parsed lyric item are prepared once
@@ -466,6 +482,19 @@ function KaraokeTextBase({
         });
         return runtimes;
     }, [wordGroups]);
+
+    const wordRuntimes = useMemo(() => wordGroups.map((group, wordIndex) => {
+        const first = group[0].item;
+        // Reuse the parsed timing, including any compressed handoff tail.
+        const endMs = Math.max(...group.map(({ item }) => item.nextStart));
+        return prepareKaraokeCharRuntime({
+            ...first,
+            time_ms: first.time_ms,
+            durationMs: Math.max(20, endMs - first.time_ms),
+            activeCharCountInWord: 1,
+            activeCharIndexInWord: 0,
+        }, wordIndex === wordGroups.length - 1);
+    }), [wordGroups]);
 
     useLayoutEffect(() => {
         const charElements = charRefs.current;
@@ -484,6 +513,7 @@ function KaraokeTextBase({
                 wordMotionWindows,
                 charRuntimes,
                 previousTransforms: new Array(flatChars.length),
+                previousWordTransforms: new Array(flatChars.length),
                 previousFillStops: new Array(flatChars.length),
                 previousGlowAlphas: new Array(flatChars.length),
                 wordPhaseCodes: new Uint8Array(wordMotionWindows.length),
@@ -522,8 +552,10 @@ function KaraokeTextBase({
         if (domChanged) {
             runtime.elements = [...charElements];
             runtime.previousTransforms.fill(undefined);
+            runtime.previousWordTransforms.fill(undefined);
             runtime.previousFillStops.fill(undefined);
             runtime.previousGlowAlphas.fill(undefined);
+            runtime.needsVisualSync = true;
             // The effect may be rerun for a focus change while the same DOM is
             // still mounted. Only a new set of nodes needs an initial cancel.
             charElements.forEach(element => {
@@ -536,36 +568,37 @@ function KaraokeTextBase({
             runtime.needsVisualSync = true;
         }
 
-        if (lyricFillMode === 'character') {
+        if (!wordFloat && lyricFillMode === 'character') {
             applyCharacterFillStyles(charElements, charRuntimes);
         }
 
-        const lineFill = lyricFillMode === 'line'
-            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs)
+        const lineFill = lyricFillMode === 'line' || wordFloat
+            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFloat && lyricFillMode === 'line')
             : null;
 
         const runtimeState = runtime;
         let debugWrites: { transform: number; fill: number; glow: number } | null = null;
 
-        const updateCharStyles = (flatIndex: number, style: KaraokeCharStyle) => {
-            const el = charElements[flatIndex];
+        const updateCharStyles = (flatIndex: number, style: KaraokeCharStyle, motionOnly = false) => {
+            const el = motionOnly ? wordRefs.current[flatIndex] : charElements[flatIndex];
             if (!el) return;
             // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
             // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
-            if (isFocusedRef.current) {
-                if (runtime.forceVisualWrite || style.transform !== runtime.previousTransforms[flatIndex]) {
+            const transforms = motionOnly ? runtime.previousWordTransforms : runtime.previousTransforms;
+            if (isFocusedRef.current && (!wordFloat || motionOnly || charRuntimes[flatIndex]?.isLongTone)) {
+                if (runtime.forceVisualWrite || style.transform !== transforms[flatIndex]) {
                     el.style.transform = style.transform;
-                    runtime.previousTransforms[flatIndex] = style.transform;
+                    transforms[flatIndex] = style.transform;
                     if (debugWrites) debugWrites.transform++;
                 }
-                if (runtime.forceVisualWrite || style.glowAlpha !== runtime.previousGlowAlphas[flatIndex]) {
+                if (!motionOnly && (runtime.forceVisualWrite || style.glowAlpha !== runtime.previousGlowAlphas[flatIndex])) {
                     el.style.setProperty('--kg', String(style.glowAlpha));
                     runtime.previousGlowAlphas[flatIndex] = style.glowAlpha;
                     if (debugWrites) debugWrites.glow++;
                 }
             }
 
-            if (style.fillStop !== runtime.previousFillStops[flatIndex]) {
+            if ((!wordFloat || motionOnly) && style.fillStop !== runtime.previousFillStops[flatIndex]) {
                 el.style.setProperty('--kf', String(style.fillStop));
                 runtime.previousFillStops[flatIndex] = style.fillStop;
                 if (debugWrites) debugWrites.fill++;
@@ -595,18 +628,28 @@ function KaraokeTextBase({
             const applyWord = (wordIndex: number) => {
                 evaluatedWordCount++;
                 const group = wordGroups[wordIndex];
+                if (wordFloat && group?.length) {
+                    const word = wordRuntimes[wordIndex].item;
+                    const progress = clamp01((timeMs - word.time_ms - wordFloatDelayMs) / Math.max(regularLiftMinDurationMs, word.durationMs));
+                    const style = runtimeState.scratchStyle;
+                    style.transform = `translateY(${(-Math.sin(progress * Math.PI / 2) * syllableLiftEm).toFixed(6)}em)`;
+                    style.fillStop = lineFill?.getWordFillStop(wordIndex) ?? -100;
+                    updateCharStyles(group[0].flatIndex, style, true);
+                }
                 group?.forEach(({ flatIndex }) => {
                     const charRuntime = charRuntimes[flatIndex];
-                    if (!charRuntime) return;
-                    const fillStop = lineFill?.getFillStop(wordIndex, charRuntime)
-                        ?? getCharacterFillStop(charRuntime.item, charRuntime.fillEdgeWidth, timeMs);
-                    const style = getKaraokeCharStyle(
+                    if (!charRuntime || (wordFloat && !charRuntime.isLongTone)) return;
+                    const fillStop = wordFloat ? 0 : (lineFill?.getFillStop(wordIndex, charRuntime)
+                        ?? getCharacterFillStop(charRuntime.item, charRuntime.fillEdgeWidth, timeMs));
+                    const style = wordFloat && !charRuntime.isLongTone ? runtimeState.scratchStyle : getKaraokeCharStyle(
                         charRuntime,
                         timeMs,
                         fillStop,
                         glowDisabledRef.current,
                         runtimeState.scratchStyle,
+                        wordFloat,
                     );
+                    style.fillStop = fillStop;
                     updateCharStyles(flatIndex, style);
                 });
             };
@@ -739,6 +782,8 @@ function KaraokeTextBase({
         wordMotionWindows,
         charRuntimes,
         lyricFillMode,
+        wordFloat,
+        wordRuntimes,
     ]);
 
     // Focus and play/pause changes should only change ownership of the stable
@@ -763,9 +808,12 @@ function KaraokeTextBase({
             unsubscribe?.();
             if (frame !== null) cancelAnimationFrame(frame);
         };
-    }, [charRuntimes, flatChars, frameRegistry, isActive, isPlaying, isSeekExiting, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
+    }, [wordFloat, wordRuntimes, charRuntimes, flatChars, frameRegistry, isActive, isPlaying, isSeekExiting, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
 
     useLayoutEffect(() => {
+        const motionElements = wordFloat
+            ? [...wordRefs.current, ...charRefs.current.filter((_element, index) => charRuntimes[index]?.isLongTone)]
+            : charRefs.current;
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = visualFocused;
 
@@ -787,7 +835,7 @@ function KaraokeTextBase({
         if (!wasFocused) {
             contentRef.current?.classList.remove('karaoke-text-exiting');
             // 从未聚焦过（如初始非激活行）：无动画残留，直接归位
-            charRefs.current.forEach((el) => {
+            motionElements.forEach((el) => {
                 if (!el) return;
                 el.style.transform = el.classList.contains('karaoke-char-long-tone')
                     ? 'translate(0, 0) scale(1)'
@@ -802,7 +850,7 @@ function KaraokeTextBase({
         // 不再为每字写 4 个退出变量 + 创建 CSS 动画。
         const exitContent = contentRef.current;
         exitContent?.classList.add('karaoke-text-exiting');
-        charRefs.current.forEach((el) => {
+        motionElements.forEach((el) => {
             if (!el) return;
             el.style.transform = '';
             el.style.removeProperty('--kg');
@@ -811,7 +859,7 @@ function KaraokeTextBase({
         const releaseTimer = window.setTimeout(() => {
             if (contentRef.current !== exitContent || isFocusedRef.current) return;
             exitContent?.classList.remove('karaoke-text-exiting');
-            charRefs.current.forEach((el) => {
+            motionElements.forEach((el) => {
                 if (!el) return;
                 el.style.transform = el.classList.contains('karaoke-char-long-tone')
                     ? 'translate(0, 0) scale(1)'
@@ -823,7 +871,7 @@ function KaraokeTextBase({
         return () => {
             window.clearTimeout(releaseTimer);
         };
-    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length]);
+    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length, wordFloat, charRuntimes]);
 
     // These events invalidate playback state, not the DOM runtime. In
     // particular a paused seek has no content frame to refresh the fill.
@@ -836,15 +884,19 @@ function KaraokeTextBase({
     return (
         <span ref={contentRef} className={[
             lyricFillMode === 'character' ? 'karaoke-text-character' : '',
+            wordFloat ? 'karaoke-text-word-float' : '',
             lyricLineBlendEnabled ? 'karaoke-text-background-blend' : '',
         ].filter(Boolean).join(' ')} style={{ display: 'block' }}>
             <span
+                className={wordFloat ? 'karaoke-word-brightness' : undefined}
                 style={{
                     display: 'block',
                     fontKerning: 'none',
                     fontVariantLigatures: 'none',
-                    '--kb': baseAlpha,
-                    '--kfa': visualFocused ? fillLayerAlpha : 0,
+                    '--kb': wordFloat ? 'var(--kw-base)' : baseAlpha,
+                    '--kfa': wordFloat ? 'var(--kw-fill)' : visualFocused ? fillLayerAlpha : 0,
+                    '--kw-base': baseAlpha,
+                    '--kw-fill': visualFocused ? fillLayerAlpha : 0,
                     '--kfd': dimMaskAlpha,
                     '--kf': lyricLineBlendEnabled ? -100 : undefined,
                 } as React.CSSProperties}
@@ -855,7 +907,9 @@ function KaraokeTextBase({
 
                     return (
                         <span
-                            key={group[0].flatIndex}
+                            key={`${lyricFloatMode}-${group[0].flatIndex}`}
+                            ref={wordFloat ? (element) => { wordRefs.current[group[0].flatIndex] = element; } : undefined}
+                            className={wordFloat ? 'karaoke-word-motion' : undefined}
                             style={{
                                 display: 'inline-block',
                                 whiteSpace: 'nowrap',

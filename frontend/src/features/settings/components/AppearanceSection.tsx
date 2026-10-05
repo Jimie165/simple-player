@@ -105,6 +105,8 @@ export default function AppearanceSection() {
         setPlayerEffectMode,
         lyricFillMode,
         setLyricFillMode,
+        lyricFloatMode,
+        setLyricFloatMode,
         reactiveBackgroundEnabled,
         setReactiveBackgroundEnabled,
         lyricLineBlendEnabled,
@@ -175,6 +177,14 @@ export default function AppearanceSection() {
                         </motion.div>
                     )}
                 </AnimatePresence>
+                <div className="mt-3">
+                    <PopupChoice
+                        label="歌词上浮方式"
+                        value={lyricFloatMode}
+                        onChange={setLyricFloatMode}
+                        options={[{ value: 'character', label: '逐字符上浮' }, { value: 'word', label: '逐词组上浮' }]}
+                    />
+                </div>
                 <div className="mt-3">
                     <PopupChoice
                         label="逐字歌词刷白方式"

@@ -630,3 +630,65 @@ body {
   width: 24px;
   height: 24px;
 }
+
+/* Word mode keeps one motion layer per timed group; character masks still fill independently. */
+.karaoke-word-motion {
+  transform: translateY(0em);
+  transform-origin: center;
+  will-change: transform;
+}
+
+.karaoke-text-word-float .karaoke-char:not(.karaoke-char-long-tone) {
+  transform: none;
+  will-change: auto;
+  backface-visibility: visible;
+}
+
+.karaoke-text-exiting .karaoke-word-motion {
+  transition: transform 250ms ease-in-out, --kg 250ms ease-in-out;
+}
+
+/* One mask per timed word also clips the independently emphasized long-tone glyphs. */
+.karaoke-text-word-float .karaoke-word-motion {
+  padding: 0.3em;
+  margin: -0.3em;
+  mask-image: linear-gradient(to right,
+    black calc(0.3em + (100% - 0.6em) * var(--kf, -100) / 100 - 0.16em),
+    rgba(0, 0, 0, var(--kw-tail, 1)) calc(0.3em + (100% - 0.6em) * var(--kf, -100) / 100 + 0.16em));
+}
+
+.karaoke-text-word-float .karaoke-char::before {
+  -webkit-mask-image: none;
+  mask-image: none;
+}
+
+/* Animate the shared brightness inputs, not the colors after mask compensation.
+   This keeps the dim tail stable throughout activation and interrupted fades. */
+@property --kw-base {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0.3;
+}
+
+@property --kw-fill {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
+.karaoke-word-brightness {
+  transition: --kw-base 450ms ease-out, --kw-fill 450ms ease-out;
+  --kw-tail: calc(
+    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill) * var(--kfd, 0)) /
+    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill))
+  );
+}
+
+.karaoke-text-word-float .karaoke-char,
+.karaoke-text-word-float .karaoke-char::before {
+  transition: none;
+}
+
+.karaoke-text-word-float.karaoke-text-exiting .karaoke-char {
+  transition: transform 250ms ease-in-out, --kg 250ms ease-in-out;
+}

@@ -37,6 +37,7 @@ export function createLineFill(
     charRuntimes: Array<LineFillCharRuntime | undefined>,
     words: LyricsWord[],
     lineEndMs: number | null,
+    wordFill = false,
 ) {
     let lineWidth = 0;
     const plans: Array<WordFillPlan | null> = wordGroups.map((group, wordIndex) => {
@@ -116,8 +117,9 @@ export function createLineFill(
         if (!plan) return;
         if (!plan.bridgeFromPrevious) chainIndex++;
         plan.chainIndex = chainIndex;
-        const segmentDurationMs = plan.durationMs / plan.voiced.length;
-        plan.voiced.forEach(({ flatIndex }, index) => {
+        const segments = wordFill ? [plan.voiced[0]] : plan.voiced;
+        const segmentDurationMs = plan.durationMs / segments.length;
+        segments.forEach(({ flatIndex }, index) => {
             const runtime = charRuntimes[flatIndex];
             if (!runtime) return;
             const startPx = index === 0
@@ -125,8 +127,8 @@ export function createLineFill(
                     ? previousPlan.endPx + (previousPlan.bridgeToNext ? 0 : previousPlan.featherPx)
                     : plan.startPx - plan.featherPx
                 : runtime.fillLeftPx;
-            const endPx = runtime.fillLeftPx + runtime.fillWidthPx +
-                (index === plan.voiced.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
+            const endPx = (wordFill ? plan.endPx : runtime.fillLeftPx + runtime.fillWidthPx) +
+                (index === segments.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
             timeline.push({
                 startMs: plan.startMs + index * segmentDurationMs,
                 endMs: plan.startMs + (index + 1) * segmentDurationMs,
@@ -152,6 +154,19 @@ export function createLineFill(
                     (timeMs - segment.startMs) / (segment.endMs - segment.startMs)));
                 currentHeadPx = segment.startPx + (segment.endPx - segment.startPx) * progress;
             }
+        },
+        getWordFillStop(wordIndex: number): number | null {
+            const group = wordGroups[wordIndex];
+            if (!group?.length) return null;
+            const first = charRuntimes[group[0].flatIndex];
+            const last = charRuntimes[group[group.length - 1].flatIndex];
+            if (!first || !last) return null;
+            const width = last.fillLeftPx + last.fillWidthPx - first.fillLeftPx;
+            return this.getFillStop(wordIndex, {
+                ...first,
+                fillPaddingPx: 0,
+                fillMaskWidthPx: Math.max(1, width),
+            });
         },
         getFillStop(wordIndex: number, runtime: LineFillCharRuntime): number | null {
             const plan = plans[wordIndex];
