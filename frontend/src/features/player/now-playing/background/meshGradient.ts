@@ -94,6 +94,13 @@ const MESH_MODES: Record<MeshModeName, MeshMode> = {
 
 const CANDIDATE_COUNT = 8;
 const MIN_CONTROL_POINT_GAP = 0.25;
+const MORPH_PERIOD_MS = 10_000;
+
+export function meshMorphMix(elapsedMilliseconds: number) {
+    const cycle = Math.max(0, elapsedMilliseconds) % MORPH_PERIOD_MS / MORPH_PERIOD_MS;
+    const phase = 1 - Math.abs(cycle * 2 - 1);
+    return phase * phase * (3 - 2 * phase);
+}
 
 function createRandom(seed: number): RandomSource {
     let state = seed >>> 0;
@@ -269,6 +276,8 @@ function applyControlPointTangents(
 ) {
     const uPower = 2 / (width - 1);
     const vPower = 2 / (height - 1);
+    const fieldX = randomRange(random, -100, 100);
+    const fieldY = randomRange(random, -100, 100);
 
     for (let row = 0; row < height; row += 1) {
         for (let column = 0; column < width; column += 1) {
@@ -289,50 +298,66 @@ function applyControlPointTangents(
             const vX = (bottom.x - top.x) / vDivisor;
             const vY = (bottom.y - top.y) / vDivisor;
             const localActivity = clamp(activity[index], 0, 1);
+            const fieldU = column / (width - 1) * 2 + fieldX;
+            const fieldV = row / (height - 1) * 2 + fieldY;
+            const variation = smoothNoise(fieldU, fieldV);
+            const quietThreshold = mode.quietChance * (1 - localActivity * 0.65);
+            const deformation = smoothstep(quietThreshold - 0.1, quietThreshold + 0.1, variation);
+            const strongThreshold = 1 - mode.strongChance * (0.45 + localActivity * 0.85);
+            const strong = smoothstep(strongThreshold - 0.1, strongThreshold + 0.1, variation);
+            const rotation = 22 + (mode.strongRotation - 22) * strong;
+            const uVariation = smoothNoise(fieldU + 13.7, fieldV - 7.1) * 2 - 1;
+            const vVariation = smoothNoise(fieldU - 9.3, fieldV + 19.5) * 2 - 1;
 
             point.uRotation = Math.atan2(uY, uX) * 180 / Math.PI;
             point.vRotation = normalizeDegrees(Math.atan2(vY, vX) * 180 / Math.PI - 90);
             point.uScale = clamp(Math.hypot(uX, uY) / uPower, 0.35, 2.2);
             point.vScale = clamp(Math.hypot(vX, vY) / vPower, 0.35, 2.2);
 
-            if (random() < mode.quietChance * (1 - localActivity * 0.65)) {
-                point.uRotation = 0;
-                point.vRotation = 0;
-                point.uScale = 1;
-                point.vScale = 1;
-            } else if (random() < mode.strongChance * (0.45 + localActivity * 0.85)) {
-                point.uRotation = normalizeDegrees(
-                    point.uRotation + randomRange(random, -mode.strongRotation, mode.strongRotation),
-                );
-                point.vRotation = normalizeDegrees(
-                    point.vRotation + randomRange(random, -mode.strongRotation, mode.strongRotation),
-                );
-                const scaleMinimum = mode.name === 'expressive' ? 0.38 : 0.5;
-                const scaleMaximum = mode.name === 'expressive' ? 2 : 1.7;
-                point.uScale = clamp(
-                    point.uScale * randomRange(random, scaleMinimum, scaleMaximum),
-                    0.3,
-                    2.2,
-                );
-                point.vScale = clamp(
-                    point.vScale * randomRange(random, scaleMinimum, scaleMaximum),
-                    0.3,
-                    2.2,
-                );
-            } else {
-                point.uRotation = normalizeDegrees(
-                    point.uRotation + randomRange(random, -22, 22),
-                );
-                point.vRotation = normalizeDegrees(
-                    point.vRotation + randomRange(random, -22, 22),
-                );
-                point.uScale = clamp(point.uScale * randomRange(random, 0.85, 1.18), 0.4, 1.8);
-                point.vScale = clamp(point.vScale * randomRange(random, 0.85, 1.18), 0.4, 1.8);
-            }
+            // 连续场决定整片区域的安静/拉伸程度，避免逐点抽签产生互相冲突的切线。
+            point.uRotation = normalizeDegrees((point.uRotation + uVariation * rotation) * deformation);
+            point.vRotation = normalizeDegrees((point.vRotation + vVariation * rotation) * deformation);
+            const scaleVariation = 0.18 + strong * 0.65;
+            point.uScale = clamp(1 + (
+                point.uScale * (1 + uVariation * scaleVariation) - 1
+            ) * deformation, 0.3, 2.2);
+            point.vScale = clamp(1 + (
+                point.vScale * (1 + vVariation * scaleVariation) - 1
+            ) * deformation, 0.3, 2.2);
 
             // 边界曲线的切向方向必须贴着画布边缘，否则 Hermite 曲线会向内弯并露出底色。
             if (row === 0 || row === height - 1) point.uRotation = 0;
             if (column === 0 || column === width - 1) point.vRotation = 0;
+        }
+    }
+}
+
+function smoothControlPointTangents(points: ControlPoint[], width: number, height: number) {
+    // 只在换封面时平滑；保留固定边界，且角度通过最短角差插值。
+    for (const factor of [0.3, 0.2]) {
+        const previous = points.map((point) => ({ ...point }));
+        for (let row = 1; row < height - 1; row += 1) {
+            for (let column = 1; column < width - 1; column += 1) {
+                const index = row * width + column;
+                const point = points[index];
+                const center = previous[index];
+                for (const axis of ['u', 'v'] as const) {
+                    const rotation = axis === 'u' ? 'uRotation' : 'vRotation';
+                    const scale = axis === 'u' ? 'uScale' : 'vScale';
+                    let angleDelta = 0;
+                    let scaleDelta = 0;
+                    for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+                        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+                            const neighbour = previous[(row + offsetY) * width + column + offsetX];
+                            const weight = (offsetX === 0 ? 2 : 1) * (offsetY === 0 ? 2 : 1);
+                            angleDelta += normalizeDegrees(neighbour[rotation] - center[rotation]) * weight;
+                            scaleDelta += (neighbour[scale] - center[scale]) * weight;
+                        }
+                    }
+                    point[rotation] = normalizeDegrees(center[rotation] + angleDelta / 16 * factor);
+                    point[scale] = center[scale] + scaleDelta / 16 * factor;
+                }
+            }
         }
     }
 }
@@ -412,6 +437,7 @@ function generateControlPoints(
     smoothControlPointPositions(points, width, height, smoothingFactor);
     enforceControlPointOrder(points, width, height);
     applyControlPointTangents(points, activity, width, height, mode, random);
+    smoothControlPointTangents(points, width, height);
     return points;
 }
 
@@ -609,7 +635,21 @@ export function createMesh(
     if (columns * rows > 0x10000) {
         throw new Error('随机网格顶点数量超过 Uint16 索引上限');
     }
-    const vertices = new Float32Array(columns * rows * 4);
+    // Move two local regions in different directions, leaving a quiet surround.
+    // Compact, low-gradient fields preserve the original topology and coverage.
+    const angle = randomRange(random, -Math.PI, Math.PI);
+    const side = random() < 0.5 ? -1 : 1;
+    const morphRegions = [
+        { x: side * 0.25, y: randomRange(random, -0.2, 0.2), radius: 0.72, angle, strength: 0.14 },
+        { x: -side * 0.25, y: randomRange(random, -0.25, 0.25), radius: 0.65,
+            angle: angle + randomRange(random, 1.8, 2.6), strength: 0.08 },
+    ].map((region) => ({
+        ...region,
+        dx: Math.cos(region.angle) * region.strength,
+        dy: Math.sin(region.angle) * region.strength,
+    }));
+    // Both endpoints share one static buffer and identical UVs/topology.
+    const vertices = new Float32Array(columns * rows * 6);
     const indices = new Uint16Array((columns - 1) * (rows - 1) * 6);
     const preparedPoints = prepareControlPoints(
         controlPoints,
@@ -634,9 +674,20 @@ export function createMesh(
             );
             vertices[vertexOffset] = x;
             vertices[vertexOffset + 1] = y;
-            vertices[vertexOffset + 2] = column / (columns - 1);
-            vertices[vertexOffset + 3] = row / (rows - 1);
-            vertexOffset += 4;
+            let toX = x;
+            let toY = y;
+            for (const region of morphRegions) {
+                const distanceSquared = ((x - region.x) ** 2 + (y - region.y) ** 2) / region.radius ** 2;
+                const weight = Math.max(0, 1 - distanceSquared) ** 3;
+                toX += region.dx * weight;
+                toY += region.dy * weight;
+            }
+            vertices[vertexOffset + 2] = toX;
+            vertices[vertexOffset + 3] = toY;
+            vertices[vertexOffset + 4] = column / (columns - 1);
+            // 封面上传时不翻转；画布顶端对应纹理 v = 0。
+            vertices[vertexOffset + 5] = 1 - row / (rows - 1);
+            vertexOffset += 6;
         }
     }
 

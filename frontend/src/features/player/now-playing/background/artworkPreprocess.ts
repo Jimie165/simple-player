@@ -1,6 +1,9 @@
 const MAX_SATURATION_BOOST = 3;
 const MIN_SATURATION_BOOST = 1.4;
 const MAX_PIXEL_SATURATION = 0.78;
+const SATURATION_KNEE = 0.55;
+const HIGHLIGHT_KNEE = 180;
+const HIGHLIGHT_LIMIT = 224;
 
 const clamp = (value: number, minimum: number, maximum: number) =>
     Math.min(maximum, Math.max(minimum, value));
@@ -29,47 +32,16 @@ function getAdaptiveSaturation(pixels: Uint8ClampedArray) {
         - (MAX_SATURATION_BOOST - MIN_SATURATION_BOOST) * eased;
 }
 
-function blurImageData(imageData: ImageData, radius = 2, quality = 4) {
-    const { width, height, data } = imageData;
-    const temporary = new Uint8ClampedArray(data.length);
-    for (let pass = 0; pass < quality; pass += 1) {
-        for (let y = 0; y < height; y += 1) {
-            for (let x = 0; x < width; x += 1) {
-                const output = (y * width + x) * 4;
-                for (let channel = 0; channel < 4; channel += 1) {
-                    let total = 0;
-                    for (let offset = -radius; offset <= radius; offset += 1) {
-                        const sampleX = Math.min(width - 1, Math.max(0, x + offset));
-                        total += data[(y * width + sampleX) * 4 + channel];
-                    }
-                    temporary[output + channel] = total / (radius * 2 + 1);
-                }
-            }
-        }
-        for (let y = 0; y < height; y += 1) {
-            for (let x = 0; x < width; x += 1) {
-                const output = (y * width + x) * 4;
-                for (let channel = 0; channel < 4; channel += 1) {
-                    let total = 0;
-                    for (let offset = -radius; offset <= radius; offset += 1) {
-                        const sampleY = Math.min(height - 1, Math.max(0, y + offset));
-                        total += temporary[(sampleY * width + x) * 4 + channel];
-                    }
-                    data[output + channel] = total / (radius * 2 + 1);
-                }
-            }
-        }
-    }
-}
+export const ARTWORK_TEXTURE_SIZE = 128;
 
 export function preprocessArtwork(source: CanvasImageSource) {
     const canvas = document.createElement('canvas');
-    canvas.width = 32;
-    canvas.height = 32;
+    canvas.width = ARTWORK_TEXTURE_SIZE;
+    canvas.height = ARTWORK_TEXTURE_SIZE;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) throw new Error('无法创建封面预处理画布');
-    context.drawImage(source, 0, 0, 32, 32);
-    const imageData = context.getImageData(0, 0, 32, 32);
+    context.drawImage(source, 0, 0, canvas.width, canvas.height);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
     const pixels = imageData.data;
     const saturation = getAdaptiveSaturation(pixels);
     for (let index = 0; index < pixels.length; index += 4) {
@@ -80,24 +52,48 @@ export function preprocessArtwork(source: CanvasImageSource) {
         red = gray * (1 - saturation) + red * saturation;
         green = gray * (1 - saturation) + green * saturation;
         blue = gray * (1 - saturation) + blue * saturation;
-        red = clamp((red - 128) * 1.7 + 128, 0, 255);
-        green = clamp((green - 128) * 1.7 + 128, 0, 255);
-        blue = clamp((blue - 128) * 1.7 + 128, 0, 255);
+        // 对比度和亮度先在浮点空间完成，避免提前截断亮色层次。
+        red = ((red - 128) * 1.7 + 128) * 0.75;
+        green = ((green - 128) * 1.7 + 128) * 0.75;
+        blue = ((blue - 128) * 1.7 + 128) * 0.75;
 
+        const luminance = red * 0.3 + green * 0.59 + blue * 0.11;
         const maximum = Math.max(red, green, blue);
         const minimum = Math.min(red, green, blue);
         const pixelSaturation = maximum > 0 ? (maximum - minimum) / maximum : 0;
-        if (pixelSaturation > MAX_PIXEL_SATURATION) {
-            const chromaScale = MAX_PIXEL_SATURATION / pixelSaturation;
-            red = maximum - (maximum - red) * chromaScale;
-            green = maximum - (maximum - green) * chromaScale;
-            blue = maximum - (maximum - blue) * chromaScale;
+        if (pixelSaturation > SATURATION_KNEE) {
+            const highlight = clamp((luminance / 255 - 0.45) / 0.25, 0, 1);
+            const highlightWeight = highlight * highlight * (3 - 2 * highlight);
+            const saturationLimit = MAX_PIXEL_SATURATION - 0.12 * highlightWeight;
+            const shoulder = saturationLimit - SATURATION_KNEE;
+            const protectedSaturation = SATURATION_KNEE + shoulder * (
+                1 - Math.exp(-(pixelSaturation - SATURATION_KNEE) / shoulder)
+            );
+            // 围绕亮度缩小色差，不再通过抬高弱通道把鲜艳颜色洗白。
+            const chromaScale = protectedSaturation * luminance / (
+                maximum - minimum - protectedSaturation * (maximum - luminance)
+            );
+            red = luminance + (red - luminance) * chromaScale;
+            green = luminance + (green - luminance) * chromaScale;
+            blue = luminance + (blue - luminance) * chromaScale;
         }
 
-        pixels[index] = red * 0.75;
-        pixels[index + 1] = green * 0.75;
-        pixels[index + 2] = blue * 0.75;
+        const peak = Math.max(red, green, blue);
+        if (peak > HIGHLIGHT_KNEE) {
+            const shoulder = HIGHLIGHT_LIMIT - HIGHLIGHT_KNEE;
+            const protectedPeak = HIGHLIGHT_KNEE + shoulder * (
+                1 - Math.exp(-(peak - HIGHLIGHT_KNEE) / shoulder)
+            );
+            const exposure = protectedPeak / peak;
+            red *= exposure;
+            green *= exposure;
+            blue *= exposure;
+        }
+
+        pixels[index] = red;
+        pixels[index + 1] = green;
+        pixels[index + 2] = blue;
     }
-    blurImageData(imageData);
+    // Keep material structure until the moving layers have been composited.
     return imageData;
 }

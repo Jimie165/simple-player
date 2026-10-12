@@ -27,6 +27,8 @@ walkdir = "2.5.0"
 cpal = "0.17.3"
 symphonia = { version = "0.5.5", features = ["all"] }
 rodio = "0.22.2"
+rustfft = "6.4"
+rtrb = "0.3.4"
 
 [dependencies.windows]
 version = "0.61"
