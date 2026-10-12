@@ -49,3 +49,27 @@ export function groupKaraokeLayout(flatChars: FlatCharItem[]): IndexedCharItem[]
     flushCurrentGroup();
     return groups;
 }
+
+/** Keep timed fragments of a lexical word in one unbreakable layout container. */
+export function groupKaraokeWordLayout(
+    wordGroups: IndexedCharItem[][],
+    layoutGroups: IndexedCharItem[][],
+): IndexedCharItem[][][] {
+    const layoutIndices = new Map<number, number>();
+    layoutGroups.forEach((group, index) => {
+        group.forEach(({ flatIndex }) => layoutIndices.set(flatIndex, index));
+    });
+    const groups: IndexedCharItem[][][] = [];
+    let previousLayoutIndex: number | undefined;
+    wordGroups.forEach(group => {
+        if (!group?.length) return;
+        const firstLayoutIndex = layoutIndices.get(group[0].flatIndex);
+        if (groups.length > 0 && firstLayoutIndex !== undefined && firstLayoutIndex === previousLayoutIndex) {
+            groups[groups.length - 1].push(group);
+        } else {
+            groups.push([group]);
+        }
+        previousLayoutIndex = layoutIndices.get(group[group.length - 1].flatIndex);
+    });
+    return groups;
+}

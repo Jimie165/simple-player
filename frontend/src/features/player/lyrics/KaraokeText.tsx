@@ -2,6 +2,7 @@ import { memo } from 'react';
 import type { RefObject } from 'react';
 import type { LyricsWord } from '@/types';
 import { useThemeStore } from '@/store/useThemeStore';
+import type { IndexedCharItem } from '@/features/player/lyrics/karaokeLayout';
 import { cjkLayoutCharPattern } from '@/features/player/lyrics/karaokeLayout';
 import { useKaraokeAnimation } from '@/features/player/lyrics/useKaraokeAnimation';
 
@@ -49,11 +50,65 @@ function KaraokeTextBase({
     const dimMaskAlpha = lyricLineBlendEnabled
         ? (glowDisabled ? 0.16 : 0.3) / fillLayerAlpha
         : 0;
-    const { contentRef, wordRefs, charRefCallbacks, layoutGroups, charRuntimes } = useKaraokeAnimation({
+    const { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes } = useKaraokeAnimation({
         words, lineEndMs, nextLineStartMs, enableTightHandoffTailCompression,
         preciseMsRef, isActive, visualFocused, isSeekExiting, isPlaying,
         playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
     });
+
+    const renderGroup = (group: IndexedCharItem[]) => {
+        if (!group || group.length === 0) return null;
+        const isCjkLayoutGroup = cjkLayoutCharPattern.test(group[0].item.char);
+
+        return (
+            <span
+                key={`${lyricFloatMode}-${group[0].flatIndex}`}
+                ref={wordFloat ? (element) => { wordRefs.current[group[0].flatIndex] = element; } : undefined}
+                className={wordFloat ? 'karaoke-word-motion' : undefined}
+                style={{
+                    display: 'inline-block',
+                    whiteSpace: 'nowrap',
+                    verticalAlign: 'bottom',
+                    // Isolate Latin word groups, but leave CJK runs
+                    // in the normal inline formatting context so
+                    // glyph shaping and line metrics stay stable.
+                    contain: isCjkLayoutGroup ? undefined : 'layout style',
+                }}
+            >
+                {group.map(({ item: charItem, flatIndex }) => {
+                    const runtime = charRuntimes[flatIndex];
+                    if (!runtime) return null;
+                    const { isLongTone, longToneAmount, glowToneAmount, fillEdgeWidth } = runtime;
+                    const fillEdgeAlpha = fillAlpha >= 1
+                        ? 0.72 + longToneAmount * 0.2
+                        : fillAlpha;
+                    const fillEdgeMaskAlpha = lyricLineBlendEnabled
+                        ? Math.min(fillEdgeAlpha, fillLayerAlpha) / fillLayerAlpha
+                        : fillAlpha > baseAlpha
+                            ? (fillEdgeAlpha - baseAlpha) / (fillLayerAlpha * (1 - baseAlpha))
+                            : 1;
+
+                    return (
+                        <span
+                            key={flatIndex}
+                            ref={charRefCallbacks[flatIndex]}
+                            className={isLongTone
+                                ? 'karaoke-char karaoke-char-long-tone'
+                                : 'karaoke-char'}
+                            data-c={charItem.char}
+                            style={{
+                                '--kfe': fillEdgeWidth,
+                                '--kfem': fillEdgeMaskAlpha,
+                                '--kgb': `${Math.min(0.3, glowToneAmount * 0.3)}em`,
+                            } as React.CSSProperties}
+                        >
+                            {charItem.char}
+                        </span>
+                    );
+                })}
+            </span>
+        );
+    };
 
     return (
         <span ref={contentRef} className={[
@@ -75,59 +130,14 @@ function KaraokeTextBase({
                     '--kf': lyricLineBlendEnabled ? -100 : undefined,
                 } as React.CSSProperties}
             >
-                {layoutGroups.map((group) => {
-                    if (!group || group.length === 0) return null;
-                    const isCjkLayoutGroup = cjkLayoutCharPattern.test(group[0].item.char);
-
-                    return (
-                        <span
-                            key={`${lyricFloatMode}-${group[0].flatIndex}`}
-                            ref={wordFloat ? (element) => { wordRefs.current[group[0].flatIndex] = element; } : undefined}
-                            className={wordFloat ? 'karaoke-word-motion' : undefined}
-                            style={{
-                                display: 'inline-block',
-                                whiteSpace: 'nowrap',
-                                verticalAlign: 'bottom',
-                                // Isolate Latin word groups, but leave CJK runs
-                                // in the normal inline formatting context so
-                                // glyph shaping and line metrics stay stable.
-                                contain: isCjkLayoutGroup ? undefined : 'layout style',
-                            }}
-                        >
-                            {group.map(({ item: charItem, flatIndex }) => {
-                                const runtime = charRuntimes[flatIndex];
-                                if (!runtime) return null;
-                                const { isLongTone, longToneAmount, glowToneAmount, fillEdgeWidth } = runtime;
-                                const fillEdgeAlpha = fillAlpha >= 1
-                                    ? 0.72 + longToneAmount * 0.2
-                                    : fillAlpha;
-                                const fillEdgeMaskAlpha = lyricLineBlendEnabled
-                                    ? Math.min(fillEdgeAlpha, fillLayerAlpha) / fillLayerAlpha
-                                    : fillAlpha > baseAlpha
-                                        ? (fillEdgeAlpha - baseAlpha) / (fillLayerAlpha * (1 - baseAlpha))
-                                        : 1;
-
-                                return (
-                                    <span
-                                        key={flatIndex}
-                                        ref={charRefCallbacks[flatIndex]}
-                                        className={isLongTone
-                                            ? 'karaoke-char karaoke-char-long-tone'
-                                            : 'karaoke-char'}
-                                        data-c={charItem.char}
-                                        style={{
-                                            '--kfe': fillEdgeWidth,
-                                            '--kfem': fillEdgeMaskAlpha,
-                                            '--kgb': `${Math.min(0.3, glowToneAmount * 0.3)}em`,
-                                        } as React.CSSProperties}
-                                    >
-                                        {charItem.char}
-                                    </span>
-                                );
-                            })}
-                        </span>
-                    );
-                })}
+                {wordFloat ? wordLayoutGroups.map(groups => (
+                    <span
+                        key={groups[0][0].flatIndex}
+                        style={{ display: 'inline-block', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}
+                    >
+                        {groups.map(renderGroup)}
+                    </span>
+                )) : layoutGroups.map(renderGroup)}
             </span>
         </span>
     );

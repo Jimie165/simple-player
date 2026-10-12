@@ -8,7 +8,7 @@ import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrame
 import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
 import { applyCharacterFillStyles, getCharacterFillStop } from '@/features/player/lyrics/karaokeCharacterFill';
 import { createLineFill } from '@/features/player/lyrics/karaokeLineFill';
-import { groupKaraokeWords, groupKaraokeLayout } from '@/features/player/lyrics/karaokeLayout';
+import { groupKaraokeWords, groupKaraokeLayout, groupKaraokeWordLayout } from '@/features/player/lyrics/karaokeLayout';
 import type { IndexedCharItem } from '@/features/player/lyrics/karaokeLayout';
 import {
     karaokeExitDurationMs, wordFloatDelayMs, regularLiftMinDurationMs, syllableLiftEm,
@@ -113,6 +113,11 @@ export function useKaraokeAnimation({
     const wordGroups = useMemo(() => groupKaraokeWords(flatChars), [flatChars]);
     const layoutGroups = useMemo(
         () => wordFloat ? wordGroups : groupKaraokeLayout(flatChars),
+        [flatChars, wordFloat, wordGroups]
+    );
+
+    const wordLayoutGroups = useMemo(
+        () => wordFloat ? groupKaraokeWordLayout(wordGroups, groupKaraokeLayout(flatChars)) : [],
         [flatChars, wordFloat, wordGroups]
     );
 
@@ -543,5 +548,5 @@ export function useKaraokeAnimation({
         runtime.syncNow?.();
     }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
-    return { contentRef, wordRefs, charRefCallbacks, layoutGroups, charRuntimes };
+    return { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes };
 }
