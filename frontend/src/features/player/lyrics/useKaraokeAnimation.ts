@@ -242,24 +242,6 @@ export function useKaraokeAnimation({
         const lineFill = lyricFillMode === 'line' || wordFloat
             ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFloat && lyricFillMode === 'line')
             : null;
-        const motionWindows = wordFloat ? wordMotionWindows.map((window, wordIndex) => {
-            let endMs = window.endMs;
-            wordGroups[wordIndex]?.forEach(({ flatIndex }) => {
-                const charRuntime = charRuntimes[flatIndex];
-                if (!charRuntime?.isLongTone) return;
-                const peakMs = charRuntime.item.groupStartMs + charRuntime.charDelayMs + charRuntime.wordEmphasisAttackMs;
-                charRuntime.wordEmphasisReleaseStartMs = Math.max(peakMs,
-                    lineFill?.getCharFillEndMs(wordIndex, charRuntime) ?? charRuntime.item.nextStart);
-                endMs = Math.max(endMs, charRuntime.wordEmphasisReleaseStartMs + charRuntime.wordEmphasisReleaseMs);
-            });
-            return { ...window, endMs };
-        }) : wordMotionWindows;
-        if (wordFloat) {
-            const orders = getWordMotionOrders(motionWindows);
-            runtime.wordStartOrder = orders.starts;
-            runtime.wordEndOrder = orders.ends;
-            runtime.needsVisualSync = true;
-        }
 
         const runtimeState = runtime;
         let debugWrites: { transform: number; fill: number; glow: number } | null = null;
@@ -353,7 +335,7 @@ export function useKaraokeAnimation({
                 runtimeState.activeWordIndices.clear();
                 runtimeState.startCursor = 0;
                 runtimeState.endCursor = 0;
-                motionWindows.forEach((motionWindow, wordIndex) => {
+                wordMotionWindows.forEach((motionWindow, wordIndex) => {
                     if (!motionWindow) return;
                     const phase = timeMs < motionWindow.startMs
                         ? WORD_PHASE_FUTURE
@@ -366,16 +348,16 @@ export function useKaraokeAnimation({
                 });
                 while (
                     runtimeState.startCursor < runtimeState.wordStartOrder.length &&
-                    timeMs >= motionWindows[runtimeState.wordStartOrder[runtimeState.startCursor]].startMs
+                    timeMs >= wordMotionWindows[runtimeState.wordStartOrder[runtimeState.startCursor]].startMs
                 ) runtimeState.startCursor++;
                 while (
                     runtimeState.endCursor < runtimeState.wordEndOrder.length &&
-                    timeMs >= motionWindows[runtimeState.wordEndOrder[runtimeState.endCursor]].endMs
+                    timeMs >= wordMotionWindows[runtimeState.wordEndOrder[runtimeState.endCursor]].endMs
                 ) runtimeState.endCursor++;
             } else {
                 while (runtimeState.startCursor < runtimeState.wordStartOrder.length) {
                     const wordIndex = runtimeState.wordStartOrder[runtimeState.startCursor];
-                    const motionWindow = motionWindows[wordIndex];
+                    const motionWindow = wordMotionWindows[wordIndex];
                     if (!motionWindow || timeMs < motionWindow.startMs) break;
                     runtimeState.startCursor++;
                     setPhase(
@@ -385,7 +367,7 @@ export function useKaraokeAnimation({
                 }
                 while (runtimeState.endCursor < runtimeState.wordEndOrder.length) {
                     const wordIndex = runtimeState.wordEndOrder[runtimeState.endCursor];
-                    const motionWindow = motionWindows[wordIndex];
+                    const motionWindow = wordMotionWindows[wordIndex];
                     if (!motionWindow || timeMs < motionWindow.endMs) break;
                     runtimeState.endCursor++;
                     setPhase(wordIndex, WORD_PHASE_SETTLED);

@@ -23,7 +23,6 @@ export type KaraokeCharRuntime = {
     emphasisDurationMs: number;
     wordEmphasisAttackMs: number;
     wordEmphasisReleaseMs: number;
-    wordEmphasisReleaseStartMs: number;
     charDelayMs: number;
     motionAmount: number;
 };
@@ -117,11 +116,11 @@ const getWordEmphasisTiming = (durationMs: number, charCount: number, emphasisDu
     const attackMs = Math.min(durationMs, Math.max(800, 2 * durationMs / charCount));
     return { attackMs, releaseMs: attackMs + 1200 };
 };
-const getWordEmphasisPulse = (elapsedMs: number, attackMs: number, releaseMs: number, releaseStartMs: number) => {
+const getWordEmphasisPulse = (elapsedMs: number, attackMs: number, releaseMs: number) => {
     return elapsedMs < attackMs
         ? evaluateCubicBezier(elapsedMs / attackMs, 0.42, 0, 0.58, 1)
         : 1 - evaluateCubicBezier(
-            (elapsedMs - releaseStartMs) / releaseMs,
+            (elapsedMs - attackMs) / releaseMs,
             0.25, 0, 0.3, 1
         );
 };
@@ -166,11 +165,6 @@ export function prepareKaraokeCharRuntime(
         emphasisDurationMs,
         wordEmphasisAttackMs: wordTiming.attackMs,
         wordEmphasisReleaseMs: wordTiming.releaseMs,
-        // Layout replaces the timing fallback with the actual mask crossing.
-        wordEmphasisReleaseStartMs: Math.max(
-            charItem.groupStartMs + charDelayMs + wordTiming.attackMs,
-            charItem.nextStart,
-        ),
         charDelayMs,
         motionAmount: Math.min(
             1.2,
@@ -197,7 +191,6 @@ export function getKaraokeCharStyle(
         emphasisDurationMs,
         wordEmphasisAttackMs,
         wordEmphasisReleaseMs,
-        wordEmphasisReleaseStartMs,
         charDelayMs,
         motionAmount,
     } = runtime;
@@ -223,7 +216,6 @@ export function getKaraokeCharStyle(
         ? emphasisOnly
             ? getWordEmphasisPulse(
                 emphasisElapsedMs, wordEmphasisAttackMs, wordEmphasisReleaseMs,
-                wordEmphasisReleaseStartMs - groupStartMs - charDelayMs,
             )
             : getEmphasisPulse(emphasisElapsedMs / emphasisDurationMs)
         : 0;
@@ -285,7 +277,7 @@ export function getWordMotionWindow(
             item.groupStartMs + charDelayMs;
         const wordTiming = getWordEmphasisTiming(item.groupDurationMs, charCount, emphasisDurationMs);
         const emphasisEndMs = wordFloat
-            ? Math.max(emphasisStartMs + wordTiming.attackMs, item.nextStart) + wordTiming.releaseMs
+            ? emphasisStartMs + wordTiming.attackMs + wordTiming.releaseMs
             : emphasisStartMs + emphasisDurationMs;
         startMs = Math.min(
             startMs,
