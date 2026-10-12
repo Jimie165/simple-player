@@ -469,44 +469,51 @@ function prepareControlPoints(points: ControlPoint[], width: number, height: num
     }));
 }
 
-function evaluatePatch(
+function samplePatch(
     topLeft: PreparedControlPoint,
     topRight: PreparedControlPoint,
     bottomLeft: PreparedControlPoint,
     bottomRight: PreparedControlPoint,
-    u: number,
-    v: number,
+    subdivisions: number,
 ) {
-    const evaluate = (component: 'x' | 'y') => {
+    const size = subdivisions + 1;
+    const samples = new Float64Array(size * size * 2);
+    // 同一列共享横向插值，只计算一次；双精度保持候选评分与原公式一致。
+    for (const component of ['x', 'y'] as const) {
         const uTangent = component === 'x' ? 'uTangentX' : 'uTangentY';
         const vTangent = component === 'x' ? 'vTangentX' : 'vTangentY';
-        const top = hermite(
-            topLeft[component], topRight[component],
-            topLeft[uTangent], topRight[uTangent], u,
-        );
-        const bottom = hermite(
-            bottomLeft[component], bottomRight[component],
-            bottomLeft[uTangent], bottomRight[uTangent], u,
-        );
-        const topTangent = hermite(
-            topLeft[vTangent], topRight[vTangent], 0, 0, u,
-        );
-        const bottomTangent = hermite(
-            bottomLeft[vTangent], bottomRight[vTangent], 0, 0, u,
-        );
-        return hermite(top, bottom, topTangent, bottomTangent, v);
-    };
-    return [evaluate('x'), evaluate('y')] as const;
+        const axis = component === 'x' ? 0 : 1;
+        for (let column = 0; column < size; column += 1) {
+            const u = column / subdivisions;
+            const top = hermite(
+                topLeft[component], topRight[component],
+                topLeft[uTangent], topRight[uTangent], u,
+            );
+            const bottom = hermite(
+                bottomLeft[component], bottomRight[component],
+                bottomLeft[uTangent], bottomRight[uTangent], u,
+            );
+            const topTangent = hermite(topLeft[vTangent], topRight[vTangent], 0, 0, u);
+            const bottomTangent = hermite(bottomLeft[vTangent], bottomRight[vTangent], 0, 0, u);
+            for (let row = 0; row < size; row += 1) {
+                samples[(row * size + column) * 2 + axis] = hermite(
+                    top, bottom, topTangent, bottomTangent, row / subdivisions,
+                );
+            }
+        }
+    }
+    return samples;
 }
 
 function triangleArea(
-    pointA: readonly [number, number],
-    pointB: readonly [number, number],
-    pointC: readonly [number, number],
+    samples: Float64Array,
+    a: number,
+    b: number,
+    c: number,
 ) {
     return (
-        (pointB[0] - pointA[0]) * (pointC[1] - pointA[1])
-        - (pointB[1] - pointA[1]) * (pointC[0] - pointA[0])
+        (samples[b] - samples[a]) * (samples[c + 1] - samples[a + 1])
+        - (samples[b + 1] - samples[a + 1]) * (samples[c] - samples[a])
     ) * 0.5;
 }
 
@@ -532,27 +539,17 @@ function scoreControlPoints(
             const topRight = prepared[patchY * width + patchX + 1];
             const bottomLeft = prepared[(patchY + 1) * width + patchX];
             const bottomRight = prepared[(patchY + 1) * width + patchX + 1];
+            const samples = samplePatch(topLeft, topRight, bottomLeft, bottomRight, coarseSubdivisions);
+            const sampleRowStride = (coarseSubdivisions + 1) * 2;
             for (let row = 0; row < coarseSubdivisions; row += 1) {
-                const v0 = row / coarseSubdivisions;
-                const v1 = (row + 1) / coarseSubdivisions;
                 for (let column = 0; column < coarseSubdivisions; column += 1) {
-                    const u0 = column / coarseSubdivisions;
-                    const u1 = (column + 1) / coarseSubdivisions;
-                    const point00 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u0, v0,
-                    );
-                    const point10 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u1, v0,
-                    );
-                    const point01 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u0, v1,
-                    );
-                    const point11 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u1, v1,
-                    );
+                    const point00 = row * sampleRowStride + column * 2;
+                    const point10 = point00 + 2;
+                    const point01 = point00 + sampleRowStride;
+                    const point11 = point01 + 2;
                     const areas = [
-                        triangleArea(point00, point10, point01),
-                        triangleArea(point10, point11, point01),
+                        triangleArea(samples, point00, point10, point01),
+                        triangleArea(samples, point10, point11, point01),
                     ];
                     for (const area of areas) {
                         triangleCount += 1;
@@ -613,6 +610,55 @@ function selectControlPoints(
     return bestCandidate.points;
 }
 
+function hasValidMorphTopology(vertices: Float32Array, indices: Uint16Array, minimumArea: number) {
+    for (let index = 0; index < indices.length; index += 3) {
+        const a = indices[index] * 6;
+        const b = indices[index + 1] * 6;
+        const c = indices[index + 2] * 6;
+        const abX = vertices[b] - vertices[a];
+        const abY = vertices[b + 1] - vertices[a + 1];
+        const acX = vertices[c] - vertices[a];
+        const acY = vertices[c + 1] - vertices[a + 1];
+        const toAbX = vertices[b + 2] - vertices[a + 2];
+        const toAbY = vertices[b + 3] - vertices[a + 3];
+        const toAcX = vertices[c + 2] - vertices[a + 2];
+        const toAcY = vertices[c + 3] - vertices[a + 3];
+        const fromArea = abX * acY - abY * acX;
+        const toArea = toAbX * toAcY - toAbY * toAcX;
+        if (Math.min(fromArea, toArea) <= minimumArea) return false;
+
+        const deltaAbX = toAbX - abX;
+        const deltaAbY = toAbY - abY;
+        const deltaAcX = toAcX - acX;
+        const deltaAcY = toAcY - acY;
+        // 三角形面积随插值量呈二次变化；两端有效仍可能在途中翻转。
+        const quadratic = deltaAbX * deltaAcY - deltaAbY * deltaAcX;
+        const linear = abX * deltaAcY + deltaAbX * acY - abY * deltaAcX - deltaAbY * acX;
+        if (quadratic > 0) {
+            const minimumMix = -linear / (2 * quadratic);
+            if (minimumMix > 0 && minimumMix < 1
+                && fromArea + linear * minimumMix + quadratic * minimumMix ** 2 <= minimumArea) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function constrainMorphTopology(vertices: Float32Array, indices: Uint16Array, minimumArea: number) {
+    // 只在生成时收敛异常网格；两端同时靠近规则网格，保留整体运动和固定边界。
+    while (!hasValidMorphTopology(vertices, indices, minimumArea)) {
+        for (let offset = 0; offset < vertices.length; offset += 6) {
+            const baseX = vertices[offset + 4] * 2 - 1;
+            const baseY = 1 - vertices[offset + 5] * 2;
+            for (const endpoint of [0, 2]) {
+                vertices[offset + endpoint] = baseX + (vertices[offset + endpoint] - baseX) * 0.5;
+                vertices[offset + endpoint + 1] = baseY + (vertices[offset + endpoint + 1] - baseY) * 0.5;
+            }
+        }
+    }
+}
+
 export function createMesh(
     requestedControlWidth?: number,
     requestedControlHeight?: number,
@@ -630,24 +676,17 @@ export function createMesh(
         mode,
         random,
     );
+    const morphControlPoints = selectControlPoints(
+        controlWidth,
+        controlHeight,
+        mode,
+        random,
+    );
     const columns = (controlWidth - 1) * subdivisions + 1;
     const rows = (controlHeight - 1) * subdivisions + 1;
     if (columns * rows > 0x10000) {
         throw new Error('随机网格顶点数量超过 Uint16 索引上限');
     }
-    // Move two local regions in different directions, leaving a quiet surround.
-    // Compact, low-gradient fields preserve the original topology and coverage.
-    const angle = randomRange(random, -Math.PI, Math.PI);
-    const side = random() < 0.5 ? -1 : 1;
-    const morphRegions = [
-        { x: side * 0.25, y: randomRange(random, -0.2, 0.2), radius: 0.72, angle, strength: 0.14 },
-        { x: -side * 0.25, y: randomRange(random, -0.25, 0.25), radius: 0.65,
-            angle: angle + randomRange(random, 1.8, 2.6), strength: 0.08 },
-    ].map((region) => ({
-        ...region,
-        dx: Math.cos(region.angle) * region.strength,
-        dy: Math.sin(region.angle) * region.strength,
-    }));
     // Both endpoints share one static buffer and identical UVs/topology.
     const vertices = new Float32Array(columns * rows * 6);
     const indices = new Uint16Array((columns - 1) * (rows - 1) * 6);
@@ -656,38 +695,39 @@ export function createMesh(
         controlWidth,
         controlHeight,
     );
-    let vertexOffset = 0;
-    for (let row = 0; row < rows; row += 1) {
-        const gridV = row / subdivisions;
-        const patchY = Math.min(controlHeight - 2, Math.floor(gridV));
-        const v = Math.min(1, gridV - patchY);
-        for (let column = 0; column < columns; column += 1) {
-            const gridU = column / subdivisions;
-            const patchX = Math.min(controlWidth - 2, Math.floor(gridU));
-            const u = Math.min(1, gridU - patchX);
-            const topLeft = preparedPoints[patchY * controlWidth + patchX];
-            const topRight = preparedPoints[patchY * controlWidth + patchX + 1];
-            const bottomLeft = preparedPoints[(patchY + 1) * controlWidth + patchX];
-            const bottomRight = preparedPoints[(patchY + 1) * controlWidth + patchX + 1];
-            const [x, y] = evaluatePatch(
-                topLeft, topRight, bottomLeft, bottomRight, u, v,
+    const preparedMorphPoints = prepareControlPoints(
+        morphControlPoints,
+        controlWidth,
+        controlHeight,
+    );
+    for (let patchY = 0; patchY < controlHeight - 1; patchY += 1) {
+        for (let patchX = 0; patchX < controlWidth - 1; patchX += 1) {
+            const corner = patchY * controlWidth + patchX;
+            const from = samplePatch(
+                preparedPoints[corner], preparedPoints[corner + 1],
+                preparedPoints[corner + controlWidth], preparedPoints[corner + controlWidth + 1],
+                subdivisions,
             );
-            vertices[vertexOffset] = x;
-            vertices[vertexOffset + 1] = y;
-            let toX = x;
-            let toY = y;
-            for (const region of morphRegions) {
-                const distanceSquared = ((x - region.x) ** 2 + (y - region.y) ** 2) / region.radius ** 2;
-                const weight = Math.max(0, 1 - distanceSquared) ** 3;
-                toX += region.dx * weight;
-                toY += region.dy * weight;
+            const to = samplePatch(
+                preparedMorphPoints[corner], preparedMorphPoints[corner + 1],
+                preparedMorphPoints[corner + controlWidth], preparedMorphPoints[corner + controlWidth + 1],
+                subdivisions,
+            );
+            for (let localRow = 0; localRow <= subdivisions; localRow += 1) {
+                const row = patchY * subdivisions + localRow;
+                for (let localColumn = 0; localColumn <= subdivisions; localColumn += 1) {
+                    const column = patchX * subdivisions + localColumn;
+                    const sampleOffset = (localRow * (subdivisions + 1) + localColumn) * 2;
+                    const vertexOffset = (row * columns + column) * 6;
+                    vertices[vertexOffset] = from[sampleOffset];
+                    vertices[vertexOffset + 1] = from[sampleOffset + 1];
+                    vertices[vertexOffset + 2] = to[sampleOffset];
+                    vertices[vertexOffset + 3] = to[sampleOffset + 1];
+                    vertices[vertexOffset + 4] = column / (columns - 1);
+                    // 封面上传时不翻转；画布顶端对应纹理 v = 0。
+                    vertices[vertexOffset + 5] = 1 - row / (rows - 1);
+                }
             }
-            vertices[vertexOffset + 2] = toX;
-            vertices[vertexOffset + 3] = toY;
-            vertices[vertexOffset + 4] = column / (columns - 1);
-            // 封面上传时不翻转；画布顶端对应纹理 v = 0。
-            vertices[vertexOffset + 5] = 1 - row / (rows - 1);
-            vertexOffset += 6;
         }
     }
 
@@ -705,5 +745,6 @@ export function createMesh(
             indexOffset += 6;
         }
     }
+    constrainMorphTopology(vertices, indices, 4 / ((columns - 1) * (rows - 1)) * 0.05);
     return { vertices, indices };
 }
