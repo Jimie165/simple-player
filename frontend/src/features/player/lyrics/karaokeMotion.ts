@@ -21,6 +21,9 @@ export type KaraokeCharRuntime = {
     charCount: number;
     charIndex: number;
     emphasisDurationMs: number;
+    wordEmphasisAttackMs: number;
+    wordEmphasisReleaseMs: number;
+    wordEmphasisReleaseStartMs: number;
     charDelayMs: number;
     motionAmount: number;
 };
@@ -32,7 +35,6 @@ export type WordMotionWindow = {
 
 export const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
-export const wordFloatDelayMs = 100;
 export const regularLiftMinDurationMs = 1000;
 const longToneThresholdMs = 1000;
 export const syllableLiftEm = 0.078;
@@ -108,9 +110,26 @@ const getEmphasisPulse = (value: number) => {
         );
 };
 
+const getWordEmphasisTiming = (durationMs: number, charCount: number, emphasisDurationMs: number) => {
+    if (charCount === 1) {
+        return { attackMs: emphasisDurationMs * 0.5, releaseMs: emphasisDurationMs * 0.7 };
+    }
+    const attackMs = Math.min(durationMs, Math.max(800, 2 * durationMs / charCount));
+    return { attackMs, releaseMs: attackMs + 1200 };
+};
+const getWordEmphasisPulse = (elapsedMs: number, attackMs: number, releaseMs: number, releaseStartMs: number) => {
+    return elapsedMs < attackMs
+        ? evaluateCubicBezier(elapsedMs / attackMs, 0.42, 0, 0.58, 1)
+        : 1 - evaluateCubicBezier(
+            (elapsedMs - releaseStartMs) / releaseMs,
+            0.25, 0, 0.3, 1
+        );
+};
+
 export function prepareKaraokeCharRuntime(
     charItem: FlatCharItem,
     isLastWord: boolean,
+    wordFloat = false,
 ): KaraokeCharRuntime {
     const longToneRaw = clamp01((charItem.groupDurationMs - longToneThresholdMs) / 760);
     const longToneAmount = smoothstep(longToneRaw);
@@ -128,6 +147,8 @@ export function prepareKaraokeCharRuntime(
         charItem.groupDurationMs,
         isLastWord
     );
+    const wordTiming = getWordEmphasisTiming(charItem.groupDurationMs, charCount, emphasisDurationMs);
+    const charDelayMs = ((wordFloat ? charItem.groupDurationMs : emphasisDurationMs) / 2.5 / charCount) * charIndex;
 
     return {
         item: charItem,
@@ -143,7 +164,14 @@ export function prepareKaraokeCharRuntime(
         charCount,
         charIndex,
         emphasisDurationMs,
-        charDelayMs: (emphasisDurationMs / 2.5 / charCount) * charIndex,
+        wordEmphasisAttackMs: wordTiming.attackMs,
+        wordEmphasisReleaseMs: wordTiming.releaseMs,
+        // Layout replaces the timing fallback with the actual mask crossing.
+        wordEmphasisReleaseStartMs: Math.max(
+            charItem.groupStartMs + charDelayMs + wordTiming.attackMs,
+            charItem.nextStart,
+        ),
+        charDelayMs,
         motionAmount: Math.min(
             1.2,
             getDurationEmphasisAmount(emphasisDurationMs, 2000) * 0.6
@@ -167,6 +195,9 @@ export function getKaraokeCharStyle(
         charCount,
         charIndex,
         emphasisDurationMs,
+        wordEmphasisAttackMs,
+        wordEmphasisReleaseMs,
+        wordEmphasisReleaseStartMs,
         charDelayMs,
         motionAmount,
     } = runtime;
@@ -184,25 +215,31 @@ export function getKaraokeCharStyle(
         )
         : 0;
 
-    const emphasisProgress = clamp01(
-        (timeMs - groupStartMs - charDelayMs) /
-        emphasisDurationMs
-    );
+    const emphasisElapsedMs = timeMs - groupStartMs - charDelayMs;
     // Most words are shorter than the emphasis threshold. Avoid evaluating
     // the cubic curve for those characters while preserving the exact zero
     // result of the original multiplication.
     const emphasisCurve = longToneAmount > 0 || (!glowDisabled && glowToneAmount > 0)
-        ? getEmphasisPulse(emphasisProgress)
+        ? emphasisOnly
+            ? getWordEmphasisPulse(
+                emphasisElapsedMs, wordEmphasisAttackMs, wordEmphasisReleaseMs,
+                wordEmphasisReleaseStartMs - groupStartMs - charDelayMs,
+            )
+            : getEmphasisPulse(emphasisElapsedMs / emphasisDurationMs)
         : 0;
-    const emphasisPulse = emphasisCurve * longToneAmount;
+    // Let word-mode glyphs express the full duration-based emphasis,
+    // including shorter sustained words.
+    const emphasisPulse = emphasisCurve * (emphasisOnly ? 1 : longToneAmount);
     const glowPulse = emphasisCurve * glowToneAmount;
     const centerOffset = charCount / 2 - charIndex;
     const translateX =
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
-    // The word container owns all vertical lift so long tones settle at
-    // the same height as ordinary words.
+    // Sustained words distribute the same lift across their glyphs. Moving the
+    // container as well would double the lift and hide the travelling wave.
     const translateY = emphasisOnly
-        ? 0
+        ? charCount > 1
+            ? -syllableLiftEm * Math.sin(clamp01(emphasisElapsedMs / wordEmphasisAttackMs) * Math.PI / 2)
+            : 0
         : regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
 
@@ -217,7 +254,8 @@ export function getKaraokeCharStyle(
 
 export function getWordMotionWindow(
     group: IndexedCharItem[],
-    isLastWord: boolean
+    isLastWord: boolean,
+    wordFloat = false,
 ): WordMotionWindow {
     let startMs = Number.POSITIVE_INFINITY;
     let endMs = Number.NEGATIVE_INFINITY;
@@ -242,11 +280,13 @@ export function getWordMotionWindow(
             item.activeCharIndexInWord
         );
         const charDelayMs =
-            (emphasisDurationMs / 2.5 / charCount) * charIndex;
+            ((wordFloat ? item.groupDurationMs : emphasisDurationMs) / 2.5 / charCount) * charIndex;
         const emphasisStartMs =
             item.groupStartMs + charDelayMs;
-        const emphasisEndMs =
-            emphasisStartMs + emphasisDurationMs;
+        const wordTiming = getWordEmphasisTiming(item.groupDurationMs, charCount, emphasisDurationMs);
+        const emphasisEndMs = wordFloat
+            ? Math.max(emphasisStartMs + wordTiming.attackMs, item.nextStart) + wordTiming.releaseMs
+            : emphasisStartMs + emphasisDurationMs;
         startMs = Math.min(
             startMs,
             progressionStartMs,

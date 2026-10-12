@@ -18,6 +18,7 @@ type WordFillPlan = {
     startPx: number;
     endPx: number;
     featherPx: number;
+    wordMaskFeatherPx: number;
     bridgeFromPrevious: boolean;
     bridgeToNext: boolean;
     chainIndex: number;
@@ -94,6 +95,7 @@ export function createLineFill(
             startPx: firstRuntime.fillLeftPx,
             endPx: lastRuntime.fillLeftPx + lastRuntime.fillWidthPx,
             featherPx: firstRuntime.fillFeatherPx,
+            wordMaskFeatherPx: fontSize * 0.16,
             bridgeFromPrevious: false,
             bridgeToNext: false,
             chainIndex: -1,
@@ -142,6 +144,20 @@ export function createLineFill(
     let currentWordIndex = -1;
     let currentHeadPx = timeline[0]?.startPx ?? 0;
     return {
+        getCharFillEndMs(wordIndex: number, runtime: LineFillCharRuntime): number | null {
+            const plan = plans[wordIndex];
+            if (!plan || runtime.fillWidthPx <= 0) return null;
+            // Match the word mask's feather so even narrow/wide glyphs wait
+            // until its opaque edge has passed their right edge.
+            const targetPx = runtime.fillLeftPx + runtime.fillWidthPx + plan.wordMaskFeatherPx;
+            for (const segment of timeline) {
+                if (segment.endPx < targetPx || segment.endPx <= segment.startPx) continue;
+                const progress = Math.min(1, Math.max(0,
+                    (targetPx - segment.startPx) / (segment.endPx - segment.startPx)));
+                return segment.startMs + (segment.endMs - segment.startMs) * progress;
+            }
+            return plan.startMs + plan.durationMs;
+        },
         update(timeMs: number) {
             currentWordIndex = -1;
             plans.forEach((plan, wordIndex) => {
