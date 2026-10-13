@@ -109,6 +109,7 @@ precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
 uniform vec2 u_direction;
+uniform bool u_protectColor;
 void main() {
     // Normalized Gaussian (sigma 10, radius 24), pairing adjacent texels with linear filtering.
     vec3 color = texture2D(u_texture, v_uv).rgb * 0.04047074;
@@ -136,6 +137,16 @@ void main() {
         + texture2D(u_texture, v_uv - u_direction * 21.446456).rgb) * 0.00806064;
     color += (texture2D(u_texture, v_uv + u_direction * 23.441519).rgb
         + texture2D(u_texture, v_uv - u_direction * 23.441519).rgb) * 0.00514545;
+    // Apply once, after both blur axes: only vivid, high-peak regions need protection.
+    if (u_protectColor) {
+        float peak = max(color.r, max(color.g, color.b));
+        float trough = min(color.r, min(color.g, color.b));
+        float protection = smoothstep(0.65, 0.86, peak)
+            * smoothstep(0.45, 0.78, peak - trough);
+        float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        // Reduce chroma and exposure together, rather than washing vivid colors to pale gray.
+        color = mix(color, vec3(gray), 0.16 * protection) * (1.0 - 0.12 * protection);
+    }
     gl_FragColor = vec4(color, 1.0);
 }
 `;
@@ -251,7 +262,7 @@ export class FluidRenderer {
         );
         this.blurProgram = compileProgram(
             gl, QUAD_VERTEX_SHADER, BLUR_FRAGMENT_SHADER,
-            ['a_position'], ['u_texture', 'u_direction'],
+            ['a_position'], ['u_texture', 'u_direction', 'u_protectColor'],
         );
 
         gl.activeTexture(gl.TEXTURE0);
@@ -468,10 +479,12 @@ export class FluidRenderer {
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.blurTarget.framebuffer);
         this.bindTexture(this.target.texture);
         gl.uniform2f(this.blurProgram.uniforms.u_direction, 1 / MATERIAL_SIZE, 0);
+        gl.uniform1i(this.blurProgram.uniforms.u_protectColor, 0);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
         gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
         this.bindTexture(this.blurTarget.texture);
         gl.uniform2f(this.blurProgram.uniforms.u_direction, 0, 1 / MATERIAL_SIZE);
+        gl.uniform1i(this.blurProgram.uniforms.u_protectColor, 1);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
