@@ -550,7 +550,7 @@ impl AudioState {
 
                 if ended {
                     if !monitor_stop.swap(true, Ordering::SeqCst) {
-                        smtc::set_playing(false);
+                        // The queue controller decides whether to continue or stop playback.
                         let _ = app_handle.emit(
                             "audio:state-changed",
                             snapshot_from_parts(&player_arc, &volume_arc),

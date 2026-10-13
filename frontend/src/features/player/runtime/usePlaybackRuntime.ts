@@ -103,6 +103,8 @@ function usePlaybackRuntime() {
         void register<PlaybackSnapshot>('audio:state-changed', (snapshot) => {
             const state = usePlayerStore.getState();
             if (
+                // End-of-track is resolved by audio:ended, including automatic continuation.
+                snapshot.status === 'ended' ||
                 state.mediaKind === 'video' ||
                 (snapshot.session_id !== 0 &&
                     state.playbackSessionId !== 0 &&
@@ -162,7 +164,7 @@ function usePlaybackRuntime() {
             if (disposed || isSeekingRef.current) return;
             try {
                 const snapshot = await audioService.getPlaybackSnapshot();
-                if (!disposed && !isSeekingRef.current) {
+                if (!disposed && !isSeekingRef.current && snapshot.status !== 'ended') {
                     positionAnchorRef.current = {
                         position: snapshot.position,
                         updatedAt: performance.now(),
