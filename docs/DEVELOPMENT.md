@@ -1,7 +1,5 @@
 # 开发与构建
 
-[返回 README](../README.md)
-
 Simple Player 使用 Tauri、React、TypeScript、Vite、Rust、Zustand、Tailwind CSS、SQLite、rodio、cpal、symphonia 和 FFmpeg。准确依赖版本以 [前端配置](../frontend/package.json) 和 [Rust 配置](../backend/tauri/Cargo.toml) 为准。
 
 ## 目录结构
@@ -60,7 +58,7 @@ backend/tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
 backend/tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe
 ```
 
-开发环境中的部分调用可以回退到系统 `PATH` 中的 `ffmpeg` / `ffprobe`，但 `pnpm build` 使用 Tauri `externalBin` 打包，必须提供按 target triple 命名的 sidecar。更多说明见 [`backend/tauri/binaries/README.md`](../backend/tauri/binaries/README.md)。
+开发环境中的部分调用可以回退到系统 `PATH` 中的 `ffmpeg` / `ffprobe`，但 `pnpm build` 使用 Tauri `externalBin` 打包，必须提供按 target triple 命名的 sidecar。更多说明见 [ffmpeg sidecar 放置说明](../backend/tauri/binaries/README.md)。
 
 ## 快速开始
 
@@ -84,6 +82,7 @@ Vite 开发服务器固定使用 `5173` 端口；端口被占用时 `pnpm dev` �
 | `pnpm lint` | 运行前端 ESLint |
 | `pnpm --filter simple-player-ui build` | 运行前端 TypeScript 检查并构建 |
 | `cargo check --manifest-path backend/Cargo.toml` | 检查 Rust workspace |
+| `pnpm --filter simple-player-ui test` | 运行前端 Vitest 测试 |
 | `cargo test --manifest-path backend/Cargo.toml` | 运行 Rust 测试 |
 | `pnpm bump <类型或 semver>` | 以根 `package.json` 为版本源，同步更新前端包和 Tauri 配置 |
 | `pnpm version:check` | 检查项目内所有版本号是否一致 |
@@ -92,8 +91,6 @@ Vite 开发服务器固定使用 `5173` 端口；端口被占用时 `pnpm dev` �
 `pnpm bump patch` 递增；预发布版本可使用 `premajor`、`preminor`、`prepatch`
 和 `prerelease`，并通过 `--preid=alpha` 指定预发布通道。也可以传入完整版本号，
 例如 `pnpm bump 1.0.0-beta.1`。脚本只修改版本文件，不自动提交、打标签或发布。
-
-> 根目录的 `pnpm test` 当前是占位脚本，不是有效的测试命令。
 
 ## 数据与缓存
 

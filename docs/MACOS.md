@@ -1,7 +1,5 @@
 # macOS 使用说明
 
-[返回 README](../README.md)
-
 Simple Player 的 macOS 版本仍在开发中，目前仅通过 [GitHub Actions](https://github.com/Jimie165/simple-player/actions/workflows/macos.yml) 提供测试构建。正式版本将在完成全面适配后发布。
 
 ## 系统要求

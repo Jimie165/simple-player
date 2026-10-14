@@ -94,6 +94,13 @@ const MESH_MODES: Record<MeshModeName, MeshMode> = {
 
 const CANDIDATE_COUNT = 8;
 const MIN_CONTROL_POINT_GAP = 0.25;
+const MORPH_PERIOD_MS = 10_000;
+
+export function meshMorphMix(elapsedMilliseconds: number) {
+    const cycle = Math.max(0, elapsedMilliseconds) % MORPH_PERIOD_MS / MORPH_PERIOD_MS;
+    const phase = 1 - Math.abs(cycle * 2 - 1);
+    return phase * phase * (3 - 2 * phase);
+}
 
 function createRandom(seed: number): RandomSource {
     let state = seed >>> 0;
@@ -269,6 +276,8 @@ function applyControlPointTangents(
 ) {
     const uPower = 2 / (width - 1);
     const vPower = 2 / (height - 1);
+    const fieldX = randomRange(random, -100, 100);
+    const fieldY = randomRange(random, -100, 100);
 
     for (let row = 0; row < height; row += 1) {
         for (let column = 0; column < width; column += 1) {
@@ -289,50 +298,66 @@ function applyControlPointTangents(
             const vX = (bottom.x - top.x) / vDivisor;
             const vY = (bottom.y - top.y) / vDivisor;
             const localActivity = clamp(activity[index], 0, 1);
+            const fieldU = column / (width - 1) * 2 + fieldX;
+            const fieldV = row / (height - 1) * 2 + fieldY;
+            const variation = smoothNoise(fieldU, fieldV);
+            const quietThreshold = mode.quietChance * (1 - localActivity * 0.65);
+            const deformation = smoothstep(quietThreshold - 0.1, quietThreshold + 0.1, variation);
+            const strongThreshold = 1 - mode.strongChance * (0.45 + localActivity * 0.85);
+            const strong = smoothstep(strongThreshold - 0.1, strongThreshold + 0.1, variation);
+            const rotation = 22 + (mode.strongRotation - 22) * strong;
+            const uVariation = smoothNoise(fieldU + 13.7, fieldV - 7.1) * 2 - 1;
+            const vVariation = smoothNoise(fieldU - 9.3, fieldV + 19.5) * 2 - 1;
 
             point.uRotation = Math.atan2(uY, uX) * 180 / Math.PI;
             point.vRotation = normalizeDegrees(Math.atan2(vY, vX) * 180 / Math.PI - 90);
             point.uScale = clamp(Math.hypot(uX, uY) / uPower, 0.35, 2.2);
             point.vScale = clamp(Math.hypot(vX, vY) / vPower, 0.35, 2.2);
 
-            if (random() < mode.quietChance * (1 - localActivity * 0.65)) {
-                point.uRotation = 0;
-                point.vRotation = 0;
-                point.uScale = 1;
-                point.vScale = 1;
-            } else if (random() < mode.strongChance * (0.45 + localActivity * 0.85)) {
-                point.uRotation = normalizeDegrees(
-                    point.uRotation + randomRange(random, -mode.strongRotation, mode.strongRotation),
-                );
-                point.vRotation = normalizeDegrees(
-                    point.vRotation + randomRange(random, -mode.strongRotation, mode.strongRotation),
-                );
-                const scaleMinimum = mode.name === 'expressive' ? 0.38 : 0.5;
-                const scaleMaximum = mode.name === 'expressive' ? 2 : 1.7;
-                point.uScale = clamp(
-                    point.uScale * randomRange(random, scaleMinimum, scaleMaximum),
-                    0.3,
-                    2.2,
-                );
-                point.vScale = clamp(
-                    point.vScale * randomRange(random, scaleMinimum, scaleMaximum),
-                    0.3,
-                    2.2,
-                );
-            } else {
-                point.uRotation = normalizeDegrees(
-                    point.uRotation + randomRange(random, -22, 22),
-                );
-                point.vRotation = normalizeDegrees(
-                    point.vRotation + randomRange(random, -22, 22),
-                );
-                point.uScale = clamp(point.uScale * randomRange(random, 0.85, 1.18), 0.4, 1.8);
-                point.vScale = clamp(point.vScale * randomRange(random, 0.85, 1.18), 0.4, 1.8);
-            }
+            // 连续场决定整片区域的安静/拉伸程度，避免逐点抽签产生互相冲突的切线。
+            point.uRotation = normalizeDegrees((point.uRotation + uVariation * rotation) * deformation);
+            point.vRotation = normalizeDegrees((point.vRotation + vVariation * rotation) * deformation);
+            const scaleVariation = 0.18 + strong * 0.65;
+            point.uScale = clamp(1 + (
+                point.uScale * (1 + uVariation * scaleVariation) - 1
+            ) * deformation, 0.3, 2.2);
+            point.vScale = clamp(1 + (
+                point.vScale * (1 + vVariation * scaleVariation) - 1
+            ) * deformation, 0.3, 2.2);
 
             // 边界曲线的切向方向必须贴着画布边缘，否则 Hermite 曲线会向内弯并露出底色。
             if (row === 0 || row === height - 1) point.uRotation = 0;
             if (column === 0 || column === width - 1) point.vRotation = 0;
+        }
+    }
+}
+
+function smoothControlPointTangents(points: ControlPoint[], width: number, height: number) {
+    // 只在换封面时平滑；保留固定边界，且角度通过最短角差插值。
+    for (const factor of [0.3, 0.2]) {
+        const previous = points.map((point) => ({ ...point }));
+        for (let row = 1; row < height - 1; row += 1) {
+            for (let column = 1; column < width - 1; column += 1) {
+                const index = row * width + column;
+                const point = points[index];
+                const center = previous[index];
+                for (const axis of ['u', 'v'] as const) {
+                    const rotation = axis === 'u' ? 'uRotation' : 'vRotation';
+                    const scale = axis === 'u' ? 'uScale' : 'vScale';
+                    let angleDelta = 0;
+                    let scaleDelta = 0;
+                    for (let offsetY = -1; offsetY <= 1; offsetY += 1) {
+                        for (let offsetX = -1; offsetX <= 1; offsetX += 1) {
+                            const neighbour = previous[(row + offsetY) * width + column + offsetX];
+                            const weight = (offsetX === 0 ? 2 : 1) * (offsetY === 0 ? 2 : 1);
+                            angleDelta += normalizeDegrees(neighbour[rotation] - center[rotation]) * weight;
+                            scaleDelta += (neighbour[scale] - center[scale]) * weight;
+                        }
+                    }
+                    point[rotation] = normalizeDegrees(center[rotation] + angleDelta / 16 * factor);
+                    point[scale] = center[scale] + scaleDelta / 16 * factor;
+                }
+            }
         }
     }
 }
@@ -412,6 +437,7 @@ function generateControlPoints(
     smoothControlPointPositions(points, width, height, smoothingFactor);
     enforceControlPointOrder(points, width, height);
     applyControlPointTangents(points, activity, width, height, mode, random);
+    smoothControlPointTangents(points, width, height);
     return points;
 }
 
@@ -443,44 +469,51 @@ function prepareControlPoints(points: ControlPoint[], width: number, height: num
     }));
 }
 
-function evaluatePatch(
+function samplePatch(
     topLeft: PreparedControlPoint,
     topRight: PreparedControlPoint,
     bottomLeft: PreparedControlPoint,
     bottomRight: PreparedControlPoint,
-    u: number,
-    v: number,
+    subdivisions: number,
 ) {
-    const evaluate = (component: 'x' | 'y') => {
+    const size = subdivisions + 1;
+    const samples = new Float64Array(size * size * 2);
+    // 同一列共享横向插值，只计算一次；双精度保持候选评分与原公式一致。
+    for (const component of ['x', 'y'] as const) {
         const uTangent = component === 'x' ? 'uTangentX' : 'uTangentY';
         const vTangent = component === 'x' ? 'vTangentX' : 'vTangentY';
-        const top = hermite(
-            topLeft[component], topRight[component],
-            topLeft[uTangent], topRight[uTangent], u,
-        );
-        const bottom = hermite(
-            bottomLeft[component], bottomRight[component],
-            bottomLeft[uTangent], bottomRight[uTangent], u,
-        );
-        const topTangent = hermite(
-            topLeft[vTangent], topRight[vTangent], 0, 0, u,
-        );
-        const bottomTangent = hermite(
-            bottomLeft[vTangent], bottomRight[vTangent], 0, 0, u,
-        );
-        return hermite(top, bottom, topTangent, bottomTangent, v);
-    };
-    return [evaluate('x'), evaluate('y')] as const;
+        const axis = component === 'x' ? 0 : 1;
+        for (let column = 0; column < size; column += 1) {
+            const u = column / subdivisions;
+            const top = hermite(
+                topLeft[component], topRight[component],
+                topLeft[uTangent], topRight[uTangent], u,
+            );
+            const bottom = hermite(
+                bottomLeft[component], bottomRight[component],
+                bottomLeft[uTangent], bottomRight[uTangent], u,
+            );
+            const topTangent = hermite(topLeft[vTangent], topRight[vTangent], 0, 0, u);
+            const bottomTangent = hermite(bottomLeft[vTangent], bottomRight[vTangent], 0, 0, u);
+            for (let row = 0; row < size; row += 1) {
+                samples[(row * size + column) * 2 + axis] = hermite(
+                    top, bottom, topTangent, bottomTangent, row / subdivisions,
+                );
+            }
+        }
+    }
+    return samples;
 }
 
 function triangleArea(
-    pointA: readonly [number, number],
-    pointB: readonly [number, number],
-    pointC: readonly [number, number],
+    samples: Float64Array,
+    a: number,
+    b: number,
+    c: number,
 ) {
     return (
-        (pointB[0] - pointA[0]) * (pointC[1] - pointA[1])
-        - (pointB[1] - pointA[1]) * (pointC[0] - pointA[0])
+        (samples[b] - samples[a]) * (samples[c + 1] - samples[a + 1])
+        - (samples[b + 1] - samples[a + 1]) * (samples[c] - samples[a])
     ) * 0.5;
 }
 
@@ -506,27 +539,17 @@ function scoreControlPoints(
             const topRight = prepared[patchY * width + patchX + 1];
             const bottomLeft = prepared[(patchY + 1) * width + patchX];
             const bottomRight = prepared[(patchY + 1) * width + patchX + 1];
+            const samples = samplePatch(topLeft, topRight, bottomLeft, bottomRight, coarseSubdivisions);
+            const sampleRowStride = (coarseSubdivisions + 1) * 2;
             for (let row = 0; row < coarseSubdivisions; row += 1) {
-                const v0 = row / coarseSubdivisions;
-                const v1 = (row + 1) / coarseSubdivisions;
                 for (let column = 0; column < coarseSubdivisions; column += 1) {
-                    const u0 = column / coarseSubdivisions;
-                    const u1 = (column + 1) / coarseSubdivisions;
-                    const point00 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u0, v0,
-                    );
-                    const point10 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u1, v0,
-                    );
-                    const point01 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u0, v1,
-                    );
-                    const point11 = evaluatePatch(
-                        topLeft, topRight, bottomLeft, bottomRight, u1, v1,
-                    );
+                    const point00 = row * sampleRowStride + column * 2;
+                    const point10 = point00 + 2;
+                    const point01 = point00 + sampleRowStride;
+                    const point11 = point01 + 2;
                     const areas = [
-                        triangleArea(point00, point10, point01),
-                        triangleArea(point10, point11, point01),
+                        triangleArea(samples, point00, point10, point01),
+                        triangleArea(samples, point10, point11, point01),
                     ];
                     for (const area of areas) {
                         triangleCount += 1;
@@ -587,6 +610,55 @@ function selectControlPoints(
     return bestCandidate.points;
 }
 
+function hasValidMorphTopology(vertices: Float32Array, indices: Uint16Array, minimumArea: number) {
+    for (let index = 0; index < indices.length; index += 3) {
+        const a = indices[index] * 6;
+        const b = indices[index + 1] * 6;
+        const c = indices[index + 2] * 6;
+        const abX = vertices[b] - vertices[a];
+        const abY = vertices[b + 1] - vertices[a + 1];
+        const acX = vertices[c] - vertices[a];
+        const acY = vertices[c + 1] - vertices[a + 1];
+        const toAbX = vertices[b + 2] - vertices[a + 2];
+        const toAbY = vertices[b + 3] - vertices[a + 3];
+        const toAcX = vertices[c + 2] - vertices[a + 2];
+        const toAcY = vertices[c + 3] - vertices[a + 3];
+        const fromArea = abX * acY - abY * acX;
+        const toArea = toAbX * toAcY - toAbY * toAcX;
+        if (Math.min(fromArea, toArea) <= minimumArea) return false;
+
+        const deltaAbX = toAbX - abX;
+        const deltaAbY = toAbY - abY;
+        const deltaAcX = toAcX - acX;
+        const deltaAcY = toAcY - acY;
+        // 三角形面积随插值量呈二次变化；两端有效仍可能在途中翻转。
+        const quadratic = deltaAbX * deltaAcY - deltaAbY * deltaAcX;
+        const linear = abX * deltaAcY + deltaAbX * acY - abY * deltaAcX - deltaAbY * acX;
+        if (quadratic > 0) {
+            const minimumMix = -linear / (2 * quadratic);
+            if (minimumMix > 0 && minimumMix < 1
+                && fromArea + linear * minimumMix + quadratic * minimumMix ** 2 <= minimumArea) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+function constrainMorphTopology(vertices: Float32Array, indices: Uint16Array, minimumArea: number) {
+    // 只在生成时收敛异常网格；两端同时靠近规则网格，保留整体运动和固定边界。
+    while (!hasValidMorphTopology(vertices, indices, minimumArea)) {
+        for (let offset = 0; offset < vertices.length; offset += 6) {
+            const baseX = vertices[offset + 4] * 2 - 1;
+            const baseY = 1 - vertices[offset + 5] * 2;
+            for (const endpoint of [0, 2]) {
+                vertices[offset + endpoint] = baseX + (vertices[offset + endpoint] - baseX) * 0.5;
+                vertices[offset + endpoint + 1] = baseY + (vertices[offset + endpoint + 1] - baseY) * 0.5;
+            }
+        }
+    }
+}
+
 export function createMesh(
     requestedControlWidth?: number,
     requestedControlHeight?: number,
@@ -604,39 +676,58 @@ export function createMesh(
         mode,
         random,
     );
+    const morphControlPoints = selectControlPoints(
+        controlWidth,
+        controlHeight,
+        mode,
+        random,
+    );
     const columns = (controlWidth - 1) * subdivisions + 1;
     const rows = (controlHeight - 1) * subdivisions + 1;
     if (columns * rows > 0x10000) {
         throw new Error('随机网格顶点数量超过 Uint16 索引上限');
     }
-    const vertices = new Float32Array(columns * rows * 4);
+    // Both endpoints share one static buffer and identical UVs/topology.
+    const vertices = new Float32Array(columns * rows * 6);
     const indices = new Uint16Array((columns - 1) * (rows - 1) * 6);
     const preparedPoints = prepareControlPoints(
         controlPoints,
         controlWidth,
         controlHeight,
     );
-    let vertexOffset = 0;
-    for (let row = 0; row < rows; row += 1) {
-        const gridV = row / subdivisions;
-        const patchY = Math.min(controlHeight - 2, Math.floor(gridV));
-        const v = Math.min(1, gridV - patchY);
-        for (let column = 0; column < columns; column += 1) {
-            const gridU = column / subdivisions;
-            const patchX = Math.min(controlWidth - 2, Math.floor(gridU));
-            const u = Math.min(1, gridU - patchX);
-            const topLeft = preparedPoints[patchY * controlWidth + patchX];
-            const topRight = preparedPoints[patchY * controlWidth + patchX + 1];
-            const bottomLeft = preparedPoints[(patchY + 1) * controlWidth + patchX];
-            const bottomRight = preparedPoints[(patchY + 1) * controlWidth + patchX + 1];
-            const [x, y] = evaluatePatch(
-                topLeft, topRight, bottomLeft, bottomRight, u, v,
+    const preparedMorphPoints = prepareControlPoints(
+        morphControlPoints,
+        controlWidth,
+        controlHeight,
+    );
+    for (let patchY = 0; patchY < controlHeight - 1; patchY += 1) {
+        for (let patchX = 0; patchX < controlWidth - 1; patchX += 1) {
+            const corner = patchY * controlWidth + patchX;
+            const from = samplePatch(
+                preparedPoints[corner], preparedPoints[corner + 1],
+                preparedPoints[corner + controlWidth], preparedPoints[corner + controlWidth + 1],
+                subdivisions,
             );
-            vertices[vertexOffset] = x;
-            vertices[vertexOffset + 1] = y;
-            vertices[vertexOffset + 2] = column / (columns - 1);
-            vertices[vertexOffset + 3] = row / (rows - 1);
-            vertexOffset += 4;
+            const to = samplePatch(
+                preparedMorphPoints[corner], preparedMorphPoints[corner + 1],
+                preparedMorphPoints[corner + controlWidth], preparedMorphPoints[corner + controlWidth + 1],
+                subdivisions,
+            );
+            for (let localRow = 0; localRow <= subdivisions; localRow += 1) {
+                const row = patchY * subdivisions + localRow;
+                for (let localColumn = 0; localColumn <= subdivisions; localColumn += 1) {
+                    const column = patchX * subdivisions + localColumn;
+                    const sampleOffset = (localRow * (subdivisions + 1) + localColumn) * 2;
+                    const vertexOffset = (row * columns + column) * 6;
+                    vertices[vertexOffset] = from[sampleOffset];
+                    vertices[vertexOffset + 1] = from[sampleOffset + 1];
+                    vertices[vertexOffset + 2] = to[sampleOffset];
+                    vertices[vertexOffset + 3] = to[sampleOffset + 1];
+                    vertices[vertexOffset + 4] = column / (columns - 1);
+                    // 封面上传时不翻转；画布顶端对应纹理 v = 0。
+                    vertices[vertexOffset + 5] = 1 - row / (rows - 1);
+                }
+            }
         }
     }
 
@@ -654,5 +745,6 @@ export function createMesh(
             indexOffset += 6;
         }
     }
+    constrainMorphTopology(vertices, indices, 4 / ((columns - 1) * (rows - 1)) * 0.05);
     return { vertices, indices };
 }

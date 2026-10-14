@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
   <img src="frontend/src/assets/logo.png" alt="Simple Player Logo" width="96" />
   <h1>Simple Player</h1>
   <p>轻量级的本地音乐与视频播放器</p>
@@ -15,9 +15,9 @@
   </p>
 </div>
 
-Simple Player 是一款本地音乐与视频播放器。添加文件夹即可浏览和播放本地媒体，支持按歌曲、艺人和专辑管理音乐库，也可以创建歌单、收藏喜欢的歌曲。播放时还能打开沉浸式界面，搭配动态背景与逐字歌词。
+Simple Player 是一款本地音乐与视频播放器。添加文件夹后即可浏览和播放电脑里的音乐和视频。音乐可以按歌曲、艺人和专辑分类查看，也可以创建歌单、收藏喜欢的歌曲。播放时还能进入沉浸式界面，一边看动态背景和逐字歌词，一边听歌。
 
-> **macOS 版本仍在开发中**：目前仅通过 [GitHub Actions](https://github.com/Jimie165/simple-player/actions/workflows/macos.yml) 下载测试构建，提供 Intel 和 Apple Silicon 的应用 ZIP 与 DMG。macOS 正式版本将在完成全面适配后发布，获取方式见 [macOS 适配与测试](docs/MACOS.md)。
+> Windows 版本已正式发布，macOS 版本仍在适配中，目前提供测试构建。
 
 ## 界面预览
 
@@ -81,61 +81,47 @@ Simple Player 是一款本地音乐与视频播放器。添加文件夹即可浏
 ## 核心特性
 
 - **音乐库**：按歌曲、艺人或专辑浏览本地音乐，支持搜索、收藏、查看最近播放和编辑歌曲信息。
-- **沉浸式播放**：支持普通歌词、滚动歌词和逐字歌词，搭配动态背景；缩窄窗口后，播放页也会随之调整布局。
-- **歌单与播放队列**：为歌单设置名称、说明和封面，拖动调整播放顺序，或把想听的歌曲插入队列。关闭应用后，播放队列也会保留。
-- **视频播放**：通过缩略图浏览本地视频。遇到不能直接播放的视频时，自动转换为兼容格式；转换产生的缓存可以在设置中管理。
-- **外观设置**：选择浅色、深色或跟随系统的主题，也可以自定义主题颜色。
-- **桌面体验**：通过 Windows 系统媒体控件或 macOS 控制中心控制播放，可以在设置中选择音频输出设备。
+- **沉浸式播放**：支持普通歌词、滚动歌词和逐字歌词，背景会动态变化；把窗口拉窄，播放页会自动切换成竖屏布局。
+- **歌单**：把喜欢的歌曲整理成歌单，自定义名称、描述和封面，拖动调整歌曲顺序。
+- **播放队列**：查看接下来要播放的歌曲及其来源，随时拖动排序或移除歌曲。临时想听的歌曲可以加入队列，听完后继续原来的列表，也可以单独清空临时加入的歌曲。重新打开应用时会恢复上次的播放队列。
+- **视频播放**：添加视频文件夹后即可播放本地视频；遇到不兼容的格式时，应用会自动重封装或转码。
+- **外观设置**：主题可以选浅色、深色或跟随系统，也能自定义主题色和变更播放页效果。
+- **系统媒体控制**：Windows 使用系统媒体传输控件（SMTC），macOS 使用控制中心的“正在播放”，支持播放、暂停和切歌。
+- **音频输出**：在设置中选择音频输出设备，方便在多个设备之间切换。
 
 ## 下载与使用
 
-Windows 版本支持 Windows 10 / Windows 11；macOS 开发版本面向 macOS 12 及以上，提供 Intel 和 Apple Silicon 两种架构的测试构建。
+| 平台 | 系统要求 | 下载 |
+| --- | --- | --- |
+| Windows | Windows 10 / Windows 11，需要 WebView2 运行时 | [Releases](https://github.com/Jimie165/simple-player/releases) 中的 `.exe` 或 `.msi` 安装包 |
+| macOS（测试版） | macOS 12+，Intel 或 Apple Silicon；使用系统自带的 WKWebView | [GitHub Actions](https://github.com/Jimie165/simple-player/actions/workflows/macos.yml) 成功完成的手动打包任务中的应用 ZIP 或 DMG |
 
-在 [Releases](https://github.com/Jimie165/simple-player/releases) 页面下载 Windows 安装包（`.exe` 或 `.msi`），下载后运行即可安装。页面中的 `Source code` 是源码，不是安装包。如果还没有发布安装包，可以参考下方的开发说明自行构建。
+Windows 安装包下载后直接运行即可。macOS 请按设备架构选择测试包：应用 ZIP 在 Mac 上解压后运行，DMG 打开后将应用拖入“应用程序”。
 
-Windows 运行 Simple Player 需要 WebView2。如果电脑上还没有安装，请先安装 WebView2 运行时。macOS 使用系统自带的 WKWebView，无需安装 WebView2。
-
-macOS 测试包请从 [GitHub Actions](https://github.com/Jimie165/simple-player/actions/workflows/macos.yml) 中已成功完成的手动打包任务下载，并按设备架构选择对应产物。ZIP 在 macOS 内解压后可直接运行，DMG 打开后将应用拖入“应用程序”即可安装。当前测试包未做 Apple 公证，首次打开可能出现系统安全提示，详细步骤见 [macOS 适配与测试](docs/MACOS.md)。
-
-首次使用：
-
-1. 打开应用，在音乐库中点击“添加文件夹”，选择存放音乐的文件夹，也可以在设置中的“音乐文件夹”里添加。
-2. 扫描完成后，音乐就会出现在音乐库中，选择歌曲即可播放。
-3. 要添加视频，请到设置中的“视频文件夹”里选择存放视频的文件夹。
-4. 你还可以创建歌单，或到设置中更换主题和音频输出设备。
+1. 在音乐库或视频库中点击“添加文件夹”，选择存放媒体的文件夹。
+2. 扫描完成后，选择歌曲或视频开始播放。
+3. 在设置中调整主题、音频输出设备和其他播放选项。
 
 ## 使用说明
 
-### 媒体格式
-
-添加文件夹时，应用会扫描以下扩展名的文件：
+应用会扫描以下扩展名的文件：
 
 | 类型 | 扩展名 |
 | --- | --- |
 | 音频 | `mp3`、`flac`、`wav`、`ogg`、`m4a` |
 | 视频 | `mp4`、`mkv`、`avi`、`mov`、`webm`、`flv`、`m4v`、`3gp`、`ts`、`rmvb`、`wmv`、`asf`、`ogv` |
 
-有些视频虽然能出现在视频库中，但系统 WebView 无法直接播放。遇到这种情况，应用会通过重封装或转码将其转换为兼容的 MP4 文件，第一次播放时可能需要等待一段时间。你可以在设置中更改转码缓存的位置和容量上限。
+不能直接播放的视频会自动重封装或转码为 MP4，首次播放可能需要等待。缓存位置和容量上限可在设置中调整。
 
-### 检查更新
+应用默认在启动时检查正式发布版本，也可以在“设置 → 关于”中手动检查或关闭自动检查。有新版本时，可前往发布页面下载安装；macOS 测试构建仍从 GitHub Actions 获取。
 
-应用默认在启动时检查更新，也可以在设置中的“关于”里手动检查或关闭自动检查。发现新版本后，点击“前往下载”，到发布页面下载并安装新版本。
-
-更新检查针对 Releases 正式发布版本；macOS 开发构建目前仍需从 GitHub Actions 下载。
-
-### 数据与常见问题
-
-音乐库、视频库、歌单和播放队列的数据都保存在电脑上。添加文件夹不会移动或复制原来的音乐和视频文件；应用会另外缓存封面、视频缩略图和转换后的视频。具体存储位置见 [开发文档](docs/DEVELOPMENT.md#数据与缓存)。
-
-如果遇到扫描、播放或视频转换问题，可以先查看 [故障排查](docs/TROUBLESHOOTING.md)。
+媒体库、歌单和播放队列的数据保存在本地，原始音乐和视频文件不会被移动或复制。存储位置见 [Windows 数据与缓存说明](docs/DEVELOPMENT.md#数据与缓存) 和 [macOS 数据与缓存说明](docs/MACOS.md#数据与缓存)，使用问题见 [故障排查](docs/TROUBLESHOOTING.md)。
 
 ## 开发与构建
 
-从源码运行或构建应用，需要安装 Node.js、pnpm 和 Rust stable。当前 CI 使用 Node.js 24、pnpm 11.11.0 和 Rust 1.98.1。
+Windows 开发环境和 sidecar 准备方式见 [开发文档](docs/DEVELOPMENT.md)。macOS 开发请使用 [macos-support 分支](https://github.com/Jimie165/simple-player/tree/macos-support)，准备 Xcode Command Line Tools、开发工具链和对应架构的 FFmpeg / FFprobe sidecar。下载安装及平台功能见 [macOS 使用说明](docs/MACOS.md)。
 
-Windows 需要 MSVC 工具链和 WebView2；macOS 需要 Xcode Command Line Tools。macOS 本地构建与 GitHub Actions 测试包的获取步骤见 [macOS 适配与测试](docs/MACOS.md)。
-
-运行或打包前，请准备好 FFmpeg 和 FFprobe 可执行文件，按 [sidecar 说明](backend/tauri/binaries/README.md) 命名并放入指定目录。打包时，文件名必须包含目标平台的 target triple。
+准备好所用平台的开发环境后运行：
 
 ```shell
 # 安装依赖
@@ -148,24 +134,12 @@ pnpm dev
 pnpm build
 ```
 
-环境配置、项目结构、检查命令和版本更新方法见 [开发文档](docs/DEVELOPMENT.md)。
-
 ## 反馈与贡献
 
-遇到问题或有功能建议，欢迎提交 [Issue](https://github.com/Jimie165/simple-player/issues)。如果想参与开发，也欢迎提交 Pull Request。
-
-反馈问题时，请附上应用版本、操作系统版本和设备架构（如 Intel 或 Apple Silicon），说明进行了哪些操作、出现了什么问题，最好能提供截图或错误信息。如果是文件扫描或播放问题，也请注明文件格式。上传日志和截图前，记得遮盖个人路径等隐私信息。
-
-提交代码前，请阅读 [开发文档](docs/DEVELOPMENT.md)，并根据修改内容运行相应的检查。
-
-## 致谢
-
-Simple Player 的开发离不开 Tauri、React、Vite、Zustand、Tailwind CSS、SQLite、rodio、cpal、symphonia 和 FFmpeg 等开源项目，感谢这些项目的开发者和贡献者。
-
-完整依赖列表见 [前端配置](frontend/package.json) 和 [Rust 配置](backend/tauri/Cargo.toml)。各依赖遵循各自的许可证。
+欢迎提交 [Issue](https://github.com/Jimie165/simple-player/issues) 或 Pull Request。反馈问题时请附上应用版本、操作系统版本、设备架构、复现步骤和错误信息；播放问题请注明文件格式。参与开发前请阅读对应平台的开发说明。
 
 ## 许可证
 
 本项目采用 [GNU General Public License v3.0](LICENSE) 开源。
 
-安装包中包含 FFmpeg 和 FFprobe。分发应用或替换这些文件时，请同时遵守所用 FFmpeg 版本的 LGPL/GPL 许可要求。
+安装包里附带了 FFmpeg 和 FFprobe。如果你要分发本应用或替换这些文件，请遵守所用 FFmpeg 版本的 LGPL/GPL 许可证。

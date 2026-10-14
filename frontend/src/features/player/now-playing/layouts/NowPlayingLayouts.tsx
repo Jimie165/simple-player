@@ -136,7 +136,7 @@ export function NowPlayingNarrowPanelLayout({
                 </div>
             </div>
 
-            <div className="relative flex-1 min-h-0">
+            <div data-narrow-panel-viewport className="relative flex-1 min-h-0">
                 {!closingPanel && (
                     <>
                         <NowPlayingQueuePanel

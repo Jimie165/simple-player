@@ -5,6 +5,7 @@ import { generateThemeVariables, PRESET_COLORS } from '@/utils/themeColors';
 type ThemeMode = 'light' | 'dark' | 'system';
 export type PlayerEffectMode = 'performance' | 'animation';
 export type LyricFillMode = 'line' | 'character';
+export type LyricFloatMode = 'character' | 'word';
 
 interface ThemeState {
     themeMode: ThemeMode;
@@ -13,6 +14,7 @@ interface ThemeState {
     isDark: boolean; // Computed actual state
     playerEffectMode: PlayerEffectMode;
     lyricFillMode: LyricFillMode;
+    lyricFloatMode: LyricFloatMode;
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
@@ -21,6 +23,7 @@ interface ThemeState {
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
     setLyricFillMode: (mode: LyricFillMode) => void;
+    setLyricFloatMode: (mode: LyricFloatMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
@@ -41,6 +44,7 @@ export const useThemeStore = create<ThemeState>()(
             isDark: false,
             playerEffectMode: 'performance',
             lyricFillMode: 'line',
+            lyricFloatMode: 'character',
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
@@ -55,6 +59,7 @@ export const useThemeStore = create<ThemeState>()(
                 set({ playerEffectMode: mode, fullScreenMode: mode });
             },
             setLyricFillMode: (mode) => set({ lyricFillMode: mode }),
+            setLyricFloatMode: (mode) => set({ lyricFloatMode: mode }),
 
             setFullScreenMode: (mode) => {
                 set({ playerEffectMode: mode, fullScreenMode: mode });
@@ -129,6 +134,7 @@ export const useThemeStore = create<ThemeState>()(
                 isCustomColor: state.isCustomColor,
                 playerEffectMode: state.playerEffectMode,
                 lyricFillMode: state.lyricFillMode,
+                lyricFloatMode: state.lyricFloatMode,
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
@@ -149,6 +155,7 @@ export const useThemeStore = create<ThemeState>()(
                     isCustomColor: persistedState?.isCustomColor ?? current.isCustomColor,
                     playerEffectMode,
                     lyricFillMode: persistedState?.lyricFillMode === 'character' ? 'character' : 'line',
+                    lyricFloatMode: persistedState?.lyricFloatMode === 'word' ? 'word' : 'character',
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,

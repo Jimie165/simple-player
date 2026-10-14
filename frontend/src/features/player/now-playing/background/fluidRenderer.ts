@@ -4,22 +4,25 @@ import {
     AudioResponse,
     type LowFrequencyFrame,
 } from '@/features/player/now-playing/background/audioResponse';
-import { preprocessArtwork } from '@/features/player/now-playing/background/artworkPreprocess';
-import { createMesh } from '@/features/player/now-playing/background/meshGradient';
+import { ARTWORK_TEXTURE_SIZE, preprocessArtwork } from '@/features/player/now-playing/background/artworkPreprocess';
+import { createMesh, meshMorphMix } from '@/features/player/now-playing/background/meshGradient';
 
 const RENDER_SCALE = 0.75;
 const FLOW_SPEED = 0.2;
 const ARTWORK_TRANSITION_MS = 500;
+const MATERIAL_SIZE = 128;
 
 const MESH_VERTEX_SHADER = `
 precision highp float;
 attribute vec2 a_position;
+attribute vec2 a_morphPosition;
 attribute vec2 a_uv;
 varying vec2 v_uv;
 uniform float u_aspect;
+uniform float u_meshMix;
 void main() {
     v_uv = a_uv;
-    vec2 position = a_position;
+    vec2 position = mix(a_position, a_morphPosition, u_meshMix);
     if (u_aspect > 1.0) {
         position.y *= u_aspect;
     } else {
@@ -33,8 +36,8 @@ const MESH_FRAGMENT_SHADER = `
 precision highp float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
-uniform vec4 u_uvTransform;
 uniform float u_colorScale;
+uniform float u_alpha;
 
 const float INV_255 = 1.0 / 255.0;
 const float HALF_INV_255 = 0.5 / 255.0;
@@ -44,11 +47,7 @@ float gradientNoise(vec2 coordinate) {
 }
 
 void main() {
-    vec2 finalUV = vec2(
-        u_uvTransform.x * v_uv.x - u_uvTransform.y * v_uv.y + u_uvTransform.z,
-        u_uvTransform.y * v_uv.x + u_uvTransform.x * v_uv.y + u_uvTransform.w
-    );
-    vec3 color = texture2D(u_texture, finalUV).rgb;
+    vec3 color = texture2D(u_texture, v_uv).rgb;
 
     color *= u_colorScale;
 
@@ -61,7 +60,7 @@ void main() {
     float dither = INV_255 * gradientNoise(gl_FragCoord.xy) - HALF_INV_255;
     color += vec3(dither);
 
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(color, u_alpha);
 }
 `;
 
@@ -74,14 +73,81 @@ void main() {
 }
 `;
 
-const PRESENT_FRAGMENT_SHADER = `
+const MATERIAL_FRAGMENT_SHADER = `
+precision highp float;
+varying vec2 v_uv;
+uniform sampler2D u_texture;
+uniform vec4 u_rotation01;
+uniform vec2 u_rotation2;
+uniform float u_pulseScale;
+vec2 inverseRotate(vec2 p, vec2 rotation) {
+    return vec2(rotation.x * p.x + rotation.y * p.y,
+        -rotation.y * p.x + rotation.x * p.y);
+}
+vec3 layer(vec3 under, vec2 p, vec2 offset, float size, vec2 rotation, float pulseScale) {
+    // Scale after subtracting the layer's offset: its anchor must not move with the beat.
+    vec2 uv = inverseRotate((p - offset) / (size * pulseScale), rotation) * 0.5 + 0.5;
+    float coverage = step(0.0, uv.x) * step(uv.x, 1.0)
+        * step(0.0, uv.y) * step(uv.y, 1.0);
+    return mix(under, texture2D(u_texture, clamp(uv, 0.0, 1.0)).rgb, coverage);
+}
+void main() {
+    vec3 color = texture2D(u_texture, v_uv).rgb;
+    vec2 p = v_uv * 2.0 - 1.0;
+    // Let the offset layers carry the beat instead of enlarging the entire material.
+    float mainScale = 1.0 + (u_pulseScale - 1.0) * 0.35;
+    color = layer(color, p, vec2(0.0), 1.4, u_rotation01.xy, mainScale);
+    color = layer(color, p, vec2(-0.25, 0.15), 0.7, u_rotation01.zw, u_pulseScale);
+    color = layer(color, inverseRotate(p, u_rotation01.xy),
+        vec2(0.7), 0.7, u_rotation2, u_pulseScale);
+    gl_FragColor = vec4(color, 1.0);
+}
+`;
+
+const BLUR_FRAGMENT_SHADER = `
 precision mediump float;
 varying vec2 v_uv;
 uniform sampler2D u_texture;
-uniform float u_alpha;
+uniform vec2 u_direction;
+uniform bool u_protectColor;
 void main() {
-    vec4 color = texture2D(u_texture, v_uv);
-    gl_FragColor = vec4(color.rgb, color.a * u_alpha);
+    // Normalized Gaussian (sigma 10, radius 24), pairing adjacent texels with linear filtering.
+    vec3 color = texture2D(u_texture, v_uv).rgb * 0.04047074;
+    color += (texture2D(u_texture, v_uv + u_direction * 1.496250).rgb
+        + texture2D(u_texture, v_uv - u_direction * 1.496250).rgb) * 0.07993826;
+    color += (texture2D(u_texture, v_uv + u_direction * 3.491251).rgb
+        + texture2D(u_texture, v_uv - u_direction * 3.491251).rgb) * 0.07604913;
+    color += (texture2D(u_texture, v_uv + u_direction * 5.486253).rgb
+        + texture2D(u_texture, v_uv - u_direction * 5.486253).rgb) * 0.06951931;
+    color += (texture2D(u_texture, v_uv + u_direction * 7.481259).rgb
+        + texture2D(u_texture, v_uv - u_direction * 7.481259).rgb) * 0.06106442;
+    color += (texture2D(u_texture, v_uv + u_direction * 9.476268).rgb
+        + texture2D(u_texture, v_uv - u_direction * 9.476268).rgb) * 0.05153979;
+    color += (texture2D(u_texture, v_uv + u_direction * 11.471282).rgb
+        + texture2D(u_texture, v_uv - u_direction * 11.471282).rgb) * 0.04179926;
+    color += (texture2D(u_texture, v_uv + u_direction * 13.466301).rgb
+        + texture2D(u_texture, v_uv - u_direction * 13.466301).rgb) * 0.03257362;
+    color += (texture2D(u_texture, v_uv + u_direction * 15.461327).rgb
+        + texture2D(u_texture, v_uv - u_direction * 15.461327).rgb) * 0.02439130;
+    color += (texture2D(u_texture, v_uv + u_direction * 17.456361).rgb
+        + texture2D(u_texture, v_uv - u_direction * 17.456361).rgb) * 0.01754992;
+    color += (texture2D(u_texture, v_uv + u_direction * 19.451404).rgb
+        + texture2D(u_texture, v_uv - u_direction * 19.451404).rgb) * 0.01213352;
+    color += (texture2D(u_texture, v_uv + u_direction * 21.446456).rgb
+        + texture2D(u_texture, v_uv - u_direction * 21.446456).rgb) * 0.00806064;
+    color += (texture2D(u_texture, v_uv + u_direction * 23.441519).rgb
+        + texture2D(u_texture, v_uv - u_direction * 23.441519).rgb) * 0.00514545;
+    // Apply once, after both blur axes: only vivid, high-peak regions need protection.
+    if (u_protectColor) {
+        float peak = max(color.r, max(color.g, color.b));
+        float trough = min(color.r, min(color.g, color.b));
+        float protection = smoothstep(0.65, 0.86, peak)
+            * smoothstep(0.45, 0.78, peak - trough);
+        float gray = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        // Reduce chroma and exposure together, rather than washing vivid colors to pale gray.
+        color = mix(color, vec3(gray), 0.16 * protection) * (1.0 - 0.12 * protection);
+    }
+    gl_FragColor = vec4(color, 1.0);
 }
 `;
 
@@ -152,12 +218,15 @@ export class FluidRenderer {
     private readonly lowFrequencyRef?: RefObject<LowFrequencyFrame>;
     private readonly gl: WebGLRenderingContext;
     private readonly meshProgram: ProgramInfo;
-    private readonly presentProgram: ProgramInfo;
+    private readonly materialProgram: ProgramInfo;
+    private readonly blurProgram: ProgramInfo;
     private readonly quadBuffer: WebGLBuffer;
     private meshStates: MeshState[] = [];
     private target: RenderTarget | null = null;
+    private blurTarget: RenderTarget | null = null;
     private animationFrame = 0;
     private lastFrame = 0;
+    private lastAudioFrame = 0;
     private startTime = performance.now();
     private artworkRequest = 0;
     private hasArtwork = false;
@@ -181,22 +250,28 @@ export class FluidRenderer {
             gl,
             MESH_VERTEX_SHADER,
             MESH_FRAGMENT_SHADER,
-            ['a_position', 'a_uv'],
-            ['u_texture', 'u_uvTransform', 'u_colorScale', 'u_aspect'],
+            ['a_position', 'a_morphPosition', 'a_uv'],
+            ['u_texture', 'u_colorScale', 'u_aspect', 'u_meshMix', 'u_alpha'],
         );
-        this.presentProgram = compileProgram(
+        this.materialProgram = compileProgram(
             gl,
             QUAD_VERTEX_SHADER,
-            PRESENT_FRAGMENT_SHADER,
+            MATERIAL_FRAGMENT_SHADER,
             ['a_position'],
-            ['u_texture', 'u_alpha'],
+            ['u_texture', 'u_rotation01', 'u_rotation2', 'u_pulseScale'],
+        );
+        this.blurProgram = compileProgram(
+            gl, QUAD_VERTEX_SHADER, BLUR_FRAGMENT_SHADER,
+            ['a_position'], ['u_texture', 'u_direction', 'u_protectColor'],
         );
 
         gl.activeTexture(gl.TEXTURE0);
         gl.useProgram(this.meshProgram.program);
         gl.uniform1i(this.meshProgram.uniforms.u_texture, 0);
-        gl.useProgram(this.presentProgram.program);
-        gl.uniform1i(this.presentProgram.uniforms.u_texture, 0);
+        for (const program of [this.materialProgram, this.blurProgram]) {
+            gl.useProgram(program.program);
+            gl.uniform1i(program.uniforms.u_texture, 0);
+        }
 
         const quadBuffer = gl.createBuffer();
         if (!quadBuffer) throw new Error('无法创建网格背景缓冲区');
@@ -213,8 +288,8 @@ export class FluidRenderer {
         const gl = this.gl;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.MIRRORED_REPEAT);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.MIRRORED_REPEAT);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     }
 
     private createMeshState(imageData?: ImageData): MeshState {
@@ -278,7 +353,11 @@ export class FluidRenderer {
         const gl = this.gl;
         const texture = gl.createTexture();
         const framebuffer = gl.createFramebuffer();
-        if (!texture || !framebuffer) throw new Error('无法创建网格背景离屏缓冲区');
+        if (!texture || !framebuffer) {
+            if (texture) gl.deleteTexture(texture);
+            if (framebuffer) gl.deleteFramebuffer(framebuffer);
+            throw new Error('无法创建网格背景离屏缓冲区');
+        }
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, width, height, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -309,28 +388,26 @@ export class FluidRenderer {
         const width = Math.max(2, Math.ceil(this.canvas.clientWidth * pixelScale));
         const height = Math.max(2, Math.ceil(this.canvas.clientHeight * pixelScale));
         if (this.canvas.width === width && this.canvas.height === height && this.target) return;
-        let nextTarget: RenderTarget;
-        try {
-            nextTarget = this.createTarget(width, height);
-        } catch (error) {
-            console.error('网格背景尺寸更新失败', error);
-            return;
+        if (!this.target) {
+            const target = this.createTarget(MATERIAL_SIZE, MATERIAL_SIZE);
+            try {
+                this.blurTarget = this.createTarget(MATERIAL_SIZE, MATERIAL_SIZE);
+                this.target = target;
+            } catch (error) {
+                this.gl.deleteFramebuffer(target.framebuffer);
+                this.gl.deleteTexture(target.texture);
+                throw error;
+            }
         }
-        const previous = this.target;
-        this.target = nextTarget;
         this.canvas.width = width;
         this.canvas.height = height;
         this.gl.useProgram(this.meshProgram.program);
         this.gl.uniform1f(this.meshProgram.uniforms.u_aspect, width / height);
         // 修改 canvas backing store 会立即清空默认 framebuffer。必须在同一任务中
-        // 完成新 FBO 的首帧呈现，避免全屏切换时把清空后的黑帧交给合成器。
+        // 完成新尺寸的首帧呈现，避免全屏切换时把清空后的黑帧交给合成器。
         const now = performance.now();
         this.renderFrame(now);
         this.canvas.style.visibility = 'visible';
-        if (previous) {
-            this.gl.deleteFramebuffer(previous.framebuffer);
-            this.gl.deleteTexture(previous.texture);
-        }
         this.requestFrame();
     }
 
@@ -339,28 +416,13 @@ export class FluidRenderer {
     }
 
     private prepareMeshFrame(time: number) {
-        const motion = this.audioResponse.motion;
-        const angle = (
-            ((time - this.startTime) / 10000) * FLOW_SPEED
-            + motion * 0.1
-        ) * 2;
-        const scale = Math.max(0.001, 1 - motion * 0.2);
-        const cosine = Math.cos(angle) * scale;
-        const sine = Math.sin(angle) * scale;
-
         const gl = this.gl;
         const program = this.meshProgram;
         gl.useProgram(program.program);
-        gl.uniform4f(
-            program.uniforms.u_uvTransform,
-            cosine,
-            sine,
-            0.5 - 0.2 * cosine + 0.2 * sine,
-            0.5 - 0.2 * sine - 0.2 * cosine,
-        );
+        gl.uniform1f(program.uniforms.u_meshMix, meshMorphMix(time - this.startTime));
         gl.uniform1f(
             program.uniforms.u_colorScale,
-            1 - this.audioResponse.luminance * 0.04,
+            1,
         );
     }
 
@@ -368,35 +430,61 @@ export class FluidRenderer {
         if (!this.target) return;
         const gl = this.gl;
         const program = this.meshProgram;
-        gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
-        gl.viewport(0, 0, this.canvas.width, this.canvas.height);
-        gl.disable(gl.BLEND);
-        gl.clearColor(0, 0, 0, 0);
-        gl.clear(gl.COLOR_BUFFER_BIT);
-        gl.bindBuffer(gl.ARRAY_BUFFER, state.vertexBuffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
-        gl.enableVertexAttribArray(program.attributes.a_position);
-        gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 16, 0);
-        gl.enableVertexAttribArray(program.attributes.a_uv);
-        gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 16, 8);
-        this.bindTexture(state.texture);
-        gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
-    }
-
-    private present(alpha: number) {
-        if (!this.target) return;
-        const gl = this.gl;
-        const program = this.presentProgram;
+        gl.useProgram(program.program);
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.viewport(0, 0, this.canvas.width, this.canvas.height);
         gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+        gl.uniform1f(program.uniforms.u_alpha, easeInOutSine(state.alpha));
+        gl.bindBuffer(gl.ARRAY_BUFFER, state.vertexBuffer);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
+        gl.enableVertexAttribArray(program.attributes.a_position);
+        gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 24, 0);
+        gl.enableVertexAttribArray(program.attributes.a_morphPosition);
+        gl.vertexAttribPointer(program.attributes.a_morphPosition, 2, gl.FLOAT, false, 24, 8);
+        gl.enableVertexAttribArray(program.attributes.a_uv);
+        gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 24, 16);
+        this.bindTexture(this.target.texture);
+        gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
+    }
+
+    private renderMaterial(state: MeshState, time: number) {
+        if (!this.target || !this.blurTarget) return;
+        const gl = this.gl;
+        const program = this.materialProgram;
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
+        gl.viewport(0, 0, MATERIAL_SIZE, MATERIAL_SIZE);
+        gl.disable(gl.BLEND);
         gl.useProgram(program.program);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
+        // Quad passes must not retain attributes backed by a replaced mesh's deleted buffers.
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_position);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_morphPosition);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_uv);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 0, 0);
+        this.bindTexture(state.texture);
+        const angle = ((time - this.startTime) / 10000) * FLOW_SPEED * 2;
+        gl.uniform4f(program.uniforms.u_rotation01,
+            Math.cos(angle), Math.sin(angle), Math.cos(angle * 120 / 70), Math.sin(angle * 120 / 70));
+        gl.uniform2f(program.uniforms.u_rotation2, Math.cos(angle * 120 / 90), Math.sin(angle * 120 / 90));
+        gl.uniform1f(program.uniforms.u_pulseScale, this.audioResponse.scale);
+        // Material and mesh share a square domain; apply viewport aspect only in the mesh.
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+        gl.useProgram(this.blurProgram.program);
+        gl.enableVertexAttribArray(this.blurProgram.attributes.a_position);
+        gl.vertexAttribPointer(this.blurProgram.attributes.a_position, 2, gl.FLOAT, false, 0, 0);
+        // Blur the changing layer boundaries, not the source artwork. All taps stay low-res.
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.blurTarget.framebuffer);
         this.bindTexture(this.target.texture);
-        gl.uniform1f(program.uniforms.u_alpha, alpha);
+        gl.uniform2f(this.blurProgram.uniforms.u_direction, 1 / MATERIAL_SIZE, 0);
+        gl.uniform1i(this.blurProgram.uniforms.u_protectColor, 0);
+        gl.drawArrays(gl.TRIANGLES, 0, 6);
+        gl.bindFramebuffer(gl.FRAMEBUFFER, this.target.framebuffer);
+        this.bindTexture(this.blurTarget.texture);
+        gl.uniform2f(this.blurProgram.uniforms.u_direction, 0, 1 / MATERIAL_SIZE);
+        gl.uniform1i(this.blurProgram.uniforms.u_protectColor, 1);
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
@@ -410,10 +498,9 @@ export class FluidRenderer {
         gl.clear(gl.COLOR_BUFFER_BIT);
         this.prepareMeshFrame(time);
         for (let index = 0; index < this.meshStates.length; index += 1) {
-            if (index > 0) gl.useProgram(this.meshProgram.program);
             const state = this.meshStates[index];
+            this.renderMaterial(state, time);
             this.renderMesh(state);
-            this.present(easeInOutSine(state.alpha));
         }
     }
 
@@ -442,7 +529,9 @@ export class FluidRenderer {
             return;
         }
         this.lastFrame = time - elapsed % frameInterval;
-        this.audioResponse.update(this.lowFrequencyRef?.current, elapsed);
+        const audioElapsed = this.lastAudioFrame === 0 ? frameInterval : time - this.lastAudioFrame;
+        this.lastAudioFrame = time;
+        this.audioResponse.update(this.lowFrequencyRef?.current, audioElapsed, time);
         this.advanceArtworkTransition(elapsed);
         this.renderFrame(time);
         this.canvas.style.visibility = 'visible';
@@ -466,13 +555,18 @@ export class FluidRenderer {
         else {
             this.cancelFrame();
             this.audioResponse.reset();
+            this.lastAudioFrame = 0;
         }
     }
 
     setVisible(visible: boolean) {
         this.visible = visible;
         if (visible) this.requestFrame();
-        else this.cancelFrame();
+        else {
+            this.cancelFrame();
+            this.audioResponse.reset();
+            this.lastAudioFrame = 0;
+        }
     }
 
     private addArtworkState(imageData: ImageData) {
@@ -495,9 +589,9 @@ export class FluidRenderer {
             const response = await fetch(src);
             if (!response.ok) throw new Error(`封面读取失败：${response.status}`);
             const bitmap = await createImageBitmap(await response.blob(), {
-                resizeWidth: 32,
-                resizeHeight: 32,
-                resizeQuality: 'low',
+                resizeWidth: ARTWORK_TEXTURE_SIZE,
+                resizeHeight: ARTWORK_TEXTURE_SIZE,
+                resizeQuality: 'high',
             });
             if (this.disposed || request !== this.artworkRequest) {
                 bitmap.close();
@@ -538,10 +632,15 @@ export class FluidRenderer {
             this.gl.deleteFramebuffer(this.target.framebuffer);
             this.gl.deleteTexture(this.target.texture);
         }
+        if (this.blurTarget) {
+            this.gl.deleteFramebuffer(this.blurTarget.framebuffer);
+            this.gl.deleteTexture(this.blurTarget.texture);
+        }
         for (const state of this.meshStates) this.deleteMeshState(state);
         this.meshStates = [];
         this.gl.deleteBuffer(this.quadBuffer);
         this.gl.deleteProgram(this.meshProgram.program);
-        this.gl.deleteProgram(this.presentProgram.program);
+        this.gl.deleteProgram(this.materialProgram.program);
+        this.gl.deleteProgram(this.blurProgram.program);
     }
 }

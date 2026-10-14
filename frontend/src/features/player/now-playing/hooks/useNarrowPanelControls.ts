@@ -87,10 +87,9 @@ export function useNarrowPanelControls({
     const handleNarrowPointerMove = (event: PointerEvent<HTMLDivElement>) => {
         if (!isNarrowPanelLayout || narrowControlsVisible) return;
         const controlsRect = narrowControlsRef.current?.getBoundingClientRect();
-        const fallbackBoundary = window.innerHeight - 120;
-        const revealBoundary = controlsRect
-            ? controlsRect.top + controlsRect.height / 2
-            : fallbackBoundary;
+        const panelViewport = event.currentTarget.querySelector<HTMLElement>('[data-narrow-panel-viewport]');
+        // 与队列隐藏控件时的 pb-8 对齐，队列和歌词都从最后一行下方的区域唤出。
+        const revealBoundary = (panelViewport?.getBoundingClientRect().bottom ?? window.innerHeight) - 32;
         if (event.clientY >= revealBoundary) {
             isPointerInsideNarrowControlsRef.current = controlsRect
                 ? event.clientX >= controlsRect.left &&

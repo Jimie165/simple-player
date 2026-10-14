@@ -232,10 +232,7 @@ function App() {
       />
 
       <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className={`relative pt-12 min-h-full pb-24 transition-colors duration-300 ${activePlaylistDetail
-          ? 'bg-surface dark:bg-surface-container'
-          : ''
-          }`}>
+        <div className="relative pt-12 min-h-full pb-24 transition-colors duration-300">
           <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none" />
           <AnimatePresence mode="wait">
             <motion.div

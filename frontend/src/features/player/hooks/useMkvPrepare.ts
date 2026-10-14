@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { videoService } from '@/services/videoService';
 
 interface UseMkvPrepareOptions {
     isOpen: boolean;
@@ -43,7 +44,7 @@ export function useMkvPrepare({
         let cancelled = false;
 
         const run = async () => {
-            if (!isOpen || !sourcePath || !isMkv) {
+            if (!isOpen || !sourcePath) {
                 setPrepared(null);
                 setIsPreparing(false);
                 setPrepareStage(null);
@@ -57,6 +58,13 @@ export function useMkvPrepare({
             setPreparePercent(null);
 
             try {
+                const exists = await videoService.fileExists(sourcePath);
+                if (cancelled) return;
+                if (!exists) throw new Error('VIDEO_FILE_NOT_FOUND');
+                if (!isMkv) {
+                    setPrepared({ source: sourcePath, path: sourcePath });
+                    return;
+                }
                 unlistenFn = await listen<{ path: string; stage: string; percent?: number }>('video:prepare-progress', (event) => {
                     if (cancelled || event.payload.path !== sourcePath) return;
                     setPrepareStage(event.payload.stage);
