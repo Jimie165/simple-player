@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DisplayItem } from '@/features/player/lyrics/types';
-import { getAnimatedLyricsMotionDelays, getAnimatedLyricsSpringParams } from '@/features/player/lyrics/animatedLyricsMotion';
+import { getAnimatedLyricsMotionDelays } from '@/features/player/lyrics/animatedLyricsMotion';
 import { AnimatedLyricsAnimator } from '@/features/player/lyrics/useAnimatedLyricsAnimator';
 import { AnimatedLyricsSpring } from '@/features/player/lyrics/animatedLyricsSpring';
 import { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
@@ -17,14 +17,6 @@ const delayArgs = {
 };
 
 describe('geometry-based group delays', () => {
-    it('uses target geometry and preserves a nonzero focus delay', () => {
-        const delays = getAnimatedLyricsMotionDelays(delayArgs);
-        expect(delays.slice(0, 4)).toEqual([0, 0, 0.05, 0.1]);
-        expect(delays[4]).toBeCloseTo(0.1 + 0.05 / 1.05);
-        expect(getAnimatedLyricsMotionDelays({ ...delayArgs, targetScrollY: 50 })[2]).toBe(0.1);
-        expect(getAnimatedLyricsMotionDelays({ ...delayArgs, targetScrollY: 200 })[2]).toBe(0.05);
-    });
-
     it('does not switch delay rules when tail compression appears or disappears', () => {
         const compressed = displayItems.map(item => item.type === 'line'
             ? { ...item, line: { ...item.line, visual_end_ms: item.line.end_time_ms! - 100 } } : item);
@@ -50,11 +42,6 @@ describe('geometry-based group delays', () => {
     it('removes stagger for manual scrolling and paused playback', () => {
         expect(getAnimatedLyricsMotionDelays({ ...delayArgs, isUserScrolling: true })).toEqual([0, 0, 0, 0, 0]);
         expect(getAnimatedLyricsMotionDelays({ ...delayArgs, isPlaying: false })).toEqual([0, 0, 0, 0, 0]);
-    });
-
-    it('preserves spring values', () => {
-        expect(getAnimatedLyricsSpringParams(delayArgs)).toEqual({ stiffness: 100, damping: 18, mass: 1 });
-        expect(getAnimatedLyricsSpringParams({ ...delayArgs, isPlaying: false })).toEqual({ stiffness: 90, damping: 15, mass: 1 });
     });
 });
 

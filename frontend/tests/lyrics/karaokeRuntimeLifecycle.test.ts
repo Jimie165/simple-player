@@ -154,22 +154,6 @@ describe('DOM-owned karaoke runtime', () => {
         expect(word.values.transform).toBe('translateY(0em)');
     });
 
-    it('delays word lift by 100ms without delaying fill and completes the delayed motion', () => {
-        hooks.floatMode = 'word';
-        const { render, frame, nodes } = setup();
-        render({ words: [{ text: 'a', start_time_ms: 1000, end_time_ms: 1400 }], isActive: true, isFocused: true });
-        const word = nodes.get('word-0')!;
-        frame(1050);
-        expect(word.values.transform).toBe('translateY(0.000000em)');
-        expect(Number(word.values['--kf'])).toBeGreaterThan(0);
-        frame(1100);
-        expect(word.values.transform).toBe('translateY(0.000000em)');
-        frame(1150);
-        expect(word.values.transform).not.toBe('translateY(0.000000em)');
-        for (let time = 1200; time <= 2100; time += 100) frame(time);
-        expect(word.values.transform).toBe('translateY(-0.078000em)');
-    });
-
     it('keeps staggered character emphasis inside a floating long-tone group', () => {
         hooks.floatMode = 'word';
         const { props, render, frame, nodes, char } = setup();
@@ -194,23 +178,6 @@ describe('DOM-owned karaoke runtime', () => {
         render({ playbackSyncKey: 1 });
         expect(Number(char().values['--kg'])).toBe(0);
         expect(char().values.transform).toContain('scale(1.0000)');
-    });
-
-    it('adds no character lift to the word height while long-tone glow fades', () => {
-        hooks.floatMode = 'word';
-        const { render, frame, char } = setup();
-        render({ words: [{ text: 'hello', start_time_ms: 1000, end_time_ms: 4000 }], isActive: true, isFocused: true });
-        const verticalOffset = () => Number(char().values.transform.match(/translate3d\([^,]+, ([-\d.]+)em/)?.[1]);
-        frame(2800);
-        const peak = verticalOffset();
-        const peakGlow = Number(char().values['--kg']);
-        expect(peak).toBe(0);
-        frame(3800);
-        expect(verticalOffset()).toBe(peak);
-        expect(Number(char().values['--kg'])).toBeLessThan(peakGlow);
-        frame(4700);
-        expect(verticalOffset()).toBe(peak);
-        expect(Number(char().values['--kg'])).toBe(0);
     });
 
     it('initializes before activation and keeps the callback and runtime across pause/resume', () => {

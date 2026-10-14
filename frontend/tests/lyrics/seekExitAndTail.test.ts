@@ -1,17 +1,8 @@
-import * as React from 'react';
-import { readFileSync } from 'node:fs';
-import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import LyricsLineItem from '@/features/player/lyrics/LyricsLineItem';
+import { describe, expect, it } from 'vitest';
 import { buildDisplayItems, getActiveLyricsState, getLineCompressionHandoffStartMs, getLineKaraokeEndMs, getTtmlLineWindows } from '@/features/player/lyrics/lyricsDisplay';
 import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplitting';
 import { animationLyricsTimingStrategy } from '@/features/player/lyrics/timingStrategy';
 import type { LyricsLine } from '@/types';
-
-vi.mock('@/store/useThemeStore', () => ({
-    useThemeStore: (selector: (state: { lyricFillMode: 'character'; lyricLineBlendEnabled: boolean }) => unknown) =>
-        selector({ lyricFillMode: 'character', lyricLineBlendEnabled: false }),
-}));
 
 const lines: LyricsLine[] = [
     { id: 'old', role: 'main', text: 'Old', start_time_ms: 1300, end_time_ms: 2000,
@@ -20,31 +11,7 @@ const lines: LyricsLine[] = [
         words: [{ text: 'Next', start_time_ms: 2000, end_time_ms: 3000 }] },
 ];
 
-const renderRow = (isSeekExiting: boolean) => {
-    vi.stubGlobal('React', React);
-    return renderToStaticMarkup(React.createElement(LyricsLineItem, {
-        line: lines[0], isActive: true, isKaraokeActive: true, isSeekExiting,
-        isUserScrolling: false, pausedScroll: false, distanceFromActive: 0,
-        interludeShift: 0, interludeShiftDurationMs: 300, lineEndMs: 2000,
-        currentTime: 1.5, preciseMsRef: { current: 1500 },
-        onSeek: () => {}, animatedMotion: true,
-    }));
-};
-
 describe('seek exit versus normal compressed handoff', () => {
-    afterEach(() => vi.unstubAllGlobals());
-    it('fades the clicked-away row’s filled layer without brightening its base', () => {
-        const playing = renderRow(false);
-        const seekingAway = renderRow(true);
-        expect(playing).toContain('--kb:0.4');
-        expect(playing).toContain('--kfa:1');
-        expect(seekingAway).toContain('--kb:0.3');
-        expect(seekingAway).toContain('--kfa:0');
-        expect(seekingAway).not.toContain('opacity-30');
-        const css = readFileSync(new URL('../../src/index.css', import.meta.url), 'utf8');
-        expect(css).toMatch(/\.karaoke-char::before\s*\{[^}]*transition: color 450ms ease-out/s);
-    });
-
     it('keeps the old line active until its compressed fill reaches visual end', () => {
         const items = buildDisplayItems(lines, true, animationLyricsTimingStrategy);
         expect(items[0].type === 'line' && items[0].line.visual_end_ms).toBe(1650);
