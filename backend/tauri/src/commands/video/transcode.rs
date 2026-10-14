@@ -2,7 +2,7 @@
 // ============================================================================
 
 use crate::modules::hwaccel::{HwAccelType, get_encode_args};
-use crate::utils::path::normalize_windows_path;
+use crate::utils::path::normalize_native_path;
 use serde::Serialize;
 use std::io::{BufRead, BufReader};
 use std::process::Stdio;
@@ -29,7 +29,7 @@ pub fn transcode_with_hw(
     video_codec: Option<String>,
     prefer_hw_decode: bool,
 ) -> Result<(), String> {
-    let input_os = normalize_windows_path(input_path);
+    let input_os = normalize_native_path(input_path);
     let is_mkv = input_path.to_lowercase().ends_with(".mkv");
 
     // 构建编码参数

@@ -4,7 +4,7 @@
 use crate::DbState;
 use crate::modules::database::{Video, VideoRepo};
 use crate::modules::library::video_thumbnails;
-use crate::utils::path::normalize_windows_path;
+use crate::utils::path::normalize_native_path;
 use serde::Serialize;
 use std::path::Path;
 use tauri::{Emitter, Manager, State};
@@ -16,7 +16,7 @@ struct ThumbnailReadyPayload {
 }
 
 fn video_path_exists(path: &str) -> Result<bool, String> {
-    Path::new(&normalize_windows_path(path))
+    Path::new(&normalize_native_path(path))
         .try_exists()
         .map_err(|error| error.to_string())
 }
@@ -42,8 +42,8 @@ pub fn get_all_videos(
         .filter(|v| match &v.thumbnail_path {
             None => true,
             Some(p) => {
-                let win_path = normalize_windows_path(p);
-                !Path::new(&win_path).exists()
+                let native_path = normalize_native_path(p);
+                !Path::new(&native_path).exists()
             }
         })
         .cloned()
