@@ -115,11 +115,11 @@ Windows 安装包下载后直接运行即可。macOS 请按设备架构选择测
 
 应用默认在启动时检查正式发布版本，也可以在“设置 → 关于”中手动检查或关闭自动检查。有新版本时，可前往发布页面下载安装；macOS 测试构建仍从 GitHub Actions 获取。
 
-媒体库、歌单和播放队列的数据保存在本地，原始音乐和视频文件不会被移动或复制。存储位置见 [Windows 数据与缓存说明](docs/DEVELOPMENT.md#数据与缓存) 和 [macOS 适配与测试](https://github.com/Jimie165/simple-player/blob/macos-support/docs/MACOS.md)，使用问题见 [故障排查](docs/TROUBLESHOOTING.md)。
+媒体库、歌单和播放队列的数据保存在本地，原始音乐和视频文件不会被移动或复制。存储位置见 [Windows 数据与缓存说明](docs/DEVELOPMENT.md#数据与缓存) 和 [macOS 数据与缓存说明](docs/MACOS.md#数据与缓存)，使用问题见 [故障排查](docs/TROUBLESHOOTING.md)。
 
 ## 开发与构建
 
-Windows 开发环境和 sidecar 准备方式见 [开发文档](docs/DEVELOPMENT.md)。macOS 开发请使用 [macos-support 分支](https://github.com/Jimie165/simple-player/tree/macos-support)，按 [macOS 构建说明](https://github.com/Jimie165/simple-player/blob/macos-support/docs/MACOS.md) 准备 Xcode Command Line Tools、开发工具链和对应架构的 FFmpeg / FFprobe sidecar。
+Windows 开发环境和 sidecar 准备方式见 [开发文档](docs/DEVELOPMENT.md)。macOS 开发请使用 [macos-support 分支](https://github.com/Jimie165/simple-player/tree/macos-support)，准备 Xcode Command Line Tools、开发工具链和对应架构的 FFmpeg / FFprobe sidecar。下载安装及平台功能见 [macOS 使用说明](docs/MACOS.md)。
 
 准备好所用平台的开发环境后运行：
 
