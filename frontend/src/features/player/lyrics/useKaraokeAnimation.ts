@@ -144,7 +144,9 @@ export function useKaraokeAnimation({
         wordGroups.forEach((group, wordIndex) => {
             const isLastWord = wordIndex === wordGroups.length - 1;
             group?.forEach(({ item, flatIndex }) => {
-                runtimes[flatIndex] = prepareKaraokeCharRuntime(item, isLastWord, wordFloat);
+                runtimes[flatIndex] = prepareKaraokeCharRuntime(
+                    item, isLastWord, wordFloat, wordFloat ? group[0].item.groupDurationMs : item.groupDurationMs,
+                );
             });
         });
         return runtimes;
@@ -162,6 +164,11 @@ export function useKaraokeAnimation({
             activeCharIndexInWord: 0,
         }, wordIndex === wordGroups.length - 1);
     }), [wordGroups]);
+
+    // 句尾压缩可能改变部分字符的长音判定，但同组必须共用上浮归属。
+    const wordCharacterLift = useMemo(() => wordRuntimes.map((runtime, wordIndex) => (
+        runtime.isLongTone && wordGroups[wordIndex][0].item.activeCharCountInWord > 1
+    )), [wordRuntimes, wordGroups]);
 
     useLayoutEffect(() => {
         const charElements = charRefs.current;
@@ -252,7 +259,8 @@ export function useKaraokeAnimation({
             // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
             // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
             const transforms = motionOnly ? runtime.previousWordTransforms : runtime.previousTransforms;
-            if (isFocusedRef.current && (!wordFloat || motionOnly || charRuntimes[flatIndex]?.isLongTone)) {
+            if (isFocusedRef.current && (!wordFloat || motionOnly || charRuntimes[flatIndex]?.isLongTone
+                || wordCharacterLift[flatChars[flatIndex].wordIndex])) {
                 if (runtime.forceVisualWrite || style.transform !== transforms[flatIndex]) {
                     el.style.transform = style.transform;
                     transforms[flatIndex] = style.transform;
@@ -301,7 +309,7 @@ export function useKaraokeAnimation({
                     const style = runtimeState.scratchStyle;
                     // Long-tone glyphs own the staggered lift; ordinary words
                     // still move together in this shared container.
-                    style.transform = wordRuntimes[wordIndex].isLongTone && group[0].item.activeCharCountInWord > 1
+                    style.transform = wordCharacterLift[wordIndex]
                         ? restingCharTransform
                         : `translateY(${(-Math.sin(progress * Math.PI / 2) * syllableLiftEm).toFixed(6)}em)`;
                     style.fillStop = lineFill?.getWordFillStop(wordIndex) ?? -100;
@@ -309,10 +317,10 @@ export function useKaraokeAnimation({
                 }
                 group?.forEach(({ flatIndex }) => {
                     const charRuntime = charRuntimes[flatIndex];
-                    if (!charRuntime || (wordFloat && !charRuntime.isLongTone)) return;
+                    if (!charRuntime || (wordFloat && !charRuntime.isLongTone && !wordCharacterLift[wordIndex])) return;
                     const fillStop = wordFloat ? 0 : (lineFill?.getFillStop(wordIndex, charRuntime)
                         ?? getCharacterFillStop(charRuntime.item, charRuntime.fillEdgeWidth, timeMs));
-                    const style = wordFloat && !charRuntime.isLongTone ? runtimeState.scratchStyle : getKaraokeCharStyle(
+                    const style = getKaraokeCharStyle(
                         charRuntime,
                         timeMs,
                         fillStop,
@@ -455,6 +463,7 @@ export function useKaraokeAnimation({
         lyricFillMode,
         wordFloat,
         wordRuntimes,
+        wordCharacterLift,
     ]);
 
     // Focus and play/pause changes should only change ownership of the stable
@@ -483,7 +492,10 @@ export function useKaraokeAnimation({
 
     useLayoutEffect(() => {
         const motionElements = wordFloat
-            ? [...wordRefs.current, ...charRefs.current.filter((_element, index) => charRuntimes[index]?.isLongTone)]
+            ? [...wordRefs.current, ...charRefs.current.filter((_element, index) => {
+                const charRuntime = charRuntimes[index];
+                return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
+            })]
             : charRefs.current;
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = visualFocused;
@@ -542,7 +554,7 @@ export function useKaraokeAnimation({
         return () => {
             window.clearTimeout(releaseTimer);
         };
-    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length, wordFloat, charRuntimes]);
+    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length, wordFloat, charRuntimes, wordCharacterLift]);
 
     // These events invalidate playback state, not the DOM runtime. In
     // particular a paused seek has no content frame to refresh the fill.
@@ -552,5 +564,5 @@ export function useKaraokeAnimation({
         runtime.syncNow?.();
     }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
-    return { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes };
+    return { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift };
 }

@@ -50,7 +50,7 @@ function KaraokeTextBase({
     const dimMaskAlpha = lyricLineBlendEnabled
         ? (glowDisabled ? 0.16 : 0.3) / fillLayerAlpha
         : 0;
-    const { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes } = useKaraokeAnimation({
+    const { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift } = useKaraokeAnimation({
         words, lineEndMs, nextLineStartMs, enableTightHandoffTailCompression,
         preciseMsRef, isActive, visualFocused, isSeekExiting, isPlaying,
         playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
@@ -92,9 +92,11 @@ function KaraokeTextBase({
                         <span
                             key={flatIndex}
                             ref={charRefCallbacks[flatIndex]}
-                            className={isLongTone
-                                ? 'karaoke-char karaoke-char-long-tone'
-                                : 'karaoke-char'}
+                            className={[
+                                'karaoke-char',
+                                isLongTone ? 'karaoke-char-long-tone' : '',
+                                wordFloat && wordCharacterLift[charItem.wordIndex] ? 'karaoke-char-word-lift' : '',
+                            ].filter(Boolean).join(' ')}
                             data-c={charItem.char}
                             style={{
                                 '--kfe': fillEdgeWidth,

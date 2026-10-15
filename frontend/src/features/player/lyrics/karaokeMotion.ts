@@ -23,6 +23,8 @@ export type KaraokeCharRuntime = {
     emphasisDurationMs: number;
     wordEmphasisAttackMs: number;
     wordEmphasisReleaseMs: number;
+    wordLiftDelayMs: number;
+    wordLiftAttackMs: number;
     charDelayMs: number;
     motionAmount: number;
 };
@@ -129,6 +131,7 @@ export function prepareKaraokeCharRuntime(
     charItem: FlatCharItem,
     isLastWord: boolean,
     wordFloat = false,
+    wordLiftDurationMs = charItem.groupDurationMs,
 ): KaraokeCharRuntime {
     const longToneRaw = clamp01((charItem.groupDurationMs - longToneThresholdMs) / 760);
     const longToneAmount = smoothstep(longToneRaw);
@@ -165,6 +168,8 @@ export function prepareKaraokeCharRuntime(
         emphasisDurationMs,
         wordEmphasisAttackMs: wordTiming.attackMs,
         wordEmphasisReleaseMs: wordTiming.releaseMs,
+        wordLiftDelayMs: wordLiftDurationMs / 2.5 / charCount * charIndex,
+        wordLiftAttackMs: getWordEmphasisTiming(wordLiftDurationMs, charCount, emphasisDurationMs).attackMs,
         charDelayMs,
         motionAmount: Math.min(
             1.2,
@@ -191,6 +196,8 @@ export function getKaraokeCharStyle(
         emphasisDurationMs,
         wordEmphasisAttackMs,
         wordEmphasisReleaseMs,
+        wordLiftDelayMs,
+        wordLiftAttackMs,
         charDelayMs,
         motionAmount,
     } = runtime;
@@ -230,7 +237,7 @@ export function getKaraokeCharStyle(
     // container as well would double the lift and hide the travelling wave.
     const translateY = emphasisOnly
         ? charCount > 1
-            ? -syllableLiftEm * Math.sin(clamp01(emphasisElapsedMs / wordEmphasisAttackMs) * Math.PI / 2)
+            ? -syllableLiftEm * Math.sin(clamp01((timeMs - groupStartMs - wordLiftDelayMs) / wordLiftAttackMs) * Math.PI / 2)
             : 0
         : regularLift * -syllableLiftEm;
     const scale = 1 + emphasisPulse * 0.1 * motionAmount;
@@ -276,6 +283,11 @@ export function getWordMotionWindow(
         const emphasisStartMs =
             item.groupStartMs + charDelayMs;
         const wordTiming = getWordEmphasisTiming(item.groupDurationMs, charCount, emphasisDurationMs);
+        const wordLiftDurationMs = group[0].item.groupDurationMs;
+        const wordLiftEndMs = wordFloat && charCount > 1
+            ? item.groupStartMs + wordLiftDurationMs / 2.5 / charCount * charIndex
+                + getWordEmphasisTiming(wordLiftDurationMs, charCount, emphasisDurationMs).attackMs
+            : liftEndMs;
         const emphasisEndMs = wordFloat
             ? emphasisStartMs + wordTiming.attackMs + wordTiming.releaseMs
             : emphasisStartMs + emphasisDurationMs;
@@ -288,6 +300,7 @@ export function getWordMotionWindow(
             endMs,
             item.time_ms + item.durationMs,
             liftEndMs,
+            wordLiftEndMs,
             progressionEndMs,
             hasLongToneMotion ? emphasisEndMs : liftEndMs
         );

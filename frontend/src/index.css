@@ -461,7 +461,8 @@ body {
 
 /* 长音从挂载到卸载始终保持同一种合成状态，避免高光结束时因
    图层降级和文字重新栅格化产生肉眼可见的位置跳变。 */
-.karaoke-char-long-tone {
+.karaoke-char-long-tone,
+.karaoke-char-word-lift {
   will-change: transform;
   backface-visibility: hidden;
 }
@@ -638,7 +639,8 @@ body {
   will-change: transform;
 }
 
-.karaoke-text-word-float .karaoke-char:not(.karaoke-char-long-tone) {
+/* Only glyphs carried by the word container can opt out of motion compositing. */
+.karaoke-text-word-float .karaoke-char:not(.karaoke-char-long-tone):not(.karaoke-char-word-lift) {
   transform: none;
   will-change: auto;
   backface-visibility: visible;
