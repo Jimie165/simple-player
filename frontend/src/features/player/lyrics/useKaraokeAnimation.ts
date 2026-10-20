@@ -66,8 +66,10 @@ export function useKaraokeAnimation({
     playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
 }: KaraokeAnimationOptions) {
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const dimWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const frameRegistry = useLyricsFrameTaskRegistry();
     const charRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const dimCharRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const contentRef = useRef<HTMLSpanElement | null>(null);
     const wasFocusedRef = useRef(visualFocused);
     const runtimeRef = useRef<KaraokeRuntimeState | null>(null);
@@ -108,6 +110,9 @@ export function useKaraokeAnimation({
 
     const charRefCallbacks = useMemo(() => flatChars.map((_item, index) =>
         (element: HTMLSpanElement | null) => { charRefs.current[index] = element; }
+    ), [flatChars]);
+    const dimCharRefCallbacks = useMemo(() => flatChars.map((_item, index) =>
+        (element: HTMLSpanElement | null) => { dimCharRefs.current[index] = element; }
     ), [flatChars]);
 
     const wordGroups = useMemo(() => groupKaraokeWords(flatChars), [flatChars]);
@@ -263,8 +268,11 @@ export function useKaraokeAnimation({
                 || wordCharacterLift[flatChars[flatIndex].wordIndex])) {
                 if (runtime.forceVisualWrite || style.transform !== transforms[flatIndex]) {
                     el.style.transform = style.transform;
+                    // Both brightness layers use the same evaluated motion, including long-tone staggering.
+                    const dim = (motionOnly ? dimWordRefs : dimCharRefs).current[flatIndex];
+                    if (dim) dim.style.transform = style.transform;
                     transforms[flatIndex] = style.transform;
-                    if (debugWrites) debugWrites.transform++;
+                    if (debugWrites) debugWrites.transform += dim ? 2 : 1;
                 }
                 if (!motionOnly && (runtime.forceVisualWrite || style.glowAlpha !== runtime.previousGlowAlphas[flatIndex])) {
                     el.style.setProperty('--kg', String(style.glowAlpha));
@@ -497,6 +505,13 @@ export function useKaraokeAnimation({
                 return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
             })]
             : charRefs.current;
+        const dimMotionElements = wordFloat
+            ? [...dimWordRefs.current, ...dimCharRefs.current.filter((_element, index) => {
+                const charRuntime = charRuntimes[index];
+                return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
+            })]
+            : dimCharRefs.current;
+        const allMotionElements = [...motionElements, ...dimMotionElements];
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = visualFocused;
 
@@ -518,7 +533,7 @@ export function useKaraokeAnimation({
         if (!wasFocused) {
             contentRef.current?.classList.remove('karaoke-text-exiting');
             // 从未聚焦过（如初始非激活行）：无动画残留，直接归位
-            motionElements.forEach((el) => {
+            allMotionElements.forEach((el) => {
                 if (!el) return;
                 el.style.transform = el.classList.contains('karaoke-char-long-tone')
                     ? 'translate(0, 0) scale(1)'
@@ -533,7 +548,7 @@ export function useKaraokeAnimation({
         // 不再为每字写 4 个退出变量 + 创建 CSS 动画。
         const exitContent = contentRef.current;
         exitContent?.classList.add('karaoke-text-exiting');
-        motionElements.forEach((el) => {
+        allMotionElements.forEach((el) => {
             if (!el) return;
             el.style.transform = '';
             el.style.removeProperty('--kg');
@@ -542,7 +557,7 @@ export function useKaraokeAnimation({
         const releaseTimer = window.setTimeout(() => {
             if (contentRef.current !== exitContent || isFocusedRef.current) return;
             exitContent?.classList.remove('karaoke-text-exiting');
-            motionElements.forEach((el) => {
+            allMotionElements.forEach((el) => {
                 if (!el) return;
                 el.style.transform = el.classList.contains('karaoke-char-long-tone')
                     ? 'translate(0, 0) scale(1)'
@@ -564,5 +579,5 @@ export function useKaraokeAnimation({
         runtime.syncNow?.();
     }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
-    return { contentRef, wordRefs, charRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift };
+    return { contentRef, wordRefs, dimWordRefs, charRefCallbacks, dimCharRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift };
 }

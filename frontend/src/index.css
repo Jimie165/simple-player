@@ -482,7 +482,6 @@ body {
   padding: inherit;
   pointer-events: none;
   color: rgba(255, 255, 255, var(--kfa, 1));
-  transition: color 450ms ease-out;
   -webkit-mask-image: linear-gradient(
     to right,
     black 0%,
@@ -521,20 +520,17 @@ body {
 }
 
 .karaoke-text-background-blend .karaoke-char {
-  transition: color 300ms ease-out;
   text-shadow: none;
 }
 
 .karaoke-text-background-blend .karaoke-char::before {
   /* Keep the glow inside the bright layer's moving mask. */
   mix-blend-mode: plus-lighter;
-  transition: color 300ms ease-out;
   text-shadow: 0 0 var(--kgb, 5px) rgba(255, 255, 255, var(--kg, 0));
 }
 
 .karaoke-text-background-blend.karaoke-text-exiting .karaoke-char {
   transition:
-    color 300ms ease-out,
     transform 250ms ease-in-out,
     --kg 250ms ease-in-out;
 }
@@ -664,26 +660,34 @@ body {
   mask-image: none;
 }
 
-/* Animate the shared brightness inputs, not the colors after mask compensation.
-   This keeps the dim tail stable throughout activation and interrupted fades. */
-@property --kw-base {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0.3;
+/* Fixed mask contrast lets brightness fades run on opacity alone.
+   Add the complementary layers inside an isolated group to avoid a dark midpoint. */
+.karaoke-brightness-layer {
+  mix-blend-mode: plus-lighter;
+  transition: opacity 450ms ease-out;
 }
 
-@property --kw-fill {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
+.karaoke-text-background-blend .karaoke-brightness-layer {
+  transition-duration: 300ms;
 }
 
-.karaoke-word-brightness {
-  transition: --kw-base 450ms ease-out, --kw-fill 450ms ease-out;
-  --kw-tail: calc(
-    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill) * var(--kfd, 0)) /
-    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill))
-  );
+.karaoke-dim-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.karaoke-dim-layer .karaoke-char {
+  text-shadow: none;
+}
+
+.karaoke-dim-layer .karaoke-char::before {
+  content: none;
+}
+
+.karaoke-text-word-float .karaoke-dim-layer .karaoke-word-motion {
+  mask-image: none;
 }
 
 .karaoke-text-word-float .karaoke-char,
