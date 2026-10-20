@@ -150,7 +150,7 @@ export function useKaraokeAnimation({
             const isLastWord = wordIndex === wordGroups.length - 1;
             group?.forEach(({ item, flatIndex }) => {
                 runtimes[flatIndex] = prepareKaraokeCharRuntime(
-                    item, isLastWord, wordFloat, wordFloat ? group[0].item.groupDurationMs : item.groupDurationMs,
+                    item, isLastWord, wordFloat, group[0].item,
                 );
             });
         });
