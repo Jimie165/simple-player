@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { motion } from 'framer-motion';
+import { cubicBezier, motion } from 'framer-motion';
 import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
@@ -17,13 +17,16 @@ const EXIT_PHASE_MIN = 0.02;
 const EXIT_PHASE_MAX = 0.08;
 const EXIT_SCALE_MAX = BREATH_SCALE_CENTER + BREATH_SCALE_AMPLITUDE;
 const FORCED_EXIT_DURATION_MS = 250;
+const ENTER_FADE_MS = 180;
+const DOT_ENTER_FADE_MS = 750;
+const DOT_ENTER_STAGGER_MS = 80;
+const ENTER_TOTAL_MS = DOT_ENTER_FADE_MS + DOT_ENTER_STAGGER_MS * 2;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
 const clamp01 = (value: number) => clamp(value, 0, 1);
 
-const easeOutExpo = (value: number) =>
-    value === 1 ? 1 : 1 - 2 ** (-10 * value);
+const enterFadeEasing = cubicBezier(0.59, 0.02, 0.07, 1);
 
 const easeOutCubic = (value: number) => 1 - (1 - clamp01(value)) ** 3;
 const easeInCubic = (value: number) => value ** 3;
@@ -65,6 +68,11 @@ export default function InterludeItem({
     const frameRegistry = useLyricsFrameTaskRegistry();
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
+    const entryRef = useRef<{
+        startedAt: number;
+        startMs: number;
+        playbackSyncKey: number;
+    } | null>(null);
     const animationEndMs = Math.max(startMs, endMs - interludeNextLineFocusLeadMs);
     const isWithinAnimationWindow = currentMs >= startMs && currentMs < animationEndMs;
     const canAnimateDots =
@@ -77,6 +85,7 @@ export default function InterludeItem({
         if (!container) return;
 
         if (!canAnimateDots) {
+            entryRef.current = null;
             if (!forceExiting) {
                 container.style.transform = 'scale(0)';
                 dotRefs.current.forEach(dot => {
@@ -86,6 +95,15 @@ export default function InterludeItem({
             return;
         }
 
+        // 入场按本次可见时间推进，跳转和重新打开视图也能完整淡入。
+        if (
+            !entryRef.current ||
+            entryRef.current.startMs !== startMs ||
+            entryRef.current.playbackSyncKey !== playbackSyncKey
+        ) {
+            entryRef.current = { startedAt: performance.now(), startMs, playbackSyncKey };
+        }
+        const entryStartedAt = entryRef.current.startedAt;
         const interludeDurationMs = Math.max(1, animationEndMs - startMs);
         const nominalBreatheDurationMs =
             interludeDurationMs /
@@ -165,17 +183,8 @@ export default function InterludeItem({
             const currentDurationMs = preciseMs - startMs;
             const remainingMs = animationEndMs - preciseMs;
             let scale = getBreathScale(currentDurationMs);
-            let globalOpacity = 1;
-
-            if (currentDurationMs < 2000) {
-                scale *= easeOutExpo(clamp01(currentDurationMs / 2000));
-            }
-
-            if (currentDurationMs < 500) {
-                globalOpacity = 0;
-            } else if (currentDurationMs < 1000) {
-                globalOpacity *= (currentDurationMs - 500) / 500;
-            }
+            const entryElapsedMs = performance.now() - entryStartedAt;
+            let globalOpacity = enterFadeEasing(clamp01(entryElapsedMs / ENTER_FADE_MS));
 
             if (currentDurationMs >= exitStartDurationMs) {
                 const exitElapsedMs =
@@ -216,17 +225,22 @@ export default function InterludeItem({
                 );
                 const dotOpacity =
                     0.25 + dotWhiteningProgress * 0.75;
-                dot.style.opacity = `${clamp01(globalOpacity * dotOpacity)}`;
+                const entryProgress = clamp01(
+                    (entryElapsedMs - dotIndex * DOT_ENTER_STAGGER_MS) / DOT_ENTER_FADE_MS
+                );
+                const entryOpacity = entryProgress ** 2;
+                dot.style.opacity = `${clamp01(globalOpacity * dotOpacity * entryOpacity)}`;
             });
 
-            if (!frameRegistry) frame = requestAnimationFrame(tick);
+            if (!frameRegistry || (isPlaying === false && entryElapsedMs < ENTER_TOTAL_MS)) {
+                frame = requestAnimationFrame(tick);
+            }
         };
 
         let unsubscribe: (() => void) | undefined;
+        tick();
         if (frameRegistry && isPlaying !== false) {
             unsubscribe = frameRegistry.subscribe(() => tick());
-        } else if (!frameRegistry) {
-            frame = requestAnimationFrame(tick);
         }
         return () => {
             unsubscribe?.();
