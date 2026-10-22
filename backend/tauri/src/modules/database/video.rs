@@ -229,6 +229,18 @@ impl VideoRepo {
         conn.execute(&sql, params_refs.as_slice())
     }
 
+    /// Record only videos in the library; external files have no statistics row.
+    pub fn record_playback(conn: &Connection, path: &str) -> Result<Option<String>> {
+        conn.query_row(
+            "UPDATE videos SET play_count = play_count + 1,
+             last_played_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+             WHERE path = ?1 AND status = 'active' RETURNING last_played_at",
+            [normalize_db_path(std::path::Path::new(path))],
+            |row| row.get(0),
+        )
+        .optional()
+    }
+
     pub fn toggle_favorite(conn: &Connection, id: i64) -> Result<bool> {
         let is_fav: bool = conn
             .query_row(

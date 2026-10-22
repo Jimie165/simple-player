@@ -75,8 +75,8 @@ export default function PlaylistList() {
     }, [sortKey]);
 
     // Filter & Sort
-    const filteredPlaylists = useMemo(() => {
-        let list: PlaylistListItem[] = [...playlists];
+    const filteredPlaylists = useMemo<PlaylistListItem[]>(() => {
+        let list = [...playlists];
 
         // Construct Favorites Pseudo-Playlist
         const favoritesItem: FavoritesPlaylist = {
@@ -107,20 +107,17 @@ export default function PlaylistList() {
             if (sortKey === 'name') return a.name.localeCompare(b.name);
             if (sortKey === 'recently_played') {
                 // Sort by last_played_at descending, null values at the end
-                const aTime = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
-                const bTime = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
-                return bTime - aTime;
+                const aTime = new Date(a.last_played_at || '').getTime() || 0;
+                const bTime = new Date(b.last_played_at || '').getTime() || 0;
+                return bTime - aTime || b.id - a.id;
             }
             // recently_added (基于内容更新时间 desc)
-            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+            return (new Date(b.updated_at).getTime() || 0) - (new Date(a.updated_at).getTime() || 0)
+                || b.id - a.id;
         });
 
         // Always prepend Favorites if not hidden
-        if (!favoritesItem.hidden) {
-            list.unshift(favoritesItem);
-        }
-
-        return list;
+        return favoritesItem.hidden ? list : [favoritesItem, ...list];
     }, [playlists, searchQuery, sortKey, favoritesCount]);
 
     // Handle Select All Request
@@ -218,7 +215,7 @@ export default function PlaylistList() {
         }
 
         // 更新最近播放时间
-        libraryService.markPlaylistAsPlayed(pl.id).catch(console.error);
+        void libraryService.markPlaylistAsPlayed(pl.id).then(() => loadPlaylists()).catch(console.error);
     };
 
     // 添加到播放队列

@@ -100,6 +100,12 @@ pub fn search_videos(db: State<'_, DbState>, query: String) -> Result<Vec<Video>
 }
 
 #[tauri::command]
+pub fn record_video_playback(db: State<'_, DbState>, path: String) -> Result<Option<String>, String> {
+    let conn = db.0.lock().map_err(|e| e.to_string())?;
+    VideoRepo::record_playback(&conn, &path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub fn toggle_video_favorite(db: State<'_, DbState>, video_id: i64) -> Result<bool, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     VideoRepo::toggle_favorite(&conn, video_id).map_err(|e| e.to_string())

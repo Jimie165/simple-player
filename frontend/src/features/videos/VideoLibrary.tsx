@@ -110,13 +110,15 @@ export const VideoLibrary: React.FC = () => {
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;
                 const timeB = new Date(b.created_at).getTime() || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'played') {
-                const timeA = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
-                const timeB = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                const timeA = new Date(a.last_played_at || '').getTime() || 0;
+                const timeB = new Date(b.last_played_at || '').getTime() || 0;
+                res = timeA - timeB
+                    || (new Date(a.created_at).getTime() || 0) - (new Date(b.created_at).getTime() || 0)
+                    || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             }
             return res;
         });
@@ -194,7 +196,7 @@ export const VideoLibrary: React.FC = () => {
                 groups.get(v.folder_id)!.push(v);
 
                 const currentMax = groupMaxPlayed.get(v.folder_id) || 0;
-                const videoPlayed = v.last_played_at ? new Date(v.last_played_at).getTime() : 0;
+                const videoPlayed = new Date(v.last_played_at || '').getTime() || 0;
                 if (videoPlayed > currentMax) {
                     groupMaxPlayed.set(v.folder_id, videoPlayed);
                 }
@@ -221,13 +223,15 @@ export const VideoLibrary: React.FC = () => {
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;
                 const timeB = new Date(b.created_at).getTime() || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'played') {
                 const timeA = groupMaxPlayed.get(a.id) || 0;
                 const timeB = groupMaxPlayed.get(b.id) || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB
+                    || (new Date(a.created_at).getTime() || 0) - (new Date(b.created_at).getTime() || 0)
+                    || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             }
             return res;
         });

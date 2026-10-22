@@ -63,11 +63,13 @@ export function useVideoPlayback({
     const lastClickTimeRef = useRef<number>(0);
     const activeVideoPathRef = useRef<string | undefined>(undefined);
     const videoRequestIdRef = useRef(0);
+    const playbackRecordedRef = useRef(false);
     const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const requestId = ++videoRequestIdRef.current;
         activeVideoPathRef.current = isOpen ? metadata?.path : undefined;
+        playbackRecordedRef.current = false;
         return () => {
             videoRequestIdRef.current = requestId + 1;
             activeVideoPathRef.current = undefined;
@@ -364,11 +366,24 @@ export function useVideoPlayback({
     const onPlaying = useCallback(() => {
         setIsBuffering(false);
         setIsPlaying(true);
+        // Buffering and pause/resume also fire playing; count once per opened video.
+        const path = metadata?.path;
+        if (isOpen && path && !playbackRecordedRef.current) {
+            playbackRecordedRef.current = true;
+            void videoService.recordPlayback(path).then(lastPlayedAt => {
+                if (!lastPlayedAt) return;
+                useVideoStore.setState(state => ({
+                    videos: state.videos.map(video => video.path === path
+                        ? { ...video, last_played_at: lastPlayedAt, play_count: video.play_count + 1 }
+                        : video),
+                }));
+            }).catch(error => console.error('Failed to record video playback', error));
+        }
         if (error) {
             setError(null);
             setShowError(false);
         }
-    }, [error]);
+    }, [error, isOpen, metadata?.path]);
 
     const onError = useCallback((e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
         if (!videoSrc || isPreparing) return;

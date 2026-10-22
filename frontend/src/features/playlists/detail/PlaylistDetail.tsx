@@ -176,7 +176,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             });
             // Track playlist play time
             if (id !== 'favorites' && typeof id === 'number') {
-                libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                void libraryService.markPlaylistAsPlayed(id).then(triggerPlaylistUpdate).catch(console.error);
             }
         }
     };
@@ -197,7 +197,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
 
             // Track playlist play time
             if (id !== 'favorites' && typeof id === 'number') {
-                libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                void libraryService.markPlaylistAsPlayed(id).then(triggerPlaylistUpdate).catch(console.error);
             }
         }
     };

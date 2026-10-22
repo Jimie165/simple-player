@@ -158,6 +158,7 @@ fn main() {
             commands::video::query::video_file_exists,
             commands::video::query::search_videos,
             commands::video::query::toggle_video_favorite,
+            commands::video::query::record_video_playback,
             commands::video::query::batch_delete_videos,
             commands::video::prepare::prepare_video_for_playback,
             commands::video::cache::get_transcode_cache_info,
