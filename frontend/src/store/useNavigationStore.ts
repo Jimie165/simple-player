@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import type { PageId } from '@/types/index';
-import type { CoverTransitionSource } from '@/utils/viewTransition';
+import type { CoverTransitionFrame, CoverTransitionSource } from '@/utils/viewTransition';
 import { captureReturnCover } from '@/utils/viewTransition';
+import { useThemeStore } from '@/store/useThemeStore';
 
 // ViewConfig for Overlays
 export type ViewType = 'artist_detail' | 'album_detail';
@@ -33,11 +34,13 @@ interface NavigationState {
     activePlaylistDetail: PlaylistDetailState | null;
     playlistDetailEntered: boolean;
 
-    // Drop artwork after handoff, but retain exit geometry until the next return.
-    returnCoverSource: CoverTransitionSource | null;
-    releaseReturnCover: (coverId: string) => void;
-    completeReturnCoverFlight: (coverId: string) => void;
-    finishReturnCoverHandoff: (coverId: string) => void;
+    // One moving cover, shared by entry and return; no per-card animation registry.
+    coverTransition: CoverTransitionSource | null;
+    startCoverEnter: (source: CoverTransitionSource, target: CoverTransitionFrame, scroll: { top: number; left: number }) => void;
+    releaseCoverTransition: (coverId: string, from: CoverTransitionFrame) => void;
+    completeCoverTransition: (coverId: string, from: CoverTransitionFrame) => void;
+    finishCoverTransition: (coverId: string) => void;
+    clearCoverTransition: () => void;
 
     // Overlay Stack
     overlayStack: ViewState[];
@@ -111,26 +114,38 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     mainHistory: [],
     activePlaylistDetail: null,
     playlistDetailEntered: false,
-    returnCoverSource: null,
-    releaseReturnCover: (coverId) => set(state => {
-        const source = state.returnCoverSource;
-        if (source?.coverId !== coverId) return state;
-        if (!source.flight) return { returnCoverSource: null };
+    coverTransition: null,
+    startCoverEnter: (source, target, scroll) => set(state => {
+        const activeSource = state.hasOverlay
+            ? state.activeOverlay?.transitionSource
+            : state.activePlaylistDetail?.transitionSource;
+        if (!useThemeStore.getState().moreTransitionsEnabled || activeSource !== source || !source.frame || !source.images?.length
+            || state.coverTransition?.flight?.direction === 'return'
+            || state.coverTransition?.frame === source.frame) return state;
+        return { coverTransition: { ...source, flight: {
+            direction: 'enter', from: source.frame, to: target, scroll,
+        } } };
+    }),
+    releaseCoverTransition: (coverId, from) => set(state => {
+        const source = state.coverTransition;
+        if (!source || source.coverId !== coverId || !source.flight || source.flight.from !== from) return state;
         if (source.flight.ready) return state;
-        return { returnCoverSource: { ...source, flight: { ...source.flight, ready: true } } };
+        return { coverTransition: { ...source, flight: { ...source.flight, ready: true } } };
     }),
-    completeReturnCoverFlight: (coverId) => set(state => {
-        const source = state.returnCoverSource;
-        if (source?.coverId !== coverId || !source.flight) return state;
+    completeCoverTransition: (coverId, from) => set(state => {
+        const source = state.coverTransition;
+        if (!source || source.coverId !== coverId || !source.flight || source.flight.from !== from) return state;
         if (source.flight.completed) return state;
-        return { returnCoverSource: { ...source, flight: { ...source.flight, completed: true } } };
+        return { coverTransition: { ...source, flight: { ...source.flight, completed: true } } };
     }),
-    finishReturnCoverHandoff: (coverId) => set(state => {
-        const source = state.returnCoverSource;
+    finishCoverTransition: (coverId) => set(state => {
+        const source = state.coverTransition;
         return source?.coverId === coverId && source.flight?.completed && source.flight.ready && !source.flight.handedOff
-            ? { returnCoverSource: { ...source, images: undefined, flight: { ...source.flight, handedOff: true } } }
+            ? { coverTransition: { ...source, images: source.flight.direction === 'enter' ? source.images : undefined,
+                flight: { ...source.flight, handedOff: true } } }
             : state;
     }),
+    clearCoverTransition: () => set({ coverTransition: null }),
     overlayStack: [],
     activeOverlay: null,
     hasOverlay: false,
@@ -166,7 +181,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             currentPage: page,
             currentTab: targetTab,
             mainHistory: newHistory,
-            returnCoverSource: null,
+            coverTransition: null,
             activePlaylistDetail: null,
             overlayStack: [],
             activeOverlay: null,
@@ -187,7 +202,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         const updates: Partial<NavigationState> = {
             currentTab: tab,
             mainHistory: newHistory,
-            returnCoverSource: null,
+            coverTransition: null,
         };
 
         if (state.currentPage === 'library') {
@@ -206,7 +221,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             return {
                 activePlaylistDetail: detail,
                 playlistDetailEntered: false,
-                returnCoverSource: null,
+                coverTransition: null,
                 overlayStack: [],
                 activeOverlay: null,
                 hasOverlay: false,
@@ -219,7 +234,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             mainHistory: appendMainHistory(state),
             activePlaylistDetail: detail,
             playlistDetailEntered: false,
-            returnCoverSource: null,
+            coverTransition: null,
             overlayStack: [],
             activeOverlay: null,
             hasOverlay: false,
@@ -232,8 +247,9 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             : state),
 
     closePlaylistDetail: () => {
-        const returnCoverSource = captureReturnCover(get().activePlaylistDetail?.transitionSource);
-        set({ activePlaylistDetail: null, playlistDetailEntered: false, returnCoverSource });
+        const coverTransition = useThemeStore.getState().moreTransitionsEnabled
+            ? captureReturnCover(get().activePlaylistDetail?.transitionSource) : null;
+        set({ activePlaylistDetail: null, playlistDetailEntered: false, coverTransition });
     },
 
     push: (view) => set((state) => {
@@ -257,7 +273,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             overlayStack: newStack,
             activeOverlay: view,
             hasOverlay: true,
-            returnCoverSource: null,
+            coverTransition: null,
             _lastPushedOverlayKey: incomingKey,
             _lastPushedAt: now
         };
@@ -265,13 +281,14 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
     pop: () => set((state) => {
         if (state.overlayStack.length === 0) return state;
-        const returnCoverSource = captureReturnCover(state.activeOverlay?.transitionSource);
+        const coverTransition = useThemeStore.getState().moreTransitionsEnabled
+            ? captureReturnCover(state.activeOverlay?.transitionSource) : null;
         const newStack = state.overlayStack.slice(0, -1);
         return {
             overlayStack: newStack,
             activeOverlay: newStack.length > 0 ? newStack[newStack.length - 1] : null,
             hasOverlay: newStack.length > 0,
-            returnCoverSource,
+            coverTransition,
         };
     }),
 
@@ -302,7 +319,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
                     currentPage: prevState.page,
                     currentTab: prevState.tab || 'songs',
                     mainHistory: newHistory,
-                    returnCoverSource: null,
+                    coverTransition: null,
                     activePlaylistDetail: prevState.playlistDetail ?? null,
                     playlistDetailEntered: false,
                     overlayStack: prevState.overlayStack ?? [],
@@ -316,7 +333,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     },
 
     reset: () => set({
-        returnCoverSource: null,
+        coverTransition: null,
         overlayStack: [],
         activeOverlay: null,
         hasOverlay: false

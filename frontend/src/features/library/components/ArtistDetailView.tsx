@@ -1,6 +1,6 @@
 import SharedCover from '@/components/common/SharedCover';
 import type { CoverTransitionSource } from '@/utils/viewTransition';
-import { viewMotion } from '@/utils/viewTransition';
+import { pageMotion } from '@/utils/viewTransition';
 import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Virtuoso } from 'react-virtuoso';
@@ -318,11 +318,11 @@ export default function ArtistDetailView({
 
             {/* Content Area */}
             <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2 pb-20">
-                <AnimatePresence mode="popLayout" initial={false}>
+                <AnimatePresence mode="wait" initial={false}>
                     {activeTab === 'albums' ? (
                         <motion.div
                             key="albums"
-                            {...viewMotion}
+                            {...pageMotion}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <AlbumGridView
@@ -337,7 +337,7 @@ export default function ArtistDetailView({
                     ) : (
                         <motion.div
                             key="songs"
-                            {...viewMotion}
+                            {...pageMotion}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <div className="mt-4">

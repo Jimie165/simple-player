@@ -15,7 +15,7 @@ import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
 import { ContentSurface } from '@/components/layout/ContentSurface';
 import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
-import { ReturnCoverOverlay } from '@/components/common/SharedCover';
+import { CoverTransitionOverlay } from '@/components/common/SharedCover';
 
 import MusicGrid from '@/features/home/MusicGrid';
 import Library from '@/features/library/Library';
@@ -328,7 +328,7 @@ function App() {
         }}
       />
       <EditableContextMenu />
-      <ReturnCoverOverlay />
+      <CoverTransitionOverlay />
 
       <NowPlayingView
         isOpen={isFullScreen}

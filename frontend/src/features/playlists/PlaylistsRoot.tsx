@@ -1,4 +1,4 @@
-import { getDetailMotion, pageMotion } from '@/utils/viewTransition';
+import { getDetailMotion } from '@/utils/viewTransition';
 import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { AnimatePresence } from 'framer-motion';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
@@ -6,6 +6,7 @@ import ScrollArea from '@/components/common/ScrollArea';
 import PlaylistDetail from '@/features/playlists/detail/PlaylistDetail';
 import PlaylistList from '@/features/playlists/PlaylistList';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { useThemeStore } from '@/store/useThemeStore';
 
 export default function PlaylistsRoot() {
     const activePlaylistDetail = useNavigationStore((state) => state.activePlaylistDetail);
@@ -26,18 +27,19 @@ export default function PlaylistsRoot() {
 /** Keep the source cards and their scroll position intact throughout the return transition. */
 export function PlaylistDetailOverlay() {
     const detail = useNavigationStore((state) => state.activePlaylistDetail);
-    const returnCoverSource = useNavigationStore((state) => state.returnCoverSource);
+    const coverTransition = useNavigationStore((state) => state.coverTransition);
+    const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
 
     return (
-        <AnimatePresence initial={false} custom={returnCoverSource}>
+        <AnimatePresence initial={false} custom={coverTransition}>
             {detail && (
                 <ArtworkThemeLayer
                     key={detail.id}
-                    {...(detail.transitionSource ? getDetailMotion(detail.transitionSource) : pageMotion)}
+                    data-transition-layer={detail.transitionSource?.coverId}
+                    {...getDetailMotion(detail.transitionSource, undefined, moreTransitionsEnabled)}
                     variants={{
-                        exit: (returnSource: CoverTransitionSource | null) => detail.transitionSource
-                            ? getDetailMotion(detail.transitionSource, returnSource).exit
-                            : pageMotion.exit,
+                        exit: (returnSource: CoverTransitionSource | null) =>
+                            getDetailMotion(detail.transitionSource, returnSource, moreTransitionsEnabled).exit,
                     }}
                     exit="exit"
                     onAnimationComplete={(definition) => {

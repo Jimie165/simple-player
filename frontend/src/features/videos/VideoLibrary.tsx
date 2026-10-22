@@ -1,4 +1,4 @@
-import { viewMotion } from '@/utils/viewTransition';
+import { pageMotion } from '@/utils/viewTransition';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoStore } from '@/store/useVideoStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
@@ -344,11 +344,11 @@ export const VideoLibrary: React.FC = () => {
 
                 {/* Content */}
                 <div className="flex-1 overflow-hidden min-h-0">
-                    <AnimatePresence mode="popLayout" initial={false}>
+                    <AnimatePresence mode="wait" initial={false}>
                         {activeTab === 'all' ? (
                             <motion.div
                                 key="all"
-                                {...viewMotion}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 <VideoGrid videos={sortedVideos} playSingleItem={true} virtualized={true} />
@@ -356,7 +356,7 @@ export const VideoLibrary: React.FC = () => {
                         ) : (
                             <motion.div
                                 key="folders"
-                                {...viewMotion}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 {groupedVideos.length === 0 ? (

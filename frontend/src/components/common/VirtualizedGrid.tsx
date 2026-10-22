@@ -49,7 +49,8 @@ export default function VirtualizedGrid<TItem>({
     }, [listStyle, scrollParent]);
 
     return (
-        <div ref={wrapperRef} className={clsx("w-full", className)}>
+        // Grid recycling changes top padding; browser scroll anchoring must not compensate for it.
+        <div ref={wrapperRef} className={clsx("w-full [overflow-anchor:none]", className)}>
             {scrollParent && <VirtuosoGrid
                 useWindowScroll={false}
                 customScrollParent={scrollParent}

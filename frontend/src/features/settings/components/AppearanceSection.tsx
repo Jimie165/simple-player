@@ -32,6 +32,8 @@ export default function AppearanceSection() {
         setLyricLineBlendEnabled,
         artworkBackgroundEnabled,
         setArtworkBackgroundEnabled,
+        moreTransitionsEnabled,
+        setMoreTransitionsEnabled,
     } = useTheme();
 
     return (
@@ -110,6 +112,13 @@ export default function AppearanceSection() {
                         label="页面背景跟随封面"
                         checked={artworkBackgroundEnabled}
                         onChange={setArtworkBackgroundEnabled}
+                    />
+                </SettingsRow>
+                <SettingsRow label="更多的过渡动画">
+                    <SettingsSwitch
+                        label="更多的过渡动画"
+                        checked={moreTransitionsEnabled}
+                        onChange={setMoreTransitionsEnabled}
                     />
                 </SettingsRow>
             </SettingsGroup>

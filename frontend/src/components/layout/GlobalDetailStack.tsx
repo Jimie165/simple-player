@@ -1,5 +1,6 @@
 import { memo, useMemo, useEffect, useRef, useState } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
+import { useThemeStore } from '@/store/useThemeStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { libraryService } from '@/services/libraryService';
 import AlbumDetailView from '@/features/library/components/AlbumDetailView';
@@ -17,19 +18,21 @@ import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
-import { detailTransition, getDetailMotion } from '@/utils/viewTransition';
+import { getDetailMotion } from '@/utils/viewTransition';
 import type { CoverTransitionSource } from '@/utils/viewTransition';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
 interface OverlayTransitionContext {
     direction: OverlayTransitionDirection;
-    returnCoverSource: CoverTransitionSource | null;
+    coverTransition: CoverTransitionSource | null;
+    moreTransitionsEnabled: boolean;
 }
 
 
 function GlobalDetailStack() {
     const overlayStack = useNavigationStore(state => state.overlayStack);
-    const returnCoverSource = useNavigationStore(state => state.returnCoverSource);
+    const coverTransition = useNavigationStore(state => state.coverTransition);
+    const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
     const push = useNavigationStore(state => state.push);
     const addToRecent = useLibraryStore(state => state.addToRecent);
     const { playSong, shufflePlay } = usePlaybackActions();
@@ -40,7 +43,7 @@ function GlobalDetailStack() {
         : overlayStack.length < settledOverlayDepth
             ? 'pop'
             : 'idle';
-    const transitionContext: OverlayTransitionContext = { direction: transitionDirection, returnCoverSource };
+    const transitionContext: OverlayTransitionContext = { direction: transitionDirection, coverTransition, moreTransitionsEnabled };
     // Keep the immediately covered detail mounted so back navigation restores its
     // data and scroll position. Older detail layers can still be unmounted.
     const visibleOverlayCount = 2;
@@ -116,7 +119,7 @@ function GlobalDetailStack() {
         >
             {visibleOverlays.map((activeView, visibleIndex) => {
                 const index = firstVisibleOverlayIndex + visibleIndex;
-                const detailMotion = getDetailMotion(activeView.transitionSource);
+                const detailMotion = getDetailMotion(activeView.transitionSource, undefined, moreTransitionsEnabled);
                 const isTopOverlay = index === overlayStack.length - 1;
                 const isFrozenOverlay = !isTopOverlay && transitionDirection !== 'push';
                 let key = `${activeView.type}-${index}`;
@@ -126,20 +129,21 @@ function GlobalDetailStack() {
                 return (
                     <ArtworkThemeLayer
                         key={key}
+                        data-transition-layer={activeView.transitionSource?.coverId}
                         custom={transitionContext}
                         variants={{
                             initial: detailMotion.initial,
                             animate: detailMotion.animate,
                             exit: (context: OverlayTransitionContext) => context.direction === 'pop'
-                                ? getDetailMotion(activeView.transitionSource, context.returnCoverSource).exit
+                                ? getDetailMotion(activeView.transitionSource, context.coverTransition, context.moreTransitionsEnabled).exit
                                 : { ...detailMotion.animate, transition: { duration: 0 } },
                         }}
                         initial={transitionDirection === 'pop' ? false : 'initial'}
                         animate="animate"
                         exit="exit"
-                        transition={detailTransition}
-                        onAnimationComplete={() => {
-                            if (isTopOverlay && transitionDirection === 'push') {
+                        transition={detailMotion.transition}
+                        onAnimationComplete={(definition) => {
+                            if (definition !== 'exit' && isTopOverlay && transitionDirection === 'push') {
                                 setSettledOverlayDepth(overlayStack.length);
                             }
                         }}

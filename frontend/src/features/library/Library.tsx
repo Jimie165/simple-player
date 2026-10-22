@@ -1,5 +1,5 @@
 import type { CoverTransitionSource } from '@/utils/viewTransition';
-import { viewMotion } from '@/utils/viewTransition';
+import { pageMotion } from '@/utils/viewTransition';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -306,11 +306,11 @@ export default function Library() {
 
                 {/* Views */}
                 <div className="flex-1 min-h-0 relative">
-                    <AnimatePresence mode="popLayout" initial={false}>
+                    <AnimatePresence mode="wait" initial={false}>
                         {activeTab === 'songs' && (
                             <motion.div
                                 key="songs"
-                                {...viewMotion}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 <SongListView
@@ -325,7 +325,7 @@ export default function Library() {
                         {activeTab === 'albums' && (
                             <motion.div
                                 key="albums"
-                                {...viewMotion}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 <AlbumGridView
@@ -361,7 +361,7 @@ export default function Library() {
                         {activeTab === 'artists' && (
                             <motion.div
                                 key="artists"
-                                {...viewMotion}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 <ArtistGridView

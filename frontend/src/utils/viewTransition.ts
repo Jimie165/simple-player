@@ -27,6 +27,8 @@ export const detailTransition: Transition = {
     ease: [0.22, 1, 0.36, 1],
 };
 
+const legacyDetailTransition: Transition = { type: 'spring', stiffness: 300, damping: 30 };
+
 export interface CoverTransitionFrame {
     left: number;
     top: number;
@@ -50,8 +52,10 @@ export interface CoverTransitionSource {
         height: number;
     }[];
     flight?: {
+        direction: 'enter' | 'return';
         from: CoverTransitionFrame;
         to: CoverTransitionFrame;
+        scroll?: { top: number; left: number };
         completed?: boolean;
         ready?: boolean;
         clipPath?: string;
@@ -60,18 +64,19 @@ export interface CoverTransitionSource {
 }
 
 /** Capture the clicked cover before navigation, in content-viewport percentages. */
-export function getCoverTransitionSource(card: HTMLElement): CoverTransitionSource | undefined {
-    const cover = card.matches('[data-transition-cover]')
+export function getCoverTransitionSource(card: HTMLElement, visualCover?: HTMLElement): CoverTransitionSource | undefined {
+    const cover = visualCover ?? (card.matches('[data-transition-cover]')
         ? card
-        : card.querySelector<HTMLElement>('[data-transition-cover]');
+        : card.querySelector<HTMLElement>('[data-transition-cover]'));
     const viewport = card.closest<HTMLElement>('[data-main-content-query]');
-    if (!cover?.dataset.transitionCover || !viewport) return;
+    const coverId = cover?.dataset.transitionCover ?? cover?.dataset.movingCover;
+    if (!cover || !coverId || !viewport) return;
     const bounds = cover.getBoundingClientRect();
     const container = viewport.getBoundingClientRect();
     if (container.width <= 0 || container.height <= 0 || bounds.width <= 0 || bounds.height <= 0) return;
     const percent = (value: number) => Math.max(0, Math.min(100, value * 100));
     return {
-        coverId: cover.dataset.transitionCover,
+        coverId,
         frame: getCoverFrame(cover),
         top: percent((bounds.top - container.top) / container.height),
         right: percent((container.right - bounds.right) / container.width),
@@ -92,7 +97,7 @@ export function getCoverTransitionSource(card: HTMLElement): CoverTransitionSour
     };
 }
 
-function getCoverFrame(element: HTMLElement): CoverTransitionFrame {
+export function getCoverFrame(element: HTMLElement): CoverTransitionFrame {
     const bounds = element.getBoundingClientRect();
     const radius = getComputedStyle(element).borderTopLeftRadius;
     const size = Math.min(bounds.width, bounds.height);
@@ -106,31 +111,32 @@ function getCoverFrame(element: HTMLElement): CoverTransitionFrame {
     };
 }
 
-/** Capture before changing navigation; shared-layout followers report projected, not landing, bounds. */
+/** Capture native cover bounds and loaded artwork before navigation removes the detail. */
 export function captureReturnCover(source?: CoverTransitionSource): CoverTransitionSource | null {
     if (!source || typeof document === 'undefined') return null;
     const covers = Array.from(document.querySelectorAll<HTMLElement>('[data-transition-cover]'))
         .filter(element => element.dataset.transitionCover === source.coverId);
     const detail = covers.find(element => element.hasAttribute('data-cover-detail'));
     if (!detail) return null;
-    const snapshot = getCoverTransitionSource(detail);
+    const movingCover = Array.from(document.querySelectorAll<HTMLElement>('[data-moving-cover]'))
+        .find(element => element.dataset.movingCover === source.coverId
+            && element.closest('[data-cover-transition-active]')
+            && getComputedStyle(element).visibility !== 'hidden');
+    const snapshot = getCoverTransitionSource(detail, movingCover);
     if (!snapshot?.images?.length || !snapshot.frame) return null;
 
     const target = covers.find(element => !element.hasAttribute('data-cover-detail'));
-    let destination = source.frame;
+    let destination = snapshot.frame;
     if (target) {
-        // Temporarily remove only the follower's projection, restoring it before any paint.
-        const transform = target.style.transform;
-        try {
-            target.style.transform = 'none';
-            const frame = getCoverFrame(target);
-            if (frame.width > 0 && frame.height > 0) destination = frame;
-        } finally {
-            target.style.transform = transform;
-        }
+        const frame = getCoverFrame(target);
+        if (frame.width > 0 && frame.height > 0) destination = frame;
     }
     if (!destination) return null;
-    snapshot.flight = { from: snapshot.frame, to: destination, ready: !target };
+    snapshot.flight = { direction: 'return', from: snapshot.frame, to: destination, ready: !target };
+    const scrollViewport = target?.closest<HTMLElement>('[data-scroll-viewport]');
+    if (scrollViewport) {
+        snapshot.flight.scroll = { top: scrollViewport.scrollTop, left: scrollViewport.scrollLeft };
+    }
     const viewport = detail.closest<HTMLElement>('[data-main-content-query]')?.getBoundingClientRect();
     if (viewport && viewport.width > 0 && viewport.height > 0) {
         const percent = (value: number) => Math.max(0, Math.min(100, value * 100));
@@ -143,7 +149,16 @@ export function captureReturnCover(source?: CoverTransitionSource): CoverTransit
     return snapshot;
 }
 
-export function getDetailMotion(source?: CoverTransitionSource, returnSource?: CoverTransitionSource | null) {
+export function getDetailMotion(source?: CoverTransitionSource, returnSource?: CoverTransitionSource | null, moreTransitionsEnabled = true) {
+    if (!moreTransitionsEnabled) {
+        const clipPath = 'inset(0% 0% 0% 0% round 0px)';
+        return {
+            initial: { x: '100%', clipPath },
+            animate: { x: '0%', clipPath },
+            exit: { x: '100%', clipPath, transition: legacyDetailTransition },
+            transition: legacyDetailTransition,
+        };
+    }
     // Match the source silhouette so circular avatars don't reveal rectangular page corners.
     const radius = source?.frame?.borderRadius ?? 16;
     const closed = source
@@ -152,7 +167,7 @@ export function getDetailMotion(source?: CoverTransitionSource, returnSource?: C
     return {
         initial: closed,
         animate: { x: '0%', clipPath: 'inset(0% 0% 0% 0% round 0px)' },
-        exit: source && returnSource?.coverId === source.coverId && returnSource.flight?.clipPath
+        exit: source && returnSource?.coverId === source.coverId && returnSource.flight?.direction === 'return' && returnSource.flight.clipPath
             ? { x: '0%', clipPath: returnSource.flight.clipPath }
             : closed,
         transition: detailTransition,
