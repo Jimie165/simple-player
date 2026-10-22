@@ -18,6 +18,7 @@ interface ThemeState {
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
+    artworkBackgroundEnabled: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
@@ -26,6 +27,7 @@ interface ThemeState {
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
+    setArtworkBackgroundEnabled: (enabled: boolean) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -46,6 +48,7 @@ export const useThemeStore = create<ThemeState>()(
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
+            artworkBackgroundEnabled: false,
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
@@ -66,6 +69,7 @@ export const useThemeStore = create<ThemeState>()(
                 set({ reactiveBackgroundEnabled: enabled });
             },
             setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
+            setArtworkBackgroundEnabled: (enabled) => set({ artworkBackgroundEnabled: enabled }),
 
             setSourceColor: (hex, isCustom = false) => {
                 set({ sourceColor: hex, isCustomColor: isCustom });
@@ -134,6 +138,7 @@ export const useThemeStore = create<ThemeState>()(
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
+                artworkBackgroundEnabled: state.artworkBackgroundEnabled,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -153,6 +158,7 @@ export const useThemeStore = create<ThemeState>()(
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
+                    artworkBackgroundEnabled: persistedState?.artworkBackgroundEnabled === true,
                 };
             },
         }

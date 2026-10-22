@@ -283,6 +283,10 @@ body {
     background-image: linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%);
   }
 
+  [data-artwork-theme] .app-shell-background {
+    background: var(--artwork-background);
+  }
+
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }

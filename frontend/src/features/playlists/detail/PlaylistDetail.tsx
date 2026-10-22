@@ -4,6 +4,9 @@ import clsx from 'clsx';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 import { ContentBackground } from '@/components/layout/ContentSurface';
+import { useThemeStore } from '@/store/useThemeStore';
+import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 
 import SortableSongList from '@/features/playlists/songlist/SortableSongList';
@@ -262,7 +265,11 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     const displayName = isFavorites ? '喜爱歌曲' : (playlistInfo?.name || initialName);
     const displayDesc = isFavorites ? undefined : playlistInfo?.description;
+    const artworkBackgroundEnabled = useThemeStore(state => state.artworkBackgroundEnabled);
     const coverPath = isFavorites ? undefined : playlistInfo?.cover_path;
+    const isActive = useNavigationStore(state => !state.hasOverlay
+        && state.currentPage === 'playlists' && state.activePlaylistDetail?.id === id);
+    useContentArtworkTheme(songs[0]?.cover_path, isActive);
 
     return (
         <div className="w-full min-h-full relative isolate">
@@ -277,7 +284,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 initialCover={coverPath || undefined}
             />
 
-            {/* Immersive Background */}
+            {!artworkBackgroundEnabled && (
             <ContentBackground>
                 <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
                     {coverPath ? (
@@ -296,6 +303,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
                 </div>
             </ContentBackground>
+            )}
 
             {/* Header Section */}
             <div className="relative w-full z-20 -mt-10">

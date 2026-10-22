@@ -14,6 +14,8 @@ export function useTheme() {
 
     const isCustomColor = useThemeStore((state) => state.isCustomColor);
     const isDark = useThemeStore((state) => state.isDark);
+    const artworkBackgroundEnabled = useThemeStore(state => state.artworkBackgroundEnabled);
+    const setArtworkBackgroundEnabled = useThemeStore(state => state.setArtworkBackgroundEnabled);
 
     const playerEffectMode = useThemeStore((state) => state.playerEffectMode);
     const setPlayerEffectMode = useThemeStore((state) => state.setPlayerEffectMode);
@@ -40,6 +42,8 @@ export function useTheme() {
 
         isCustomColor,
         isDark,
+        artworkBackgroundEnabled,
+        setArtworkBackgroundEnabled,
 
         playerEffectMode,
         setPlayerEffectMode,

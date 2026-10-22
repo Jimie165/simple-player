@@ -12,6 +12,7 @@ import TitleBar from '@/components/layout/TitleBar';
 import Sidebar from '@/components/layout/Sidebar';
 import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
 import { ContentSurface } from '@/components/layout/ContentSurface';
+import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
 
 import MusicGrid from '@/features/home/MusicGrid';
@@ -237,11 +238,10 @@ function App() {
         inert={isFullScreen}
         aria-hidden={isFullScreen}
       >
-        {/* 1. 标题栏（始终在最顶层 z-100） */}
-        <TitleBar />
-        <SelectionMenuBar />
-
-        <div className="flex flex-1 overflow-hidden relative">
+        <ContentTheme>
+          {/* 1. 标题栏（始终在最顶层 z-100） */}
+          <TitleBar />
+          <SelectionMenuBar />
           {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
           <div className="app-shell-background absolute inset-0 flex">
             <Sidebar
@@ -296,22 +296,21 @@ function App() {
               </AnimatePresence>
             </ContentSurface>
           </div>
-        </div>
-
-        {/* 4. 底部播放控制 - M3 Surface Container */}
-        <div className="relative z-70">
-          <PlayerControl
-            isFullScreen={isFullScreen}
-            isSuspended={isFullScreen}
-            onToggleFullScreen={toggleFullScreenPlayer}
-            sidebarOffset={sidebarOffset}
-            rightOffset={queueOffset}
-            mode={playerMode}
-            isQueueOpen={isQueueOpen}
-            canShowQueue={canShowQueue}
-            onToggleQueue={() => setIsQueueOpen((open) => !open)}
-          />
-        </div>
+          {/* 4. 底部播放控制 - M3 Surface Container */}
+          <div className="relative z-70">
+            <PlayerControl
+              isFullScreen={isFullScreen}
+              isSuspended={isFullScreen}
+              onToggleFullScreen={toggleFullScreenPlayer}
+              sidebarOffset={sidebarOffset}
+              rightOffset={queueOffset}
+              mode={playerMode}
+              isQueueOpen={isQueueOpen}
+              canShowQueue={canShowQueue}
+              onToggleQueue={() => setIsQueueOpen((open) => !open)}
+            />
+          </div>
+        </ContentTheme>
       </div>
       <AddToPlaylistSheet />
       <GlobalDialogLayer />

@@ -15,6 +15,7 @@ import { AnimatePresence, motion, type Variants } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
 import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features/library/utils/grouping';
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
+import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
 
@@ -209,6 +210,10 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
         };
     }, [initialData]);
     const [albumData, setAlbumData] = useState<AlbumData>(albumInitialData);
+    // Exiting motion layers retain their props, so consult live navigation ownership.
+    const isActive = useNavigationStore(state => state.activeOverlay?.type === 'album_detail'
+        && state.activeOverlay.data === initialData);
+    useContentArtworkTheme(albumData.cover || albumData.songs[0]?.cover_path, isActive);
 
     useEffect(() => {
         // Always resolve the complete album from the library. An album opened

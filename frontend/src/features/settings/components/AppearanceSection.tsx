@@ -111,6 +111,8 @@ export default function AppearanceSection() {
         setReactiveBackgroundEnabled,
         lyricLineBlendEnabled,
         setLyricLineBlendEnabled,
+        artworkBackgroundEnabled,
+        setArtworkBackgroundEnabled,
     } = useTheme();
 
     return (
@@ -120,6 +122,7 @@ export default function AppearanceSection() {
                 <span>外观与主题</span>
             </div>
 
+            <h3 className="text-base font-semibold text-on-surface px-1">应用外观</h3>
             {/* Mode Selection */}
             <div className="space-y-3">
                 <h4 className="text-sm font-medium text-on-surface px-1">主题模式</h4>
@@ -130,6 +133,101 @@ export default function AppearanceSection() {
                 </div>
             </div>
 
+            {/* Color Selection */}
+            <div className="space-y-4">
+                <div className="flex items-center justify-between px-1">
+                    <h4 className="text-sm font-medium text-on-surface">应用配色</h4>
+                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 px-2 py-1 rounded-md">
+                        <MdColorLens />
+                        <span>主题颜色</span>
+                    </div>
+                </div>
+
+                <div className="settings-card rounded-2xl p-5">
+                    <div className="flex flex-wrap gap-4 items-center">
+                        {/* Presets */}
+                        {presetColors.map((color) => {
+                            const isSelected = !isCustomColor && sourceColor === color.value;
+                            return (
+                                <CustomTooltip key={color.id} text={color.name}>
+                                    <button
+                                        onClick={() => setSourceColor(color.value, false)}
+                                        aria-label={color.name}
+                                        className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
+                                    >
+                                        <div
+                                            className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
+                                            style={{ backgroundColor: color.value }}
+                                        />
+                                        {isSelected && (
+                                            <MdCheck className="relative z-10 text-white text-xl drop-shadow-md" />
+                                        )}
+                                    </button>
+                                </CustomTooltip>
+                            );
+                        })}
+
+                        {/* Divider */}
+                        <div className="w-px h-8 bg-outline-variant/30 mx-2" />
+
+                        {/* Custom Picker */}
+                        <CustomTooltip text="自定义颜色" className="relative group">
+                            <div
+                                className={clsx(
+                                    "w-12 h-12 rounded-full flex items-center justify-center border transition-all cursor-pointer overflow-hidden",
+                                    isCustomColor
+                                        ? "border-primary ring-2 ring-primary/30"
+                                        : "border-outline-variant/50 border-dashed hover:border-primary/50"
+                                )}
+                            >
+                                {isCustomColor ? (
+                                    <div
+                                        className="w-full h-full"
+                                        style={{ backgroundColor: sourceColor }}
+                                    />
+                                ) : (
+                                    <MdAdd className="text-2xl text-on-surface-variant" />
+                                )}
+
+                                {/* Invisible Color Input covering the button */}
+                                <input
+                                    type="color"
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                    value={sourceColor}
+                                    onChange={(e) => setSourceColor(e.target.value, true)}
+                                    aria-label="自定义颜色"
+                                />
+                            </div>
+                            {isCustomColor && (
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                    <MdCheck className="text-white text-xl drop-shadow-md mix-blend-difference" />
+                                </div>
+                            )}
+                        </CustomTooltip>
+                        <span className="text-sm text-on-surface-variant ml-2">自定义</span>
+                    </div>
+                </div>
+            </div>
+            <div className="settings-card flex items-center justify-between gap-4 rounded-xl border px-4 py-3">
+                <span>
+                    <span className="block text-sm font-medium text-on-surface">封面配色背景</span>
+                    <span className="block text-xs text-on-surface-variant">专辑按封面配色，播放列表按第一首歌曲封面配色</span>
+                </span>
+                <button
+                    type="button"
+                    role="switch"
+                    aria-label="封面配色背景"
+                    aria-checked={artworkBackgroundEnabled}
+                    onClick={() => setArtworkBackgroundEnabled(!artworkBackgroundEnabled)}
+                    className="flex shrink-0 items-center justify-center rounded-full p-2 -mr-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                    <span className={clsx('relative block h-6 w-11 rounded-full transition-colors', artworkBackgroundEnabled ? 'bg-primary' : 'bg-outline-variant/50')}>
+                        <span className={clsx('absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform', artworkBackgroundEnabled ? 'translate-x-5' : 'translate-x-0')} />
+                    </span>
+                </button>
+            </div>
+
+            <h3 className="border-t border-outline-variant/20 pt-6 text-base font-semibold text-on-surface px-1">播放页</h3>
             {/* Player Effect Selection */}
             <div>
                 <PopupChoice
@@ -221,81 +319,6 @@ export default function AppearanceSection() {
                 </div>
             </div>
 
-            {/* Color Selection */}
-            <div className="space-y-4">
-                <div className="flex items-center justify-between px-1">
-                    <h4 className="text-sm font-medium text-on-surface">应用配色</h4>
-                    <div className="flex items-center gap-2 text-xs text-primary bg-primary/10 px-2 py-1 rounded-md">
-                        <MdColorLens />
-                        <span>主题颜色</span>
-                    </div>
-                </div>
-
-                <div className="settings-card rounded-2xl p-5">
-                    <div className="flex flex-wrap gap-4 items-center">
-                        {/* Presets */}
-                        {presetColors.map((color) => {
-                            const isSelected = !isCustomColor && sourceColor === color.value;
-                            return (
-                                <CustomTooltip key={color.id} text={color.name}>
-                                    <button
-                                        onClick={() => setSourceColor(color.value, false)}
-                                        aria-label={color.name}
-                                        className="group relative w-12 h-12 rounded-full flex items-center justify-center transition-transform hover:scale-110 focus:outline-none"
-                                    >
-                                        <div
-                                            className="absolute inset-0 rounded-full border border-outline-variant/20 shadow-sm"
-                                            style={{ backgroundColor: color.value }}
-                                        />
-                                        {isSelected && (
-                                            <MdCheck className="relative z-10 text-white text-xl drop-shadow-md" />
-                                        )}
-                                    </button>
-                                </CustomTooltip>
-                            );
-                        })}
-
-                        {/* Divider */}
-                        <div className="w-px h-8 bg-outline-variant/30 mx-2" />
-
-                        {/* Custom Picker */}
-                        <CustomTooltip text="自定义颜色" className="relative group">
-                            <div
-                                className={clsx(
-                                    "w-12 h-12 rounded-full flex items-center justify-center border transition-all cursor-pointer overflow-hidden",
-                                    isCustomColor
-                                        ? "border-primary ring-2 ring-primary/30"
-                                        : "border-outline-variant/50 border-dashed hover:border-primary/50"
-                                )}
-                            >
-                                {isCustomColor ? (
-                                    <div
-                                        className="w-full h-full"
-                                        style={{ backgroundColor: sourceColor }}
-                                    />
-                                ) : (
-                                    <MdAdd className="text-2xl text-on-surface-variant" />
-                                )}
-
-                                {/* Invisible Color Input covering the button */}
-                                <input
-                                    type="color"
-                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                                    value={sourceColor}
-                                    onChange={(e) => setSourceColor(e.target.value, true)}
-                                    aria-label="自定义颜色"
-                                />
-                            </div>
-                            {isCustomColor && (
-                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                    <MdCheck className="text-white text-xl drop-shadow-md mix-blend-difference" />
-                                </div>
-                            )}
-                        </CustomTooltip>
-                        <span className="text-sm text-on-surface-variant ml-2">自定义</span>
-                    </div>
-                </div>
-            </div>
         </section>
     );
 }
