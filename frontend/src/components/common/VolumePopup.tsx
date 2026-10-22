@@ -54,13 +54,13 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                     <div className="absolute left-0 right-0 h-1 bg-on-surface/15 rounded-full overflow-hidden pointer-events-none transition-[height] group-hover:h-1.5"></div>
                     {/* 进度填充 */}
                     <div
-                        className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-on-surface/80 rounded-full pointer-events-none transition-[height] group-hover:h-1.5"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-[height] group-hover:h-1.5"
                         style={{ width: `${displayVolume}%` }}
                     />
                     {/* 圆点 (Thumb) */}
                     <div
                         className={clsx(
-                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-on-surface opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
+                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
                             isDragging && "opacity-100 scale-125"
                         )}
                         style={{ left: `${displayVolume}%`, marginLeft: '-6px' }}
