@@ -19,6 +19,7 @@ import { VideoLibrary } from '@/features/videos/VideoLibrary';
 import Settings from '@/features/settings/Settings';
 import PlayerControl from '@/features/player/PlayerControl';
 import NowPlayingView from '@/features/player/NowPlayingView';
+import NowPlayingQueue from '@/features/player/NowPlayingQueue';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PageId } from '@/types/index';
@@ -35,6 +36,8 @@ import { Toaster } from 'react-hot-toast';
 import EditableContextMenu from '@/components/common/EditableContextMenu';
 import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
 import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
+
+const FULL_PLAYER_MIN_WIDTH = 820;
 
 function App() {
   const { init: initTheme } = useThemeStore();
@@ -103,6 +106,7 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const {
     isOpen: isFullScreen,
     isBaseLayerFrozen,
@@ -124,14 +128,20 @@ function App() {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
       setIsCompactSidebar(window.innerWidth < 768);
+      const nextSidebarOffset = window.innerWidth < 768 || sidebarCollapsed ? 72 : 280;
+      if (window.innerWidth - nextSidebarOffset < FULL_PLAYER_MIN_WIDTH) setIsQueueOpen(false);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [sidebarCollapsed]);
 
   const sidebarOffset = isSidebarOverlay || sidebarCollapsed ? 72 : 280;
   const mainContentWidth = windowWidth - sidebarOffset;
-  const playerMode = mainContentWidth < 560 ? 'mini' : mainContentWidth < 820 ? 'compact' : 'full';
+  // 以队列收起时的完整控件为基准，避免队列自身占宽触发关闭。
+  const canShowQueue = mainContentWidth >= FULL_PLAYER_MIN_WIDTH;
+  const queueOffset = isQueueOpen && canShowQueue ? 360 : 0;
+  const playerWidth = mainContentWidth - queueOffset;
+  const playerMode = playerWidth < 560 ? 'mini' : playerWidth < FULL_PLAYER_MIN_WIDTH ? 'compact' : 'full';
   const handleNavigate = (page: string) => {
     const target = page as PageId;
     storeNavigate(target);
@@ -236,7 +246,10 @@ function App() {
               activeId={currentPage}
               onNavigate={handleNavigate}
               collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed((prev) => !prev)}
+              onToggle={() => {
+                setSidebarCollapsed((prev) => !prev);
+                if (windowWidth - 280 < FULL_PLAYER_MIN_WIDTH) setIsQueueOpen(false);
+              }}
               canGoBack={mainHistory.length > 0 || hasOverlay || activePlaylistDetail !== null || isFullScreen}
               onBack={handleBack}
               onSearch={handleSearch}
@@ -244,7 +257,7 @@ function App() {
               onRequestClose={() => setSidebarCollapsed(true)}
             />
 
-            <div className="flex-1 flex flex-col min-w-0 relative">
+            <div className="flex-1 flex min-w-0 relative">
               {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
               {isSidebarOverlay && !sidebarCollapsed && (
                 <div
@@ -255,6 +268,30 @@ function App() {
 
               {/* Reuse mainContent variable content inline or wrapper */}
               {mainContent}
+
+              <AnimatePresence initial={false}>
+                {isQueueOpen && canShowQueue && (
+                  <motion.aside
+                    id="content-play-queue"
+                    aria-label="播放队列"
+                    initial={{ width: 0 }}
+                    animate={{ width: 360 }}
+                    exit={{ width: 0 }}
+                    transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                    className="relative shrink-0 min-h-0 overflow-hidden"
+                  >
+                    <div className="absolute inset-y-0 left-0 flex flex-col w-90 pt-12 border-l border-outline-variant/20 bg-surface-container-low dark:bg-surface-container-high">
+                      <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
+                      <NowPlayingQueue
+                        variant="content"
+                        isOpen={isQueueOpen}
+                        onClose={() => setIsQueueOpen(false)}
+                        onNavigate={() => setIsQueueOpen(false)}
+                      />
+                    </div>
+                  </motion.aside>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -266,7 +303,11 @@ function App() {
             isSuspended={isFullScreen}
             onToggleFullScreen={toggleFullScreenPlayer}
             sidebarOffset={sidebarOffset}
+            rightOffset={queueOffset}
             mode={playerMode}
+            isQueueOpen={isQueueOpen}
+            canShowQueue={canShowQueue}
+            onToggleQueue={() => setIsQueueOpen((open) => !open)}
           />
         </div>
       </div>

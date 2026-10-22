@@ -15,10 +15,14 @@ interface PlayerControlProps {
     isSuspended: boolean;
     onToggleFullScreen: () => void;
     sidebarOffset: number;
+    rightOffset: number;
     mode: 'full' | 'compact' | 'mini';
+    isQueueOpen: boolean;
+    canShowQueue: boolean;
+    onToggleQueue: () => void;
 }
 
-export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullScreen, sidebarOffset, mode }: PlayerControlProps) {
+export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullScreen, sidebarOffset, rightOffset, mode, isQueueOpen, canShowQueue, onToggleQueue }: PlayerControlProps) {
     const metadata = usePlayerStore(s => s.metadata);
     const [isInfoOpen, setIsInfoOpen] = useState(false);
     const isMini = mode === 'mini';
@@ -26,9 +30,9 @@ export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullS
     return (
         <>
             <div className={clsx(
-                "pointer-events-none fixed bottom-4 right-0 z-75 flex justify-center px-4 transition-[left] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+                "pointer-events-none fixed bottom-4 z-75 flex justify-center px-4 transition-[left,right] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
             )}
-                style={{ left: sidebarOffset }}
+                style={{ left: sidebarOffset, right: rightOffset }}
             >
                 <div className={clsx(
                     "pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full border border-black/8 bg-white/72 shadow-[0_10px_30px_rgba(15,23,42,0.14)] backdrop-blur-[22px] backdrop-saturate-180 dark:border-transparent dark:bg-[#2b2e35]/78 dark:shadow-[0_18px_42px_rgba(0,0,0,0.38)] dark:ring-1 dark:ring-black/18",
@@ -72,6 +76,9 @@ export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullS
                         <ExtraControls
                             mode={mode}
                             onInfoClick={() => setIsInfoOpen(true)}
+                            isQueueOpen={isQueueOpen}
+                            canShowQueue={canShowQueue}
+                            onToggleQueue={onToggleQueue}
                         />
                     </div>
 

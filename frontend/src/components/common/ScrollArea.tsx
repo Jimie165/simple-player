@@ -1,5 +1,5 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import type { ReactNode } from 'react';
+import { useRef, useEffect, useState, useCallback, useImperativeHandle } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import clsx from 'clsx';
 
 interface ScrollAreaProps {
@@ -7,10 +7,12 @@ interface ScrollAreaProps {
     className?: string;
     topOffset?: number;
     resetOnKeyChange?: unknown;
+    viewportRef?: RefObject<HTMLDivElement | null>;
 }
 
-export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange }: ScrollAreaProps) {
+export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange, viewportRef: externalViewportRef }: ScrollAreaProps) {
     const viewportRef = useRef<HTMLDivElement>(null);
+    useImperativeHandle<HTMLDivElement | null, HTMLDivElement | null>(externalViewportRef, () => viewportRef.current, []);
     const thumbRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
