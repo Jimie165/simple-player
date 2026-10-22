@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { MdRefresh, MdTune } from 'react-icons/md';
+import { MdRefresh } from 'react-icons/md';
 import clsx from 'clsx';
 import { toast } from 'react-hot-toast';
 
+import { SettingsGroup, SettingsRow } from '@/features/settings/components/SettingsControls';
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useVideoStore } from '@/store/useVideoStore';
@@ -52,56 +53,27 @@ export default function GeneralSettingsSection() {
     };
 
     return (
-        <section className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
-                <MdTune className="text-lg" />
-                <span>常规设置</span>
-            </div>
-
-            {/* M3 Expressive Style: Grouped container with hairline gap */}
-            <div className="settings-list flex flex-col gap-px rounded-2xl overflow-hidden">
-                {/* Refresh Music */}
-                <div className="settings-static-row flex items-center justify-between p-4">
-                    <div className="flex flex-col gap-1">
-                        <span className="text-base font-medium text-on-surface">刷新音乐库</span>
-                        <span className="text-sm text-on-surface-variant">重新扫描音乐文件夹并更新元数据</span>
-                    </div>
-                    <button
-                        onClick={handleRefreshMusicLibrary}
-                        disabled={isRefreshingMusic}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
-                            isRefreshingMusic
-                                ? "settings-subtle text-on-surface-variant cursor-wait"
-                                : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
-                        )}
-                    >
-                        <MdRefresh className={clsx("text-lg", isRefreshingMusic && "animate-spin")} />
-                        {isRefreshingMusic ? '刷新中...' : '刷新'}
-                    </button>
-                </div>
-
-                {/* Refresh Video */}
-                <div className="settings-static-row flex items-center justify-between p-4">
-                    <div className="flex flex-col gap-1">
-                        <span className="text-base font-medium text-on-surface">刷新视频库</span>
-                        <span className="text-sm text-on-surface-variant">重新扫描视频文件夹并更新缩略图</span>
-                    </div>
-                    <button
-                        onClick={handleRefreshVideoLibrary}
-                        disabled={isRefreshingVideo}
-                        className={clsx(
-                            "flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all active:scale-95",
-                            isRefreshingVideo
-                                ? "settings-subtle text-on-surface-variant cursor-wait"
-                                : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
-                        )}
-                    >
-                        <MdRefresh className={clsx("text-lg", isRefreshingVideo && "animate-spin")} />
-                        {isRefreshingVideo ? '刷新中...' : '刷新'}
-                    </button>
-                </div>
-            </div>
-        </section>
+        <SettingsGroup title="资料库">
+            <SettingsRow label="刷新音乐库" description="重新扫描音乐文件夹并更新元数据">
+                <button
+                    onClick={handleRefreshMusicLibrary}
+                    disabled={isRefreshingMusic}
+                    className="settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
+                >
+                    <MdRefresh className={clsx('text-base', isRefreshingMusic && 'animate-spin')} />
+                    {isRefreshingMusic ? '刷新中…' : '刷新'}
+                </button>
+            </SettingsRow>
+            <SettingsRow label="刷新视频库" description="重新扫描视频文件夹并更新缩略图">
+                <button
+                    onClick={handleRefreshVideoLibrary}
+                    disabled={isRefreshingVideo}
+                    className="settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
+                >
+                    <MdRefresh className={clsx('text-base', isRefreshingVideo && 'animate-spin')} />
+                    {isRefreshingVideo ? '刷新中…' : '刷新'}
+                </button>
+            </SettingsRow>
+        </SettingsGroup>
     );
 }

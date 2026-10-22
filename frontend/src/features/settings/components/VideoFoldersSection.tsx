@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { toast } from 'react-hot-toast';
 import { MdAdd, MdDelete, MdExpandLess, MdExpandMore, MdFolder } from 'react-icons/md';
-import clsx from 'clsx';
 
 import { libraryService } from '@/services/libraryService';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import { SettingsGroup } from '@/features/settings/components/SettingsControls';
 import RestoreArchivedVideosDialog from '@/features/videos/dialogs/RestoreArchivedVideosDialog';
 import { useVideoStore } from '@/store/useVideoStore';
 import type { LibraryFolder, VideoMetadata } from '@/types';
@@ -102,78 +102,67 @@ export default function VideoFoldersSection() {
     };
 
     return (
-        <section className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
-                <MdFolder className="text-lg" />
-                <span>视频文件夹</span>
-            </div>
-
-            <div className="settings-card rounded-2xl overflow-hidden">
+        <>
+            <SettingsGroup title="视频文件夹">
                 {videoFolders.length === 0 ? (
-                    <div className="p-4 text-sm text-on-surface-variant">
+                    <div className="px-3.5 py-3 text-sm text-on-surface-variant">
                         尚未添加任何视频文件夹
                     </div>
                 ) : (
-                    <>
-                        <ul className="divide-y divide-outline-variant/30">
-                            {(foldersExpanded ? videoFolders : videoFolders.slice(0, FOLDER_PREVIEW_COUNT)).map((folder) => (
-                                <li
-                                    key={folder.id}
-                                    className="settings-static-row flex items-center justify-between gap-3 p-4"
+                    (foldersExpanded ? videoFolders : videoFolders.slice(0, FOLDER_PREVIEW_COUNT)).map((folder) => (
+                        <div
+                            key={folder.id}
+                            className="group flex min-h-11 items-center gap-3 px-3.5 py-2"
+                        >
+                            <MdFolder className="shrink-0 text-lg text-primary" />
+                            <CustomTooltip text={folder.path} onlyWhenOverflow className="block min-w-0 flex-1">
+                                <p className="truncate text-sm text-on-surface">
+                                    {folder.path}
+                                </p>
+                            </CustomTooltip>
+                            <CustomTooltip text="移除此文件夹">
+                                <button
+                                    onClick={() => handleRemoveFolder(folder)}
+                                    aria-label="移除此文件夹"
+                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant opacity-60 transition-all hover:bg-error/10 hover:text-error hover:opacity-100 active:scale-95 group-hover:opacity-100"
                                 >
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-sm font-medium text-on-surface truncate">
-                                            {folder.path}
-                                        </p>
-                                    </div>
-                                    <CustomTooltip text="移除此文件夹">
-                                        <button
-                                            onClick={() => handleRemoveFolder(folder)}
-                                            aria-label="移除此文件夹"
-                                            className="flex items-center justify-center w-9 h-9 rounded-full text-on-surface-variant hover:bg-error/10 hover:text-error transition-colors active:scale-95 shrink-0"
-                                        >
-                                            <MdDelete className="text-lg" />
-                                        </button>
-                                    </CustomTooltip>
-                                </li>
-                            ))}
-                        </ul>
-                        {videoFolders.length > FOLDER_PREVIEW_COUNT && (
-                            <button
-                                onClick={() => setFoldersExpanded((v) => !v)}
-                                className="settings-row settings-divider flex items-center justify-center gap-1 w-full py-2.5 text-sm font-medium text-primary border-t"
-                            >
-                                {foldersExpanded ? (
-                                    <>
-                                        <MdExpandLess className="text-lg" />
-                                        收起
-                                    </>
-                                ) : (
-                                    <>
-                                        <MdExpandMore className="text-lg" />
-                                        展开剩余 {videoFolders.length - FOLDER_PREVIEW_COUNT} 项
-                                    </>
-                                )}
-                            </button>
-                        )}
-                    </>
+                                    <MdDelete className="text-base" />
+                                </button>
+                            </CustomTooltip>
+                        </div>
+                    ))
                 )}
-                <div className="settings-divider p-3 border-t">
+                <div className="flex items-center justify-between gap-3 px-3.5 py-2">
+                    {videoFolders.length > FOLDER_PREVIEW_COUNT ? (
+                        <button
+                            onClick={() => setFoldersExpanded((v) => !v)}
+                            className="flex items-center gap-0.5 text-[13px] font-medium text-primary hover:underline"
+                        >
+                            {foldersExpanded ? (
+                                <>
+                                    <MdExpandLess className="text-base" />
+                                    收起
+                                </>
+                            ) : (
+                                <>
+                                    <MdExpandMore className="text-base" />
+                                    展开剩余 {videoFolders.length - FOLDER_PREVIEW_COUNT} 项
+                                </>
+                            )}
+                        </button>
+                    ) : (
+                        <span />
+                    )}
                     <button
                         onClick={handleAddFolder}
                         disabled={isAddingFolder}
-                        className={clsx(
-                            "flex items-center justify-center gap-2 w-full py-2.5 rounded-xl font-medium text-sm transition-all active:scale-95",
-                            isAddingFolder
-                                ? "settings-control text-on-surface-variant cursor-wait"
-                                : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
-                        )}
+                        className="settings-control flex items-center gap-1 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
                     >
-                        <MdAdd className="text-lg" />
-                        {isAddingFolder ? '添加中...' : '添加视频文件夹'}
+                        <MdAdd className="text-base" />
+                        {isAddingFolder ? '添加中…' : '添加视频文件夹…'}
                     </button>
                 </div>
-            </div>
+            </SettingsGroup>
             <RestoreArchivedVideosDialog
                 isOpen={restorePrompt !== null}
                 folderPath={restorePrompt?.folderPath ?? ''}
@@ -181,6 +170,6 @@ export default function VideoFoldersSection() {
                 onClose={() => setRestorePrompt(null)}
                 onRestore={handleRestoreVideos}
             />
-        </section>
+        </>
     );
 }

@@ -114,13 +114,13 @@
 
   /* Settings use a foreground-first hierarchy: cards and controls are brighter
      than the surrounding page, rather than following the generic MD surface ramp. */
-  --settings-card: #FFFFFF;
-  --settings-option: #FBFBFD;
-  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 6%, var(--settings-option));
-  --settings-subtle: #F5F6FA;
-  --settings-border: rgba(68, 71, 79, 0.16);
-  --settings-divider: rgba(68, 71, 79, 0.12);
-  --settings-shadow: 0 10px 28px rgba(25, 28, 32, 0.05);
+  --settings-card: rgba(255, 255, 255, 0.82);
+  --settings-option: #FFFFFF;
+  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--settings-option));
+  --settings-subtle: rgba(0, 0, 0, 0.05);
+  --settings-border: rgba(0, 0, 0, 0.08);
+  --settings-divider: rgba(0, 0, 0, 0.07);
+  --settings-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 :root.dark {
@@ -168,13 +168,13 @@
   --content-glass-divider: rgba(255, 255, 255, 0.1);
   --content-glass-shadow: rgba(0, 0, 0, 0.2);
 
-  --settings-card: #2A2A2A;
-  --settings-option: #353535;
+  --settings-card: rgba(255, 255, 255, 0.05);
+  --settings-option: #3A3A3C;
   --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 9%, var(--settings-option));
-  --settings-subtle: #303030;
-  --settings-border: rgba(255, 255, 255, 0.11);
-  --settings-divider: rgba(255, 255, 255, 0.08);
-  --settings-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  --settings-subtle: rgba(255, 255, 255, 0.07);
+  --settings-border: rgba(255, 255, 255, 0.09);
+  --settings-divider: rgba(255, 255, 255, 0.07);
+  --settings-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 body {
@@ -216,51 +216,63 @@ body {
     box-shadow: 0 10px 40px var(--content-glass-shadow);
   }
 
-  .settings-card {
+  /* macOS 风格分组表单：低对比分组卡片，行与行之间使用左右内缩的发丝分隔线。 */
+  .settings-group {
     background-color: var(--settings-card);
-    border: 1px solid var(--settings-border);
-    box-shadow: var(--settings-shadow);
+    box-shadow: 0 0 0 0.5px var(--settings-border), var(--settings-shadow);
   }
 
-  .settings-list {
+  .settings-group > * {
+    position: relative;
+  }
+
+  .settings-group > * + *::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
     background-color: var(--settings-divider);
-    border: 1px solid var(--settings-border);
-    box-shadow: var(--settings-shadow);
-  }
-
-  .settings-row {
-    background-color: var(--settings-card);
-    transition: background-color 180ms ease, box-shadow 180ms ease;
-  }
-
-  .settings-row:hover {
-    background-color: var(--settings-option-hover);
-  }
-
-  .settings-static-row {
-    background-color: var(--settings-card);
+    pointer-events: none;
   }
 
   .settings-control {
     background-color: var(--settings-option);
-    border-color: var(--settings-border);
+    box-shadow: 0 0 0 0.5px var(--settings-border), 0 1px 1.5px rgba(0, 0, 0, 0.08);
+    transition: background-color 150ms ease;
   }
 
   .settings-control:not(:disabled):hover {
     background-color: var(--settings-option-hover);
   }
 
+  .dark .settings-control.settings-segment-indicator {
+    background-color: #636366;
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
   .settings-subtle {
     background-color: var(--settings-subtle);
   }
 
-  .settings-divider {
-    border-color: var(--settings-divider);
+  /* 顶部分类栏与弹出菜单使用半透明玻璃材质。 */
+  .settings-glass {
+    background: var(--glass-surface);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: inset 0 0 0 0.5px var(--glass-border), 0 0 0 0.5px var(--settings-border), 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+
+  .settings-menu {
+    background: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 86%, transparent);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: 0 0 0 0.5px var(--settings-border), 0 12px 32px rgba(0, 0, 0, 0.18);
   }
 }
 
-:where(button, [role="button"]):focus,
-:where(button, [role="button"]):focus-visible {
+/* 设置控件的阴影同时绘制边框，获得焦点时仍需保留。 */
+:where(button:not(.settings-control), [role="button"]:not(.settings-control)):focus,
+:where(button:not(.settings-control), [role="button"]:not(.settings-control)):focus-visible {
   outline: none;
   box-shadow: none;
 }
