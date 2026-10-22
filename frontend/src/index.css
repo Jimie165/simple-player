@@ -213,7 +213,7 @@ body {
     background: var(--content-glass-background);
     backdrop-filter: saturate(220%) blur(16px);
     border-left: 0.5px solid var(--content-glass-divider);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 10px 40px var(--content-glass-shadow);
   }
 
   .settings-card {
@@ -284,7 +284,7 @@ body {
   }
 
   [data-artwork-theme] .app-shell-background {
-    background: var(--artwork-background);
+    background: var(--artwork-sidebar-background);
     --md-sys-color-primary: var(--md-sys-color-on-surface);
     --md-sys-color-on-primary: var(--artwork-on-primary);
     --color-primary: var(--md-sys-color-on-surface);

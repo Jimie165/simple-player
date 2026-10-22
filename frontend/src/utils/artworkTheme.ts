@@ -2,6 +2,7 @@ import { Hct, hexFromArgb } from '@material/material-color-utilities';
 
 export interface ArtworkTheme {
     background: string;
+    sidebarBackground: string;
     isDark: boolean;
 }
 
@@ -23,6 +24,22 @@ export function averageArtworkColor(pixels: Uint8ClampedArray): number | null {
         | (Math.round(green / weight) << 8) | Math.round(blue / weight)) >>> 0;
 }
 
+function computeGlassColor(argb: number, isDark: boolean): string {
+    const r = (argb >>> 16) & 0xff;
+    const g = (argb >>> 8) & 0xff;
+    const b = argb & 0xff;
+    const s = 2.2;
+    const sr = Math.min(255, Math.max(0, (0.2126 + 0.7874 * s) * r + (0.7152 - 0.7152 * s) * g + (0.0722 - 0.0722 * s) * b));
+    const sg = Math.min(255, Math.max(0, (0.2126 - 0.2126 * s) * r + (0.7152 + 0.2848 * s) * g + (0.0722 - 0.0722 * s) * b));
+    const sb = Math.min(255, Math.max(0, (0.2126 - 0.2126 * s) * r + (0.7152 - 0.7152 * s) * g + (0.0722 + 0.9278 * s) * b));
+    const [or, og, ob, a] = isDark ? [38, 38, 40, 0.6] : [245, 245, 247, 0.55];
+    const out = (0xff000000
+        | (Math.round(or * a + sr * (1 - a)) << 16)
+        | (Math.round(og * a + sg * (1 - a)) << 8)
+        | Math.round(ob * a + sb * (1 - a))) >>> 0;
+    return hexFromArgb(out);
+}
+
 /** Approximate the observed album material; these are not Apple's private tuning values. */
 export function createArtworkTheme(color: number, systemDark: boolean): ArtworkTheme {
     const source = Hct.fromInt(color);
@@ -33,5 +50,10 @@ export function createArtworkTheme(color: number, systemDark: boolean): ArtworkT
             ? Math.max(24, Math.min(42, source.tone))
             : Math.max(72, Math.min(84, source.tone));
     const background = Hct.from(source.hue, Math.min(source.chroma, systemDark ? 32 : 48), tone);
-    return { background: hexFromArgb(background.toInt()), isDark };
+    const bgInt = background.toInt();
+    return {
+        background: hexFromArgb(bgInt),
+        sidebarBackground: computeGlassColor(bgInt, isDark),
+        isDark,
+    };
 }

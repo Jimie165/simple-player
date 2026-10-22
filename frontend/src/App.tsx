@@ -280,9 +280,10 @@ function App() {
                     animate={{ width: CONTENT_QUEUE_WIDTH }}
                     exit={{ width: 0 }}
                     transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
-                    className="relative shrink-0 min-h-0 overflow-hidden"
+                    className="content-queue-shell relative z-30 shrink-0 min-h-0"
                   >
-                    <div className="content-queue-shell absolute inset-y-0 left-0 flex flex-col w-75 pt-12">
+                    <div className="relative h-full w-full overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 flex flex-col w-75 pt-12">
                       <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
                       <NowPlayingQueue
                         variant="content"
@@ -290,6 +291,7 @@ function App() {
                         onClose={() => setIsQueueOpen(false)}
                         onNavigate={() => setIsQueueOpen(false)}
                       />
+                      </div>
                     </div>
                   </motion.aside>
                 )}
