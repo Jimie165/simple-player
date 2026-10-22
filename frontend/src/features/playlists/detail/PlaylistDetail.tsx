@@ -269,7 +269,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     const coverPath = isFavorites ? undefined : playlistInfo?.cover_path;
     const isActive = useNavigationStore(state => !state.hasOverlay
         && state.currentPage === 'playlists' && state.activePlaylistDetail?.id === id);
-    useContentArtworkTheme(songs[0]?.cover_path, isActive);
+    useContentArtworkTheme(sortedSongs[0]?.cover_path, isActive);
 
     return (
         <div className="w-full min-h-full relative isolate">

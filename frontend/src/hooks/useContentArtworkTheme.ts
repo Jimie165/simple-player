@@ -17,12 +17,20 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
 
     useEffect(() => {
         if (!path || !active || !enabled) return;
+        if (sample?.path === path && sample.version === libraryVersion) return;
         let cancelled = false;
         let image: HTMLImageElement | null = null;
+        const fail = () => {
+            if (!cancelled) setSample({ path, version: libraryVersion, color: null });
+        };
         const load = async () => {
             const thumbnail = getCoverThumbnailPath(path, 128);
             const url = await resolveMediaPath(thumbnail ?? path);
-            if (!url || cancelled) return;
+            if (cancelled) return;
+            if (!url) {
+                fail();
+                return;
+            }
             image = new Image();
             image.crossOrigin = 'anonymous';
             image.onload = () => {
@@ -31,25 +39,36 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
                     const canvas = document.createElement('canvas');
                     canvas.width = canvas.height = 32;
                     const context = canvas.getContext('2d', { willReadFrequently: true });
-                    if (!context) return;
+                    if (!context) {
+                        fail();
+                        return;
+                    }
                     context.drawImage(image, 0, 0, 32, 32);
                     const color = selectArtworkColor(context.getImageData(0, 0, 32, 32).data);
                     setSample({ path, version: libraryVersion, color });
                 } catch {
                     // Unreadable or cross-origin covers retain the normal application theme.
+                    fail();
                 }
             };
             image.onerror = () => {
-                if (!thumbnail) return;
+                if (!thumbnail) {
+                    fail();
+                    return;
+                }
                 void resolveMediaPath(path).then(original => {
-                    if (cancelled || !image || !original) return;
-                    image.onerror = null;
+                    if (cancelled || !image) return;
+                    if (!original) {
+                        fail();
+                        return;
+                    }
+                    image.onerror = fail;
                     image.src = original;
-                }).catch(() => { /* Keep the normal theme if the original cannot be resolved. */ });
+                }).catch(fail);
             };
             image.src = url;
         };
-        void load().catch(() => { /* Missing artwork falls back to the application theme. */ });
+        void load().catch(fail);
         return () => {
             cancelled = true;
             if (image) {
@@ -57,13 +76,25 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
                 image.onerror = null;
             }
         };
-    }, [path, active, libraryVersion, enabled]);
+    }, [path, active, libraryVersion, enabled, sample]);
 
-    const theme = useMemo(() => (
-        enabled && sample && sample.path === path && sample.version === libraryVersion && sample.color !== null
-            ? createArtworkTheme(sample.color, systemDark)
+    // Keep the last palette while revalidating artwork instead of briefly clearing the background.
+    const color = sample?.color ?? null;
+    const hasArtwork = Boolean(path);
+    const nextTheme = useMemo(() => (
+        enabled && hasArtwork && color !== null
+            ? createArtworkTheme(color, systemDark)
             : null
-    ), [sample, path, libraryVersion, systemDark, enabled]);
+    ), [color, hasArtwork, systemDark, enabled]);
+    const background = nextTheme?.background;
+    const sidebarBackground = nextTheme?.sidebarBackground;
+    const isDark = nextTheme?.isDark;
+    // Preserve the published object when different source colors produce the same final palette.
+    const theme = useMemo(() => (
+        background !== undefined && sidebarBackground !== undefined && isDark !== undefined
+            ? { background, sidebarBackground, isDark }
+            : null
+    ), [background, sidebarBackground, isDark]);
 
     useEffect(() => {
         if (!active || !publishTheme) return;
