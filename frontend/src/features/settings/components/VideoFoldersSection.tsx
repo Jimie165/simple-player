@@ -158,7 +158,7 @@ export default function VideoFoldersSection() {
                         )}
                     </>
                 )}
-                <div className="settings-subtle settings-divider p-3 border-t">
+                <div className="settings-divider p-3 border-t">
                     <button
                         onClick={handleAddFolder}
                         disabled={isAddingFolder}

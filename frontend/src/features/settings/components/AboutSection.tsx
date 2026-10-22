@@ -115,7 +115,7 @@ export default function AboutSection() {
                     </div>
                 </div>
 
-                <div className="border-t border-outline-variant/20 bg-surface-container/30 p-4">
+                <div className="border-t border-outline-variant/20 p-4">
                     <div className="settings-subtle flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
                         <div className="min-w-0">
                             <p className="text-sm font-medium text-on-surface">自动检查更新</p>

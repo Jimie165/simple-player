@@ -190,7 +190,7 @@ body {
   }
 
   .settings-row {
-    background-color: var(--settings-option);
+    background-color: var(--settings-card);
     transition: background-color 180ms ease, box-shadow 180ms ease;
   }
 
@@ -199,7 +199,7 @@ body {
   }
 
   .settings-static-row {
-    background-color: var(--settings-option);
+    background-color: var(--settings-card);
   }
 
   .settings-control {
