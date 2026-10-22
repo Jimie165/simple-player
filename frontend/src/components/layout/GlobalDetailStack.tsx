@@ -11,11 +11,12 @@ import type { RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { AnimatePresence, motion, type Variants } from 'framer-motion';
+import { AnimatePresence, type Variants } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
 import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features/library/utils/grouping';
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
+import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
 
@@ -122,7 +123,7 @@ function GlobalDetailStack() {
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
 
                 return (
-                    <motion.div
+                    <ArtworkThemeLayer
                         key={key}
                         custom={transitionDirection}
                         variants={overlayVariants}
@@ -175,7 +176,7 @@ function GlobalDetailStack() {
                                 })()}
                             </ErrorBoundary>
                         </ScrollArea>
-                    </motion.div>
+                    </ArtworkThemeLayer>
                 );
             })}
         </AnimatePresence>

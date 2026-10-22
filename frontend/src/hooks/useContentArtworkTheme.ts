@@ -1,23 +1,40 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { getCoverThumbnailPath, resolveMediaPath } from '@/utils/mediaPath';
-import { selectArtworkColor, createArtworkTheme } from '@/utils/artworkTheme';
+import { createArtworkTheme } from '@/utils/artworkTheme';
 import type { ArtworkTheme } from '@/utils/artworkTheme';
+import { sampleArtworkColor } from '@/utils/artworkColorCache';
+import { ArtworkColorCacheContext, PageArtworkThemeContext } from '@/hooks/artworkThemeContexts';
 
 export const ContentThemeContext = createContext<Dispatch<SetStateAction<ArtworkTheme | null>> | null>(null);
 
 export function useContentArtworkTheme(path: string | null | undefined, active: boolean) {
     const publishTheme = useContext(ContentThemeContext);
+    const cache = useContext(ArtworkColorCacheContext);
+    const publishPageTheme = useContext(PageArtworkThemeContext);
     const systemDark = useThemeStore(state => state.isDark);
     const enabled = useThemeStore(state => state.artworkBackgroundEnabled);
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
-    const [sample, setSample] = useState<{ path: string; version: number; color: number | null } | null>(null);
+    const [sample, setSample] = useState<{ path: string; version: number; color: number | null } | null>(() => {
+        const current = path ? cache?.read(path, libraryVersion) : undefined;
+        const color = current !== undefined ? current : path ? cache?.read(path) : undefined;
+        return path && color !== undefined ? { path, version: current !== undefined ? libraryVersion : -1, color } : null;
+    });
 
     useEffect(() => {
         if (!path || !active || !enabled) return;
         if (sample?.path === path && sample.version === libraryVersion) return;
+        const cachedColor = cache?.read(path, libraryVersion);
+        if (cachedColor !== undefined) {
+            let cancelled = false;
+            // Rendering already reads the cache synchronously; retain it for the next uncached cover.
+            queueMicrotask(() => {
+                if (!cancelled) setSample({ path, version: libraryVersion, color: cachedColor });
+            });
+            return () => { cancelled = true; };
+        }
         let cancelled = false;
         let image: HTMLImageElement | null = null;
         const fail = () => {
@@ -36,15 +53,8 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
             image.onload = () => {
                 if (cancelled || !image) return;
                 try {
-                    const canvas = document.createElement('canvas');
-                    canvas.width = canvas.height = 32;
-                    const context = canvas.getContext('2d', { willReadFrequently: true });
-                    if (!context) {
-                        fail();
-                        return;
-                    }
-                    context.drawImage(image, 0, 0, 32, 32);
-                    const color = selectArtworkColor(context.getImageData(0, 0, 32, 32).data);
+                    const color = sampleArtworkColor(image);
+                    cache?.write(path, libraryVersion, color);
                     setSample({ path, version: libraryVersion, color });
                 } catch {
                     // Unreadable or cross-origin covers retain the normal application theme.
@@ -76,10 +86,11 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
                 image.onerror = null;
             }
         };
-    }, [path, active, libraryVersion, enabled, sample]);
+    }, [path, active, libraryVersion, enabled, sample, cache]);
 
     // Keep the last palette while revalidating artwork instead of briefly clearing the background.
-    const color = sample?.color ?? null;
+    const cachedColor = path ? cache?.read(path, libraryVersion) : undefined;
+    const color = cachedColor !== undefined ? cachedColor : sample?.color ?? null;
     const hasArtwork = Boolean(path);
     const nextTheme = useMemo(() => (
         enabled && hasArtwork && color !== null
@@ -96,10 +107,11 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
             : null
     ), [background, sidebarBackground, isDark]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!active || !publishTheme) return;
         publishTheme(theme);
+        publishPageTheme?.(theme);
         // A covered detail must not clear the newer page's theme during navigation.
         return () => publishTheme(current => current === theme ? null : current);
-    }, [active, publishTheme, theme]);
+    }, [active, publishTheme, publishPageTheme, theme]);
 }

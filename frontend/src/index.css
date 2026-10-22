@@ -70,6 +70,7 @@
 :root {
   /* Default Primary Fallback (Blue) - will be overridden by JS */
   --md-sys-color-primary: #005AC1;
+  --app-shell-gradient-color: var(--md-sys-color-primary);
   --md-sys-color-on-primary: #FFFFFF;
   --md-sys-color-primary-container: #D8E2FF;
   --md-sys-color-on-primary-container: #001A41;
@@ -186,6 +187,14 @@ body {
   cursor: default;
 }
 
+/* Palette commits are atomic; normal hover and layout transitions resume on the next frame. */
+[data-artwork-updating],
+[data-artwork-updating] *,
+[data-artwork-updating] *::before,
+[data-artwork-updating] *::after {
+  transition: none !important;
+}
+
 @layer components {
   /* Keep the material behind the controls so nested popups can blur independently. */
   .content-player-shell::before {
@@ -210,6 +219,7 @@ body {
   }
 
   .content-queue-shell {
+    transition: background-color 200ms ease, border-color 200ms ease;
     background: var(--content-glass-background);
     backdrop-filter: saturate(220%) blur(16px);
     border-left: 0.5px solid var(--content-glass-divider);
@@ -287,20 +297,39 @@ body {
 @layer utilities {
   /* 侧栏与内容圆角外侧共用背景，避免接缝处重复叠色。 */
   .app-shell-background {
+    transition: background-color 200ms ease;
     background-color: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+  }
+
+  /* Keep the gradient layer mounted: background-image cannot interpolate when artwork takes over. */
+  .app-shell-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-shell-gradient-color) 12%, transparent) 0%, color-mix(in srgb, var(--app-shell-gradient-color) 7%, transparent) 38%, transparent 100%);
+    opacity: 0;
+    transition: opacity 200ms ease;
   }
 
   .dark .app-shell-background {
     background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
-    background-image: linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%);
+  }
+
+  .dark .app-shell-background::before {
+    opacity: 1;
   }
 
   [data-artwork-theme] .app-shell-background {
-    background: var(--artwork-sidebar-background);
+    background-color: var(--artwork-sidebar-background);
     --md-sys-color-primary: var(--md-sys-color-on-surface);
     --md-sys-color-on-primary: var(--artwork-on-primary);
     --color-primary: var(--md-sys-color-on-surface);
     --color-on-primary: var(--artwork-on-primary);
+  }
+
+  [data-artwork-theme] .app-shell-background::before {
+    opacity: 0;
   }
 
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */

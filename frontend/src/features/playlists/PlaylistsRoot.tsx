@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
+import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
 import PlaylistDetail from '@/features/playlists/detail/PlaylistDetail';
 import PlaylistList from '@/features/playlists/PlaylistList';
 import { useNavigationStore } from '@/store/useNavigationStore';
@@ -25,7 +26,7 @@ export default function PlaylistsRoot() {
     return (
         <div ref={rootRef} className="min-h-full">
             <AnimatePresence mode="wait" initial={false}>
-                <motion.div
+                <ArtworkThemeLayer
                     key={pageKey}
                     initial={{ opacity: 0, y: 14, scale: 0.99 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -44,7 +45,7 @@ export default function PlaylistsRoot() {
                     ) : (
                         <PlaylistList />
                     )}
-                </motion.div>
+                </ArtworkThemeLayer>
             </AnimatePresence>
         </div>
     );
