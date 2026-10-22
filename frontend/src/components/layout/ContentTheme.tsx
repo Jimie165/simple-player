@@ -14,6 +14,7 @@ export function ContentTheme({ children }: { children: ReactNode }) {
     const style: CSSProperties & Record<string, string | undefined> = theme ? {
         colorScheme: theme.isDark ? 'dark' : 'light',
         '--artwork-background': theme.background,
+        '--artwork-on-primary': theme.isDark ? theme.background : '#ffffff',
         '--md-sys-color-surface': theme.background,
         '--md-sys-color-surface-container-low': theme.background,
         '--md-sys-color-surface-container': theme.background,

@@ -64,14 +64,14 @@ export default function AlbumDetailView({
 
                 {/* Details */}
                 <div className="flex flex-col justify-center gap-2 min-w-0 flex-1 pb-2">
-                    <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 dark:text-neutral-50 truncate leading-tight tracking-tight mt-2">
+                    <h1 className="text-4xl md:text-5xl font-bold text-on-surface truncate leading-tight tracking-tight mt-2">
                         {album.name}
                     </h1>
                     <h2 className="text-2xl font-medium text-primary truncate">
                         {album.artist}
                     </h2>
 
-                    <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 font-medium flex items-center gap-2">
+                    <div className="text-sm text-on-surface-variant mt-2 font-medium flex items-center gap-2">
                         <span className="bg-on-surface/8 text-on-surface-variant px-2 py-0.5 rounded-md text-xs">Album</span>
                         <span>•</span>
                         <span>{album.songs[0]?.year || 'Unknown Year'}</span>

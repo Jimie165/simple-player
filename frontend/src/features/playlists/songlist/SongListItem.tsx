@@ -190,14 +190,14 @@ export const SongListItem = memo(({
                 </div>
                 <span className={clsx(
                     "font-medium truncate pr-4",
-                    selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
+                    selected ? "text-primary" : "text-on-surface"
                 )}>
                     {song.title}
                 </span>
             </div>
 
             {!hideArtist && (
-                <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
+                <div className="text-on-surface-variant truncate font-medium">
                     <span
                         className={clsx(
                             "transition-colors",
@@ -220,7 +220,7 @@ export const SongListItem = memo(({
             )}
 
             {!hideAlbum && (
-                <div className="text-neutral-500 dark:text-neutral-400 truncate">
+                <div className="text-on-surface-variant truncate">
                     <span
                         className={clsx(
                             "transition-colors",
@@ -242,7 +242,7 @@ export const SongListItem = memo(({
                 </div>
             )}
 
-            <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
+            <div className="text-on-surface-variant text-right pr-2 text-[13px] font-variant-numeric">
                 {formatDuration(song.duration)}
             </div>
 

@@ -315,7 +315,7 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky z-45 grid pt-2 pb-3 border-b border-white/10 backdrop-blur-xl",
+                    "sticky z-45 grid pt-2 pb-3 border-b border-on-surface/10 backdrop-blur-xl",
                     headerTopClass,
                     gridGapClass,
                     headerPaddingClass,

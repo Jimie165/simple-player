@@ -285,6 +285,10 @@ body {
 
   [data-artwork-theme] .app-shell-background {
     background: var(--artwork-background);
+    --md-sys-color-primary: var(--md-sys-color-on-surface);
+    --md-sys-color-on-primary: var(--artwork-on-primary);
+    --color-primary: var(--md-sys-color-on-surface);
+    --color-on-primary: var(--artwork-on-primary);
   }
 
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */

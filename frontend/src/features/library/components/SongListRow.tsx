@@ -131,7 +131,7 @@ function SongListRowImpl({
                 )}
                 <span className={clsx(
                     "font-medium truncate pr-4",
-                    selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
+                    selected ? "text-primary" : "text-on-surface"
                 )}>
                     {song.title}
                 </span>
@@ -140,7 +140,7 @@ function SongListRowImpl({
             {!hideArtist && (
                 <div
                     className={clsx(
-                        "text-neutral-500 dark:text-neutral-400 truncate font-medium transition-colors",
+                        "text-on-surface-variant truncate font-medium transition-colors",
                         !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -163,7 +163,7 @@ function SongListRowImpl({
             {!effectiveHideAlbum && (
                 <div
                     className={clsx(
-                        "text-neutral-500 dark:text-neutral-400 truncate transition-colors",
+                        "text-on-surface-variant truncate transition-colors",
                         !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -183,7 +183,7 @@ function SongListRowImpl({
                 </div>
             )}
 
-            <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
+            <div className="text-on-surface-variant text-right pr-2 text-[13px] font-variant-numeric">
                 {formatDuration(song.duration)}
             </div>
 
