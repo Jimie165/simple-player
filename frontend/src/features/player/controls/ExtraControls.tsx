@@ -63,6 +63,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
     }, []);
 
     const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";
+    const volumeIconClass = clsx("text-xl", showVolumePopup && "text-primary");
     const queueButton = (
         <CustomTooltip text="播放队列">
             <button
@@ -94,13 +95,13 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
                         }}
                         className={clsx(
                             utilityButtonClass,
-                            showVolumePopup ? "bg-black/5 text-[#d60017] dark:bg-white/10 dark:text-[#ff375f]" : ""
+                            showVolumePopup ? "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary" : ""
                         )}
                     >
                         {(() => {
-                            if (localVolume === 0) return <MdVolumeMute className="text-xl" />;
-                            if (localVolume <= 50) return <MdVolumeDown className="text-xl" />;
-                            return <MdVolumeUp className="text-xl" />;
+                            if (localVolume === 0) return <MdVolumeMute className={volumeIconClass} />;
+                            if (localVolume <= 50) return <MdVolumeDown className={volumeIconClass} />;
+                            return <MdVolumeUp className={volumeIconClass} />;
                         })()}
                     </button>
                 </CustomTooltip>

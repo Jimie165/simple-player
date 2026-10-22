@@ -38,27 +38,29 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
         setIsDragging(true);
     }, handleVolumeCommit);
 
+    // Fade the material and contents separately; the outer backdrop root stays stable.
     return (
         <div className={clsx(
-            "absolute bottom-full left-1/2 -translate-x-1/2 mb-4 p-3 rounded-xl shadow-xl border",
-            "bg-white dark:bg-[#2d2d2d] border-neutral-100 dark:border-neutral-700",
-            "transition-all duration-200 origin-bottom",
-            show ? "opacity-100 scale-100 visible" : "opacity-0 scale-95 invisible pointer-events-none"
+            "content-player-shell isolate absolute bottom-full left-1/2 -translate-x-1/2 mb-4 p-3 rounded-xl",
+            "before:transition-opacity before:duration-180 after:transition-opacity after:duration-180",
+            show
+                ? "visible translate-y-0 before:opacity-100 after:opacity-100 [transition:translate_180ms_ease-out,visibility_0s]"
+                : "invisible translate-y-2 before:opacity-0 after:opacity-0 pointer-events-none [transition:translate_180ms_ease-in,visibility_0s_180ms]"
         )}>
-            <div className="flex items-center gap-3 w-32">
+            <div className={clsx("flex items-center gap-3 w-32 transition-opacity duration-180", show ? "opacity-100" : "opacity-0")}>
                 {/* 自定义进度条 UI */}
                 <div className="flex-1 relative h-4 group flex items-center">
                     {/* 轨道背景 */}
-                    <div className="absolute left-0 right-0 h-1 bg-neutral-200 dark:bg-neutral-700 rounded-full overflow-hidden pointer-events-none transition-[height] group-hover:h-1.5"></div>
+                    <div className="absolute left-0 right-0 h-1 bg-on-surface/15 rounded-full overflow-hidden pointer-events-none transition-[height] group-hover:h-1.5"></div>
                     {/* 进度填充 */}
                     <div
-                        className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary rounded-full pointer-events-none transition-[height] group-hover:h-1.5"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-on-surface/80 rounded-full pointer-events-none transition-[height] group-hover:h-1.5"
                         style={{ width: `${displayVolume}%` }}
                     />
                     {/* 圆点 (Thumb) */}
                     <div
                         className={clsx(
-                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-primary opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
+                            "absolute top-1/2 -mt-1.5 h-3 w-3 rounded-full bg-on-surface opacity-0 shadow-sm transition-opacity duration-200 group-hover:opacity-100",
                             isDragging && "opacity-100 scale-125"
                         )}
                         style={{ left: `${displayVolume}%`, marginLeft: '-6px' }}
@@ -73,12 +75,10 @@ export default function VolumePopup({ show, onChange }: VolumePopupProps) {
                         className="absolute inset-0 z-20 w-full h-full opacity-0 cursor-pointer touch-none"
                     />
                 </div>
-                <span className="text-xs font-medium w-6 text-right tabular-nums text-neutral-900 dark:text-neutral-100">
+                <span className="text-xs font-medium w-6 text-right tabular-nums text-on-surface">
                     {displayVolume}
                 </span>
             </div>
-            {/* 底部的小三角箭头 */}
-            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 border-8 border-transparent border-t-white dark:border-t-[#2d2d2d]" />
         </div>
     );
 }

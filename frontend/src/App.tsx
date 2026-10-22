@@ -39,6 +39,7 @@ import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
 import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
 
 const FULL_PLAYER_MIN_WIDTH = 820;
+const CONTENT_QUEUE_WIDTH = 300;
 
 function App() {
   const { init: initTheme } = useThemeStore();
@@ -140,7 +141,7 @@ function App() {
   const mainContentWidth = windowWidth - sidebarOffset;
   // 以队列收起时的完整控件为基准，避免队列自身占宽触发关闭。
   const canShowQueue = mainContentWidth >= FULL_PLAYER_MIN_WIDTH;
-  const queueOffset = isQueueOpen && canShowQueue ? 360 : 0;
+  const queueOffset = isQueueOpen && canShowQueue ? CONTENT_QUEUE_WIDTH : 0;
   const playerWidth = mainContentWidth - queueOffset;
   const playerMode = playerWidth < 560 ? 'mini' : playerWidth < FULL_PLAYER_MIN_WIDTH ? 'compact' : 'full';
   const handleNavigate = (page: string) => {
@@ -276,12 +277,12 @@ function App() {
                     id="content-play-queue"
                     aria-label="播放队列"
                     initial={{ width: 0 }}
-                    animate={{ width: 360 }}
+                    animate={{ width: CONTENT_QUEUE_WIDTH }}
                     exit={{ width: 0 }}
                     transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
                     className="relative shrink-0 min-h-0 overflow-hidden"
                   >
-                    <div className="absolute inset-y-0 left-0 flex flex-col w-90 pt-12 border-l border-outline-variant/15 bg-surface-container-low/55 dark:bg-surface-container-low/45 backdrop-blur-2xl backdrop-saturate-150">
+                    <div className="content-queue-shell absolute inset-y-0 left-0 flex flex-col w-75 pt-12">
                       <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
                       <NowPlayingQueue
                         variant="content"

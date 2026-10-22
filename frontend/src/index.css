@@ -107,6 +107,11 @@
   --glass-surface: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.5);
 
+  --content-glass-background: rgba(245, 245, 247, 0.55);
+  --content-glass-edge: rgba(0, 0, 0, 0.05);
+  --content-glass-divider: rgba(0, 0, 0, 0.1);
+  --content-glass-shadow: rgba(0, 0, 0, 0.1);
+
   /* Settings use a foreground-first hierarchy: cards and controls are brighter
      than the surrounding page, rather than following the generic MD surface ramp. */
   --settings-card: #FFFFFF;
@@ -158,6 +163,11 @@
   --glass-surface: rgba(30, 30, 30, 0.5);
   --glass-border: rgba(255, 255, 255, 0.1);
 
+  --content-glass-background: rgba(38, 38, 40, 0.6);
+  --content-glass-edge: rgba(255, 255, 255, 0.2);
+  --content-glass-divider: rgba(255, 255, 255, 0.1);
+  --content-glass-shadow: rgba(0, 0, 0, 0.2);
+
   --settings-card: #2A2A2A;
   --settings-option: #353535;
   --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 9%, var(--settings-option));
@@ -177,6 +187,35 @@ body {
 }
 
 @layer components {
+  /* Keep the material behind the controls so nested popups can blur independently. */
+  .content-player-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--content-glass-background);
+    backdrop-filter: saturate(220%) blur(16px);
+    box-shadow: 0 10px 40px var(--content-glass-shadow);
+    pointer-events: none;
+  }
+
+  .content-player-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 0.5px var(--content-glass-edge);
+    pointer-events: none;
+  }
+
+  .content-queue-shell {
+    background: var(--content-glass-background);
+    backdrop-filter: saturate(220%) blur(16px);
+    border-left: 0.5px solid var(--content-glass-divider);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+  }
+
   .settings-card {
     background-color: var(--settings-card);
     border: 1px solid var(--settings-border);
