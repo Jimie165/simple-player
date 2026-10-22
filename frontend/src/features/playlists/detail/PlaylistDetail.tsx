@@ -3,6 +3,7 @@ import { MdPlayArrow, MdShuffle, MdEdit, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import DetailScrollHeader from '@/components/common/DetailScrollHeader';
+import { ContentBackground } from '@/components/layout/ContentSurface';
 
 
 import SortableSongList from '@/features/playlists/songlist/SortableSongList';
@@ -277,22 +278,24 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             />
 
             {/* Immersive Background */}
-            <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
-                {coverPath ? (
-                    <CoverImage src={coverPath} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
-                ) : (
-                    sortedSongs.length > 0 && !isFavorites ? (
-                        <PlaylistCoverCollage songs={sortedSongs} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
+            <ContentBackground>
+                <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
+                    {coverPath ? (
+                        <CoverImage src={coverPath} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
                     ) : (
-                        <div className={clsx(
-                            "w-full h-full bg-linear-to-br opacity-30",
-                            isFavorites ? "from-red-500 to-pink-600" : "from-primary/20 to-secondary/20"
-                        )} />
-                    )
-                )}
-                {/* Gradient Scrim for Readability - Optimized gradient for smoother transition */}
-                <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
-            </div>
+                        sortedSongs.length > 0 && !isFavorites ? (
+                            <PlaylistCoverCollage songs={sortedSongs} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
+                        ) : (
+                            <div className={clsx(
+                                "w-full h-full bg-linear-to-br opacity-30",
+                                isFavorites ? "from-red-500 to-pink-600" : "from-primary/20 to-secondary/20"
+                            )} />
+                        )
+                    )}
+                    {/* Gradient Scrim for Readability - Optimized gradient for smoother transition */}
+                    <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
+                </div>
+            </ContentBackground>
 
             {/* Header Section */}
             <div className="relative w-full z-20 -mt-10">

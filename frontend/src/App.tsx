@@ -11,6 +11,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from '@/components/layout/TitleBar';
 import Sidebar from '@/components/layout/Sidebar';
 import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
+import { ContentSurface } from '@/components/layout/ContentSurface';
 import ScrollArea from '@/components/common/ScrollArea';
 
 import MusicGrid from '@/features/home/MusicGrid';
@@ -193,7 +194,7 @@ function App() {
   const mainContent = (
     <div
       data-main-content-query
-      className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden relative z-0 transition-colors duration-300"
+      className="main-content-query flex flex-1 flex-col min-w-0 rounded-tl-2xl overflow-hidden relative z-0"
     >
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
@@ -257,7 +258,7 @@ function App() {
               onRequestClose={() => setSidebarCollapsed(true)}
             />
 
-            <div className="flex-1 flex min-w-0 relative">
+            <ContentSurface hidePageBackground={hasOverlay}>
               {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
               {isSidebarOverlay && !sidebarCollapsed && (
                 <div
@@ -280,7 +281,7 @@ function App() {
                     transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
                     className="relative shrink-0 min-h-0 overflow-hidden"
                   >
-                    <div className="absolute inset-y-0 left-0 flex flex-col w-90 pt-12 border-l border-outline-variant/20 bg-surface-container-low dark:bg-surface-container-high">
+                    <div className="absolute inset-y-0 left-0 flex flex-col w-90 pt-12 border-l border-outline-variant/15 bg-surface-container-low/55 dark:bg-surface-container-low/45 backdrop-blur-2xl backdrop-saturate-150">
                       <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
                       <NowPlayingQueue
                         variant="content"
@@ -292,7 +293,7 @@ function App() {
                   </motion.aside>
                 )}
               </AnimatePresence>
-            </div>
+            </ContentSurface>
           </div>
         </div>
 
