@@ -61,7 +61,7 @@ const SongListItemMenu = memo(({
             groups={menuItems}
             onOpen={onMenuOpen}
             variant="clean"
-            buttonClassName="w-8 h-8 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
+            buttonClassName="w-8 h-8 [&_svg]:size-4 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
         />
     );
 });
@@ -118,7 +118,7 @@ export const SongListItem = memo(({
         <div
             style={gridStyle}
             className={clsx(
-                "group grid gap-4 px-4 py-2 items-center rounded-lg transition-colors relative touch-pan-y",
+                "group grid h-13.5 gap-4 px-4 items-center rounded-lg transition-colors relative touch-pan-y",
                 isOverlay
                     ? "bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02]"
                     : selected

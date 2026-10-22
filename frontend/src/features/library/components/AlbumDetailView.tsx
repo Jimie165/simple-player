@@ -51,7 +51,7 @@ export default function AlbumDetailView({
             <DetailScrollHeader />
 
             {/* Header Area using Material 3 Styling */}
-            <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6 relative z-10 -mt-10">
+            <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6 relative z-10">
                 {/* Cover: Elevation, Large Radius */}
                 <div className="w-48 h-48 md:w-60 md:h-60 rounded-3xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
                     <CoverImage

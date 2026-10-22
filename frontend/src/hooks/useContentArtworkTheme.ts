@@ -3,7 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { getCoverThumbnailPath, resolveMediaPath } from '@/utils/mediaPath';
-import { averageArtworkColor, createArtworkTheme } from '@/utils/artworkTheme';
+import { selectArtworkColor, createArtworkTheme } from '@/utils/artworkTheme';
 import type { ArtworkTheme } from '@/utils/artworkTheme';
 
 export const ContentThemeContext = createContext<Dispatch<SetStateAction<ArtworkTheme | null>> | null>(null);
@@ -33,7 +33,7 @@ export function useContentArtworkTheme(path: string | null | undefined, active: 
                     const context = canvas.getContext('2d', { willReadFrequently: true });
                     if (!context) return;
                     context.drawImage(image, 0, 0, 32, 32);
-                    const color = averageArtworkColor(context.getImageData(0, 0, 32, 32).data);
+                    const color = selectArtworkColor(context.getImageData(0, 0, 32, 32).data);
                     setSample({ path, version: libraryVersion, color });
                 } catch {
                     // Unreadable or cross-origin covers retain the normal application theme.

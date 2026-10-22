@@ -82,7 +82,8 @@ function SongListRowImpl({
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group grid py-2 items-center rounded-lg transition-colors relative",
+                "group grid items-center rounded-lg transition-colors relative",
+                hideCover ? "h-11.5" : "h-13.5",
                 gridGapClass,
                 rowPaddingClass,
                 selected
@@ -199,7 +200,7 @@ function SongListRowImpl({
                     items={song}
                     context={context}
                     variant="clean"
-                    buttonClassName="w-8 h-8 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
+                    buttonClassName="w-8 h-8 [&_svg]:size-4 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
                     onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                     onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
                     isSelected={selected}

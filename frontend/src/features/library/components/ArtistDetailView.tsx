@@ -4,7 +4,7 @@ import { Virtuoso } from 'react-virtuoso';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
 import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
 import clsx from 'clsx';
@@ -222,7 +222,7 @@ export default function ArtistDetailView({
             <DetailScrollHeader />
 
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-6 px-6 relative z-10 -mt-10">
+            <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-6 px-6 relative z-10">
                 {/* (Back Button Removed) */}
 
                 {/* Artist Cover */}
@@ -313,11 +313,13 @@ export default function ArtistDetailView({
 
             {/* Content Area */}
             <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2 pb-20">
+                <AnimatePresence mode="wait" initial={false}>
                     {activeTab === 'albums' ? (
                         <motion.div
                             key="albums"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             transition={{ duration: 0.18, ease: "easeOut" }}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
@@ -334,6 +336,7 @@ export default function ArtistDetailView({
                             key="songs"
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
                             transition={{ duration: 0.18, ease: "easeOut" }}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
@@ -349,6 +352,7 @@ export default function ArtistDetailView({
                             </div>
                         </motion.div>
                     )}
+                </AnimatePresence>
             </div>
         </div>
     );
