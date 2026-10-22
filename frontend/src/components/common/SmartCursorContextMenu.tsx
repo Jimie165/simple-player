@@ -204,7 +204,7 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                 >
                     {resolvedGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>
-                            {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-neutral-200/50 dark:bg-white/20'}`} />}
+                            {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-on-surface/10'}`} />}
                             {group.map((mItem) => (
                                 <button
                                     key={mItem.id}
@@ -214,9 +214,9 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
                                     }}
                                     className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors ${isApple
                                         ? 'hover:bg-white/10 font-medium text-white'
-                                        : 'hover:bg-neutral-100 dark:hover:bg-white/10'
+                                        : 'hover:bg-on-surface/8'
                                         } ${!isApple && mItem.variant === 'danger'
-                                            ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                            ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
                                             : ''
                                         } ${isApple && mItem.variant === 'danger' ? 'text-red-400' : ''
                                         }`}

@@ -30,20 +30,20 @@ export default function TitleBar() {
             {/* 最小化 */}
             <button
                 onClick={systemService.minimize}
-                className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
+                className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-on-surface/10"
             >
-                <VscChromeMinimize className="text-lg text-neutral-900 dark:text-neutral-100" />
+                <VscChromeMinimize className="text-lg" />
             </button>
 
             {/* 最大化/还原 */}
             <button
                 onClick={systemService.toggleMaximize}
-                className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-neutral-200 dark:hover:bg-white/10"
+                className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-on-surface/10"
             >
                 {isMaximized ? (
-                    <VscChromeRestore className="text-lg text-neutral-900 dark:text-neutral-100" />
+                    <VscChromeRestore className="text-lg" />
                 ) : (
-                    <VscChromeMaximize className="text-lg text-neutral-900 dark:text-neutral-100" />
+                    <VscChromeMaximize className="text-lg" />
                 )}
             </button>
 
@@ -51,10 +51,10 @@ export default function TitleBar() {
             <button
                 onClick={systemService.close}
                 // 关闭按钮保留 M3 风格，但在 Hover 时使用红色背景+白字
-                className="group flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-red-500 hover:text-white"
+                className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-red-500 hover:text-white"
             >
                 {/* 图标在 group-hover 时变白 */}
-                <VscChromeClose className="text-lg text-neutral-900 dark:text-neutral-100 group-hover:text-white" />
+                <VscChromeClose className="text-lg" />
             </button>
 
         </div>

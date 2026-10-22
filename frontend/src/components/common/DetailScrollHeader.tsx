@@ -11,7 +11,7 @@ export default function DetailScrollHeader() {
             <div className={clsx(
                 'sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b',
                 isScrolled
-                    ? 'bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto'
+                    ? 'bg-surface/60 dark:bg-surface/35 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto'
                     : 'bg-transparent border-transparent opacity-0 pointer-events-none'
             )} />
         </>

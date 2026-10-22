@@ -29,10 +29,10 @@ export default function PlaylistSearchControl({
             <div
                 onMouseLeave={() => setSuppressTooltip(false)}
                 className={clsx(
-                    'flex items-center transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
+                    'flex items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
                     isSearchOpen
-                        ? 'w-64 bg-surface-container-lowest/90 dark:bg-surface-container-highest/90 backdrop-blur-md border border-outline-variant/20 shadow-sm mr-2'
-                        : 'w-10 h-10 btn-blur text-on-surface-variant hover:bg-surface-container-lowest dark:hover:bg-surface-container-highest hover:text-primary cursor-pointer'
+                        ? 'w-64 mr-2'
+                        : 'w-10 h-10 text-on-surface-variant hover:text-primary cursor-pointer'
                 )}
                 onClick={() => !isSearchOpen && setIsSearchOpen(true)}
             >

@@ -235,7 +235,7 @@ export default function EditableContextMenu() {
         >
             {items.map(({ label, icon: Icon, command, disabled }, index) => (
                 <div key={command}>
-                    {index === 2 && <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />}
+                    {index === 2 && <div className="my-1 h-px bg-on-surface/10" />}
                     <button
                         type="button"
                         role="menuitem"
@@ -256,7 +256,7 @@ export default function EditableContextMenu() {
                             runEditCommand(command, menu.element);
                             closeMenu();
                         }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/10"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors enabled:hover:bg-on-surface/8 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         <Icon className="text-lg opacity-70" />
                         {label}

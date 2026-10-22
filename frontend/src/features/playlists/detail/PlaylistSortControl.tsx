@@ -46,7 +46,7 @@ export default function PlaylistSortControl({
                         'w-10 h-10 flex items-center justify-center rounded-full transition-colors',
                         isSortMenuOpen
                             ? 'bg-primary text-on-primary shadow-lg'
-                            : 'btn-blur text-on-surface-variant hover:bg-surface-container-highest hover:text-primary'
+                            : 'bg-on-surface/5 backdrop-blur-md border border-on-surface/10 text-on-surface-variant hover:bg-on-surface/10 hover:text-primary'
                     )}
                 >
                     <MdSort className="text-xl" />
@@ -62,7 +62,7 @@ export default function PlaylistSortControl({
                             setSuppressSortTooltip(true);
                         }}
                     />
-                    <div className="absolute right-0 mt-2 w-56 bg-white/60 dark:bg-primary/10 border border-primary/10 rounded-xl shadow-2xl py-2 z-70 backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
+                    <div className="absolute right-0 mt-2 w-56 bg-white/50 dark:bg-neutral-900/50 border border-on-surface/10 rounded-xl shadow-2xl py-2 z-70 backdrop-blur-3xl animate-in fade-in zoom-in duration-200 origin-top-right">
                         <div className="px-3 py-1.5 text-[11px] font-bold text-on-surface-variant/60 uppercase tracking-wider">排序依据</div>
                         {[
                             { label: '播放列表顺序', key: 'manual' as SortKey },

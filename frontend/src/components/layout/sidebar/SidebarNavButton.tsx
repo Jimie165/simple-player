@@ -51,7 +51,7 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                         ? "bg-primary/15" // 稍微加深点 active 状态
                         : clsx(
                             "bg-transparent",
-                            !isClicked && "group-hover:bg-primary/5" // 如果点击了就不再显示 hover 背景
+                            !isClicked && "group-hover:bg-on-surface/8" // 如果点击了就不再显示 hover 背景
                         )
                 )} />
 

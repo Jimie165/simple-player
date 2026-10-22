@@ -152,7 +152,7 @@ export default function MusicGrid() {
                             return (
                                 <div
                                     key={item.id}
-                                    className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
+                                    className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-on-surface/5 transition-colors cursor-pointer relative"
                                     onClick={(e) => handleItemClick(item, e)}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >

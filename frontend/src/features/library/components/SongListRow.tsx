@@ -109,8 +109,8 @@ function SongListRowImpl({
                         className={clsx(
                             "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
                             isFav
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                ? "text-red-500 hover:bg-red-500/10 opacity-100"
+                                : "text-on-surface-variant hover:text-red-500 hover:bg-on-surface/8 opacity-0 group-hover:opacity-100"
                         )}
                     >
                         {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}

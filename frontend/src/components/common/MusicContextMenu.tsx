@@ -195,12 +195,12 @@ function MenuContent({
                 >
                     {resolvedGroups.map((group, groupIndex) => (
                         <React.Fragment key={groupIndex}>
-                            {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
+                            {groupIndex > 0 && <div className="my-1 h-0.5 bg-on-surface/10" />}
                             {group.map((item) => (
                                 <MenuItem key={item.id}>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); item.onClick(); }}
-                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-focus:bg-red-50 dark:data-focus:bg-red-900/20' : ''
+                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors data-focus:bg-on-surface/8 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-focus:bg-red-500/10' : ''
                                             }`}
                                     >
                                         <div className="flex flex-1 items-center gap-3">

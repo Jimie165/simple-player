@@ -72,7 +72,7 @@ export default function AlbumDetailView({
                     </h2>
 
                     <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-2 font-medium flex items-center gap-2">
-                        <span className="bg-neutral-100 dark:bg-white/10 px-2 py-0.5 rounded-md text-xs">Album</span>
+                        <span className="bg-on-surface/8 text-on-surface-variant px-2 py-0.5 rounded-md text-xs">Album</span>
                         <span>•</span>
                         <span>{album.songs[0]?.year || 'Unknown Year'}</span>
                         <span>•</span>

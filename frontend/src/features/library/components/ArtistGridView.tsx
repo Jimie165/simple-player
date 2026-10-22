@@ -94,7 +94,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
         return (
             <div
                 key={id}
-                className="group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer min-w-0"
+                className="group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-on-surface/5 transition-colors cursor-pointer min-w-0"
                 onClick={(e) => handleItemClick(artist, e)}
                 onContextMenu={(e) => handleContextMenu(e, artist)}
             >

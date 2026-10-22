@@ -93,7 +93,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             >
                 {menuGroups.map((group, groupIndex) => (
                     <div key={groupIndex}>
-                        {groupIndex > 0 && <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />}
+                        {groupIndex > 0 && <div className="my-1 h-px bg-on-surface/10" />}
                         {group.map((item) => (
                             <button
                                 key={item.id}
@@ -101,8 +101,8 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
                                     item.onClick();
                                     onClose();
                                 }}
-                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-neutral-100 dark:hover:bg-white/10 ${item.variant === 'danger'
-                                    ? 'text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20'
+                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-on-surface/8 ${item.variant === 'danger'
+                                    ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
                                     : ''
                                     }`}
                             >

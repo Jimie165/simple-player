@@ -23,9 +23,9 @@ export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }
           <CustomTooltip text="返回上级" placement="bottom">
             <button
               onClick={onBack}
-              className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors"
+              className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/8 transition-colors"
             >
-              <MdArrowBack className="text-[24px] text-neutral-600 dark:text-neutral-300" />
+              <MdArrowBack className="text-[24px] text-on-surface-variant" />
             </button>
           </CustomTooltip>
         </div>
@@ -43,7 +43,7 @@ export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }
           </div>
 
           <span className={clsx(
-            "whitespace-nowrap font-semibold text-lg text-neutral-800 dark:text-neutral-100 ml-2 transition-all duration-300",
+            "whitespace-nowrap font-semibold text-lg text-on-surface ml-2 transition-all duration-300",
             collapsed ? "opacity-0 w-0 scale-95" : "opacity-100 w-auto scale-100"
           )}>
             Simple Player
@@ -68,12 +68,12 @@ export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }
             <div className={clsx(
               "absolute top-1/2 -translate-y-1/2 h-10 rounded-2xl transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
               "left-0 w-12", // 始终固定宽度和位置
-              "bg-transparent group-hover:bg-neutral-100 dark:group-hover:bg-white/5"
+              "bg-transparent group-hover:bg-on-surface/8"
             )} />
 
             {/* 图标 */}
             <div className="relative z-10 w-12 h-12 flex items-center justify-center shrink-0">
-              <MdMenu className="text-[24px] text-neutral-600 dark:text-neutral-300" />
+              <MdMenu className="text-[24px] text-on-surface-variant" />
             </div>
           </button>
         </CustomTooltip>
