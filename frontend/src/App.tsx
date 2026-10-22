@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
@@ -167,7 +167,8 @@ function App() {
     });
   };
 
-  const renderContent = () => {
+  // 侧栏和队列开关只改变外壳布局，页面由自己的 store/effect 更新。
+  const pageContent = useMemo(() => {
     switch (currentPage) {
       case 'home': return <MusicGrid />;
       case 'library': return <Library />;
@@ -177,7 +178,7 @@ function App() {
       case 'playlists': return <PlaylistsRoot />;
       default: return null;
     }
-  };
+  }, [currentPage, searchQuery]);
 
   const mainContent = (
     <div
@@ -204,7 +205,7 @@ function App() {
               transition={{ duration: 0.2, ease: "easeOut" }}
               className="h-full"
             >
-              {renderContent()}
+              {pageContent}
             </motion.div>
           </AnimatePresence>
         </div>

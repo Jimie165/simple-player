@@ -13,7 +13,7 @@ import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义专辑数据结构
@@ -37,7 +37,7 @@ interface AlbumGridViewProps {
 }
 
 export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false, hideYear = false }: AlbumGridViewProps) {
-    const mainContentWidth = useMainContentWidth();
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(albums.length, 'cover'));
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
     const openEditAlbum = useDialogStore(state => state.openEditAlbum);

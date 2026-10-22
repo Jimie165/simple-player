@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useMemo } from 'react';
+import { useState, useEffect, memo, useMemo, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
@@ -52,6 +52,7 @@ export type SortOrder = 'asc' | 'desc';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 const HIDE_ARTIST_BREAKPOINT = 650;
+const SONG_LIST_BREAKPOINTS = [HIDE_ARTIST_BREAKPOINT, HIDE_ALBUM_BREAKPOINT];
 
 const renderHeaderCell = (label: ReactNode, className?: string, alignRight = false) => (
     <div
@@ -142,8 +143,9 @@ export default function SortableSongList({
     playlistId,
     context = 'playlist' // Default to playlist
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
-    const mainContentWidth = useMainContentWidth();
-    const scrollParent = useScrollViewport(true);
+    const mainContentWidth = useMainContentWidth(SONG_LIST_BREAKPOINTS);
+    const listRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(true, listRef);
     const overscan = useViewportOverscan(scrollParent);
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
     const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
@@ -326,7 +328,7 @@ export default function SortableSongList({
     };
 
     return (
-        <div className="w-full relative select-none">
+        <div ref={listRef} className="w-full relative select-none">
             <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-white/10 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl">
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}

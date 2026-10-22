@@ -1,4 +1,8 @@
-import { useState, useMemo } from 'react';
+import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import type { ReactNode } from 'react';
+import { Virtuoso } from 'react-virtuoso';
+import { useScrollViewport } from '@/hooks/useScrollViewport';
+import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 import { MdPlayArrow, MdShuffle, MdPerson } from 'react-icons/md';
 import { motion } from 'framer-motion';
 import CardPlayButton from '@/components/common/CardPlayButton';
@@ -9,9 +13,10 @@ import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import SongListView from '@/features/library/components/SongListView';
 import AlbumGridView from '@/features/library/components/AlbumGridView';
 import type { SongMetadata } from '@/types';
+import { getMusicItemId } from '@/utils/musicItemUtils';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
-import { useScrollBlur } from '@/hooks/useScrollBlur';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 
 interface ArtistDetailViewProps {
     artist: ArtistData;
@@ -26,6 +31,14 @@ interface ArtistDetailViewProps {
     onOpenAlbumByName?: (name: string) => void;
 }
 
+const ArtistAlbumSection = memo(function ArtistAlbumSection({ album, index, render }: {
+    album: AlbumData;
+    index: number;
+    render: (album: AlbumData, index: number) => ReactNode;
+}) {
+    return render(album, index);
+});
+
 export default function ArtistDetailView({
     artist,
     albums,
@@ -37,10 +50,9 @@ export default function ArtistDetailView({
     onDeleteAlbum,
     onOpenAlbumByName
 }: ArtistDetailViewProps) {
-    const { isScrolled, topSentinelRef } = useScrollBlur();
 
     // Helper to robustly handle album opening by name
-    const handleOpenAlbumByName = (name: string) => {
+    const handleOpenAlbumByName = useCallback((name: string) => {
         if (onOpenAlbumByName) {
             onOpenAlbumByName(name);
             return;
@@ -50,9 +62,13 @@ export default function ArtistDetailView({
         if (found) {
             onOpenAlbum(found);
         }
-    };
+    }, [onOpenAlbumByName, albums, onOpenAlbum]);
 
-    const { lastArtistDetailTab, setArtistDetailTab } = useNavigationStore();
+    const lastArtistDetailTab = useNavigationStore(state => state.lastArtistDetailTab);
+    const setArtistDetailTab = useNavigationStore(state => state.setArtistDetailTab);
+    const detailRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(true, detailRef);
+    const overscan = useViewportOverscan(scrollParent);
 
     // Use persistent tab state from store
     const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
@@ -105,30 +121,105 @@ export default function ArtistDetailView({
         return sortedAlbums.flatMap(album => album.songs);
     }, [sortedAlbums]);
 
-    const [animatedAlbumIds, setAnimatedAlbumIds] = useState(() => new Set<string>());
-    const getAlbumAnimationClass = (album: AlbumData) => {
-        const key = `${album.name}::${album.artist}`;
-        return animatedAlbumIds.has(key) ? "" : "animate-in fade-in duration-500";
-    };
-    const markAlbumAnimationComplete = (album: AlbumData) => {
-        const key = `${album.name}::${album.artist}`;
-        setAnimatedAlbumIds((current) => {
-            if (current.has(key)) return current;
-            return new Set(current).add(key);
-        });
-    };
+    const isSelectionMode = useSelectionStore(state => state.isSelectionMode);
+    const selectAllRequested = useSelectionStore(state => state.selectAllRequested);
+    useEffect(() => {
+        if (activeTab !== 'songs' || !isSelectionMode || detailRef.current?.closest('[inert]')) return;
+        useSelectionStore.getState().setSelectableIds(sortedSongs.map(getMusicItemId).filter(Boolean));
+    }, [activeTab, isSelectionMode, sortedSongs]);
+
+    useEffect(() => {
+        if (activeTab !== 'songs' || !isSelectionMode || !selectAllRequested || detailRef.current?.closest('[inert]')) return;
+        const selection = useSelectionStore.getState();
+        selection.selectAll(sortedSongs.map(song => ({ id: getMusicItemId(song), data: song })).filter(item => item.id !== ''), 'song');
+        selection.setSelectAllRequested(false);
+    }, [activeTab, isSelectionMode, selectAllRequested, sortedSongs]);
+
+    const renderAlbum = useCallback((album: AlbumData, index: number) => (
+        <div
+            key={`${album.name}::${album.artist}`}
+            className={index === sortedAlbums.length - 1 ? "" : "pb-12"}
+        >
+            <div
+                className="flex flex-col md:flex-row gap-6 md:gap-8"
+            >
+                <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
+                    <div
+                        className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
+                        onClick={() => onPlayAlbum(album)}
+                    >
+                        {album.songs.length > 0 ? (
+                            <CoverImage
+                                song={album.songs[0]}
+                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                iconClassName="text-6xl"
+                            />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-neutral-400">
+                                <MdPerson className="text-6xl" />
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <CardPlayButton
+                                variant="cover"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    onPlayAlbum(album);
+                                }}
+                                className="static! inset-auto!"
+                            />
+                        </div>
+                    </div>
+                    <div className="px-1 text-center md:text-left">
+                        <h3
+                            className="font-bold text-neutral-900 dark:text-neutral-50 text-lg leading-tight cursor-pointer hover:text-primary transition-colors"
+                            onClick={() => onOpenAlbum(album)}
+                        >
+                            {album.name}
+                        </h3>
+                        <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
+                            {album.artist}
+                        </div>
+                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
+                            <span>{album.songs[0]?.year || "Unknown Year"}</span>
+                            {album.songs[0]?.genre && (
+                                <>
+                                    <span>•</span>
+                                    <span>{album.songs[0]?.genre}</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex-1 min-w-0">
+                    <SongListView
+                        songs={album.songs}
+                        onPlay={(song, _index, options) => {
+                            const globalIndex = sortedSongs.findIndex(s => s.path === song.path);
+                            if (globalIndex !== -1) {
+                                onPlaySong(song, globalIndex, { ...options, disableShuffle: true });
+                            }
+                        }}
+                        onDelete={onDeleteSong}
+                        hideCover={true}
+                        hideArtist={true}
+                        hideAlbum={true}
+                        disableSort={true}
+                        enableDelete={true}
+                        virtualize={false}
+                        manageSelection={false}
+                        onOpenAlbum={handleOpenAlbumByName}
+                        context="artist_detail"
+                    />
+                </div>
+            </div>
+        </div>
+    ), [sortedAlbums.length, sortedSongs, onPlayAlbum, onOpenAlbum, onPlaySong, onDeleteSong, handleOpenAlbumByName]);
 
     return (
-        <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-300 relative isolate">
-            <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
-
-            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
-            <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
-                isScrolled
-                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
-                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
-            )} data-tauri-drag-region />
+        <div ref={detailRef} className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-300 relative isolate">
+            <DetailScrollHeader />
 
             {/* Header Section */}
             <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-6 px-6 relative z-10 -mt-10">
@@ -247,89 +338,13 @@ export default function ArtistDetailView({
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <div className="mt-4">
-                                {sortedAlbums.map((album, index) => (
-                                        <div
-                                            key={`${album.name}::${album.artist}`}
-                                            className={index === sortedAlbums.length - 1 ? "" : "pb-12"}
-                                        >
-                                            <div
-                                                className={clsx("flex flex-col md:flex-row gap-6 md:gap-8", getAlbumAnimationClass(album))}
-                                                onAnimationEnd={(event) => {
-                                                    if (event.currentTarget === event.target) markAlbumAnimationComplete(album);
-                                                }}
-                                            >
-                                                <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
-                                                    <div
-                                                        className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
-                                                        onClick={() => onPlayAlbum(album)}
-                                                    >
-                                                        {album.songs.length > 0 ? (
-                                                            <CoverImage
-                                                                song={album.songs[0]}
-                                                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
-                                                                iconClassName="text-6xl"
-                                                            />
-                                                        ) : (
-                                                            <div className="w-full h-full flex items-center justify-center text-neutral-400">
-                                                                <MdPerson className="text-6xl" />
-                                                            </div>
-                                                        )}
-                                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                                            <CardPlayButton
-                                                                variant="cover"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    onPlayAlbum(album);
-                                                                }}
-                                                                className="static! inset-auto!"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                    <div className="px-1 text-center md:text-left">
-                                                        <h3
-                                                            className="font-bold text-neutral-900 dark:text-neutral-50 text-lg leading-tight cursor-pointer hover:text-primary transition-colors"
-                                                            onClick={() => onOpenAlbum(album)}
-                                                        >
-                                                            {album.name}
-                                                        </h3>
-                                                        <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
-                                                            {album.artist}
-                                                        </div>
-                                                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
-                                                            <span>{album.songs[0]?.year || "Unknown Year"}</span>
-                                                            {album.songs[0]?.genre && (
-                                                                <>
-                                                                    <span>•</span>
-                                                                    <span>{album.songs[0]?.genre}</span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex-1 min-w-0">
-                                                    <SongListView
-                                                        songs={album.songs}
-                                                        onPlay={(song, _index, options) => {
-                                                            const globalIndex = sortedSongs.findIndex(s => s.path === song.path);
-                                                            if (globalIndex !== -1) {
-                                                                onPlaySong(song, globalIndex, { ...options, disableShuffle: true });
-                                                            }
-                                                        }}
-                                                        onDelete={onDeleteSong}
-                                                        hideCover={true}
-                                                        hideArtist={true}
-                                                        hideAlbum={true}
-                                                        disableSort={true}
-                                                        enableDelete={true}
-                                                        virtualize={false}
-                                                        onOpenAlbum={handleOpenAlbumByName}
-                                                        context="artist_detail"
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                ))}
+                                {scrollParent && <Virtuoso
+                                    data={sortedAlbums}
+                                    customScrollParent={scrollParent}
+                                    overscan={overscan}
+                                    computeItemKey={(_index, album) => `${album.name}::${album.artist}`}
+                                    itemContent={(index, album) => <ArtistAlbumSection album={album} index={index} render={renderAlbum} />}
+                                />}
                                 <div className="h-20 w-full" />
                             </div>
                         </motion.div>

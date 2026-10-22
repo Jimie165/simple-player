@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { MdAccessTime, MdArrowDropUp, MdArrowDropDown } from 'react-icons/md';
 import clsx from 'clsx';
 import { Virtuoso } from 'react-virtuoso';
@@ -14,8 +14,18 @@ import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
+const formatDuration = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+};
+
 const HIDE_ALBUM_BREAKPOINT = 900;
 const HIDE_ARTIST_BREAKPOINT = 650;
+const SONG_LIST_BREAKPOINTS = [HIDE_ARTIST_BREAKPOINT, HIDE_ALBUM_BREAKPOINT];
+const NO_COLUMN_BREAKPOINTS: readonly number[] = [];
+const ARTIST_COLUMN_BREAKPOINTS = [HIDE_ARTIST_BREAKPOINT];
+const ALBUM_COLUMN_BREAKPOINTS = [HIDE_ALBUM_BREAKPOINT];
 
 interface SongListVirtuosoContext {
     footerSpacerClassName: string;
@@ -35,6 +45,7 @@ interface SongListViewProps {
     hideAlbum?: boolean;
     disableSort?: boolean;
     virtualize?: boolean;
+    manageSelection?: boolean;
     onOpenArtist?: (artist: string) => void;
     onOpenAlbum?: (album: string) => void;
     context?: MusicMenuContext;
@@ -54,6 +65,7 @@ export default function SongListView({
     hideAlbum = false,
     disableSort = false,
     virtualize = true,
+    manageSelection = true,
     onOpenArtist,
     onOpenAlbum,
     context = 'library',
@@ -68,7 +80,9 @@ export default function SongListView({
     // Header Blur / Context specific class - kept from original if any logic existed, seemingly generic sticky
 
     // Responsive: auto-hide album column based on the main content area width.
-    const mainContentWidth = useMainContentWidth();
+    const mainContentWidth = useMainContentWidth(hideAlbum
+        ? (hideArtist ? NO_COLUMN_BREAKPOINTS : ARTIST_COLUMN_BREAKPOINTS)
+        : (hideArtist ? ALBUM_COLUMN_BREAKPOINTS : SONG_LIST_BREAKPOINTS));
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
     const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
 
@@ -113,16 +127,12 @@ export default function SongListView({
     };
     const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
-    const handleContextMenu = (e: React.MouseEvent, song: SongMetadata, index: number) => {
+    const handleContextMenu = useCallback((e: React.MouseEvent, song: SongMetadata, index: number) => {
         e.preventDefault();
         setContextMenu({ x: e.clientX, y: e.clientY, song, index });
-    };
+    }, []);
 
-    const formatDuration = (sec: number) => {
-        const m = Math.floor(sec / 60);
-        const s = Math.floor(sec % 60);
-        return `${m}:${s.toString().padStart(2, '0')}`;
-    };
+
 
     const visibleSongs = useMemo(() => {
         if (optimisticallyDeletedSongIds.size === 0) return songs;
@@ -156,7 +166,7 @@ export default function SongListView({
 
     // Update Selectable IDs
     useEffect(() => {
-        if (selectAllRequested && isSelectionMode) {
+        if (manageSelection && selectAllRequested && isSelectionMode) {
             const items = sortedSongs.map(song => ({
                 id: getMusicItemId(song),
                 data: song
@@ -165,12 +175,12 @@ export default function SongListView({
             selectAll(items, 'song');
             setSelectAllRequested(false);
         }
-    }, [selectAllRequested, isSelectionMode, sortedSongs, selectAll, setSelectAllRequested]);
+    }, [manageSelection, selectAllRequested, isSelectionMode, sortedSongs, selectAll, setSelectAllRequested]);
 
     useEffect(() => {
-        if (!isSelectionMode) return;
+        if (!manageSelection || !isSelectionMode) return;
         setSelectableIds(sortedSongs.map(song => getMusicItemId(song)).filter(id => id !== ''));
-    }, [isSelectionMode, sortedSongs, setSelectableIds]);
+    }, [manageSelection, isSelectionMode, sortedSongs, setSelectableIds]);
 
     const handleSort = (key: SortKey) => {
         if (sortKey === key) {
@@ -255,9 +265,12 @@ export default function SongListView({
         cols += " 100px 40px";
         return cols;
     };
-    const gridStyle = { gridTemplateColumns: getGridCols() };
+    const gridTemplateColumns = getGridCols();
+    const gridStyle = useMemo(() => ({ gridTemplateColumns }), [gridTemplateColumns]);
+    const handleSelectSong = useCallback((song: SongMetadata) => handleCheckboxClick(null, song), [handleCheckboxClick]);
 
-    const scrollParent = useScrollViewport(virtualize);
+    const listRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(virtualize, listRef);
     const overscan = useViewportOverscan(scrollParent);
 
     // Render Row Function
@@ -291,13 +304,13 @@ export default function SongListView({
                 onOpenAlbum={onOpenAlbum}
                 onContextMenu={handleContextMenu}
                 onRowClick={handleItemClick}
-                onSelect={() => handleCheckboxClick(null, song)}
+                onSelect={handleSelectSong}
             />
         );
     };
 
     return (
-        <div className="w-full relative select-none">
+        <div ref={listRef} className="w-full relative select-none">
             {/* Header (Sticky) via CSS outside Virtuoso */}
             <div
                 style={gridStyle}

@@ -2,8 +2,10 @@ import type { CSSProperties } from 'react';
 
 type GridKind = 'cover' | 'video';
 
+const NO_GRID_BREAKPOINTS: readonly number[] = [];
+
 type GridConfig = {
-    breakpoints: number[];
+    breakpoints: readonly number[];
     columns: number[];
     fallbackLockedWidth: number;
 };
@@ -20,6 +22,12 @@ const GRID_CONFIGS: Record<GridKind, GridConfig> = {
         fallbackLockedWidth: 215,
     },
 };
+
+/** 满行网格由 CSS 容器查询换列，只有稀疏网格需要 JS 跟踪断点。 */
+export function getSparseGridBreakpoints(itemCount: number, kind: GridKind): readonly number[] {
+    const { breakpoints, columns } = GRID_CONFIGS[kind];
+    return itemCount >= columns[columns.length - 1] ? NO_GRID_BREAKPOINTS : breakpoints;
+}
 
 export function getGridColumnCount(width: number, kind: GridKind) {
     const { breakpoints, columns } = GRID_CONFIGS[kind];

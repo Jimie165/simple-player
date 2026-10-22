@@ -8,7 +8,7 @@ import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/PlaylistCardMenus';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 type PlaylistGridItem = Playlist | (Omit<Playlist, 'id'> & { id: 'favorites' | 'playlist:favorites' });
@@ -48,7 +48,7 @@ export default function PlaylistCardsGrid({
     setFavoritesContextMenu,
     playlistCoverPaths,
 }: PlaylistCardsGridProps) {
-    const mainContentWidth = useMainContentWidth();
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(filteredPlaylists.length, 'cover'));
 
     return (
         <VirtualizedGrid

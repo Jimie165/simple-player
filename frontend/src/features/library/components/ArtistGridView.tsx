@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
-import { Virtuoso } from 'react-virtuoso';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
@@ -9,12 +8,9 @@ import type { SongMetadata } from '@/types';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getGridColumnCount } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import { useScrollViewport } from '@/hooks/useScrollViewport';
-import { useViewportOverscan } from '@/hooks/useViewportOverscan';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -35,17 +31,6 @@ interface ArtistGridViewProps {
 }
 
 export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
-    const mainContentWidth = useMainContentWidth();
-    const scrollParent = useScrollViewport(true);
-    const overscan = useViewportOverscan(scrollParent);
-    const columnCount = getGridColumnCount(mainContentWidth, 'cover');
-    const artistRows = useMemo(() => {
-        const rows: ArtistData[][] = [];
-        for (let index = 0; index < artists.length; index += columnCount) {
-            rows.push(artists.slice(index, index + columnCount));
-        }
-        return rows;
-    }, [artists, columnCount]);
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
@@ -195,27 +180,12 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 type="danger"
             />
 
-            {scrollParent ? (
-                <Virtuoso
-                    useWindowScroll={false}
-                    customScrollParent={scrollParent}
-                    data={artistRows}
-                    computeItemKey={(_index, row) => row.map(artist => getMusicItemId(artist)).join('|')}
-                    overscan={overscan}
-                    components={{
-                        Header: () => <div className="h-4" />,
-                        Footer: () => <div className="h-20" />,
-                    }}
-                    itemContent={(_index, row) => (
-                        <div className="grid content-grid-cover gap-4 pb-4">
-                            {row.map(renderArtistCard)}
-                        </div>
-                    )}
-                    className="w-full"
-                />
-            ) : (
-                <div className="opacity-0" />
-            )}
+            <VirtualizedGrid
+                data={artists}
+                itemKey={(_index, artist) => getMusicItemId(artist)}
+                listClassName="grid content-grid-cover gap-4 pt-4 pb-24"
+                itemContent={(_index, artist) => renderArtistCard(artist)}
+            />
             {/* Cursor Context Menu */}
             {contextMenu && (
                 <SmartCursorContextMenu

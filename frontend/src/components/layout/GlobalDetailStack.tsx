@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef, useState } from 'react';
+import { memo, useMemo, useEffect, useRef, useState } from 'react';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { libraryService } from '@/services/libraryService';
@@ -27,9 +27,10 @@ const overlayVariants: Variants = {
         : { x: 0, transition: { duration: 0 } },
 };
 
-export default function GlobalDetailStack() {
-    const { overlayStack, push } = useNavigationStore();
-    const { addToRecent } = useLibraryStore();
+function GlobalDetailStack() {
+    const overlayStack = useNavigationStore(state => state.overlayStack);
+    const push = useNavigationStore(state => state.push);
+    const addToRecent = useLibraryStore(state => state.addToRecent);
     const { playSong, shufflePlay } = usePlaybackActions();
     const [settledOverlayDepth, setSettledOverlayDepth] = useState(overlayStack.length);
 
@@ -179,6 +180,8 @@ export default function GlobalDetailStack() {
         </AnimatePresence>
     );
 }
+
+export default memo(GlobalDetailStack);
 
 // --- Internal Sub-Components to Isolate Hooks ---
 

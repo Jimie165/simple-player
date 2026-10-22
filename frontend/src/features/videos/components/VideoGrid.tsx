@@ -11,11 +11,11 @@ import { formatTime } from '@/utils/time';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { VideoCard } from '@/features/videos/components/VideoCard';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
-    const mainContentWidth = useMainContentWidth();
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videos.length, 'video'));
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const { pausePlayback } = usePlaybackActions();
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);

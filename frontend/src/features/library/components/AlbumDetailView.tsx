@@ -5,9 +5,8 @@ import CoverImage from '@/components/common/CoverImage';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { SongMetadata } from '@/types';
-import { useScrollBlur } from '@/hooks/useScrollBlur';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 import { useDialogStore } from '@/store/useDialogStore';
-import clsx from 'clsx';
 
 interface AlbumDetailViewProps {
     album: AlbumData;
@@ -29,7 +28,6 @@ export default function AlbumDetailView({
     onAlbumDeleted,
     onOpenArtistByName
 }: AlbumDetailViewProps) {
-    const { isScrolled, topSentinelRef } = useScrollBlur();
     const openEditAlbum = useDialogStore(state => state.openEditAlbum);
 
     const totalDuration = useMemo(() => {
@@ -50,15 +48,7 @@ export default function AlbumDetailView({
 
     return (
         <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-300 relative isolate">
-            <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
-
-            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
-            <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
-                isScrolled
-                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
-                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
-            )} data-tauri-drag-region />
+            <DetailScrollHeader />
 
             {/* Header Area using Material 3 Styling */}
             <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6 relative z-10 -mt-10">

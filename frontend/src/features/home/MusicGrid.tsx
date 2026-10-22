@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import clsx from 'clsx';
 import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdVideocam } from 'react-icons/md';
 import PageContainer from '@/components/layout/PageContainer';
@@ -8,7 +8,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { libraryService } from '@/services/libraryService';
 
-import type { RecentItem } from '@/types';
+import type { RecentItem, SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
@@ -18,7 +18,7 @@ import CardPlayButton from '@/components/common/CardPlayButton';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 /**
@@ -43,9 +43,19 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
     return <PlaylistCoverCollage songs={[]} coverPaths={coverPaths} className="w-full h-full" />;
 }
 export default function MusicGrid() {
-    const mainContentWidth = useMainContentWidth();
     // Store Actions
     const { recentHistory } = useLibraryStore();
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(recentHistory.length, 'cover'));
+    // 虚拟网格会在尺寸变化时重复渲染卡片，封面数据需保持引用稳定。
+    const recentCoverSongs = useMemo(() => new Map<string, SongMetadata>(recentHistory.map((item) => [item.id, {
+        title: item.title,
+        artist: item.artist || '',
+        album: '',
+        duration: 0,
+        path: item.path,
+        cover: null,
+        cover_path: item.cover_path,
+    }])), [recentHistory]);
     const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
     const {
         contextMenu,
@@ -172,15 +182,7 @@ export default function MusicGrid() {
                                             )
                                         ) : (
                                             <CoverImage
-                                                song={{
-                                                    title: item.title,
-                                                    artist: item.artist || '',
-                                                    album: '',
-                                                    duration: 0,
-                                                    path: item.path,
-                                                    cover: null,
-                                                    cover_path: item.cover_path
-                                                }}
+                                                song={recentCoverSongs.get(item.id)}
                                                 className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
                                                 iconClassName="text-6xl opacity-50"
                                             />

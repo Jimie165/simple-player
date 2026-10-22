@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MdPlayArrow, MdShuffle, MdEdit, MdFavorite } from 'react-icons/md';
 import clsx from 'clsx';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import { useScrollBlur } from '@/hooks/useScrollBlur';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 
 
 import SortableSongList from '@/features/playlists/songlist/SortableSongList';
@@ -33,7 +33,8 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     const initialLoadRef = useRef(true);
 
     // Sort State - Load initial state from store if available, else default
-    const { getPlaylistSettings, setPlaylistSettings } = useLibraryStore();
+    const getPlaylistSettings = useLibraryStore(state => state.getPlaylistSettings);
+    const setPlaylistSettings = useLibraryStore(state => state.setPlaylistSettings);
     const savedSettings = getPlaylistSettings(id.toString());
 
     const [sortKey, setLocalSortKey] = useState<SortKey>(savedSettings.sortKey);
@@ -71,11 +72,16 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     // Store Actions
     // Store Actions
-    const { triggerLibraryUpdate, triggerPlaylistUpdate, favoriteSet, favoritesLoaded, updateRecentItemCover, playlistVersion } = useLibraryStore();
+    const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
+    const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
+    const favoriteSet = useLibraryStore(state => state.favoriteSet);
+    const favoritesLoaded = useLibraryStore(state => state.favoritesLoaded);
+    const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
+    const playlistVersion = useLibraryStore(state => state.playlistVersion);
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
-    const { isScrolled, topSentinelRef } = useScrollBlur();
+
 
     // Load Data
 
@@ -259,15 +265,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     return (
         <div className="w-full min-h-full relative isolate">
-            <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
-
-            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
-            <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
-                isScrolled
-                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
-                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
-            )} data-tauri-drag-region />
+            <DetailScrollHeader />
 
             <EditPlaylistDialog
                 isOpen={isEditOpen}

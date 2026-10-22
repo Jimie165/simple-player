@@ -84,18 +84,18 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         const content = contentRef.current;
         if (!viewport || !content) return;
 
-        const resizeObserver = new ResizeObserver(() => updateThumb());
+        const resizeObserver = new ResizeObserver(onScroll);
 
         // Observe both viewport (for resize) and content (for height change)
         resizeObserver.observe(viewport);
         resizeObserver.observe(content);
 
         // Also use MutationObserver as a backup for non-size-changing layout shifts that might affect scrollHeight (rare but possible)
-        const mutationObserver = new MutationObserver(() => updateThumb());
+        const mutationObserver = new MutationObserver(onScroll);
         mutationObserver.observe(content, { childList: true, subtree: true });
 
         viewport.addEventListener('scroll', onScroll);
-        window.addEventListener('resize', updateThumb);
+        window.addEventListener('resize', onScroll);
 
         updateThumb();
 
@@ -103,8 +103,11 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             resizeObserver.disconnect();
             mutationObserver.disconnect();
             viewport.removeEventListener('scroll', onScroll);
-            window.removeEventListener('resize', updateThumb);
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            window.removeEventListener('resize', onScroll);
+            if (requestRef.current) {
+                cancelAnimationFrame(requestRef.current);
+                requestRef.current = undefined;
+            }
         };
     }, [onScroll, updateThumb]);
 
@@ -144,11 +147,12 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         };
 
         setIsDragging(true);
-        document.body.style.userSelect = 'none';
     };
 
     useEffect(() => {
         if (!isDragging) return;
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.userSelect = 'none';
 
         const handlePointerMove = (e: PointerEvent) => {
             if (!viewportRef.current) return;
@@ -164,7 +168,6 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
 
             activePointerId.current = null;
             setIsDragging(false);
-            document.body.style.userSelect = '';
             scheduleThumbUpdate();
         };
 
@@ -173,6 +176,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         window.addEventListener('pointercancel', stopDragging);
 
         return () => {
+            document.body.style.userSelect = previousUserSelect;
             window.removeEventListener('pointermove', handlePointerMove);
             window.removeEventListener('pointerup', stopDragging);
             window.removeEventListener('pointercancel', stopDragging);

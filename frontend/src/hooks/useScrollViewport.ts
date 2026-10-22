@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { RefObject } from 'react';
 
 const SCROLL_VIEWPORT_SELECTOR = '[data-scroll-viewport]';
 
@@ -7,7 +8,7 @@ function findScrollViewport(): HTMLElement | null {
     return element instanceof HTMLElement ? element : null;
 }
 
-export function useScrollViewport(enabled = true) {
+export function useScrollViewport(enabled = true, anchorRef?: RefObject<HTMLElement | null>) {
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
 
     useEffect(() => {
@@ -23,7 +24,9 @@ export function useScrollViewport(enabled = true) {
         const resolve = () => {
             if (cancelled) return true;
 
-            const element = findScrollViewport();
+            const element = anchorRef
+                ? anchorRef.current?.closest<HTMLElement>(SCROLL_VIEWPORT_SELECTOR)
+                : findScrollViewport();
             if (!element) return false;
 
             setScrollParent(element);
@@ -49,7 +52,7 @@ export function useScrollViewport(enabled = true) {
             cancelAnimationFrame(frame);
             observer?.disconnect();
         };
-    }, [enabled]);
+    }, [enabled, anchorRef]);
 
     return scrollParent;
 }

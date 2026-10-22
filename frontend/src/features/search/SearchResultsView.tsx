@@ -1,3 +1,4 @@
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { useState, useEffect, useMemo } from 'react';
 import type { SongMetadata } from '@/types';
 import type { VideoMetadata } from '@/types/video';
@@ -14,7 +15,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { buildAlbums } from '@/features/library/utils/grouping';
 
@@ -23,9 +24,9 @@ interface SearchResultsViewProps {
 }
 
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
-    const mainContentWidth = useMainContentWidth();
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videoResults.length, 'video'));
     const [completedQuery, setCompletedQuery] = useState<string | null>(null);
     // 防抖等待也属于加载阶段，只有当前关键词的请求结束后才展示结果或空态。
     const loading = Boolean(query.trim()) && completedQuery !== query;
@@ -288,11 +289,12 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     {videoResults.length}
                                 </span>
                             </h2>
-                            <div
-                                className="grid content-grid-video gap-4"
-                                style={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
-                            >
-                                {videoResults.map((video) => (
+                            <VirtualizedGrid
+                                data={videoResults}
+                                itemKey={(_index, video) => video.id}
+                                listClassName="grid content-grid-video gap-4"
+                                listStyle={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
+                                itemContent={(_index, video) => (
                                     <div
                                         key={video.id}
                                         onClick={() => handlePlayVideo(video)}
@@ -327,8 +329,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                             </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            />
                         </section>
                     )}
                 </div>

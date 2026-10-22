@@ -11,7 +11,7 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
-export function SongListRow({
+function SongListRowImpl({
     index,
     song,
     gridStyle,
@@ -56,7 +56,7 @@ export function SongListRow({
     onOpenAlbum?: (album: string) => void;
     onContextMenu: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
     onRowClick: (e: React.MouseEvent, song: SongMetadata) => void;
-    onSelect: () => void;
+    onSelect: (song: SongMetadata) => void;
 }) {
     const id = getMusicItemId(song);
     const { togglePlayback } = usePlaybackActions();
@@ -202,9 +202,11 @@ export function SongListRow({
                     onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                     onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
                     isSelected={selected}
-                    onSelect={onSelect}
+                    onSelect={() => onSelect(song)}
                 />
             </div>
         </div>
     );
 }
+
+export const SongListRow = React.memo(SongListRowImpl);

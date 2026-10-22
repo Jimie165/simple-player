@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react';
+import { memo, useLayoutEffect, useRef } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
 import clsx from 'clsx';
 import { VirtuosoGrid } from 'react-virtuoso';
@@ -15,6 +15,17 @@ type VirtualizedGridProps<TItem> = {
     overscan?: number | { main: number; reverse: number };
 };
 
+function GridItem<TItem>({ index, item, renderItem }: {
+    index: number;
+    item: TItem;
+    renderItem: (index: number, item: TItem) => ReactNode;
+}) {
+    return renderItem(index, item);
+}
+
+// 保留泛型签名；尺寸测量更新时复用未变化的卡片子树。
+const MemoGridItem = memo(GridItem) as typeof GridItem;
+
 export default function VirtualizedGrid<TItem>({
     data,
     itemKey,
@@ -24,9 +35,9 @@ export default function VirtualizedGrid<TItem>({
     className,
     overscan
 }: VirtualizedGridProps<TItem>) {
-    const scrollParent = useScrollViewport(true);
-    const viewportOverscan = useViewportOverscan(scrollParent);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const scrollParent = useScrollViewport(true, wrapperRef);
+    const viewportOverscan = useViewportOverscan(scrollParent);
 
     useLayoutEffect(() => {
         const listEl = wrapperRef.current?.querySelector('.virtualized-grid-list');
@@ -35,25 +46,23 @@ export default function VirtualizedGrid<TItem>({
         listEl.style.gridTemplateColumns = typeof listStyle?.gridTemplateColumns === 'string'
             ? listStyle.gridTemplateColumns
             : '';
-    }, [listStyle]);
-
-    if (!scrollParent) {
-        return <div className="opacity-0" />;
-    }
+    }, [listStyle, scrollParent]);
 
     return (
         <div ref={wrapperRef} className={clsx("w-full", className)}>
-            <VirtuosoGrid
+            {scrollParent && <VirtuosoGrid
                 useWindowScroll={false}
                 customScrollParent={scrollParent}
                 data={data}
-                itemContent={itemContent}
+                itemContent={(index, item) => (
+                    <MemoGridItem index={index} item={item} renderItem={itemContent} />
+                )}
                 computeItemKey={itemKey}
                 overscan={overscan ?? viewportOverscan}
                 listClassName={clsx("virtualized-grid-list", listClassName)}
                 itemClassName="min-w-0"
                 className="w-full"
-            />
+            />}
         </div>
     );
 }
