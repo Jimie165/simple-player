@@ -1,3 +1,4 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import React from 'react';
 import clsx from 'clsx';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
@@ -87,7 +88,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                             onPlay={() => onPlay(video)}
                             onSelect={() => onToggleSelection(id, 'video', video)}
                             onShowProperties={() => onShowProperties(video)}
-                        />
+                        >
+                            <MoreIcon />
+                        </SmartMusicContextMenu>
                     </div>
                 )}
 

@@ -1,8 +1,9 @@
+import CoverPlaybackIcon from '@/components/common/CoverPlaybackIcon';
 import React, { useEffect, useRef, useState } from 'react';
 import clsx from 'clsx';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { IoPlay, IoEllipsisHorizontal } from 'react-icons/io5';
+import MoreIcon from '@/components/common/MoreIcon';
 
 import CoverImage from '@/components/common/CoverImage';
 import MusicContextMenu from '@/components/common/MusicContextMenu';
@@ -52,7 +53,7 @@ export function QueueRowMenu({ song, onRemove, onNavigate, autoOpen, onAutoOpene
                 variant="clean"
                 buttonClassName={clsx('group/queue-menu w-8 h-8 flex items-center justify-center transition-colors cursor-pointer', appearance === 'content' ? 'text-on-surface-variant hover:text-primary' : 'text-white/50 hover:text-white')}
             >
-                <IoEllipsisHorizontal className={appearance === 'content' ? 'text-on-surface-variant group-hover/queue-menu:text-primary transition-colors' : undefined} />
+                <MoreIcon className={appearance === 'content' ? 'text-on-surface-variant group-hover/queue-menu:text-primary transition-colors' : undefined} />
             </MusicContextMenu>
         </div>
     );
@@ -126,7 +127,7 @@ function SongRow({
                 <CoverImage thumbnail={128}
 song={song} className="w-full h-full object-cover" />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <IoPlay className="text-[clamp(1rem,1.8vw,1.5rem)] text-white" />
+                    <CoverPlaybackIcon />
                 </div>
             </div>
 
@@ -173,7 +174,7 @@ song={song} className="w-full h-full object-cover" />
                         }}
                         aria-label="打开操作菜单"
                     >
-                        <IoEllipsisHorizontal />
+                        <MoreIcon />
                     </button>
                 )}
             </div>

@@ -1,5 +1,6 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import { useState, useRef, useEffect } from 'react';
-import { MdVolumeUp, MdVolumeDown, MdVolumeMute, MdInfoOutline, MdQueueMusic, MdMoreHoriz } from 'react-icons/md';
+import { MdVolumeUp, MdVolumeDown, MdVolumeMute, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import VolumePopup from '@/components/common/VolumePopup';
@@ -137,7 +138,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
                             showCompactMenu && "bg-black/5 dark:bg-white/10"
                         )}
                     >
-                        <MdMoreHoriz className="text-2xl" />
+                        <MoreIcon />
                     </button>
                 </CustomTooltip>
             </div>

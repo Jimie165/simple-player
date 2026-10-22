@@ -1,10 +1,11 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import { useRef, useEffect, useState, useMemo } from 'react';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import type { MusicItem } from '@/utils/musicItemUtils';
-import { MdClose, MdCheckBoxOutlineBlank, MdCheckBox, MdMoreHoriz } from 'react-icons/md';
+import { MdClose, MdCheckBoxOutlineBlank, MdCheckBox } from 'react-icons/md';
 import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
 
 
@@ -168,7 +169,7 @@ export default function SelectionMenuBar() {
                     {overflowActions.length > 0 && (
                         <Menu as="div" className="relative">
                             <MenuButton className="p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-white/10 transition-colors shrink-0">
-                                <MdMoreHoriz className="text-xl text-neutral-600 dark:text-neutral-300" />
+                                <MoreIcon className="text-neutral-600 dark:text-neutral-300" />
                             </MenuButton>
                             <MenuItems
                                 anchor={{ to: 'top end', gap: 9 }}

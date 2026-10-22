@@ -61,6 +61,7 @@ const SongListItemMenu = memo(({
             groups={menuItems}
             onOpen={onMenuOpen}
             variant="clean"
+            buttonClassName="w-8 h-8 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
         />
     );
 });

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
+import MoreIcon from '@/components/common/MoreIcon';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
 import {
@@ -378,7 +379,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 e.stopPropagation();
                             }}
                         >
-                            {props.children || <MdMoreHoriz className={variant === 'cover' ? 'cover-card-menu-icon' : undefined} />}
+                            {props.children || (variant === 'cover' ? <MdMoreHoriz className="cover-card-menu-icon" /> : <MoreIcon />)}
                         </MenuButton>
                     );
 

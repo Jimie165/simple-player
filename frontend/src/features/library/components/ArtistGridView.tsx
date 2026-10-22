@@ -1,3 +1,4 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
 
@@ -149,7 +150,9 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                     ? toggleSelection(id, 'artist', artist)
                                     : toggleSelectionMode({ id, type: 'artist', data: artist })
                                 }
-                            />
+                            >
+                                <MoreIcon />
+                            </SmartMusicContextMenu>
                         </div>
                     )}
                 </div>

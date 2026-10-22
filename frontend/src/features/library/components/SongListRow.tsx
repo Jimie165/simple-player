@@ -199,6 +199,7 @@ function SongListRowImpl({
                     items={song}
                     context={context}
                     variant="clean"
+                    buttonClassName="w-8 h-8 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
                     onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                     onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
                     isSelected={selected}

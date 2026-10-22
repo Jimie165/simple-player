@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { MdPlayArrow, MdPause } from 'react-icons/md';
+import CoverPlaybackIcon from '@/components/common/CoverPlaybackIcon';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import type { SongMetadata } from '@/types';
@@ -73,10 +73,10 @@ export default function SongCoverOverlay({
 
             {/* Overlay Layer */}
             <div className={clsx(
-                "absolute inset-0 flex items-center justify-center transition-all duration-200 z-10",
+                "absolute inset-0 flex items-center justify-center transition-colors duration-200 z-10",
                 isCurrent
-                    ? "bg-black/50"
-                    : "bg-transparent group-hover/overlay:bg-black/40 group-hover/overlay:backdrop-blur-[1px]"
+                    ? "bg-black/50 group-hover:bg-black/30 group-hover/overlay:bg-black/30"
+                    : "bg-transparent group-hover:bg-black/30 group-hover/overlay:bg-black/30"
             )}>
                 {/* 
                    Render Logic (CSS Driven):
@@ -91,16 +91,12 @@ export default function SongCoverOverlay({
                 {isCurrent ? (
                     <>
                         {/* Current & Hovered: Control Button */}
-                        <div className="hidden group-hover/overlay:flex items-center justify-center">
-                            {isPlaying ? (
-                                <MdPause className="text-white text-xl drop-shadow-md" />
-                            ) : (
-                                <MdPlayArrow className="text-white text-xl drop-shadow-md ml-0.5" />
-                            )}
+                        <div className="hidden group-hover:flex group-hover/overlay:flex items-center justify-center">
+                            <CoverPlaybackIcon playing={isPlaying} />
                         </div>
 
                         {/* Current & Not Hovered: Indicator */}
-                        <div className="flex group-hover/overlay:hidden items-center justify-center w-4 h-4">
+                        <div className="flex group-hover:hidden group-hover/overlay:hidden items-center justify-center w-4 h-4">
                             <Equalizer
                                 isPlaying={isPlaying}
                                 className="bg-white"
@@ -109,8 +105,8 @@ export default function SongCoverOverlay({
                     </>
                 ) : (
                     /* Not Current: Only show Play icon on hover */
-                    <div className="hidden group-hover/overlay:flex items-center justify-center">
-                        <MdPlayArrow className="text-white text-xl drop-shadow-md ml-0.5 animate-in fade-in duration-200" />
+                    <div className="hidden group-hover:flex group-hover/overlay:flex items-center justify-center">
+                        <CoverPlaybackIcon />
                     </div>
                 )}
             </div>

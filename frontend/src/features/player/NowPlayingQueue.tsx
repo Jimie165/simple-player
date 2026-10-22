@@ -1,3 +1,4 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
@@ -23,7 +24,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
-import { IoClose, IoEllipsisHorizontal } from 'react-icons/io5';
+import { IoClose } from 'react-icons/io5';
 import CoverImage from '@/components/common/CoverImage';
 import SongCoverOverlay from '@/components/common/SongCoverOverlay';
 import ScrollArea from '@/components/common/ScrollArea';
@@ -347,7 +348,7 @@ song={activeDragEntry.song} className="w-full h-full object-cover" />
                                     </div>
                                 </div>
                                 <div className={clsx('w-8 h-8 flex items-center justify-center -mr-2', isContent ? 'text-on-surface-variant' : 'text-white/50')}>
-                                    <IoEllipsisHorizontal />
+                                    <MoreIcon />
                                 </div>
                             </div>
                         </div>
