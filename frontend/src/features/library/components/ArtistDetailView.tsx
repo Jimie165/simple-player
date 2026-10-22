@@ -1,3 +1,6 @@
+import SharedCover from '@/components/common/SharedCover';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
+import { viewMotion } from '@/utils/viewTransition';
 import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Virtuoso } from 'react-virtuoso';
@@ -23,7 +26,8 @@ interface ArtistDetailViewProps {
     albums: AlbumData[];
     onShuffle: () => void;
     onPlayAlbum: (album: AlbumData) => void;
-    onOpenAlbum: (album: AlbumData) => void;
+    onOpenAlbum: (album: AlbumData, source?: CoverTransitionSource) => void;
+    transitionSource?: CoverTransitionSource;
     onPlaySong: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }) => void;
     onDeleteSong?: (song: SongMetadata) => void;
     onDeleteAlbum?: (album: AlbumData) => void;
@@ -48,7 +52,8 @@ export default function ArtistDetailView({
     onPlaySong,
     onDeleteSong,
     onDeleteAlbum,
-    onOpenAlbumByName
+    onOpenAlbumByName,
+    transitionSource,
 }: ArtistDetailViewProps) {
 
     // Helper to robustly handle album opening by name
@@ -218,7 +223,7 @@ export default function ArtistDetailView({
     ), [sortedAlbums.length, sortedSongs, onPlayAlbum, onOpenAlbum, onPlaySong, onDeleteSong, handleOpenAlbumByName]);
 
     return (
-        <div ref={detailRef} className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-300 relative isolate">
+        <div ref={detailRef} className="flex flex-col h-full relative isolate">
             <DetailScrollHeader />
 
             {/* Header Section */}
@@ -226,7 +231,7 @@ export default function ArtistDetailView({
                 {/* (Back Button Removed) */}
 
                 {/* Artist Cover */}
-                <div className="w-40 h-40 md:w-48 md:h-48 rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
+                <SharedCover source={transitionSource} className="w-40 h-40 md:w-48 md:h-48 rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
                     {artist.songs.length > 0 ? (
                         <CoverImage
                             song={artist.songs[0]}
@@ -238,7 +243,7 @@ export default function ArtistDetailView({
                             <MdPerson className="text-6xl" />
                         </div>
                     )}
-                </div>
+                </SharedCover>
 
                 {/* Info & Actions */}
                 <div className="flex flex-col gap-4 text-center md:text-left flex-1">
@@ -313,17 +318,15 @@ export default function ArtistDetailView({
 
             {/* Content Area */}
             <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2 pb-20">
-                <AnimatePresence mode="wait" initial={false}>
+                <AnimatePresence mode="popLayout" initial={false}>
                     {activeTab === 'albums' ? (
                         <motion.div
                             key="albums"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            {...viewMotion}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <AlbumGridView
+                                coverScope={`artist-albums-${getMusicItemId(artist)}`}
                                 albums={sortedAlbums}
                                 onPlayAlbum={onPlayAlbum}
                                 onOpenAlbum={onOpenAlbum}
@@ -334,10 +337,7 @@ export default function ArtistDetailView({
                     ) : (
                         <motion.div
                             key="songs"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.18, ease: "easeOut" }}
+                            {...viewMotion}
                             className="col-start-1 row-start-1 w-full min-w-0"
                         >
                             <div className="mt-4">

@@ -1,3 +1,5 @@
+import type { CoverTransitionSource } from '@/utils/viewTransition';
+import { viewMotion } from '@/utils/viewTransition';
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -180,14 +182,14 @@ export default function Library() {
     // --------------------------------------------------------
     // Navigation Handlers (Push to Global Stack)
     // --------------------------------------------------------
-    const handleOpenArtist = (artist: ArtistData) => {
+    const handleOpenArtist = (artist: ArtistData, transitionSource?: CoverTransitionSource) => {
         useSelectionStore.getState().clearSelection();
-        push({ type: 'artist_detail', data: artist });
+        push({ type: 'artist_detail', data: artist, transitionSource });
     };
 
-    const handleOpenAlbum = (album: AlbumData) => {
+    const handleOpenAlbum = (album: AlbumData, transitionSource?: CoverTransitionSource) => {
         useSelectionStore.getState().clearSelection();
-        push({ type: 'album_detail', data: album });
+        push({ type: 'album_detail', data: album, transitionSource });
     };
 
     const handleOpenArtistByName = (name: string) => {
@@ -304,14 +306,11 @@ export default function Library() {
 
                 {/* Views */}
                 <div className="flex-1 min-h-0 relative">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="popLayout" initial={false}>
                         {activeTab === 'songs' && (
                             <motion.div
                                 key="songs"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
+                                {...viewMotion}
                                 className="h-full"
                             >
                                 <SongListView
@@ -326,10 +325,7 @@ export default function Library() {
                         {activeTab === 'albums' && (
                             <motion.div
                                 key="albums"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
+                                {...viewMotion}
                                 className="h-full"
                             >
                                 <AlbumGridView
@@ -365,10 +361,7 @@ export default function Library() {
                         {activeTab === 'artists' && (
                             <motion.div
                                 key="artists"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                transition={{ duration: 0.2 }}
+                                {...viewMotion}
                                 className="h-full"
                             >
                                 <ArtistGridView

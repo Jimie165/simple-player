@@ -229,6 +229,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 </span>
                             </h2>
                             <ArtistGridView
+                                coverScope="search-artists"
                                 artists={matchingArtists}
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
@@ -251,6 +252,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 </span>
                             </h2>
                             <AlbumGridView
+                                coverScope="search-albums"
                                 albums={matchingAlbums}
                                 hideYear={true}
                                 onPlayAlbum={(album) => {

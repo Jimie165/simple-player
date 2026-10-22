@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { PageId } from '@/types/index';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
+import { captureReturnCover } from '@/utils/viewTransition';
 
 // ViewConfig for Overlays
 export type ViewType = 'artist_detail' | 'album_detail';
@@ -7,11 +9,13 @@ export type ViewType = 'artist_detail' | 'album_detail';
 export interface PlaylistDetailState {
     id: number | 'favorites';
     name: string;
+    transitionSource?: CoverTransitionSource;
 }
 
 export interface ViewState {
     type: ViewType;
     data?: unknown; // artist, album, or playlist data
+    transitionSource?: CoverTransitionSource;
 }
 
 interface MainState {
@@ -27,6 +31,13 @@ interface NavigationState {
     currentTab: string;
     mainHistory: MainState[];
     activePlaylistDetail: PlaylistDetailState | null;
+    playlistDetailEntered: boolean;
+
+    // Drop artwork after handoff, but retain exit geometry until the next return.
+    returnCoverSource: CoverTransitionSource | null;
+    releaseReturnCover: (coverId: string) => void;
+    completeReturnCoverFlight: (coverId: string) => void;
+    finishReturnCoverHandoff: (coverId: string) => void;
 
     // Overlay Stack
     overlayStack: ViewState[];
@@ -41,6 +52,7 @@ interface NavigationState {
     setTab: (tab: string) => void; // For tab-only changes within current page
     setArtistDetailTab: (tab: string) => void;
     openPlaylistDetail: (detail: PlaylistDetailState) => void;
+    completePlaylistDetailEnter: (detail: PlaylistDetailState) => void;
     closePlaylistDetail: () => void;
     push: (view: ViewState) => void;
     pop: () => void;
@@ -58,6 +70,30 @@ interface NavigationState {
 
 const OVERLAY_PUSH_DEBOUNCE_MS = 260;
 
+function historyCover(source?: CoverTransitionSource): CoverTransitionSource | undefined {
+    return source ? { ...source, images: undefined, flight: undefined } : undefined;
+}
+
+/** History restores details through their existing loaders, without retaining song datasets. */
+function appendMainHistory(state: NavigationState): MainState[] {
+    return [
+        ...state.mainHistory,
+        {
+            page: state.currentPage,
+            tab: state.currentTab,
+            overlayStack: state.overlayStack.length > 0 ? state.overlayStack.map(view => ({
+                ...view,
+                data: view.data && typeof view.data === 'object' ? { ...view.data, songs: [] } : view.data,
+                transitionSource: historyCover(view.transitionSource),
+            })) : undefined,
+            playlistDetail: state.activePlaylistDetail ? {
+                ...state.activePlaylistDetail,
+                transitionSource: historyCover(state.activePlaylistDetail.transitionSource),
+            } : null,
+        },
+    ];
+}
+
 function getOverlayKey(view: ViewState): string {
     const data = view.data && typeof view.data === 'object'
         ? view.data as Record<string, unknown>
@@ -74,6 +110,27 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     currentTab: 'songs',
     mainHistory: [],
     activePlaylistDetail: null,
+    playlistDetailEntered: false,
+    returnCoverSource: null,
+    releaseReturnCover: (coverId) => set(state => {
+        const source = state.returnCoverSource;
+        if (source?.coverId !== coverId) return state;
+        if (!source.flight) return { returnCoverSource: null };
+        if (source.flight.ready) return state;
+        return { returnCoverSource: { ...source, flight: { ...source.flight, ready: true } } };
+    }),
+    completeReturnCoverFlight: (coverId) => set(state => {
+        const source = state.returnCoverSource;
+        if (source?.coverId !== coverId || !source.flight) return state;
+        if (source.flight.completed) return state;
+        return { returnCoverSource: { ...source, flight: { ...source.flight, completed: true } } };
+    }),
+    finishReturnCoverHandoff: (coverId) => set(state => {
+        const source = state.returnCoverSource;
+        return source?.coverId === coverId && source.flight?.completed && source.flight.ready && !source.flight.handedOff
+            ? { returnCoverSource: { ...source, images: undefined, flight: { ...source.flight, handedOff: true } } }
+            : state;
+    }),
     overlayStack: [],
     activeOverlay: null,
     hasOverlay: false,
@@ -91,15 +148,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             return state;
         }
 
-        const newHistory = [
-            ...state.mainHistory,
-            {
-                page: state.currentPage,
-                tab: state.currentTab,
-                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
-                playlistDetail: state.activePlaylistDetail,
-            }
-        ];
+        const newHistory = appendMainHistory(state);
 
         // Resolve target tab
         let targetTab = tab || 'songs';
@@ -117,6 +166,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             currentPage: page,
             currentTab: targetTab,
             mainHistory: newHistory,
+            returnCoverSource: null,
             activePlaylistDetail: null,
             overlayStack: [],
             activeOverlay: null,
@@ -131,20 +181,13 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
     setTab: (tab) => set((state) => {
         if (state.currentTab === tab) return state;
-        const newHistory = [
-            ...state.mainHistory,
-            {
-                page: state.currentPage,
-                tab: state.currentTab,
-                overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
-                playlistDetail: state.activePlaylistDetail,
-            }
-        ];
+        const newHistory = appendMainHistory(state);
 
         // Update persistent state for library
         const updates: Partial<NavigationState> = {
             currentTab: tab,
-            mainHistory: newHistory
+            mainHistory: newHistory,
+            returnCoverSource: null,
         };
 
         if (state.currentPage === 'library') {
@@ -162,6 +205,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         if (state.currentPage === 'playlists') {
             return {
                 activePlaylistDetail: detail,
+                playlistDetailEntered: false,
+                returnCoverSource: null,
                 overlayStack: [],
                 activeOverlay: null,
                 hasOverlay: false,
@@ -171,23 +216,25 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         return {
             currentPage: 'playlists',
             currentTab: 'songs',
-            mainHistory: [
-                ...state.mainHistory,
-                {
-                    page: state.currentPage,
-                    tab: state.currentTab,
-                    overlayStack: state.overlayStack.length > 0 ? [...state.overlayStack] : undefined,
-                    playlistDetail: state.activePlaylistDetail,
-                },
-            ],
+            mainHistory: appendMainHistory(state),
             activePlaylistDetail: detail,
+            playlistDetailEntered: false,
+            returnCoverSource: null,
             overlayStack: [],
             activeOverlay: null,
             hasOverlay: false,
         };
     }),
 
-    closePlaylistDetail: () => set({ activePlaylistDetail: null }),
+    completePlaylistDetailEnter: (detail) => set(state =>
+        state.activePlaylistDetail === detail && !state.playlistDetailEntered
+            ? { playlistDetailEntered: true }
+            : state),
+
+    closePlaylistDetail: () => {
+        const returnCoverSource = captureReturnCover(get().activePlaylistDetail?.transitionSource);
+        set({ activePlaylistDetail: null, playlistDetailEntered: false, returnCoverSource });
+    },
 
     push: (view) => set((state) => {
         const now = Date.now();
@@ -210,6 +257,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             overlayStack: newStack,
             activeOverlay: view,
             hasOverlay: true,
+            returnCoverSource: null,
             _lastPushedOverlayKey: incomingKey,
             _lastPushedAt: now
         };
@@ -217,11 +265,13 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
     pop: () => set((state) => {
         if (state.overlayStack.length === 0) return state;
+        const returnCoverSource = captureReturnCover(state.activeOverlay?.transitionSource);
         const newStack = state.overlayStack.slice(0, -1);
         return {
             overlayStack: newStack,
             activeOverlay: newStack.length > 0 ? newStack[newStack.length - 1] : null,
-            hasOverlay: newStack.length > 0
+            hasOverlay: newStack.length > 0,
+            returnCoverSource,
         };
     }),
 
@@ -239,7 +289,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
         // 2. Playlist detail is a first-class page inside the playlists module.
         if (currentPage === 'playlists' && activePlaylistDetail) {
-            set({ activePlaylistDetail: null });
+            get().closePlaylistDetail();
             return;
         }
 
@@ -252,7 +302,9 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
                     currentPage: prevState.page,
                     currentTab: prevState.tab || 'songs',
                     mainHistory: newHistory,
+                    returnCoverSource: null,
                     activePlaylistDetail: prevState.playlistDetail ?? null,
+                    playlistDetailEntered: false,
                     overlayStack: prevState.overlayStack ?? [],
                     activeOverlay: prevState.overlayStack && prevState.overlayStack.length > 0
                         ? prevState.overlayStack[prevState.overlayStack.length - 1]
@@ -264,6 +316,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     },
 
     reset: () => set({
+        returnCoverSource: null,
         overlayStack: [],
         activeOverlay: null,
         hasOverlay: false

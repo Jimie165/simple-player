@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { viewMotion } from '@/utils/viewTransition';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoStore } from '@/store/useVideoStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import clsx from 'clsx';
@@ -26,7 +27,8 @@ export const VideoLibrary: React.FC = () => {
     const { videos, fetchVideos, setVideos, videoFolders, fetchVideoFolders, foldersRefreshing, collapsedFolderIds, toggleFolderCollapse, sortBy, sortOrder, setSortBy, setSortOrder } = useVideoStore();
     const { currentTab, currentPage, lastVideoTab, setTab } = useNavigationStore();
     const { isSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds, selectItem, deselectItem, selectedIds } = useSelectionStore();
-    const scrollParent = useScrollViewport(true);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(true, contentRef);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [restorePrompt, setRestorePrompt] = useState<{
         folderPath: string;
@@ -268,7 +270,7 @@ export const VideoLibrary: React.FC = () => {
                 </div>
             }
         >
-            <div className="h-full flex flex-col animate-fade-in">
+            <div ref={contentRef} className="h-full flex flex-col">
                 {/* Tabs and Sort */}
                 <div className="flex items-center justify-between border-b border-outline-variant/20 mb-6 px-1">
                     <div className="flex items-center gap-8">
@@ -342,14 +344,11 @@ export const VideoLibrary: React.FC = () => {
 
                 {/* Content */}
                 <div className="flex-1 overflow-hidden min-h-0">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="popLayout" initial={false}>
                         {activeTab === 'all' ? (
                             <motion.div
                                 key="all"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 10 }}
-                                transition={{ duration: 0.2 }}
+                                {...viewMotion}
                                 className="h-full"
                             >
                                 <VideoGrid videos={sortedVideos} playSingleItem={true} virtualized={true} />
@@ -357,10 +356,7 @@ export const VideoLibrary: React.FC = () => {
                         ) : (
                             <motion.div
                                 key="folders"
-                                initial={{ opacity: 0, x: 10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10 }}
-                                transition={{ duration: 0.2 }}
+                                {...viewMotion}
                                 className="h-full"
                             >
                                 {groupedVideos.length === 0 ? (

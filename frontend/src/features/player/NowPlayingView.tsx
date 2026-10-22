@@ -204,13 +204,18 @@ export default function NowPlayingView({
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: '100%' }}
+            initial={{ opacity: 0, scale: 0.94, y: 40 }}
             animate={{
                 opacity: isOpen ? 1 : 0,
-                y: isOpen ? 0 : '100%',
+                scale: isOpen ? 1 : 0.94,
+                y: isOpen ? 0 : 40,
                 pointerEvents: isOpen ? 'auto' : 'none'
             }}
-            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+            transition={isOpen ? {
+                y: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
+                scale: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
+                opacity: { duration: 0.35, ease: 'easeOut' },
+            } : { duration: 0.35, ease: 'easeOut' }}
             onAnimationComplete={() => {
                 if (isOpen) onOpened();
             }}

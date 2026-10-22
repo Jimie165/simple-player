@@ -1,5 +1,9 @@
+import SharedCover from '@/components/common/SharedCover';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { MdPlayArrow, MdShuffle, MdEdit, MdFavorite } from 'react-icons/md';
+import { useIsPresent } from 'framer-motion';
+import { MdPlayArrow, MdShuffle, MdEdit } from 'react-icons/md';
+import favoritesCover from '@/assets/favorites-cover.svg';
 import clsx from 'clsx';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import DetailScrollHeader from '@/components/common/DetailScrollHeader';
@@ -27,9 +31,12 @@ interface PlaylistDetailProps {
     id: number | 'favorites';
     name: string;
     onClose?: () => void;
+    transitionSource?: CoverTransitionSource;
 }
 
-export default function PlaylistDetail({ id, name: initialName }: PlaylistDetailProps) {
+export default function PlaylistDetail({ id, name: initialName, transitionSource }: PlaylistDetailProps) {
+    const isPresent = useIsPresent();
+    const entered = useNavigationStore(state => state.playlistDetailEntered);
     const [songs, setSongs] = useState<SongMetadata[]>([]);
     const [loading, setLoading] = useState(false);
     const [playlistInfo, setPlaylistInfo] = useState<Playlist | null>(null);
@@ -333,13 +340,13 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 <div className="relative z-10 p-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
-                        <div className={clsx(
+                        <SharedCover source={transitionSource} className={clsx(
                             "w-56 h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
                             isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
-                                <MdFavorite className="text-8xl text-white drop-shadow-md" />
-                            ) : coverPath ? (
+                                <img src={favoritesCover} alt="" loading="eager" decoding="sync" className="w-full h-full object-cover" />
+                            ) : loading ? null : coverPath ? (
                                 <CoverImage src={coverPath} className="w-full h-full object-cover" />
                             ) : (
                                 <PlaylistCoverCollage
@@ -347,10 +354,10 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                     className="w-full h-full"
                                 />
                             )}
-                        </div>
+                        </SharedCover>
 
                         {/* Edit Button Overlay */}
-                        {!isFavorites && (
+                        {!isFavorites && entered && isPresent && isActive && (
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                                 <CustomTooltip text="编辑信息" placement="top">
                                     <button

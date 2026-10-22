@@ -1,52 +1,64 @@
-import { useLayoutEffect, useRef } from 'react';
+import { getDetailMotion, pageMotion } from '@/utils/viewTransition';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { AnimatePresence } from 'framer-motion';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
+import ScrollArea from '@/components/common/ScrollArea';
 import PlaylistDetail from '@/features/playlists/detail/PlaylistDetail';
 import PlaylistList from '@/features/playlists/PlaylistList';
 import { useNavigationStore } from '@/store/useNavigationStore';
 
 export default function PlaylistsRoot() {
     const activePlaylistDetail = useNavigationStore((state) => state.activePlaylistDetail);
-    const rootRef = useRef<HTMLDivElement>(null);
-    const previousPageKey = useRef('list');
-    const scrollPositions = useRef(new Map<string, number>());
-    const pageKey = activePlaylistDetail
-        ? `detail:${activePlaylistDetail.id}`
-        : 'list';
+    const entered = useNavigationStore((state) => state.playlistDetailEntered);
 
-    useLayoutEffect(() => {
-        const viewport = rootRef.current?.closest<HTMLElement>('[data-scroll-viewport]');
-        if (!viewport) return;
+    // Suppress the covered list's paint while retaining measurable return targets.
+    return (
+        <div
+            className={activePlaylistDetail && entered ? 'min-h-full opacity-0' : 'min-h-full'}
+            inert={!!activePlaylistDetail}
+            aria-hidden={!!activePlaylistDetail}
+        >
+            <PlaylistList />
+        </div>
+    );
+}
 
-        scrollPositions.current.set(previousPageKey.current, viewport.scrollTop);
-        viewport.scrollTop = scrollPositions.current.get(pageKey) ?? 0;
-        previousPageKey.current = pageKey;
-    }, [pageKey]);
+/** Keep the source cards and their scroll position intact throughout the return transition. */
+export function PlaylistDetailOverlay() {
+    const detail = useNavigationStore((state) => state.activePlaylistDetail);
+    const returnCoverSource = useNavigationStore((state) => state.returnCoverSource);
 
     return (
-        <div ref={rootRef} className="min-h-full">
-            <AnimatePresence mode="wait" initial={false}>
+        <AnimatePresence initial={false} custom={returnCoverSource}>
+            {detail && (
                 <ArtworkThemeLayer
-                    key={pageKey}
-                    initial={{ opacity: 0, y: 14, scale: 0.99 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -8, scale: 0.995 }}
-                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                    className={activePlaylistDetail
-                        ? '-mt-12 min-h-[calc(100%+3rem)] origin-top'
-                        : 'min-h-full origin-top'
-                    }
+                    key={detail.id}
+                    {...(detail.transitionSource ? getDetailMotion(detail.transitionSource) : pageMotion)}
+                    variants={{
+                        exit: (returnSource: CoverTransitionSource | null) => detail.transitionSource
+                            ? getDetailMotion(detail.transitionSource, returnSource).exit
+                            : pageMotion.exit,
+                    }}
+                    exit="exit"
+                    onAnimationComplete={(definition) => {
+                        if (definition !== 'exit') {
+                            useNavigationStore.getState().completePlaylistDetailEnter(detail);
+                        }
+                    }}
+                    className="absolute inset-0 z-50 overflow-hidden bg-surface dark:bg-surface-container-low"
                 >
-                    {activePlaylistDetail ? (
-                        <PlaylistDetail
-                            id={activePlaylistDetail.id}
-                            name={activePlaylistDetail.name}
-                        />
-                    ) : (
-                        <PlaylistList />
-                    )}
+                    <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
+                    <ScrollArea className="h-full" topOffset={48}>
+                        <div className="min-h-full pb-24">
+                            <PlaylistDetail
+                                id={detail.id}
+                                name={detail.name}
+                                transitionSource={detail.transitionSource}
+                            />
+                        </div>
+                    </ScrollArea>
                 </ArtworkThemeLayer>
-            </AnimatePresence>
-        </div>
+            )}
+        </AnimatePresence>
     );
 }

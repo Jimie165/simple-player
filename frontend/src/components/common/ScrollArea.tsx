@@ -1,6 +1,7 @@
 import { useRef, useEffect, useState, useCallback, useImperativeHandle } from 'react';
 import type { ReactNode, RefObject } from 'react';
 import clsx from 'clsx';
+import { motion } from 'framer-motion';
 
 interface ScrollAreaProps {
     children: ReactNode;
@@ -206,15 +207,16 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
         >
-            <div
+            <motion.div
                 ref={viewportRef}
+                layoutScroll
                 data-scroll-viewport
                 className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
             >
                 <div ref={contentRef}>
                     {children}
                 </div>
-            </div>
+            </motion.div>
 
             <div
                 className={clsx(

@@ -1,3 +1,4 @@
+import { viewMotion } from '@/utils/viewTransition';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -169,9 +170,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
     return (
         <>
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...viewMotion}
                 className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible && !isPreparing ? 'cursor-none' : ''}`}
                 data-controls-visible={isControlsVisible}
                 onPointerMove={showControls}

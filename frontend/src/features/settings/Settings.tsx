@@ -1,3 +1,4 @@
+import { viewMotion } from '@/utils/viewTransition';
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { IconType } from 'react-icons';
@@ -63,14 +64,11 @@ export default function Settings() {
                     </div>
                 </div>
 
-                <AnimatePresence mode="wait" initial={false}>
+                <AnimatePresence mode="popLayout" initial={false}>
                     <motion.div
                         key={activeTab}
                         role="tabpanel"
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
-                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                        {...viewMotion}
                         className="mx-auto w-full max-w-170 space-y-7"
                     >
                         {activeTab === 'general' && (

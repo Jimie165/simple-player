@@ -11,26 +11,25 @@ import type { RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
-import { AnimatePresence, type Variants } from 'framer-motion';
+import { AnimatePresence } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
 import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features/library/utils/grouping';
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
+import { detailTransition, getDetailMotion } from '@/utils/viewTransition';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
+interface OverlayTransitionContext {
+    direction: OverlayTransitionDirection;
+    returnCoverSource: CoverTransitionSource | null;
+}
 
-const overlayTransition = { type: 'spring' as const, stiffness: 300, damping: 30 };
-const overlayVariants: Variants = {
-    initial: { x: '100%' },
-    animate: { x: 0 },
-    exit: (direction: OverlayTransitionDirection) => direction === 'pop'
-        ? { x: '100%', transition: overlayTransition }
-        : { x: 0, transition: { duration: 0 } },
-};
 
 function GlobalDetailStack() {
     const overlayStack = useNavigationStore(state => state.overlayStack);
+    const returnCoverSource = useNavigationStore(state => state.returnCoverSource);
     const push = useNavigationStore(state => state.push);
     const addToRecent = useLibraryStore(state => state.addToRecent);
     const { playSong, shufflePlay } = usePlaybackActions();
@@ -41,6 +40,7 @@ function GlobalDetailStack() {
         : overlayStack.length < settledOverlayDepth
             ? 'pop'
             : 'idle';
+    const transitionContext: OverlayTransitionContext = { direction: transitionDirection, returnCoverSource };
     // Keep the immediately covered detail mounted so back navigation restores its
     // data and scroll position. Older detail layers can still be unmounted.
     const visibleOverlayCount = 2;
@@ -107,7 +107,7 @@ function GlobalDetailStack() {
     // Render the stack
     return (
         <AnimatePresence
-            custom={transitionDirection}
+            custom={transitionContext}
             onExitComplete={() => {
                 if (overlayStack.length < settledOverlayDepth) {
                     setSettledOverlayDepth(overlayStack.length);
@@ -116,6 +116,7 @@ function GlobalDetailStack() {
         >
             {visibleOverlays.map((activeView, visibleIndex) => {
                 const index = firstVisibleOverlayIndex + visibleIndex;
+                const detailMotion = getDetailMotion(activeView.transitionSource);
                 const isTopOverlay = index === overlayStack.length - 1;
                 const isFrozenOverlay = !isTopOverlay && transitionDirection !== 'push';
                 let key = `${activeView.type}-${index}`;
@@ -125,18 +126,24 @@ function GlobalDetailStack() {
                 return (
                     <ArtworkThemeLayer
                         key={key}
-                        custom={transitionDirection}
-                        variants={overlayVariants}
+                        custom={transitionContext}
+                        variants={{
+                            initial: detailMotion.initial,
+                            animate: detailMotion.animate,
+                            exit: (context: OverlayTransitionContext) => context.direction === 'pop'
+                                ? getDetailMotion(activeView.transitionSource, context.returnCoverSource).exit
+                                : { ...detailMotion.animate, transition: { duration: 0 } },
+                        }}
                         initial={transitionDirection === 'pop' ? false : 'initial'}
                         animate="animate"
                         exit="exit"
-                        transition={overlayTransition}
+                        transition={detailTransition}
                         onAnimationComplete={() => {
                             if (isTopOverlay && transitionDirection === 'push') {
                                 setSettledOverlayDepth(overlayStack.length);
                             }
                         }}
-                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-50"
+                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-50 overflow-hidden"
                         style={{
                             zIndex: 50 + index,
                             ...(isFrozenOverlay ? { contentVisibility: 'hidden', contain: 'strict' } : {}),
@@ -153,6 +160,7 @@ function GlobalDetailStack() {
                                             return (
                                                 <AlbumOverlay
                                                     data={activeView.data as AlbumData}
+                                                    transitionSource={activeView.transitionSource}
                                                     onPlaySong={handlePlaySong}
                                                     onShuffle={shufflePlay}
                                                     addToRecent={addToRecent}
@@ -163,6 +171,7 @@ function GlobalDetailStack() {
                                             return (
                                                 <ArtistOverlay
                                                     data={activeView.data as ArtistData}
+                                                    transitionSource={activeView.transitionSource}
                                                     onPlaySong={handlePlaySong}
                                                     onShuffle={shufflePlay}
                                                     addToRecent={addToRecent}
@@ -188,15 +197,16 @@ export default memo(GlobalDetailStack);
 // --- Internal Sub-Components to Isolate Hooks ---
 
 interface OverlayProps {
+    transitionSource?: CoverTransitionSource;
     data: AlbumData | ArtistData;
     onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
     onShuffle: (params: { songs: SongMetadata[], context?: { type: string, name: string, id?: string } }) => void;
     addToRecent: (item: RecentItem) => void;
-    push?: (view: { type: 'album_detail'; data: AlbumData }) => void;
+    push?: (view: { type: 'album_detail'; data: AlbumData; transitionSource?: CoverTransitionSource }) => void;
     onOpenArtistByName: (name: string) => void;
 }
 
-function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
+function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const pop = useNavigationStore(state => state.pop);
     const resolvedSongIdsRef = useRef<Set<number> | null>(null);
@@ -252,6 +262,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
 
     return (
         <AlbumDetailView
+            transitionSource={transitionSource}
             album={{ ...albumData, songs: albumData.songs || [] }} // Ensure songs is never undefined
             onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, { ...options, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name })}
             onPlayAll={() => {
@@ -283,7 +294,7 @@ function AlbumOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, o
     );
 }
 
-function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
+function ArtistOverlay({ data: initialData, transitionSource, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const artistInitialData = useMemo<ArtistData>(() => {
         const data = initialData as Partial<ArtistData>;
@@ -329,9 +340,9 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
         return buildAlbums(artistData.songs || [], 'name');
     }, [artistData.songs]);
 
-    const handleOpenAlbum = (album: AlbumData) => {
+    const handleOpenAlbum = (album: AlbumData, transitionSource?: CoverTransitionSource) => {
         useSelectionStore.getState().clearSelection();
-        push?.({ type: 'album_detail', data: album });
+        push?.({ type: 'album_detail', data: album, transitionSource });
     };
 
     const handlePlayAlbum = (album: AlbumData) => {
@@ -360,6 +371,7 @@ function ArtistOverlay({ data: initialData, onPlaySong, onShuffle, addToRecent, 
 
     return (
         <ArtistDetailView
+            transitionSource={transitionSource}
             artist={artistData}
             albums={artistAlbums}
             onShuffle={() => {

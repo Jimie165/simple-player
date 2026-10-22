@@ -1,3 +1,6 @@
+import SharedCover from '@/components/common/SharedCover';
+import { getCoverTransitionSource } from '@/utils/viewTransition';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 import MoreIcon from '@/components/common/MoreIcon';
 import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
@@ -24,14 +27,15 @@ export interface ArtistData {
 }
 
 interface ArtistGridViewProps {
+    coverScope?: string;
     artists: ArtistData[];
     onPlayArtist: (artist: ArtistData) => void;
     onShuffleArtist?: (artist: ArtistData) => void;
-    onOpenArtist: (artist: ArtistData) => void;
+    onOpenArtist: (artist: ArtistData, source?: CoverTransitionSource) => void;
     onDeleteArtist?: (artist: ArtistData) => void;
 }
 
-export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
+export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist, coverScope = 'library-artists' }: ArtistGridViewProps) {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
@@ -78,13 +82,13 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
         setArtistToDelete(null);
     };
 
-    const handleItemClick = (artist: ArtistData, e: React.MouseEvent) => {
+    const handleItemClick = (artist: ArtistData, e: React.MouseEvent<HTMLDivElement>) => {
         if (isSelectionMode) {
             e.stopPropagation();
             toggleSelection(getMusicItemId(artist), 'artist', artist);
             return;
         }
-        onOpenArtist(artist);
+        onOpenArtist(artist, getCoverTransitionSource(e.currentTarget));
     };
 
     const renderArtistCard = (artist: ArtistData) => {
@@ -98,12 +102,12 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 onClick={(e) => handleItemClick(artist, e)}
                 onContextMenu={(e) => handleContextMenu(e, artist)}
             >
-                <div className="relative w-full aspect-square max-w-40 shrink-0">
+                <SharedCover data-transition-cover={`${coverScope}-${id}`} layoutId={`${coverScope}-${id}`} className="relative w-full aspect-square max-w-40 shrink-0 rounded-full">
                     <div className="w-full h-full rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative z-10 border border-black/5 dark:border-white/5">
                         <CoverImage
                             song={artist.songs[0]}
                             src={artist.cover}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover"
                             iconClassName="text-6xl"
                         />
 
@@ -155,7 +159,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                             </SmartMusicContextMenu>
                         </div>
                     )}
-                </div>
+                </SharedCover>
 
                 <div className="text-center w-full">
                     <CustomTooltip text={artist.name} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">

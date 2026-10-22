@@ -1,3 +1,4 @@
+import { pageMotion } from '@/utils/viewTransition';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
@@ -14,6 +15,7 @@ import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
 import { ContentSurface } from '@/components/layout/ContentSurface';
 import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
+import { ReturnCoverOverlay } from '@/components/common/SharedCover';
 
 import MusicGrid from '@/features/home/MusicGrid';
 import Library from '@/features/library/Library';
@@ -26,7 +28,7 @@ import NowPlayingQueue from '@/features/player/NowPlayingQueue';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PageId } from '@/types/index';
 import SearchResultsView from '@/features/search/SearchResultsView';
-import PlaylistsRoot from '@/features/playlists/PlaylistsRoot';
+import PlaylistsRoot, { PlaylistDetailOverlay } from '@/features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from '@/hooks/playback/useQueuePersistence';
 import { useGlobalEvents } from '@/hooks/useGlobalEvents';
 import { useImmersivePlayerTransition } from '@/features/player/hooks/useImmersivePlayerTransition';
@@ -207,24 +209,24 @@ function App() {
           }`}
       />
 
-      <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentPage}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="h-full"
-            >
-              {pageContent}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </ScrollArea>
+      <div className="flex-1 min-h-0 relative overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={currentPage}
+            {...pageMotion}
+            className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low"
+          >
+            <ScrollArea className="h-full" topOffset={48}>
+              <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                {pageContent}
+              </div>
+            </ScrollArea>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
+      <PlaylistDetailOverlay />
       <GlobalDetailStack />
     </div>
   );
@@ -326,6 +328,7 @@ function App() {
         }}
       />
       <EditableContextMenu />
+      <ReturnCoverOverlay />
 
       <NowPlayingView
         isOpen={isFullScreen}

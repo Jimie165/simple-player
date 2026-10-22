@@ -1,4 +1,7 @@
-import { MdCheck, MdFavorite } from 'react-icons/md';
+import SharedCover from '@/components/common/SharedCover';
+import { getCoverTransitionSource } from '@/utils/viewTransition';
+import { MdCheck } from 'react-icons/md';
+import favoritesCover from '@/assets/favorites-cover.svg';
 import clsx from 'clsx';
 import type { Playlist } from '@/types';
 import type { PlaylistDetailState } from '@/store/useNavigationStore';
@@ -63,11 +66,11 @@ export default function PlaylistCardsGrid({
                     return (
                         <div
                             key="favorites"
-                            onClick={() => {
+                            onClick={(event) => {
                                 if (isSelectionMode) {
                                     toggleSelection(favoritesSelectionId, 'playlist', pl);
                                 } else {
-                                    onOpenPlaylist({ id: 'favorites', name: '喜爱歌曲' });
+                                    onOpenPlaylist({ id: 'favorites', name: '喜爱歌曲', transitionSource: getCoverTransitionSource(event.currentTarget) });
                                 }
                             }}
                             onContextMenu={(e) => {
@@ -75,67 +78,67 @@ export default function PlaylistCardsGrid({
                                 setContextMenu(null);
                                 setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
                             }}
-                            className="group relative aspect-square cursor-pointer transition-transform hover:scale-[1.02] rounded-2xl overflow-hidden"
+                            className="group flex flex-col gap-3 cursor-pointer"
                         >
-                            <div className="absolute inset-0 bg-linear-to-br from-red-500 to-pink-600 rounded-2xl shadow-lg shadow-red-900/20" />
+                            <SharedCover data-transition-cover="playlist-cover-favorites" layoutId="playlist-cover-favorites"
+                                className="relative aspect-square rounded-xl overflow-hidden bg-linear-to-br from-red-500 to-pink-600 shadow-sm group-hover:shadow-md transition-shadow"
+                            >
+                                <img src={favoritesCover} alt="" loading="eager" decoding="sync" className="w-full h-full object-cover" />
 
-                            <div className="absolute inset-0 p-5 flex flex-col justify-between">
-                                <div className="flex justify-end">
-                                    <div className="bg-white/20 p-2.5 rounded-full backdrop-blur-sm">
-                                        <MdFavorite className="text-white text-xl" />
+                                {isSelectionMode && (
+                                    <div
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            toggleSelection(favoritesSelectionId, 'playlist', pl);
+                                        }}
+                                        className={clsx(
+                                            'absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer',
+                                            isSelected
+                                                ? 'bg-white text-primary opacity-100'
+                                                : 'bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100'
+                                        )}
+                                    >
+                                        {isSelected ? <MdCheck className="text-lg" /> : null}
                                     </div>
-                                </div>
-                                <div>
-                                    <h3 className="text-white font-bold text-2xl tracking-tight">喜爱歌曲</h3>
-                                    <p className="text-white/80 text-sm mt-1 font-medium">{favoritesCount} 首歌曲</p>
-                                </div>
-                            </div>
-
-                            {isSelectionMode && (
-                                <div
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        toggleSelection(favoritesSelectionId, 'playlist', pl);
-                                    }}
-                                    className={clsx(
-                                        'absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer',
-                                        isSelected
-                                            ? 'bg-white text-primary opacity-100'
-                                            : 'bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100'
-                                    )}
-                                >
-                                    {isSelected ? <MdCheck className="text-lg" /> : null}
-                                </div>
-                            )}
-
-                            <div className={clsx(
-                                'absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 rounded-2xl',
-                                !isSelectionMode ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
-                            )}>
-                                {!isSelectionMode && (
-                                    <>
-                                        <CardPlayButton variant="cover"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                handlePlayFavorites();
-                                            }}
-                                        />
-                                        <FavoritesCardMenu
-                                            handlePlayFavorites={handlePlayFavorites}
-                                            handleAddFavoritesToQueue={handleAddFavoritesToQueue}
-                                            setFavoritesContextMenu={setFavoritesContextMenu}
-                                            setContextMenu={setContextMenu}
-                                            toggleSelectionMode={toggleSelectionMode}
-                                            toggleSelection={toggleSelection}
-                                            isSelectionMode={isSelectionMode}
-                                            isSelected={isSelected}
-                                        />
-                                    </>
                                 )}
+
+                                <div className={clsx(
+                                    'absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent transition-opacity duration-300 rounded-xl',
+                                    !isSelectionMode ? 'opacity-0 group-hover:opacity-100' : 'opacity-0'
+                                )}>
+                                    {!isSelectionMode && (
+                                        <>
+                                            <CardPlayButton variant="cover"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handlePlayFavorites();
+                                                }}
+                                            />
+                                            <FavoritesCardMenu
+                                                handlePlayFavorites={handlePlayFavorites}
+                                                handleAddFavoritesToQueue={handleAddFavoritesToQueue}
+                                                setFavoritesContextMenu={setFavoritesContextMenu}
+                                                setContextMenu={setContextMenu}
+                                                toggleSelectionMode={toggleSelectionMode}
+                                                toggleSelection={toggleSelection}
+                                                isSelectionMode={isSelectionMode}
+                                                isSelected={isSelected}
+                                            />
+                                        </>
+                                    )}
+                                </div>
+                                {isSelectionMode && (
+                                    <div className="absolute inset-0 bg-black/10 transition-opacity pointer-events-none" />
+                                )}
+                            </SharedCover>
+                            <div>
+                                <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 truncate text-[15px] group-hover:text-primary transition-colors">
+                                    喜爱歌曲
+                                </h3>
+                                <div className="flex items-center gap-2 text-xs text-neutral-500 font-medium">
+                                    <span>{favoritesCount} 首歌曲</span>
+                                </div>
                             </div>
-                            {isSelectionMode && (
-                                <div className="absolute inset-0 bg-black/10 transition-opacity pointer-events-none" />
-                            )}
                         </div>
                     );
                 }
@@ -146,11 +149,11 @@ export default function PlaylistCardsGrid({
                 return (
                     <div
                         key={playlist.id}
-                        onClick={() => {
+                        onClick={(event) => {
                             if (isSelectionMode) {
                                 toggleSelection(id, 'playlist', playlist);
                             } else {
-                                onOpenPlaylist({ id: playlist.id, name: playlist.name });
+                                onOpenPlaylist({ id: playlist.id, name: playlist.name, transitionSource: getCoverTransitionSource(event.currentTarget) });
                             }
                         }}
                         onContextMenu={(e) => {
@@ -160,14 +163,13 @@ export default function PlaylistCardsGrid({
                         }}
                         className="group flex flex-col gap-3 cursor-pointer"
                     >
-                        <div className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-all">
+                        <SharedCover data-transition-cover={`playlist-cover-${playlist.id}`} layoutId={`playlist-cover-${playlist.id}`} className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-shadow">
                             {playlist.cover_path ? (
-                                <CoverImage src={playlist.cover_path} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                                <CoverImage src={playlist.cover_path} className="w-full h-full object-cover" />
                             ) : (
                                 <PlaylistCoverCollage
                                     songs={[]}
                                     coverPaths={playlistCoverPaths[playlist.id] || []}
-                                    className="transition-transform duration-500 group-hover:scale-105"
                                 />
                             )}
 
@@ -214,7 +216,7 @@ export default function PlaylistCardsGrid({
                             {isSelectionMode && (
                                 <div className="absolute inset-0 bg-primary/10 transition-opacity" />
                             )}
-                        </div>
+                        </SharedCover>
 
                         <div>
                             <h3 className="font-semibold text-neutral-900 dark:text-neutral-100 truncate text-[15px] group-hover:text-primary transition-colors">
