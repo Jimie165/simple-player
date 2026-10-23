@@ -1,5 +1,5 @@
 import { pageMotion } from '@/utils/viewTransition';
-import { useState, useEffect, useRef } from 'react';
+import { Activity, useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
@@ -283,12 +283,14 @@ function App() {
                     <div className="relative h-full w-full overflow-hidden">
                       <div className="absolute inset-y-0 left-0 flex flex-col w-75 pt-12">
                       <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
+                      <Activity mode={isBaseLayerFrozen ? 'hidden' : 'visible'}>
                       <NowPlayingQueue
                         variant="content"
                         isOpen={isQueueOpen}
                         onClose={() => setIsQueueOpen(false)}
                         onNavigate={() => setIsQueueOpen(false)}
                       />
+                      </Activity>
                       </div>
                     </div>
                   </motion.aside>

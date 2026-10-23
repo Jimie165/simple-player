@@ -29,6 +29,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
     const [isHovering, setIsHovering] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const requestRef = useRef<number | undefined>(undefined);
+    const resetStateRef = useRef<{ initialized: boolean; key: unknown }>({ initialized: false, key: undefined });
 
     const updateThumb = useCallback(() => {
         if (!viewportRef.current || !thumbRef.current) return;
@@ -77,7 +78,11 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
 
     useEffect(() => {
         if (viewportRef.current) {
-            viewportRef.current.scrollTop = 0;
+            // Activity resumes effects without remounting the retained scroll viewport.
+            if (!resetStateRef.current.initialized || !Object.is(resetStateRef.current.key, resetOnKeyChange)) {
+                viewportRef.current.scrollTop = 0;
+                resetStateRef.current = { initialized: true, key: resetOnKeyChange };
+            }
             updateThumb();
         }
     }, [resetOnKeyChange, updateThumb]);

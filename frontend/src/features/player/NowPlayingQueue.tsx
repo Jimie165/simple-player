@@ -63,6 +63,7 @@ export default function NowPlayingQueue({
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const lastScrollTopRef = useRef(0);
+    const lastScrollRequestRef = useRef<{ isOpen: boolean | undefined; signal: number | undefined } | null>(null);
     const [scrollParent, setScrollParent] = useState<HTMLElement | null>(null);
     const [activeDragId, setActiveDragId] = useState<string | null>(null);
     const [draggedItemWidth, setDraggedItemWidth] = useState<number | undefined>(undefined);
@@ -85,7 +86,11 @@ export default function NowPlayingQueue({
     }, []);
 
     useLayoutEffect(() => {
-        if (!isOpen || !scrollParent || !virtuosoRef.current) return;
+        if (!scrollParent || !virtuosoRef.current) return;
+        const previous = lastScrollRequestRef.current;
+        lastScrollRequestRef.current = { isOpen, signal: scrollToTopSignal };
+        // Activity replays effects when revealed; preserve the retained queue's scroll position.
+        if (!isOpen || (previous?.isOpen === isOpen && previous.signal === scrollToTopSignal)) return;
         // 面板仍不可见时由虚拟列表完成一次定位，避免进入动画后再次跳动。
         virtuosoRef.current.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
         lastScrollTopRef.current = 0;

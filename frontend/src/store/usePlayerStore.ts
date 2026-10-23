@@ -251,8 +251,13 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         volume: state.volume,
         isShuffling: state.isShuffling,
         repeatMode: state.repeatMode,
-        isQueueOpen: state.isQueueOpen,
         // Don't persist isVideoMode, always start closed
+    }),
+    // Ignore the queue visibility saved by older versions; each app session starts closed.
+    merge: (persisted, current) => ({
+        ...current,
+        ...(persisted as Partial<typeof current>),
+        isQueueOpen: false,
     }),
     // Zustand 只恢复前端状态；同时把持久化音量写回后端，避免 UI 与实际播放音量脱节。
     onRehydrateStorage: () => (state, error) => {
