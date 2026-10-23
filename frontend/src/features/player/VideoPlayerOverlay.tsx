@@ -11,7 +11,6 @@ import {
 import { motion } from 'framer-motion';
 import MusicSlider from '@/components/common/MusicSlider';
 import { systemService } from '@/services/systemService';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
 import { VideoPlaylistDrawer } from '@/features/player/video/VideoPlaylistDrawer';
 import { VideoStatusOverlays } from '@/features/player/video/VideoStatusOverlays';
@@ -41,7 +40,8 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         isPlaylistOpen,
         setIsPlaylistOpen,
         toggleAppFullscreen,
-    } = useVideoControls();
+        exitFullscreen,
+    } = useVideoControls(isOpen);
 
     const autoHideEnabled = true;
     const showControls = useCallback(() => {
@@ -145,10 +145,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         }
 
         try {
-            const win = getCurrentWindow();
-            if (await win.isFullscreen()) {
-                await win.setFullscreen(false);
-            }
+            await exitFullscreen();
         } catch (error) {
             console.error('[VideoPlayer] 退出全屏失败:', error);
         }

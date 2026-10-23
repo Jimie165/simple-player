@@ -15,7 +15,7 @@ import {
 } from '@/features/player/now-playing/layouts/NowPlayingLayouts';
 import { useNowPlayingPanels } from '@/features/player/now-playing/hooks/useNowPlayingPanels';
 import { useCoverBackground } from '@/features/player/now-playing/hooks/useCoverBackground';
-import { useImmersiveFullscreen } from '@/features/player/now-playing/hooks/useImmersiveFullscreen';
+import { usePlayerFullscreen } from '@/features/player/hooks/usePlayerFullscreen';
 import { useImmersivePlaybackControls } from '@/features/player/now-playing/hooks/useImmersivePlaybackControls';
 import { useNarrowPanelControls } from '@/features/player/now-playing/hooks/useNarrowPanelControls';
 import { useLowFrequencyLevel } from '@/features/player/now-playing/hooks/useLowFrequencyLevel';
@@ -120,7 +120,7 @@ export default function NowPlayingView({
         onNarrowActivity: handleNarrowActivity,
     });
 
-    const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
+    const { isFullscreen, toggleFullscreen } = usePlayerFullscreen(isOpen);
     const handlePlayPrev = useCallback(() => {
         void playPrev(usePlayerStore.getState().currentTime);
     }, [playPrev]);

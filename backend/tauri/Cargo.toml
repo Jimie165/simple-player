@@ -36,6 +36,8 @@ features = [
     "Foundation",
     "Win32_Foundation",
     "Win32_System_WinRT",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
     "Media",
     "Media_Core",
     "Media_Playback",
