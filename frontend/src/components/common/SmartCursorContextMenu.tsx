@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Portal } from '@headlessui/react';
+import { useMemo } from 'react';
+import CursorContextMenu from '@/components/common/CursorContextMenu';
 import type { MusicMenuContext, MenuItemData } from '@/hooks/menu/useSongOperations';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import { getMusicItemId, getMusicItemType } from '@/utils/musicItemUtils';
@@ -96,68 +96,6 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
         },
     });
 
-    const menuRef = useRef<HTMLDivElement>(null);
-    const [position, setPosition] = useState({ top: y, left: x, opacity: 0 });
-
-    // Handle closing on click outside or events
-    useEffect(() => {
-        const handleClickOutside = (event: PointerEvent) => {
-            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-                onClose();
-            }
-        };
-        document.addEventListener('pointerdown', handleClickOutside, true);
-        window.addEventListener('resize', onClose);
-        window.addEventListener('app:close-cursor-menus', onClose);
-
-        return () => {
-            document.removeEventListener('pointerdown', handleClickOutside, true);
-            window.removeEventListener('resize', onClose);
-            window.removeEventListener('app:close-cursor-menus', onClose);
-        };
-    }, [onClose]);
-
-    // Re-position when measured
-    useEffect(() => {
-        const baseGroups = menuGroups ?? menuItems;
-        if (!menuRef.current || baseGroups.length === 0) return;
-
-        const raf = requestAnimationFrame(() => {
-            if (!menuRef.current) return;
-            const menuRect = menuRef.current.getBoundingClientRect();
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
-            const padding = 12;
-
-            let newTop = y;
-            let newLeft = x;
-
-            if (x + menuRect.width > windowWidth - padding) {
-                newLeft = x - menuRect.width;
-            }
-
-            // Placement Logic
-            if (placement === 'top') {
-                // Force top positioning (above cursor)
-                newTop = y - menuRect.height;
-            } else if (placement === 'bottom') {
-                newTop = y;
-            } else {
-                // Auto
-                if (y + menuRect.height > windowHeight - padding) {
-                    newTop = y - menuRect.height;
-                }
-            }
-
-            if (newLeft < padding) newLeft = padding;
-            if (newTop < padding) newTop = padding;
-
-            setPosition({ top: newTop, left: newLeft, opacity: 1 });
-        });
-
-        return () => cancelAnimationFrame(raf);
-    }, [x, y, menuItems, menuGroups, placement]);
-
     const baseGroups = menuGroups ?? menuItems;
     const resolvedGroups = extraGroups && extraGroups.length > 0
         ? [...baseGroups, ...extraGroups]
@@ -165,73 +103,5 @@ export default function SmartCursorContextMenu(props: SmartCursorContextMenuProp
 
     if (!resolvedGroups || resolvedGroups.length === 0) return null;
 
-    const isApple = variant === 'apple';
-
-    return (
-        <Portal>
-            <>
-                <div
-                    className="fixed inset-0 z-9998"
-                    style={{ touchAction: 'none' }}
-                    onPointerDown={(e) => {
-                        e.preventDefault();
-                        onClose();
-                    }}
-                    onContextMenu={(e) => {
-                        e.preventDefault();
-                        onClose();
-                    }}
-                    onWheel={(e) => {
-                        e.preventDefault();
-                    }}
-                />
-                <div
-                    ref={menuRef}
-                    data-menu-portal="true"
-                    className={`fixed z-9999 w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 transition-opacity duration-150 ${isApple
-                        ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
-                        : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'
-                        }`}
-                    style={{
-                        top: position.top,
-                        left: position.left,
-                        opacity: position.opacity,
-                        pointerEvents: position.opacity === 0 ? 'none' : 'auto'
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => e.stopPropagation()}
-                    onContextMenu={(e) => e.preventDefault()}
-                >
-                    {resolvedGroups.map((group, groupIndex) => (
-                        <React.Fragment key={groupIndex}>
-                            {groupIndex > 0 && <div className={`my-1 h-[1px] ${isApple ? 'bg-white/10' : 'bg-on-surface/10'}`} />}
-                            {group.map((mItem) => (
-                                <button
-                                    key={mItem.id}
-                                    onClick={() => {
-                                        mItem.onClick();
-                                        onClose();
-                                    }}
-                                    className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 transition-colors ${isApple
-                                        ? 'hover:bg-white/10 font-medium text-white'
-                                        : 'hover:bg-on-surface/8'
-                                        } ${!isApple && mItem.variant === 'danger'
-                                            ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
-                                            : ''
-                                        } ${isApple && mItem.variant === 'danger' ? 'text-red-400' : ''
-                                        }`}
-                                >
-                                    <div className="flex flex-1 items-center gap-3">
-                                        {mItem.icon && <mItem.icon className={isApple ? 'text-lg opacity-100' : 'text-lg opacity-70'} />}
-                                        <span>{mItem.label}</span>
-                                    </div>
-                                    {!isApple && mItem.suffix}
-                                </button>
-                            ))}
-                        </React.Fragment>
-                    ))}
-                </div>
-            </>
-        </Portal>
-    );
+    return <CursorContextMenu x={x} y={y} menuGroups={resolvedGroups} onClose={onClose} variant={variant} placement={placement} />;
 }

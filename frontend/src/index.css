@@ -790,3 +790,17 @@ body {
 .karaoke-text-word-float.karaoke-text-exiting .karaoke-char {
   transition: transform 250ms ease-in-out, --kg 250ms ease-in-out;
 }
+
+/* Use one animation owner for cursor and button menus; leave no inline opacity/transform. */
+@keyframes menu-surface-enter {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.menu-surface {
+  animation: menu-surface-enter 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-surface { animation: none; }
+}

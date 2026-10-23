@@ -1,43 +1,28 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
+import { MenuSurface, MenuEntries } from '@/components/common/MenuSurface';
+import { useMenuDismiss } from '@/hooks/menu/useMenuDismiss';
 
 interface CursorContextMenuProps {
     x: number;
     y: number;
     menuGroups: MenuItemData[][];
     onClose: () => void;
+    variant?: 'default' | 'apple';
+    placement?: 'auto' | 'top' | 'bottom';
 }
 
-export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorContextMenuProps) {
+export default function CursorContextMenu({ x, y, menuGroups, onClose, variant = 'default', placement = 'auto' }: CursorContextMenuProps) {
     const ref = useRef<HTMLDivElement>(null);
     const [position, setPosition] = useState({ top: y, left: x });
 
-    useEffect(() => {
-        const handleClickOutside = (event: PointerEvent) => {
-            if (ref.current && !ref.current.contains(event.target as Node)) {
-                onClose();
-            }
-        };
-        // Use pointerdown so touch also closes the menu immediately
-        document.addEventListener('pointerdown', handleClickOutside);
-
-        // Handle window resize
-        const handleResize = () => onClose();
-        window.addEventListener('resize', handleResize);
-        window.addEventListener('app:close-cursor-menus', onClose);
-
-        return () => {
-            document.removeEventListener('pointerdown', handleClickOutside);
-            window.removeEventListener('resize', handleResize);
-            window.removeEventListener('app:close-cursor-menus', onClose);
-        };
-    }, [onClose]);
+    useMenuDismiss(true, ref, onClose);
 
     // Smart Positioning Logic
     useEffect(() => {
         if (ref.current) {
-            const menuRect = ref.current.getBoundingClientRect();
+            const menuRect = { width: ref.current.offsetWidth, height: ref.current.offsetHeight };
             const windowWidth = window.innerWidth;
             const windowHeight = window.innerHeight;
 
@@ -50,7 +35,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             }
 
             // Check vertical overflow (bottom)
-            if (y + menuRect.height > windowHeight) {
+            if (placement === 'top' || (placement === 'auto' && y + menuRect.height > windowHeight)) {
                 newTop = y - menuRect.height; // Flip to top
             }
 
@@ -64,7 +49,7 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
             });
             return () => cancelAnimationFrame(frame);
         }
-    }, [x, y, menuGroups]);
+    }, [x, y, menuGroups, placement]);
 
     // Render using Portal to document.body
     return createPortal(
@@ -84,38 +69,17 @@ export default function CursorContextMenu({ x, y, menuGroups, onClose }: CursorC
                     e.preventDefault();
                 }}
             />
-            <div
+            <MenuSurface
                 ref={ref}
-                className="fixed z-9999 w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl dark:border-white/10 dark:text-white pointer-events-auto"
+                variant={variant}
+                data-menu-portal="true"
                 style={{ top: position.top, left: position.left }}
-                onClick={(e) => e.stopPropagation()} // Prevent triggering other clicks
-                onContextMenu={(e) => e.preventDefault()} // Prevent browser context menu on the menu itself
+                onPointerDown={event => event.stopPropagation()}
+                onClick={event => event.stopPropagation()}
+                onContextMenu={event => event.preventDefault()}
             >
-                {menuGroups.map((group, groupIndex) => (
-                    <div key={groupIndex}>
-                        {groupIndex > 0 && <div className="my-1 h-px bg-on-surface/10" />}
-                        {group.map((item) => (
-                            <button
-                                key={item.id}
-                                onClick={() => {
-                                    item.onClick();
-                                    onClose();
-                                }}
-                                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-on-surface/8 ${item.variant === 'danger'
-                                    ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10'
-                                    : ''
-                                    }`}
-                            >
-                                <div className="flex flex-1 items-center gap-3">
-                                    <item.icon className="text-lg opacity-70" />
-                                    {item.label}
-                                </div>
-                                {item.suffix}
-                            </button>
-                        ))}
-                    </div>
-                ))}
-            </div>
+                <MenuEntries groups={menuGroups} onClose={onClose} variant={variant} />
+            </MenuSurface>
         </>,
         document.body
     );
