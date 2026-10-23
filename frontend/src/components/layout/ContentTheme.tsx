@@ -7,6 +7,7 @@ import { getArtworkThemeStyle } from '@/utils/artworkThemeStyle';
 import { ArtworkColorCache } from '@/utils/artworkColorCache';
 import { ArtworkColorCacheContext } from '@/hooks/artworkThemeContexts';
 import { useThemeStore } from '@/store/useThemeStore';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 export function ContentTheme({ children }: { children: ReactNode }) {
     const [pageTheme, setTheme] = useState<ArtworkTheme | null>(null);
@@ -17,6 +18,20 @@ export function ContentTheme({ children }: { children: ReactNode }) {
     const style = getArtworkThemeStyle(theme);
     const rootRef = useRef<HTMLDivElement>(null);
     const previousTheme = useRef(theme);
+    const currentPage = useNavigationStore(state => state.currentPage);
+
+    useLayoutEffect(() => {
+        const root = rootRef.current;
+        if (!root) return;
+        // Avoid restarting descendant CSS transitions as pages hide, resume and inherit their palette.
+        // Framer Motion owns the page transition; hover transitions resume once navigation settles.
+        root.setAttribute('data-navigation-updating', '');
+        const timer = window.setTimeout(() => root.removeAttribute('data-navigation-updating'), 300);
+        return () => {
+            window.clearTimeout(timer);
+            root.removeAttribute('data-navigation-updating');
+        };
+    }, [currentPage]);
 
     useLayoutEffect(() => {
         if (previousTheme.current === theme) return;

@@ -1,5 +1,5 @@
 import { pageMotion } from '@/utils/viewTransition';
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
@@ -12,6 +12,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from '@/components/layout/TitleBar';
 import Sidebar from '@/components/layout/Sidebar';
 import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
+import RetainedMediaPage from '@/components/layout/RetainedMediaPage';
 import { ContentSurface } from '@/components/layout/ContentSurface';
 import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
@@ -182,23 +183,10 @@ function App() {
     });
   };
 
-  // 侧栏和队列开关只改变外壳布局，页面由自己的 store/effect 更新。
-  const pageContent = useMemo(() => {
-    switch (currentPage) {
-      case 'home': return <MusicGrid />;
-      case 'library': return <Library />;
-      case 'videos': return <VideoLibrary />;
-      case 'settings': return <Settings />;
-      case 'search': return <SearchResultsView query={searchQuery} />;
-      case 'playlists': return <PlaylistsRoot />;
-      default: return null;
-    }
-  }, [currentPage, searchQuery]);
-
   const mainContent = (
     <div
       data-main-content-query
-      className="main-content-query flex flex-1 flex-col min-w-0 rounded-tl-2xl overflow-hidden relative z-0"
+      className="main-content-query flex flex-1 flex-col min-w-0 overflow-hidden relative z-0"
     >
       {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
@@ -210,23 +198,31 @@ function App() {
       />
 
       <div className="flex-1 min-h-0 relative overflow-hidden">
+        <RetainedMediaPage active={currentPage === 'home'}><MusicGrid /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'library'}><Library /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'videos'}><VideoLibrary /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'playlists'}>
+          <PlaylistsRoot isPageVisible={currentPage === 'playlists' && !isBaseLayerFrozen} />
+        </RetainedMediaPage>
         <AnimatePresence mode="wait">
-          <motion.div
-            key={currentPage}
-            {...pageMotion}
-            className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low"
-          >
-            <ScrollArea className="h-full" topOffset={48}>
-              <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
-                {pageContent}
-              </div>
-            </ScrollArea>
-          </motion.div>
+          {(currentPage === 'settings' || currentPage === 'search') && (
+            <motion.div
+              key={currentPage}
+              {...pageMotion}
+              className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low"
+            >
+              <ScrollArea className="h-full" topOffset={48}>
+                <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                  {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
+                </div>
+              </ScrollArea>
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
-      <PlaylistDetailOverlay />
+      <PlaylistDetailOverlay isVisible={!isBaseLayerFrozen && !hasOverlay} />
       <GlobalDetailStack />
     </div>
   );

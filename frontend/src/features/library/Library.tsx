@@ -1,7 +1,6 @@
 import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { pageMotion } from '@/utils/viewTransition';
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { listen } from '@tauri-apps/api/event';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -31,7 +30,8 @@ import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
-    const { currentTab, setTab } = useNavigationStore();
+    const currentTab = useNavigationStore(state => state.currentPage === 'library' ? state.currentTab : state.lastLibraryTab);
+    const setTab = useNavigationStore(state => state.setTab);
     const activeTab: 'songs' | 'albums' | 'artists' =
         currentTab === 'albums' || currentTab === 'artists' || currentTab === 'songs'
             ? currentTab
@@ -66,56 +66,23 @@ export default function Library() {
     // Filtered & Sorted Logic
     // ...
 
-    const refreshLibrary = useCallback(async () => {
-        try {
-            const songs = await libraryService.getLibrarySongs();
-            setLibrarySongs(songs);
-        } catch (error) {
-            console.error('Failed to load library:', error);
-        }
-    }, []);
-
+    const loadedVersion = useRef<number | null>(null);
     useEffect(() => {
+        // Global scan events invalidate libraryVersion, including while Activity is hidden.
+        if (loadedVersion.current === libraryVersion) return;
+        let cancelled = false;
         const frame = requestAnimationFrame(() => {
-            refreshLibrary();
+            void libraryService.getLibrarySongs().then(songs => {
+                if (cancelled) return;
+                setLibrarySongs(songs);
+                loadedVersion.current = libraryVersion;
+            }).catch(error => console.error('Failed to load library:', error));
         });
-        return () => cancelAnimationFrame(frame);
-    }, [libraryVersion, refreshLibrary]);
-
-    useEffect(() => {
-        let unlisten: (() => void) | undefined;
-        let isMounted = true;
-
-        const setupListeners = async () => {
-            try {
-                const unlistenFn = await listen('library_scan_complete', () => {
-                    if (isMounted) {
-                        refreshLibrary();
-                    }
-                });
-                if (isMounted) {
-                    unlisten = unlistenFn;
-                } else {
-                    unlistenFn();
-                }
-            } catch (err) {
-                console.error('Failed to listen library scan events:', err);
-            }
-        };
-
-        setupListeners();
-
         return () => {
-            isMounted = false;
-            if (unlisten) {
-                try {
-                    Promise.resolve(unlisten()).catch((e: unknown) => console.warn('Failed to unlisten (async)', e));
-                } catch (e) {
-                    console.warn('Failed to unlisten (sync)', e);
-                }
-            }
+            cancelled = true;
+            cancelAnimationFrame(frame);
         };
-    }, [refreshLibrary]);
+    }, [libraryVersion]);
 
     const handleAddFolder = async () => {
         if (isAddingFolder) return;

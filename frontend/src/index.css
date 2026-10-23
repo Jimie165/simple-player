@@ -191,7 +191,11 @@ body {
 [data-artwork-updating],
 [data-artwork-updating] *,
 [data-artwork-updating] *::before,
-[data-artwork-updating] *::after {
+[data-artwork-updating] *::after,
+[data-navigation-updating],
+[data-navigation-updating] *,
+[data-navigation-updating] *::before,
+[data-navigation-updating] *::after {
   transition: none !important;
 }
 

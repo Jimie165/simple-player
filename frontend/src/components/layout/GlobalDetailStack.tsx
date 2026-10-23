@@ -18,11 +18,12 @@ import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
 import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
-import { getDetailMotion } from '@/utils/viewTransition';
+import { getDetailMotion, pageMotion } from '@/utils/viewTransition';
 import type { CoverTransitionSource } from '@/utils/viewTransition';
 
 type OverlayTransitionDirection = 'push' | 'pop' | 'idle';
 interface OverlayTransitionContext {
+    page: string;
     direction: OverlayTransitionDirection;
     coverTransition: CoverTransitionSource | null;
     moreTransitionsEnabled: boolean;
@@ -30,6 +31,7 @@ interface OverlayTransitionContext {
 
 
 function GlobalDetailStack() {
+    const currentPage = useNavigationStore(state => state.currentPage);
     const overlayStack = useNavigationStore(state => state.overlayStack);
     const coverTransition = useNavigationStore(state => state.coverTransition);
     const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
@@ -43,7 +45,7 @@ function GlobalDetailStack() {
         : overlayStack.length < settledOverlayDepth
             ? 'pop'
             : 'idle';
-    const transitionContext: OverlayTransitionContext = { direction: transitionDirection, coverTransition, moreTransitionsEnabled };
+    const transitionContext: OverlayTransitionContext = { page: currentPage, direction: transitionDirection, coverTransition, moreTransitionsEnabled };
     // Keep the immediately covered detail mounted so back navigation restores its
     // data and scroll position. Older detail layers can still be unmounted.
     const visibleOverlayCount = 2;
@@ -134,7 +136,9 @@ function GlobalDetailStack() {
                         variants={{
                             initial: detailMotion.initial,
                             animate: detailMotion.animate,
-                            exit: (context: OverlayTransitionContext) => context.direction === 'pop'
+                            exit: (context: OverlayTransitionContext) => context.page !== currentPage
+                                ? { ...pageMotion.exit, x: '0%', clipPath: 'inset(0% 0% 0% 0% round 0px)', transition: pageMotion.transition }
+                                : context.direction === 'pop'
                                 ? getDetailMotion(activeView.transitionSource, context.coverTransition, context.moreTransitionsEnabled).exit
                                 : { ...detailMotion.animate, transition: { duration: 0 } },
                         }}

@@ -48,27 +48,26 @@ export default function SharedCover({ source, children, className, layoutId, ...
         return () => useNavigationStore.getState().releaseCoverTransition(coverId, from);
     }, [receiving, coverId, from]);
 
-    const handleImagesLoaded = useCallback(async () => {
+    const handleImagesLoaded = useCallback(() => {
         if (!source && !receiving) return;
         const content = contentRef.current;
         if (!content) return;
         const loaded = Array.from(content.querySelectorAll('img'));
         if (loaded.length === 0 || loaded.some(image => !image.complete || image.naturalWidth === 0)) return;
         const urls = loaded.map(image => image.currentSrc);
-        try {
-            await Promise.all(loaded
-                .filter(image => decodedImages.current.get(image) !== image.currentSrc)
-                .map(image => image.decode()));
-        } catch {
-            return;
-        }
-        if (contentRef.current !== content
-            || loaded.some((image, index) => !content.contains(image) || image.currentSrc !== urls[index])) return;
-        loaded.forEach((image, index) => decodedImages.current.set(image, urls[index]));
-        setReady(true);
-        if (receiving && coverId && from) {
-            useNavigationStore.getState().releaseCoverTransition(coverId, from);
-        }
+        void Promise.all(loaded
+            .filter(image => decodedImages.current.get(image) !== image.currentSrc)
+            .map(image => image.decode())).then(() => {
+            if (contentRef.current !== content
+                || loaded.some((image, index) => !content.contains(image) || image.currentSrc !== urls[index])) return;
+            loaded.forEach((image, index) => decodedImages.current.set(image, urls[index]));
+            setReady(true);
+            if (receiving && coverId && from) {
+                useNavigationStore.getState().releaseCoverTransition(coverId, from);
+            }
+        }, () => {
+            // A failed decode must keep the snapshot until another load succeeds.
+        });
     }, [source, receiving, coverId, from]);
 
     useLayoutEffect(() => { void handleImagesLoaded(); }, [handleImagesLoaded]);

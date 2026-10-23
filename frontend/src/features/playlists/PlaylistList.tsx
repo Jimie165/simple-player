@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { getMusicItemId } from '@/utils/musicItemUtils';
@@ -16,15 +16,18 @@ import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDia
 import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
 import PlaylistSortMenu, { type PlaylistSortKey } from '@/features/playlists/list/PlaylistSortMenu';
 import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
+import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
 type SortKey = PlaylistSortKey;
 type FavoritesPlaylist = Omit<Playlist, 'id'> & { id: 'favorites'; hidden?: boolean };
 type PlaylistListItem = Playlist | FavoritesPlaylist;
 
-export default function PlaylistList() {
+export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistCoverPaths, setPlaylistCoverPaths] = useState<Record<number, string[]>>({});
     const [favoritesCount, setFavoritesCount] = useState(0);
+    const loadedDataVersionRef = useRef<string | null>(null);
+    const loadedCoverPlaylistsRef = useRef<Playlist[] | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [sortKey, setSortKey] = useState<SortKey>(() => {
         try {
@@ -43,28 +46,51 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { openPlaylistDetail } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, playlistVersion, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
+    const addMultipleToNext = useLibraryStore(state => state.addMultipleToNext);
+    const libraryVersion = useLibraryStore(state => isVisible ? state.libraryVersion : 0);
+    const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
+    const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
+    const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
     const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
 
-    const loadPlaylists = useCallback(async () => {
-        try {
-            const list = await libraryService.getPlaylists();
-            setPlaylists(list);
-        } catch (error) {
-            console.error(error);
-        }
-    }, []);
-
+    const dataVersion = `${libraryVersion}:${playlistVersion}`;
     useEffect(() => {
+        if (!isVisible) return;
+        let cancelled = false;
         const frame = requestAnimationFrame(() => {
-            setPlaylistCoverPaths({});
-            loadPlaylists();
-            libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
+            if (cancelled) return;
+            void runPlaylistDataRefresh({
+                isVisible,
+                loadedVersion: loadedDataVersionRef.current,
+                currentVersion: dataVersion,
+                isCurrent: () => !cancelled,
+                load: () => Promise.allSettled([libraryService.getPlaylists(), libraryService.getFavorites()]),
+            }).then(result => {
+                if (!result) return;
+                const [playlistsResult, favoritesResult] = result.data;
+                let loaded = true;
+                if (playlistsResult.status === 'fulfilled') {
+                    setPlaylists(playlistsResult.value);
+                } else {
+                    loaded = false;
+                    console.error(playlistsResult.reason);
+                }
+                if (favoritesResult.status === 'fulfilled') {
+                    setFavoritesCount(favoritesResult.value.length);
+                } else {
+                    loaded = false;
+                    console.error(favoritesResult.reason);
+                }
+                if (loaded) loadedDataVersionRef.current = result.version;
+            });
         });
-        return () => cancelAnimationFrame(frame);
-    }, [libraryVersion, playlistVersion, loadPlaylists]);
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(frame);
+        };
+    }, [dataVersion, isVisible]);
 
     useEffect(() => {
         try {
@@ -148,7 +174,6 @@ export default function PlaylistList() {
             await libraryService.updatePlaylistCover(newPl.id, coverPath);
         }
         triggerLibraryUpdate();
-        loadPlaylists();
     };
 
     // 完整歌曲只在播放或加入队列时按需查询，不再为卡片常驻缓存。
@@ -163,17 +188,23 @@ export default function PlaylistList() {
 
     // 卡片只查询并保存最多四条封面路径。
     useEffect(() => {
+        if (!isVisible || loadedCoverPlaylistsRef.current === playlists) return;
         let cancelled = false;
         const loadCoverPaths = async () => {
             const entries = await Promise.all(playlists.map(async playlist => [
                 playlist.id,
                 await libraryService.getPlaylistCoverPaths(playlist.id, useLibraryStore.getState().getPlaylistSettings(playlist.id.toString())),
             ] as const));
-            if (!cancelled) setPlaylistCoverPaths(Object.fromEntries(entries));
+            if (!cancelled) {
+                setPlaylistCoverPaths(Object.fromEntries(entries));
+                loadedCoverPlaylistsRef.current = playlists;
+            }
         };
-        void loadCoverPaths();
+        void loadCoverPaths().catch(error => {
+            if (!cancelled) console.warn('Failed to load playlist cover paths', error);
+        });
         return () => { cancelled = true; };
-    }, [playlists]);
+    }, [isVisible, playlists]);
     // 播放播放列表
     const handlePlayPlaylist = async (pl: Playlist, shuffle = false) => {
         const songs = await loadPlaylistSongs(pl.id);
@@ -215,7 +246,7 @@ export default function PlaylistList() {
         }
 
         // 更新最近播放时间
-        void libraryService.markPlaylistAsPlayed(pl.id).then(() => loadPlaylists()).catch(console.error);
+        void libraryService.markPlaylistAsPlayed(pl.id).then(() => triggerLibraryUpdate()).catch(console.error);
     };
 
     // 添加到播放队列
@@ -289,7 +320,6 @@ export default function PlaylistList() {
         }
         triggerLibraryUpdate();
         setEditPlaylist(null);
-        loadPlaylists();
     };
 
     return (

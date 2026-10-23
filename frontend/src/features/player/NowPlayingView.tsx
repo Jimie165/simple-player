@@ -56,7 +56,11 @@ export default function NowPlayingView({
     const [marqueeResetToken, setMarqueeResetToken] = useState(0);
     const isNarrowPanelLayout = mainContentWidth < 560 && (isQueueOpen || isLyricsOpen);
     const coverScale = isPlaying ? 1 : 0.85;
-    const bgImageSrc = useCoverBackground(metadata);
+    // Load on first open, then reuse the paused renderer instead of recreating WebGL on every open.
+    const [resourcesMounted, setResourcesMounted] = useState(false);
+    if (isOpen && !resourcesMounted) setResourcesMounted(true);
+    const visibleMetadata = resourcesMounted ? metadata : null;
+    const bgImageSrc = useCoverBackground(visibleMetadata);
     const coverRef = useRef<HTMLDivElement>(null);
     const coverShellRef = useRef<HTMLDivElement>(null);
     const controlsRef = useRef<HTMLDivElement>(null);
@@ -165,7 +169,7 @@ export default function NowPlayingView({
     }, [isOpen, isNarrowPanelLayout]);
 
     const layoutProps = {
-        metadata,
+        metadata: visibleMetadata,
         bgImageSrc,
         coverScale,
         isPlaying,
@@ -204,18 +208,13 @@ export default function NowPlayingView({
 
     return (
         <motion.div
-            initial={{ opacity: 0, scale: 0.94, y: 40 }}
+            initial={{ opacity: 0, y: '100%' }}
             animate={{
                 opacity: isOpen ? 1 : 0,
-                scale: isOpen ? 1 : 0.94,
-                y: isOpen ? 0 : 40,
+                y: isOpen ? 0 : '100%',
                 pointerEvents: isOpen ? 'auto' : 'none'
             }}
-            transition={isOpen ? {
-                y: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
-                scale: { type: 'spring', stiffness: 90, damping: 14, mass: 0.8 },
-                opacity: { duration: 0.35, ease: 'easeOut' },
-            } : { duration: 0.35, ease: 'easeOut' }}
+            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             onAnimationComplete={() => {
                 if (isOpen) onOpened();
             }}

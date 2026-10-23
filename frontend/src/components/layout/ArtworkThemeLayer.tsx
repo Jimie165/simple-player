@@ -12,8 +12,6 @@ export default function ArtworkThemeLayer({ children, className, style, ...props
     const [theme, setTheme] = useState<ArtworkTheme | null>(null);
     const [exitFinished, setExitFinished] = useState(false);
     const isPresent = useIsPresent();
-    // A missing cover receiver must not keep a completed page exit painted.
-    if (exitFinished && !isPresent) return null;
     return (
         <PageArtworkThemeContext.Provider value={setTheme}>
             <motion.div
@@ -27,7 +25,7 @@ export default function ArtworkThemeLayer({ children, className, style, ...props
                     props.onAnimationComplete?.(definition);
                 }}
                 inert={props.inert || !isPresent}
-                className={clsx(className, 'transition-colors duration-200', theme && 'bg-surface dark:bg-surface-container-low', theme?.isDark && 'dark')}
+                className={clsx(className, !isPresent && 'pointer-events-none', exitFinished && !isPresent && 'hidden', 'transition-colors duration-200', theme && 'bg-surface dark:bg-surface-container-low', theme?.isDark && 'dark')}
                 style={{ translate: isPresent ? 'none' : undefined, ...getArtworkThemeStyle(theme), ...style }}
             >
                 {children}

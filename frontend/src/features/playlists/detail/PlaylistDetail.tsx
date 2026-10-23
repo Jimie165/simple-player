@@ -21,6 +21,7 @@ import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
 import PlaylistSortControl from '@/features/playlists/detail/PlaylistSortControl';
+import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -30,17 +31,19 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 interface PlaylistDetailProps {
     id: number | 'favorites';
     name: string;
+    isVisible: boolean;
     onClose?: () => void;
     transitionSource?: CoverTransitionSource;
 }
 
-export default function PlaylistDetail({ id, name: initialName, transitionSource }: PlaylistDetailProps) {
+export default function PlaylistDetail({ id, name: initialName, transitionSource, isVisible }: PlaylistDetailProps) {
     const isPresent = useIsPresent();
     const entered = useNavigationStore(state => state.playlistDetailEntered);
     const [songs, setSongs] = useState<SongMetadata[]>([]);
     const [loading, setLoading] = useState(false);
     const [playlistInfo, setPlaylistInfo] = useState<Playlist | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [dataRefreshVersion, setDataRefreshVersion] = useState(0);
     const initialLoadRef = useRef(true);
 
     // Sort State - Load initial state from store if available, else default
@@ -86,9 +89,11 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
     const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
     const favoriteSet = useLibraryStore(state => state.favoriteSet);
-    const favoritesLoaded = useLibraryStore(state => state.favoritesLoaded);
+    const favoritesLoaded = useLibraryStore(state => isVisible && state.favoritesLoaded);
     const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
-    const playlistVersion = useLibraryStore(state => state.playlistVersion);
+    const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
+    const favoritesLibraryVersion = useLibraryStore(state => isVisible && id === 'favorites' ? state.libraryVersion : 0);
+    const loadedDataVersionRef = useRef<string | null>(null);
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
@@ -97,7 +102,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     // Load Data
 
     // Load Data
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (isCurrent: () => boolean) => {
         if (initialLoadRef.current) {
             setLoading(true);
         }
@@ -109,23 +114,42 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             } else {
                 list = await libraryService.getPlaylistSongs(id);
             }
+            if (!isCurrent()) return false;
             setSongs(list);
 
             // 2. Load Playlist Info (for description, cover updates)
             if (id !== 'favorites') {
                 const playlists = await libraryService.getPlaylists();
+                if (!isCurrent()) return false;
                 const pl = playlists.find(p => p.id === id);
                 if (pl) setPlaylistInfo(pl);
             }
+            return true;
         } catch (error) {
             console.error(error);
+            return false;
         } finally {
-            setLoading(false);
-            initialLoadRef.current = false;
+            if (isCurrent()) {
+                setLoading(false);
+                initialLoadRef.current = false;
+            }
         }
     }, [id, sortKey, sortOrder]);
 
-    useEffect(() => { loadData(); }, [loadData, playlistVersion]);
+    const dataVersion = `${id}:${sortKey}:${sortOrder}:${playlistVersion}:${id === 'favorites' ? favoritesLibraryVersion : ''}:${dataRefreshVersion}`;
+    useEffect(() => {
+        let cancelled = false;
+        void runPlaylistDataRefresh({
+            isVisible,
+            loadedVersion: loadedDataVersionRef.current,
+            currentVersion: dataVersion,
+            isCurrent: () => !cancelled,
+            load: () => loadData(() => !cancelled),
+        }).then(result => {
+            if (result?.data) loadedDataVersionRef.current = result.version;
+        });
+        return () => { cancelled = true; };
+    }, [dataVersion, isVisible, loadData]);
 
     // Actions
     const buildRecentForSong = (song: SongMetadata): RecentItem => ({
@@ -225,7 +249,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                 updateRecentItemCover(`playlist:${id}`, coverPath || null);
             }
             triggerLibraryUpdate();
-            loadData();
+            setDataRefreshVersion(version => version + 1);
         }
     };
 

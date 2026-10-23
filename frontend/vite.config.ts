@@ -34,7 +34,7 @@ export default defineConfig({
         onlyExplicitManualChunks: true,
         manualChunks(id) {
           if (
-            id.includes('/src/features/player/apple/') ||
+            id.includes('/src/features/player/now-playing/') ||
             id.includes('/src/features/player/lyrics/')
           ) {
             return 'immersive-player'

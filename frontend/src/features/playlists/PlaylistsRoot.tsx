@@ -1,5 +1,4 @@
-import { getDetailMotion } from '@/utils/viewTransition';
-import type { CoverTransitionSource } from '@/utils/viewTransition';
+import { getDetailMotion, pageMotion } from '@/utils/viewTransition';
 import { AnimatePresence } from 'framer-motion';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
 import ScrollArea from '@/components/common/ScrollArea';
@@ -8,7 +7,7 @@ import PlaylistList from '@/features/playlists/PlaylistList';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useThemeStore } from '@/store/useThemeStore';
 
-export default function PlaylistsRoot() {
+export default function PlaylistsRoot({ isPageVisible }: { isPageVisible: boolean }) {
     const activePlaylistDetail = useNavigationStore((state) => state.activePlaylistDetail);
     const entered = useNavigationStore((state) => state.playlistDetailEntered);
 
@@ -19,27 +18,30 @@ export default function PlaylistsRoot() {
             inert={!!activePlaylistDetail}
             aria-hidden={!!activePlaylistDetail}
         >
-            <PlaylistList />
+            <PlaylistList isVisible={isPageVisible && !activePlaylistDetail} />
         </div>
     );
 }
 
 /** Keep the source cards and their scroll position intact throughout the return transition. */
-export function PlaylistDetailOverlay() {
+export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
+    const currentPage = useNavigationStore((state) => state.currentPage);
     const detail = useNavigationStore((state) => state.activePlaylistDetail);
     const coverTransition = useNavigationStore((state) => state.coverTransition);
     const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
 
     return (
-        <AnimatePresence initial={false} custom={coverTransition}>
+        <AnimatePresence initial={false} custom={{ page: currentPage, coverTransition }}>
             {detail && (
                 <ArtworkThemeLayer
                     key={detail.id}
                     data-transition-layer={detail.transitionSource?.coverId}
                     {...getDetailMotion(detail.transitionSource, undefined, moreTransitionsEnabled)}
                     variants={{
-                        exit: (returnSource: CoverTransitionSource | null) =>
-                            getDetailMotion(detail.transitionSource, returnSource, moreTransitionsEnabled).exit,
+                        exit: (context: { page: string; coverTransition: typeof coverTransition }) =>
+                            context.page !== currentPage
+                                ? { ...pageMotion.exit, x: '0%', clipPath: 'inset(0% 0% 0% 0% round 0px)', transition: pageMotion.transition }
+                                : getDetailMotion(detail.transitionSource, context.coverTransition, moreTransitionsEnabled).exit,
                     }}
                     exit="exit"
                     onAnimationComplete={(definition) => {
@@ -56,6 +58,7 @@ export function PlaylistDetailOverlay() {
                                 id={detail.id}
                                 name={detail.name}
                                 transitionSource={detail.transitionSource}
+                                isVisible={isVisible}
                             />
                         </div>
                     </ScrollArea>
