@@ -37,6 +37,12 @@ export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
                     key={detail.id}
                     data-transition-layer={detail.transitionSource?.coverId}
                     {...getDetailMotion(detail.transitionSource, undefined, moreTransitionsEnabled)}
+                    animate={{
+                        ...getDetailMotion(detail.transitionSource, undefined, moreTransitionsEnabled).animate,
+                        // The content surface owns the resting corner clip. Keeping a second
+                        // clip-path here leaves WebView compositing the transparent source page.
+                        transitionEnd: { clipPath: 'none' },
+                    }}
                     variants={{
                         exit: (context: { page: string; coverTransition: typeof coverTransition }) =>
                             context.page !== currentPage

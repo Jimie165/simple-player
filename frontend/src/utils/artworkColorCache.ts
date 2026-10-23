@@ -6,7 +6,7 @@ export function sampleArtworkColor(image: HTMLImageElement): number | null {
     const context = canvas.getContext('2d', { willReadFrequently: true });
     if (!context) return null;
     context.drawImage(image, 0, 0, 32, 32);
-    return selectArtworkColor(context.getImageData(0, 0, 32, 32).data);
+    return selectArtworkColor(context.getImageData(0, 0, 32, 32).data, 32);
 }
 
 /** Owned by ContentTheme; idle work never delays navigation or image display. */
