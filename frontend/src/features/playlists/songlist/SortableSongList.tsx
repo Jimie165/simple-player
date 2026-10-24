@@ -77,6 +77,7 @@ interface SortableSongListProps {
 type SortableItemProps = {
     song: SongMetadata;
     index: number;
+    isLast: boolean;
     style: CSSProperties;
     isDraggingGroup?: boolean;
     isSelectionMode: boolean;
@@ -302,6 +303,7 @@ export default function SortableSongList({
                 style={gridStyle}
                 isSelectionMode={isSelectionMode}
                 selected={isSelected(uniqueId)}
+                isLast={index === displaySongs.length - 1}
                 onPlay={onPlay}
                 handleItemClick={(e: React.MouseEvent, s: SongMetadata) => {
                     e.stopPropagation();
@@ -329,7 +331,7 @@ export default function SortableSongList({
 
     return (
         <div ref={listRef} className="w-full relative select-none">
-            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-on-surface/10 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl">
+            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl after:absolute after:bottom-0 after:left-14 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none">
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 {renderHeaderCell('标题')}

@@ -365,7 +365,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
                         <SharedCover source={transitionSource} className={clsx(
-                            "w-56 h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
+                            "w-[270px] h-[270px] rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
                             isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
@@ -396,7 +396,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     </div>
 
                     {/* Metadata */}
-                    <div className="flex-1 flex flex-col gap-2 text-center md:text-left items-center md:items-start">
+                    <div className="flex-1 min-w-0 flex flex-col gap-2 text-center md:text-left items-center md:items-start">
                         <h1 className="text-3xl md:text-5xl font-bold text-on-surface text-balance">
                             {displayName}
                         </h1>

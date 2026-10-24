@@ -284,6 +284,7 @@ export default function SongListView({
         return (
             <SongListRow
                 index={index}
+                isLast={index === sortedSongs.length - 1}
                 song={song}
                 gridStyle={gridStyle}
                 gridGapClass={gridGapClass}
@@ -315,7 +316,8 @@ export default function SongListView({
             <div
                 style={gridStyle}
                 className={clsx(
-                    "sticky z-45 grid pt-2 pb-3 border-b border-on-surface/10 backdrop-blur-xl",
+                    "sticky z-45 grid pt-2 pb-3 backdrop-blur-xl after:absolute after:bottom-0 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none",
+                    isLibraryContext ? "after:left-11" : "after:left-14",
                     headerTopClass,
                     gridGapClass,
                     headerPaddingClass,

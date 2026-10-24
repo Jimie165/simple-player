@@ -69,6 +69,7 @@ const SongListItemMenu = memo(({
 export const SongListItem = memo(({
     song,
     index,
+    isLast = false,
     style: gridStyle,
     isSelectionMode,
     selected,
@@ -91,6 +92,7 @@ export const SongListItem = memo(({
 }: {
     song: SongMetadata;
     index: number;
+    isLast?: boolean;
     style: React.CSSProperties;
     isSelectionMode?: boolean;
     selected?: boolean;
@@ -118,14 +120,15 @@ export const SongListItem = memo(({
         <div
             style={gridStyle}
             className={clsx(
-                "group grid h-13.5 gap-4 px-4 items-center rounded-lg transition-colors relative touch-pan-y",
+                "group grid h-13.5 gap-4 px-4 items-center transition-colors relative touch-pan-y after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none",
+                isLast ? "after:left-14" : "after:left-28",
                 isOverlay
                     ? "bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02]"
                     : selected
                         ? "bg-primary/10 hover:bg-primary/15"
                         : isDragging
                             ? "bg-surface-container-high elevation-2 opacity-50"
-                            : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
+                            : "hover:bg-surface-container-highest active:bg-surface-container-high",
                 "cursor-default text-[14px]",
                 isDragging && !isOverlay ? "opacity-30" : ""
             )}
@@ -180,7 +183,7 @@ export const SongListItem = memo(({
             </div>
 
             <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                <div className="w-11 h-11 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                     <SongCoverOverlay
                         song={song}
                         className="w-full h-full"
@@ -247,10 +250,7 @@ export const SongListItem = memo(({
             </div>
 
             <div
-                className={clsx(
-                    "flex justify-end transition-opacity",
-                    isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 any-pointer-coarse:opacity-100"
-                )}
+                className="flex justify-end"
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >

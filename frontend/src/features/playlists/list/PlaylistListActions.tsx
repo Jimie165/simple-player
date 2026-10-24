@@ -1,4 +1,6 @@
-import { MdAdd, MdSearch } from 'react-icons/md';
+import { useState } from 'react';
+import { MdAdd } from 'react-icons/md';
+import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
 
 interface PlaylistListActionsProps {
     searchQuery: string;
@@ -11,18 +13,20 @@ export default function PlaylistListActions({
     setSearchQuery,
     setIsCreateOpen,
 }: PlaylistListActionsProps) {
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [suppressTooltip, setSuppressTooltip] = useState(false);
+
     return (
         <div className="flex items-center gap-2">
-            <div className="relative group">
-                <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-primary transition-colors" />
-                <input
-                    type="text"
-                    placeholder="搜索..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-on-surface/5 hover:bg-on-surface/10 focus:bg-on-surface/10 backdrop-blur-md border-none rounded-full py-1.5 pl-9 pr-4 text-sm text-on-surface w-40 outline-none ring-0 focus:w-60 focus:outline-none focus-visible:outline-none focus:ring-0 transition-all duration-300 placeholder:text-on-surface-variant/60"
-                />
-            </div>
+            <PlaylistSearchControl
+                isSearchOpen={isSearchOpen}
+                setIsSearchOpen={setIsSearchOpen}
+                searchQuery={searchQuery}
+                setSearchQuery={setSearchQuery}
+                suppressTooltip={suppressTooltip}
+                setSuppressTooltip={setSuppressTooltip}
+                placeholder="搜索播放列表..."
+            />
 
             <button
                 onClick={() => setIsCreateOpen(true)}

@@ -13,6 +13,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 function SongListRowImpl({
     index,
+    isLast,
     song,
     gridStyle,
     gridGapClass,
@@ -36,6 +37,7 @@ function SongListRowImpl({
     onSelect,
 }: {
     index: number;
+    isLast: boolean;
     song: SongMetadata;
     gridStyle: React.CSSProperties;
     gridGapClass: string;
@@ -82,13 +84,16 @@ function SongListRowImpl({
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group grid items-center rounded-lg transition-colors relative",
-                hideCover ? "h-11.5" : "h-13.5",
+                "group grid items-center transition-colors relative after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none",
+                "h-13.5",
+                isLast ? (context === 'library' ? "after:left-11" : "after:left-14") : hideCover
+                    ? (context === 'library' ? "after:left-19" : "after:left-22")
+                    : (context === 'library' ? "after:left-25" : "after:left-28"),
                 gridGapClass,
                 rowPaddingClass,
                 selected
                     ? "bg-primary/10 hover:bg-primary/15"
-                    : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
+                    : "hover:bg-surface-container-highest active:bg-surface-container-high",
                 "cursor-default text-[14px]"
             )}
         >
@@ -121,7 +126,7 @@ function SongListRowImpl({
 
             <div className="flex items-center gap-3 overflow-hidden">
                 {!hideCover && (
-                    <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                    <div className="w-11 h-11 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                         <SongCoverOverlay
                             song={song}
                             className="w-full h-full"
@@ -129,6 +134,9 @@ function SongListRowImpl({
                             restartOnPlay
                         />
                     </div>
+                )}
+                {hideCover && (
+                    <span className="w-5 shrink-0 text-center text-on-surface-variant tabular-nums">{index + 1}</span>
                 )}
                 <span className={clsx(
                     "font-medium truncate pr-4",
@@ -189,10 +197,7 @@ function SongListRowImpl({
             </div>
 
             <div
-                className={clsx(
-                    "flex justify-end transition-opacity",
-                    isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 any-pointer-coarse:opacity-100"
-                )}
+                className="flex justify-end"
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >

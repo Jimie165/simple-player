@@ -148,7 +148,7 @@ export default function ArtistDetailView({
             <div
                 className="flex flex-col md:flex-row gap-6 md:gap-8"
             >
-                <div className="w-40 md:w-48 shrink-0 flex flex-col gap-3">
+                <div className="w-[270px] shrink-0 flex flex-col gap-3">
                     <div
                         className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
                         onClick={() => onPlayAlbum(album)}
@@ -231,7 +231,7 @@ export default function ArtistDetailView({
                 {/* (Back Button Removed) */}
 
                 {/* Artist Cover */}
-                <SharedCover source={transitionSource} className="w-40 h-40 md:w-48 md:h-48 rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
+                <SharedCover source={transitionSource} className="w-[270px] h-[270px] rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
                     {artist.songs.length > 0 ? (
                         <CoverImage
                             song={artist.songs[0]}

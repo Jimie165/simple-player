@@ -55,9 +55,9 @@ export default function AlbumDetailView({
             <DetailScrollHeader />
 
             {/* Header Area using Material 3 Styling */}
-            <div className="flex flex-col md:flex-row gap-8 mb-4 px-6 pt-6 relative z-10">
+            <div className="flex flex-col md:flex-row gap-8 mb-8 px-6 pt-6 relative z-10">
                 {/* Cover: Elevation, Large Radius */}
-                <SharedCover source={transitionSource} className="w-48 h-48 md:w-60 md:h-60 rounded-3xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
+                <SharedCover source={transitionSource} className="w-[270px] h-[270px] rounded-xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
                     <CoverImage
                         song={album.songs[0]}
                         src={album.cover}
@@ -75,7 +75,7 @@ export default function AlbumDetailView({
                         {album.artist}
                     </h2>
 
-                    <div className="text-sm text-on-surface-variant mt-2 font-medium flex items-center gap-2">
+                    <div className="text-sm text-on-surface-variant mt-2 font-medium flex flex-wrap items-center gap-2">
                         <span className="bg-on-surface/8 text-on-surface-variant px-2 py-0.5 rounded-md text-xs">Album</span>
                         <span>•</span>
                         <span>{album.songs[0]?.year || 'Unknown Year'}</span>

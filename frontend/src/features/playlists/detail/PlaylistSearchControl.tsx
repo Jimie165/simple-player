@@ -9,6 +9,7 @@ interface PlaylistSearchControlProps {
     setSearchQuery: (value: string) => void;
     suppressTooltip: boolean;
     setSuppressTooltip: (value: boolean) => void;
+    placeholder?: string;
 }
 
 export default function PlaylistSearchControl({
@@ -18,6 +19,7 @@ export default function PlaylistSearchControl({
     setSearchQuery,
     suppressTooltip,
     setSuppressTooltip,
+    placeholder = '搜索歌单内...',
 }: PlaylistSearchControlProps) {
     return (
         <CustomTooltip
@@ -29,14 +31,14 @@ export default function PlaylistSearchControl({
             <div
                 onMouseLeave={() => setSuppressTooltip(false)}
                 className={clsx(
-                    'flex items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
+                    'flex h-10 items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
                     isSearchOpen
                         ? 'w-64 mr-2'
-                        : 'w-10 h-10 text-on-surface-variant hover:text-primary cursor-pointer'
+                        : 'w-10 text-on-surface-variant hover:text-primary cursor-pointer'
                 )}
                 onClick={() => !isSearchOpen && setIsSearchOpen(true)}
             >
-                <div className="flex items-center w-full px-3 py-1.5 h-10">
+                <div className="flex items-center w-full px-3 py-1.5 h-full">
                     <MdSearch
                         className={clsx(
                             'text-xl shrink-0 transition-colors transform',
@@ -48,7 +50,7 @@ export default function PlaylistSearchControl({
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="搜索歌单内..."
+                        placeholder={placeholder}
                         className={clsx(
                             'bg-transparent border-none focus:outline-none text-sm text-on-surface ml-2 placeholder:text-on-surface-variant/50 transition-all duration-300',
                             isSearchOpen ? 'w-full opacity-100' : 'w-0 opacity-0 pointer-events-none'
