@@ -51,6 +51,8 @@ interface PlayerState {
     lyricsDocument: LyricsDocument | null;
     lyricsRequestId: number;
     lyricsPath: string | null;
+    autoLyricsSearchPath: string | null;
+    setAutoLyricsSearchPath: (path: string | null) => void;
     requestLyricsForPath: (path?: string) => Promise<void>;
     reloadLyricsForPath: (path: string) => Promise<void>;
 
@@ -88,6 +90,8 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     lyricsDocument: null,
     lyricsRequestId: 0,
     lyricsPath: null,
+    autoLyricsSearchPath: null,
+    setAutoLyricsSearchPath: (autoLyricsSearchPath) => set({ autoLyricsSearchPath }),
     isVideoMode: false,
     videoMetadata: null,
     videoQueue: [],

@@ -89,6 +89,9 @@ fn main() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::online_lyrics::search_online_lyrics,
+            commands::online_lyrics::fetch_online_lyrics,
+            commands::online_lyrics::save_online_lyrics_if_missing,
             modules::player::media_controls::update_windows_video_media,
             // Player commands
             commands::player::play_audio,

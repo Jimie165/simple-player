@@ -11,6 +11,7 @@ import AboutSection from '@/features/settings/components/AboutSection';
 import AppearanceSection from '@/features/settings/components/AppearanceSection';
 import AudioOutputSection from '@/features/settings/components/AudioOutputSection';
 import GeneralSettingsSection from '@/features/settings/components/GeneralSettingsSection';
+import OnlineLyricsSection from '@/features/settings/components/OnlineLyricsSection';
 import IgnoredDirsSection from '@/features/settings/components/IgnoredDirsSection';
 import MusicFoldersSection from '@/features/settings/components/MusicFoldersSection';
 import VideoFoldersSection from '@/features/settings/components/VideoFoldersSection';
@@ -75,6 +76,7 @@ export default function Settings() {
                             <>
                                 <GeneralSettingsSection />
                                 <AudioOutputSection />
+                                <OnlineLyricsSection />
                             </>
                         )}
                         {activeTab === 'appearance' && <AppearanceSection />}

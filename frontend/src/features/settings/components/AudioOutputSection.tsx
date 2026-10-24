@@ -64,7 +64,7 @@ export default function AudioOutputSection() {
     }
 
     return (
-        <SettingsGroup title="音频输出" footer="选择「跟随系统默认」时，切换 Windows 默认输出会自动跟随。">
+        <SettingsGroup title="音频输出">
             <SettingsRow label="输出设备">
                 <SettingsPopup
                     label="输出设备"

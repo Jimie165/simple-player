@@ -128,12 +128,14 @@ export function SettingsPopup<T extends string>({
     onChange,
     options,
     buttonLabel,
+    menuClassName = 'z-50',
 }: {
     label: string;
     value: T;
     onChange: (value: T) => void;
     options: { value: T; label: string; description?: string }[];
     buttonLabel?: string;
+    menuClassName?: string;
 }) {
     const selectedLabel = buttonLabel ?? options.find((option) => option.value === value)?.label;
 
@@ -157,7 +159,7 @@ export function SettingsPopup<T extends string>({
                                 initial={{ opacity: 0, y: -4 }}
                                 animate={{ opacity: 1, y: 0, transition: { duration: 0.14, ease: 'easeOut' } }}
                                 exit={{ opacity: 0, transition: { duration: 0.1, ease: 'easeIn' } }}
-                                className="settings-menu z-50 max-h-72 min-w-(--button-width) overflow-y-auto rounded-xl p-1 [--anchor-gap:6px] focus:outline-none"
+                                className={clsx('settings-menu max-h-72 min-w-(--button-width) overflow-y-auto rounded-xl p-1 [--anchor-gap:6px] focus:outline-none', menuClassName)}
                             >
                                 {options.map((option) => (
                                     <ListboxOption

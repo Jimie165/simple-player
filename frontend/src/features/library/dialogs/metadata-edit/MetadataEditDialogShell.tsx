@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import type React from 'react';
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { MdClose } from 'react-icons/md';
 
 export interface MetadataEditTab<T extends string> {
@@ -25,6 +25,7 @@ interface MetadataEditDialogShellProps<T extends string> {
     message?: string;
     footerStart?: React.ReactNode;
     children: React.ReactNode;
+    replacementView?: React.ReactNode;
 }
 
 export default function MetadataEditDialogShell<T extends string>({
@@ -43,7 +44,9 @@ export default function MetadataEditDialogShell<T extends string>({
     message,
     footerStart,
     children,
+    replacementView,
 }: MetadataEditDialogShellProps<T>) {
+    const reducedMotion = useReducedMotion();
     return (
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-9999" onClose={saving ? () => undefined : onClose}>
@@ -62,8 +65,8 @@ export default function MetadataEditDialogShell<T extends string>({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
-                                <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col">
+                            <DialogPanel className="relative h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
+                                <motion.form onSubmit={onSubmit} inert={Boolean(replacementView)} animate={{ x: replacementView && !reducedMotion ? -32 : 0, opacity: replacementView ? 0 : 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">{title}</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
                                         <button
@@ -133,7 +136,14 @@ export default function MetadataEditDialogShell<T extends string>({
                                             </button>
                                         </div>
                                     </div>
-                                </form>
+                                </motion.form>
+                                <AnimatePresence>
+                                    {replacementView && (
+                                        <motion.div key="replacement" initial={{ x: reducedMotion ? 0 : 48, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reducedMotion ? 0 : 48, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.22, ease: 'easeOut' }} className="absolute inset-0 z-20" inert={!replacementView}>
+                                            {replacementView}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </DialogPanel>
                         </TransitionChild>
                     </div>

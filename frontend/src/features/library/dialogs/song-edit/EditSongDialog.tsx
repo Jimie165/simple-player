@@ -11,6 +11,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SongInfoFields from '@/features/library/dialogs/song-edit/SongInfoFields';
 import SongLyricsFields from '@/features/library/dialogs/song-edit/SongLyricsFields';
+import OnlineLyricsSearch from '@/features/library/dialogs/song-edit/OnlineLyricsSearch';
 import SongArtworkFields from '@/features/library/dialogs/song-edit/SongArtworkFields';
 import {
     buildUpdateSongDetailsRequest,
@@ -63,6 +64,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
     const [errors, setErrors] = useState<SongEditFormErrors>({});
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
 
     const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
     const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
@@ -79,6 +81,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
         setErrors({});
         setMessage('');
         setActiveTab('details');
+        setSearchOpen(false);
     }, [isOpen, song]);
 
     useEffect(() => {
@@ -210,7 +213,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
         <MetadataEditDialogShell
             isOpen={isOpen}
             saving={saving}
-            onClose={onClose}
+            onClose={searchOpen ? () => setSearchOpen(false) : onClose}
             onSubmit={handleSubmit}
             title="编辑歌曲信息"
             cover={(
@@ -236,6 +239,20 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             scrollContent={activeTab === 'details'}
             message={message}
             footerStart={lyricsFooter}
+            replacementView={searchOpen ? (
+                <OnlineLyricsSearch
+                    title={resolvedValues.title}
+                    artist={resolvedValues.artist}
+                    album={resolvedValues.album}
+                    durationMs={song.duration * 1000}
+                    onClose={() => setSearchOpen(false)}
+                    onDismiss={onClose}
+                    onApply={content => {
+                        handleChange({ lyricsText: content, lyricsSourcePath: '', customLyricsEnabled: true });
+                        setSearchOpen(false);
+                    }}
+                />
+            ) : undefined}
         >
             {activeTab === 'details' && (
                 <SongInfoFields
@@ -251,6 +268,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                     values={resolvedValues}
                     onChange={handleChange}
                     onError={setMessage}
+                    onSearchOnline={() => setSearchOpen(true)}
                 />
             )}
             {activeTab === 'artwork' && (

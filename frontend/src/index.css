@@ -240,7 +240,8 @@ body {
     position: relative;
   }
 
-  .settings-group > * + *::before {
+  .settings-group > * + *::before,
+  .settings-row-dividers > * + *::before {
     content: '';
     position: absolute;
     top: 0;

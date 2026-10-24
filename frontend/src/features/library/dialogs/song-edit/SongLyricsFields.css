@@ -1,0 +1,55 @@
+@property --lyrics-search-progress {
+    syntax: '<number>';
+    inherits: true;
+    initial-value: 10;
+}
+
+/* M3 Expressive retreat motion: 6s grow/shrink cycle, constant rotation plus
+   a 90deg spin over 500ms every 1500ms. No React updates or animation timers. */
+.lyrics-search-ring {
+    --lyrics-search-progress: 10;
+    transform: rotate(-90deg);
+    animation: lyrics-search-rotate 6s linear infinite,
+        lyrics-search-retreat 6s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.lyrics-search-ring-spin {
+    transform-origin: 24px 24px;
+    animation: lyrics-search-spin 6s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+.lyrics-search-ring-arc {
+    stroke-dasharray: calc(var(--lyrics-search-progress) - 2.9) calc(102.9 - var(--lyrics-search-progress));
+    stroke-dashoffset: -1.45;
+}
+
+/* Only the remaining track is visible; round caps and the gap never overlap. */
+.lyrics-search-ring-track {
+    stroke: var(--md-sys-color-secondary-container, currentColor);
+    stroke-dasharray: calc(91.32 - var(--lyrics-search-progress)) calc(8.68 + var(--lyrics-search-progress));
+    stroke-dashoffset: calc(-4.34 - var(--lyrics-search-progress));
+}
+
+@keyframes lyrics-search-rotate {
+    from { transform: rotate(-90deg); }
+    to { transform: rotate(990deg); }
+}
+
+@keyframes lyrics-search-retreat {
+    0%, 100% { --lyrics-search-progress: 10; }
+    50% { --lyrics-search-progress: 87; }
+}
+
+@keyframes lyrics-search-spin {
+    0% { transform: rotate(0deg); }
+    8.333333%, 25% { transform: rotate(90deg); }
+    33.333333%, 50% { transform: rotate(180deg); }
+    58.333333%, 75% { transform: rotate(270deg); }
+    83.333333%, 100% { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .lyrics-search-ring { --lyrics-search-progress: 65; }
+    .lyrics-search-ring,
+    .lyrics-search-ring-spin { animation: none; }
+}
