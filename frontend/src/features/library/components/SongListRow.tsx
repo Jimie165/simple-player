@@ -20,6 +20,8 @@ function SongListRowImpl({
     rowPaddingClass,
     isSelectionMode,
     selected,
+    previousSelected = false,
+    nextSelected = false,
     isFav,
     hideCover,
     hideArtist,
@@ -44,6 +46,8 @@ function SongListRowImpl({
     rowPaddingClass: string;
     isSelectionMode: boolean;
     selected: boolean;
+    previousSelected?: boolean;
+    nextSelected?: boolean;
     isFav: boolean;
     hideCover: boolean;
     hideArtist: boolean;
@@ -84,23 +88,22 @@ function SongListRowImpl({
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group grid items-center transition-colors relative after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none",
+                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
                 "h-13.5",
+                context === 'library' ? "before:left-9 before:right-0" : "before:left-12 before:right-2",
                 isLast ? (context === 'library' ? "after:left-11" : "after:left-14") : hideCover
                     ? (context === 'library' ? "after:left-19" : "after:left-22")
                     : (context === 'library' ? "after:left-25" : "after:left-28"),
                 gridGapClass,
                 rowPaddingClass,
                 selected
-                    ? "bg-primary/10 hover:bg-primary/15"
-                    : "hover:bg-surface-container-highest active:bg-surface-container-high",
+                    ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
+                    : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
+                (!selected || !previousSelected) && "before:rounded-t-xl",
+                (!selected || !nextSelected) && "before:rounded-b-xl",
                 "cursor-default text-[14px]"
             )}
         >
-            {selected && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
-            )}
-
             <div className="flex justify-center items-center">
                 <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
                     <button
@@ -138,10 +141,7 @@ function SongListRowImpl({
                 {hideCover && (
                     <span className="w-5 shrink-0 text-center text-on-surface-variant tabular-nums">{index + 1}</span>
                 )}
-                <span className={clsx(
-                    "font-medium truncate pr-4",
-                    selected ? "text-primary" : "text-on-surface"
-                )}>
+                <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}
                 </span>
             </div>
@@ -149,7 +149,8 @@ function SongListRowImpl({
             {!hideArtist && (
                 <div
                     className={clsx(
-                        "text-on-surface-variant truncate font-medium transition-colors",
+                        "truncate font-medium transition-colors group-hover:text-on-surface",
+                        selected ? "text-on-surface" : "text-on-surface-variant",
                         !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -172,7 +173,8 @@ function SongListRowImpl({
             {!effectiveHideAlbum && (
                 <div
                     className={clsx(
-                        "text-on-surface-variant truncate transition-colors",
+                        "truncate transition-colors group-hover:text-on-surface",
+                        selected ? "text-on-surface" : "text-on-surface-variant",
                         !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -192,7 +194,7 @@ function SongListRowImpl({
                 </div>
             )}
 
-            <div className="text-on-surface-variant text-right pr-2 text-[13px] font-variant-numeric">
+            <div className={clsx("text-right pr-2 text-[13px] font-variant-numeric transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                 {formatDuration(song.duration)}
             </div>
 

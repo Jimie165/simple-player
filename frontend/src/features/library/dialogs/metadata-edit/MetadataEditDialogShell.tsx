@@ -66,7 +66,7 @@ export default function MetadataEditDialogShell<T extends string>({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="relative h-full w-full overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl dark:bg-[#202020] sm:rounded-md">
+                            <DialogPanel className="relative h-full w-full overflow-hidden rounded-xl bg-surface text-left align-middle shadow-2xl sm:rounded-md">
                                 <motion.form onSubmit={onSubmit} inert={Boolean(replacementView)} animate={{ x: replacementView && !reducedMotion ? -32 : 0, opacity: replacementView ? 0 : 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">{title}</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
@@ -123,7 +123,7 @@ export default function MetadataEditDialogShell<T extends string>({
                                             <button
                                                 type="submit"
                                                 disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] bg-primary px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+                                                className="h-10 min-w-30 rounded-[7px] bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 base-theme:dark:hover:bg-on-primary disabled:opacity-50"
                                             >
                                                 {saving ? '保存中...' : '确定'}
                                             </button>
@@ -131,7 +131,7 @@ export default function MetadataEditDialogShell<T extends string>({
                                                 type="button"
                                                 onClick={onClose}
                                                 disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] border border-neutral-300 bg-white px-7 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
+                                                className="h-10 min-w-30 rounded-[7px] border border-outline-variant/60 bg-transparent px-7 text-[15px] font-medium text-on-surface-variant transition-colors hover:bg-primary/5 disabled:opacity-50"
                                             >
                                                 取消
                                             </button>

@@ -111,14 +111,14 @@ export default function OnlineLyricsSearch({ title, artist, album, durationMs, o
         exit: (direction: number) => ({ opacity: 0, x: reducedMotion ? 0 : direction * -16 }),
     };
     const button = 'rounded-lg border border-neutral-200 px-4 py-2 text-sm dark:border-white/15 disabled:opacity-40';
-    return <div className="flex h-full min-h-0 flex-col bg-[#fbfbfb] p-6 text-neutral-900 dark:bg-[#202020] dark:text-white" role="region" aria-label="选择在线歌词">
+    return <div className="flex h-full min-h-0 flex-col bg-surface p-6 text-neutral-900 dark:text-white" role="region" aria-label="选择在线歌词">
         <div className="mb-4 flex items-center gap-3"><button type="button" aria-label="返回" onClick={selected ? back : onClose} className="grid h-8 w-8 place-items-center rounded-lg transition-colors hover:bg-primary/10"><MdArrowBack className="h-5 w-5" /></button><h3 className="flex-1 font-semibold">选择在线歌词</h3><button type="button" aria-label="关闭歌曲编辑" onClick={onDismiss} className="grid h-8 w-8 place-items-center transition-colors hover:text-primary"><MdClose className="h-6 w-6" /></button></div>
         <AnimatePresence mode="wait" initial={false} custom={direction}>
         <motion.div key={selected ? 'preview' : 'results'} custom={direction} variants={pageVariants} initial="enter" animate="center" exit="exit" transition={{ duration: reducedMotion ? 0 : 0.16 }} className="flex min-h-0 flex-1 flex-col">
         {!selected ? <>
             <div className="flex gap-2">
                 <input aria-label="歌词搜索关键词" value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); if (!searching && query.trim()) void search(query, provider); } }} className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-transparent px-3 py-2 text-sm dark:border-white/15" />
-                <button type="button" onClick={() => void search(query, provider)} disabled={searching || !query.trim()} aria-busy={searching} className={`${button} inline-flex items-center gap-1.5 bg-primary text-on-primary transition-[background-color,box-shadow,transform] duration-150 enabled:hover:bg-primary/85 enabled:hover:shadow-md enabled:active:scale-[0.97] enabled:active:bg-primary/75 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none`}><MdSearch className={searching ? 'h-4 w-4 animate-pulse' : 'h-4 w-4'} />{searching ? '搜索中…' : '搜索'}</button>
+                <button type="button" onClick={() => void search(query, provider)} disabled={searching || !query.trim()} aria-busy={searching} className={`${button} inline-flex items-center gap-1.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary transition-[background-color,box-shadow,transform] duration-150 enabled:hover:bg-primary/85 base-theme:dark:enabled:hover:bg-on-primary enabled:hover:shadow-md enabled:active:scale-[0.97] enabled:active:bg-primary/75 base-theme:dark:enabled:active:bg-primary-container focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none`}><MdSearch className={searching ? 'h-4 w-4 animate-pulse' : 'h-4 w-4'} />{searching ? '搜索中…' : '搜索'}</button>
             </div>
             <div className="my-2 flex items-center justify-between text-xs text-neutral-500"><span>可输入歌名、艺人或专辑</span><button type="button" onClick={() => setQuery(originalQuery)} className="rounded-md px-2 py-1 text-primary transition-[background-color,transform] duration-150 hover:bg-primary/10 active:scale-[0.97] active:bg-primary/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary motion-reduce:transform-none">恢复原始信息</button></div>
             <div className="my-3 flex items-center justify-between"><span className="text-sm font-medium">搜索结果（{visibleResults.length}）</span><SettingsPopup label="歌词来源" value={provider} onChange={setProvider} options={sourceOptions} menuClassName="z-[10000]" /></div>
@@ -133,6 +133,6 @@ export default function OnlineLyricsSearch({ title, artist, album, durationMs, o
         </>}
         </motion.div>
         </AnimatePresence>
-        <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className={button}>取消</button>{selected && <button type="button" disabled={busy || !preview} onClick={() => { if (preview) onApply(preview.text); }} className={`${button} bg-primary text-on-primary`}>使用此歌词</button>}</div>
+        <div className="mt-3 flex justify-end gap-2"><button type="button" onClick={onClose} className={button}>取消</button>{selected && <button type="button" disabled={busy || !preview} onClick={() => { if (preview) onApply(preview.text); }} className={`${button} bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary`}>使用此歌词</button>}</div>
     </div>;
 }

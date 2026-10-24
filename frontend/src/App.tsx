@@ -209,7 +209,7 @@ function App() {
             <motion.div
               key={currentPage}
               {...pageMotion}
-              className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low"
+              className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
               <ScrollArea className="h-full" topOffset={48}>
                 <div className="pt-12 min-h-full pb-24 transition-colors duration-300">

@@ -20,7 +20,7 @@ import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog'
 import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
-import PlaylistSortControl from '@/features/playlists/detail/PlaylistSortControl';
+import SortMenu from '@/components/common/SortMenu';
 import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
 import { libraryService } from '@/services/libraryService';
@@ -53,7 +53,6 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
 
     const [sortKey, setLocalSortKey] = useState<SortKey>(savedSettings.sortKey);
     const [sortOrder, setLocalSortOrder] = useState<SortOrder>(savedSettings.sortOrder);
-    const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
     // Sync state changes to store
     const updateSortKey = (key: SortKey) => {
@@ -82,7 +81,6 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     // 当用户通过点击 × 关闭搜索时，短暂抑制 Tooltip 显示，直到鼠标移出搜索按钮区域
     const [suppressTooltip, setSuppressTooltip] = useState(false);
-    const [suppressSortTooltip, setSuppressSortTooltip] = useState(false);
 
     // Store Actions
     // Store Actions
@@ -349,15 +347,17 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         setSuppressTooltip={setSuppressTooltip}
                     />
 
-                    <PlaylistSortControl
-                        isSortMenuOpen={isSortMenuOpen}
-                        setIsSortMenuOpen={setIsSortMenuOpen}
-                        suppressSortTooltip={suppressSortTooltip}
-                        setSuppressSortTooltip={setSuppressSortTooltip}
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        updateSortKey={updateSortKey}
-                        updateSortOrder={updateSortOrder}
+                    <SortMenu
+                        value={sortKey}
+                        onChange={updateSortKey}
+                        order={{ value: sortOrder, onChange: updateSortOrder }}
+                        options={[
+                            { value: 'manual', label: '播放列表顺序' },
+                            { value: 'title', label: '标题' },
+                            { value: 'album', label: '专辑' },
+                            { value: 'artist', label: '艺人' },
+                            { value: 'duration', label: '时长' },
+                        ]}
                     />
                 </div>
 
@@ -417,14 +417,14 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         <div className="flex items-center gap-3 mt-4">
                             <button
                                 onClick={handlePlayAll}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-full hover:bg-primary/90 transition-all font-medium shadow-lg hover:shadow-xl active:scale-95"
+                                className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-lg hover:shadow-xl active:scale-95"
                             >
                                 <MdPlayArrow className="text-2xl" />
                                 播放
                             </button>
                             <button
                                 onClick={handleShuffle}
-                                className="flex items-center gap-2 btn-blur text-primary px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
+                                className="flex items-center gap-2 btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                             >
                                 <MdShuffle className="text-xl" />
                                 随机播放

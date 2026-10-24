@@ -221,7 +221,7 @@ export default function CustomTooltip({
                     ref={setTooltipElement}
                     className={clsx(
                         "fixed z-99999 px-2.5 py-1.5 pointer-events-none",
-                        "bg-primary/90 text-on-primary backdrop-blur-sm",
+                        "bg-primary/90 text-on-primary base-theme:bg-surface-container-highest base-theme:text-on-surface backdrop-blur-sm",
                         "text-xs font-medium leading-relaxed text-center rounded-md shadow-sm whitespace-normal",
                         // 定位基准点变换
                         placement === 'top' && "-translate-x-1/2 -translate-y-full origin-bottom",
@@ -245,19 +245,19 @@ export default function CustomTooltip({
                     {/* 小三角箭头 */}
                     {placement === 'top' && (
                         <div
-                            className="absolute top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-primary/90"
+                            className="absolute top-full -translate-x-1/2 -mt-px border-4 border-transparent border-t-primary/90 base-theme:border-t-surface-container-highest"
                             style={{ left: `calc(50% + ${coords.arrowOffset}px)` }}
                         />
                     )}
                     {placement === 'right' && (
                         <div
-                            className="absolute right-full -translate-y-1/2 -mr-px border-4 border-transparent border-r-primary/90"
+                            className="absolute right-full -translate-y-1/2 -mr-px border-4 border-transparent border-r-primary/90 base-theme:border-r-surface-container-highest"
                             style={{ top: `calc(50% + ${coords.arrowOffset}px)` }}
                         />
                     )}
                     {placement === 'bottom' && (
                         <div
-                            className="absolute bottom-full -translate-x-1/2 -mb-px border-4 border-transparent border-b-primary/90"
+                            className="absolute bottom-full -translate-x-1/2 -mb-px border-4 border-transparent border-b-primary/90 base-theme:border-b-surface-container-highest"
                             style={{ left: `calc(50% + ${coords.arrowOffset}px)` }}
                         />
                     )}

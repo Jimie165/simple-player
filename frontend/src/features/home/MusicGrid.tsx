@@ -93,7 +93,7 @@ export default function MusicGrid() {
             <section>
                 {pendingFolderPlay && (
                     <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
+                        <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 base-theme:bg-surface border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
                             <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                                 检测到混合媒体
                             </h3>
@@ -108,7 +108,7 @@ export default function MusicGrid() {
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
                                         await playVideoList(videoSongs, recentItem);
                                     }}
-                                    className="flex-1 rounded-xl bg-primary text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                                    className="flex-1 rounded-xl bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-colors"
                                 >
                                     播放视频
                                 </button>
@@ -152,18 +152,18 @@ export default function MusicGrid() {
                             return (
                                 <div
                                     key={item.id}
-                                    className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-on-surface/5 transition-colors cursor-pointer relative"
+                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
                                     onClick={(e) => handleItemClick(item, e)}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
                                         {item.type === 'folder' ? (
-                                            <MdFolder className="text-6xl text-blue-400 opacity-80" />
+                                            <MdFolder className="text-6xl text-blue-400 base-theme:text-secondary opacity-80" />
                                         ) : item.type === 'video' ? (
                                             item.cover_path ? (
                                                 <CoverImage
                                                     src={item.cover_path}
-                                                    className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                                                    className="w-full h-full"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
@@ -183,7 +183,7 @@ export default function MusicGrid() {
                                         ) : (
                                             <CoverImage
                                                 song={recentCoverSongs.get(item.id)}
-                                                className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+                                                className="w-full h-full"
                                                 iconClassName="text-6xl opacity-50"
                                             />
                                         )}

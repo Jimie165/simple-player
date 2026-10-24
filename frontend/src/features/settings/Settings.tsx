@@ -53,7 +53,7 @@ export default function Settings() {
                                     {selected && (
                                         <motion.span
                                             layoutId="settings-tab-indicator"
-                                            className="absolute inset-0 rounded-xl bg-on-surface/8"
+                                            className="absolute inset-0 rounded-xl bg-secondary-container"
                                             transition={{ type: 'spring', duration: 0.35, bounce: 0.18 }}
                                         />
                                     )}

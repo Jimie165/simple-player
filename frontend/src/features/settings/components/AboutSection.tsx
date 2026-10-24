@@ -109,7 +109,7 @@ export default function AboutSection() {
                         disabled={status === 'checking'}
                         onClick={() => void handleUpdateAction()}
                         className={status === 'available'
-                            ? "flex items-center gap-1.5 rounded-md bg-primary px-3 py-1 text-[13px] font-medium text-on-primary transition-transform hover:brightness-110 active:scale-[0.97]"
+                            ? "flex items-center gap-1.5 rounded-md bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-3 py-1 text-[13px] font-medium text-on-primary transition-transform hover:brightness-110 active:scale-[0.97]"
                             : "settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"}
                     >
                         {status === 'checking'

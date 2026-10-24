@@ -155,7 +155,7 @@ export default function SelectionMenuBar() {
                             className={`
                                 flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 whitespace-nowrap
                                 ${action.id === 'play' // Highlight Play primary
-                                    ? 'bg-primary text-on-primary shadow-sm hover:brightness-110'
+                                    ? 'bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary shadow-sm hover:brightness-110'
                                     : 'hover:bg-on-surface/8 text-on-surface-variant'
                                 }
                                 ${action.variant === 'danger' ? 'text-red-600 dark:text-red-400 hover:bg-red-500/10' : ''}
@@ -173,7 +173,7 @@ export default function SelectionMenuBar() {
                             </MenuButton>
                             <MenuItems
                                 anchor={{ to: 'top end', gap: 9 }}
-                                className="w-48 origin-bottom-right rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm shadow-2xl dark:border-white/10 z-100"
+                                className="w-48 origin-bottom-right rounded-xl border border-neutral-200/30 bg-white/50 base-theme:bg-surface/95 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm shadow-2xl dark:border-white/10 z-100"
                             >
                                 {overflowActions.map(action => (
                                     <MenuItem key={action.id}>
@@ -182,7 +182,7 @@ export default function SelectionMenuBar() {
                                                 action.onClick();
                                                 clearSelection();
                                             }}
-                                            className={`group flex w-full items-center gap-2 rounded-lg py-2 px-3 transition-colors data-focus:bg-on-surface/8 ${action.variant === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-200'
+                                            className={`group flex w-full items-center gap-2 rounded-lg py-2 px-3 transition-colors data-focus:bg-on-surface/8 base-theme:data-focus:bg-surface-variant/40 ${action.variant === 'danger' ? 'text-red-600 dark:text-red-400' : 'text-neutral-700 dark:text-neutral-200'
                                                 }`}
                                         >
                                             <action.icon className="text-lg" />

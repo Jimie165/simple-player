@@ -36,7 +36,7 @@ export default function DuplicateSongConfirmDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
                                         <MdLibraryAdd className="text-xl text-primary" />
@@ -74,7 +74,7 @@ export default function DuplicateSongConfirmDialog({
                                     {/* Skip Button (Right) - Primary Action */}
                                     <button
                                         type="button"
-                                        className="inline-flex flex-1 justify-center rounded-full border border-transparent bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                                        className="inline-flex flex-1 justify-center rounded-full border border-transparent bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:bg-primary/90 base-theme:dark:hover:bg-on-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                                         onClick={() => {
                                             onSkip();
                                             onClose();

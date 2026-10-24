@@ -300,7 +300,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     <div
                                         key={video.id}
                                         onClick={() => handlePlayVideo(video)}
-                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:bg-surface base-theme:hover:bg-surface-variant/30"
                                     >
                                         <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">
                                             <CoverImage

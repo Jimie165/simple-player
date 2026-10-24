@@ -48,8 +48,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             className={clsx(
                 "group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer h-full",
                 isSelected
-                    ? "bg-primary/10 hover:bg-primary/20"
-                    : "hover:bg-black/5 dark:hover:bg-white/5"
+                    ? "bg-primary/10 hover:bg-primary/20 base-theme:bg-secondary-container base-theme:hover:bg-secondary-container/80"
+                    : "hover:bg-black/5 dark:hover:bg-white/5 base-theme:bg-surface base-theme:hover:bg-surface-variant/30"
             )}
         >
             {/* Thumbnail */}

@@ -101,7 +101,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
 
     return (
         <div className="relative flex h-full min-h-0 flex-col">
-            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/3">
+            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/3 base-theme:bg-surface">
                 <textarea
                     aria-label="歌词内容"
                     aria-busy={searching}
@@ -135,7 +135,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
                     onClick={handleToggleCustom}
                     className="flex items-center gap-3"
                 >
-                    <span className={`grid h-5 w-5 place-items-center rounded-[5px] border-2 transition-colors ${customEnabled ? 'border-primary bg-primary text-on-primary' : 'border-neutral-400 text-transparent dark:border-neutral-500'}`}>
+                    <span className={`grid h-5 w-5 place-items-center rounded-[5px] border-2 transition-colors ${customEnabled ? 'border-primary bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary' : 'border-neutral-400 text-transparent dark:border-neutral-500'}`}>
                         <MdCheck className="text-base" />
                     </span>
                     <span className="text-[15px] text-neutral-900 dark:text-neutral-100">自定义歌词</span>

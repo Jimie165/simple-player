@@ -21,13 +21,14 @@ export interface ThemeVariables {
 
 /**
  * 根据种子颜色生成 CSS 变量
- * 只覆盖 Primary / Secondary / Tertiary 及其衍生色
- * Surface / Outline / Error 保持默认（index.css 定义）
+ * 强调色区分操作，低饱和表面色提供页面与容器层级。
+ * 封面色板仍由内容区域独立覆盖。
  */
 export function generateThemeVariables(sourceHex: string, isDark: boolean): ThemeVariables {
     const argb = argbFromHex(sourceHex);
     const theme = themeFromSourceColor(argb);
     const scheme = isDark ? theme.schemes.dark : theme.schemes.light;
+    const surfaceTone = (tone: number) => hexFromArgb(theme.palettes.neutral.tone(tone));
 
     return {
         // Primary
@@ -47,5 +48,23 @@ export function generateThemeVariables(sourceHex: string, isDark: boolean): Them
         '--md-sys-color-on-tertiary': hexFromArgb(scheme.onTertiary),
         '--md-sys-color-tertiary-container': hexFromArgb(scheme.tertiaryContainer),
         '--md-sys-color-on-tertiary-container': hexFromArgb(scheme.onTertiaryContainer),
+
+        '--md-sys-color-background': `color-mix(in srgb, ${hexFromArgb(scheme.background)} ${isDark ? 50 : 95}%, ${isDark ? 'black' : 'white'})`,
+        '--md-sys-color-surface': hexFromArgb(scheme.surface),
+        '--md-sys-color-on-surface': hexFromArgb(scheme.onSurface),
+        '--md-sys-color-surface-variant': hexFromArgb(scheme.surfaceVariant),
+        '--md-sys-color-on-surface-variant': hexFromArgb(scheme.onSurfaceVariant),
+        '--md-sys-color-surface-container-lowest': surfaceTone(isDark ? 4 : 100),
+        '--md-sys-color-surface-container-low': surfaceTone(isDark ? 12 : 96),
+        '--md-sys-color-surface-container': surfaceTone(isDark ? 17 : 94),
+        '--md-sys-color-surface-container-high': surfaceTone(isDark ? 22 : 92),
+        '--md-sys-color-surface-container-highest': surfaceTone(isDark ? 24 : 90),
+        '--md-sys-color-outline': hexFromArgb(scheme.outline),
+        '--md-sys-color-outline-variant': hexFromArgb(scheme.outlineVariant),
+        '--glass-surface': `color-mix(in srgb, ${surfaceTone(isDark ? 22 : 98)} 80%, transparent)`,
+        '--glass-border': `color-mix(in srgb, ${hexFromArgb(scheme.outlineVariant)} 35%, transparent)`,
+        '--content-glass-background': isDark ? 'rgba(38, 38, 40, 0.6)' : 'rgba(245, 245, 247, 0.55)',
+        '--settings-card': hexFromArgb(scheme.surface),
+        '--settings-option': surfaceTone(isDark ? 24 : 100),
     };
 }

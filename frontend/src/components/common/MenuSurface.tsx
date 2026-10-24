@@ -10,7 +10,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<'
             ref={ref}
             className={`menu-surface fixed z-9999 w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 focus:outline-none pointer-events-auto ${variant === 'apple'
                 ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
-                : 'border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 text-neutral-900 ring-black/5 dark:border-white/10 dark:text-white'} ${className}`}
+                : 'border-outline-variant/50 bg-surface/95 backdrop-blur-3xl backdrop-saturate-150 text-on-surface ring-on-surface/5'} ${className}`}
         />;
     },
 );
@@ -27,7 +27,7 @@ export function MenuEntries({ groups, onClose, headless = false, variant = 'defa
         {group.map(item => {
             const button = <button
                 onClick={event => { event.stopPropagation(); item.onClick(); onClose(); }}
-                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-on-surface/8 data-focus:bg-on-surface/8 ${apple ? 'font-medium' : ''} ${item.variant === 'danger' ? (apple ? 'text-red-400' : 'text-red-600 dark:text-red-400') : ''}`}
+                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-on-surface/8 data-focus:bg-on-surface/8 ${apple ? 'font-medium' : 'base-theme:hover:bg-surface-variant/40 base-theme:data-focus:bg-surface-variant/40'} ${item.variant === 'danger' ? (apple ? 'text-red-400' : 'text-red-600 dark:text-red-400') : ''}`}
             >
                 <div className="flex flex-1 items-center gap-3">
                     {item.icon && <item.icon className={`text-lg ${apple ? '' : 'opacity-70'}`} />}

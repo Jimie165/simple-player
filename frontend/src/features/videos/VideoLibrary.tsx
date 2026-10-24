@@ -11,8 +11,8 @@ import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButt
 import { AnimatePresence, motion } from 'framer-motion';
 import PageContainer from '@/components/layout/PageContainer';
 import type { VideoMetadata } from '@/types';
-import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
-import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdSort, MdCheck, MdExpandMore, MdExpandLess } from 'react-icons/md';
+import SortMenu from '@/components/common/SortMenu';
+import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdExpandMore, MdExpandLess } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { Virtuoso } from 'react-virtuoso';
 import { VideoGrid } from '@/features/videos/components/VideoGrid';
@@ -247,13 +247,6 @@ export const VideoLibrary: React.FC = () => {
         setTab(tab);
     };
 
-    const getSortLabel = () => {
-        if (sortBy === 'name') return '名称';
-        if (sortBy === 'created') return '添加日期';
-        if (sortBy === 'played') return '播放日期';
-        return '排序';
-    };
-
     return (
         <PageContainer
             title="视频"
@@ -270,12 +263,24 @@ export const VideoLibrary: React.FC = () => {
                             <span className="tabular-nums">{progress.processed}/{progress.total}</span>
                         </div>
                     )}
+                    <SortMenu
+                        value={sortBy}
+                        onChange={(value) => {
+                            setSortBy(value);
+                            setSortOrder(value === 'name' ? 'asc' : 'desc');
+                        }}
+                        options={[
+                            { value: 'played', label: '最近播放' },
+                            { value: 'created', label: '最近添加' },
+                            { value: 'name', label: '名称' },
+                        ]}
+                    />
                     <LibraryHeaderButton onClick={handleAddFolder} />
                 </div>
             }
         >
             <div ref={contentRef} className="h-full flex flex-col">
-                {/* Tabs and Sort */}
+                {/* Tabs */}
                 <div className="flex items-center justify-between border-b border-outline-variant/20 mb-6 px-1">
                     <div className="flex items-center gap-8">
                         <button
@@ -313,37 +318,6 @@ export const VideoLibrary: React.FC = () => {
                             )}
                         </button>
                     </div>
-
-                    {/* Sort Menu */}
-                    <Menu as="div" className="relative mb-3">
-                        <MenuButton className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors">
-                            <MdSort className="text-lg" />
-                            {getSortLabel()}
-                        </MenuButton>
-                        <MenuItems
-                            anchor="bottom end"
-                            className="w-40 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white z-50 mt-2"
-                        >
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('played'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    最近播放
-                                    {sortBy === 'played' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('created'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    最近添加
-                                    {sortBy === 'created' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('name'); setSortOrder('asc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    名称
-                                    {sortBy === 'name' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                        </MenuItems>
-                    </Menu>
                 </div>
 
                 {/* Content */}

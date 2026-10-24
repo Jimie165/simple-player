@@ -13,7 +13,7 @@ export function ContentSurface({ children, hidePageBackground }: {
 
     return (
         <div className="relative flex flex-1 min-w-0 overflow-hidden rounded-tl-2xl">
-            <div aria-hidden className="pointer-events-none absolute inset-0 bg-surface dark:bg-surface-container-low transition-colors duration-300" />
+            <div aria-hidden className="pointer-events-none absolute inset-0 bg-surface dark:bg-surface-container-low base-theme:bg-background transition-colors duration-300" />
             <div
                 ref={setTarget}
                 aria-hidden

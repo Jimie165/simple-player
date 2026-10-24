@@ -14,11 +14,12 @@ import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
 import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
 import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
-import PlaylistSortMenu, { type PlaylistSortKey } from '@/features/playlists/list/PlaylistSortMenu';
+import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
+import SortMenu from '@/components/common/SortMenu';
 import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
 import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
-type SortKey = PlaylistSortKey;
+type SortKey = 'name' | 'recently_added' | 'recently_played';
 type FavoritesPlaylist = Omit<Playlist, 'id'> & { id: 'favorites'; hidden?: boolean };
 type PlaylistListItem = Playlist | FavoritesPlaylist;
 
@@ -29,6 +30,8 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     const loadedDataVersionRef = useRef<string | null>(null);
     const loadedCoverPlaylistsRef = useRef<Playlist[] | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [suppressSearchTooltip, setSuppressSearchTooltip] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>(() => {
         try {
             const saved = localStorage.getItem('playlist_sort_key');
@@ -325,7 +328,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     return (
         <PageContainer
             title="播放列表"
-            actions={<PlaylistListActions searchQuery={searchQuery} setSearchQuery={setSearchQuery} setIsCreateOpen={setIsCreateOpen} />}
+            actions={<PlaylistListActions setIsCreateOpen={setIsCreateOpen} />}
         >
             {/* confirm dialog removed, handled by useSongOperations globally */}
 
@@ -345,11 +348,30 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
             />
 
             {/* Toolbar */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">
+            <div className="mb-5 flex h-14 items-center justify-between gap-3 pb-2">
+                <div className="min-w-0 truncate text-sm font-medium text-on-surface-variant">
                     {filteredPlaylists.length} 个播放列表
                 </div>
-                <PlaylistSortMenu sortKey={sortKey} setSortKey={setSortKey} />
+                <div className="flex shrink-0 items-center gap-2">
+                    <PlaylistSearchControl
+                        isSearchOpen={isSearchOpen}
+                        setIsSearchOpen={setIsSearchOpen}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        suppressTooltip={suppressSearchTooltip}
+                        setSuppressTooltip={setSuppressSearchTooltip}
+                        placeholder="搜索播放列表..."
+                    />
+                    <SortMenu
+                        value={sortKey}
+                        onChange={setSortKey}
+                        options={[
+                            { value: 'recently_played', label: '最近播放' },
+                            { value: 'recently_added', label: '最近添加' },
+                            { value: 'name', label: '名称' },
+                        ]}
+                    />
+                </div>
             </div>
 
             <PlaylistCardsGrid

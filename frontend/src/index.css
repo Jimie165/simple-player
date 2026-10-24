@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant base-theme (&:not(:where([data-artwork-theme], [data-artwork-theme] *)));
 
 /* WebView2 native caption hit testing also supports touch and pen dragging. */
 *[data-tauri-drag-region]:not([data-tauri-drag-region="false"]) {
@@ -34,6 +35,7 @@
   --color-on-error: var(--md-sys-color-on-error);
   
   --color-surface: var(--md-sys-color-surface);
+  --color-background: var(--md-sys-color-background);
   --color-on-surface: var(--md-sys-color-on-surface);
   --color-surface-variant: var(--md-sys-color-surface-variant);
   --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
@@ -90,6 +92,7 @@
 
   /* Fixed Surface Colors (Neutral) */
   --md-sys-color-surface: #F9F9FC;
+  --md-sys-color-background: #FDFBFF;
   --md-sys-color-on-surface: #191C20;
   --md-sys-color-surface-variant: #E1E2EC;
   --md-sys-color-on-surface-variant: #44474F;
@@ -146,6 +149,7 @@
 
   /* Fixed Surface Colors (Neutral Dark) */
   --md-sys-color-surface: #1f1f1f;
+  --md-sys-color-background: #0D0D0F;
   --md-sys-color-on-surface: #E2E2E6;
   --md-sys-color-surface-variant: #4A4D56;
   --md-sys-color-on-surface-variant: #C4C6D0;
@@ -262,8 +266,12 @@ body {
     background-color: var(--settings-option-hover);
   }
 
+  .settings-control.settings-segment-indicator {
+    background-color: var(--md-sys-color-secondary-container);
+  }
+
   .dark .settings-control.settings-segment-indicator {
-    background-color: #636366;
+    background-color: var(--md-sys-color-secondary-container);
     box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
   }
 
@@ -279,7 +287,7 @@ body {
   }
 
   .settings-menu {
-    background: color-mix(in srgb, var(--md-sys-color-surface-container-lowest) 86%, transparent);
+    background: color-mix(in srgb, var(--md-sys-color-surface) 95%, transparent);
     backdrop-filter: saturate(180%) blur(24px);
     box-shadow: 0 0 0 0.5px var(--settings-border), 0 12px 32px rgba(0, 0, 0, 0.18);
   }

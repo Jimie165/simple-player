@@ -55,7 +55,7 @@ export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
                             useNavigationStore.getState().completePlaylistDetailEnter(detail);
                         }
                     }}
-                    className="absolute inset-0 z-50 overflow-hidden bg-surface dark:bg-surface-container-low"
+                    className="absolute inset-0 z-50 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
                 >
                     <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
                     <ScrollArea className="h-full" topOffset={48}>

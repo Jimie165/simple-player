@@ -156,7 +156,7 @@ export default function RestoreArchivedVideosDialog({
                                         type="button"
                                         onClick={handleRestore}
                                         disabled={selectedIds.size === 0 || restoring}
-                                        className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {restoring ? '正在恢复...' : `恢复选中 (${selectedIds.size})`}
                                     </button>

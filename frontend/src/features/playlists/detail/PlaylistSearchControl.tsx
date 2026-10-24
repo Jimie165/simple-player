@@ -31,7 +31,7 @@ export default function PlaylistSearchControl({
             <div
                 onMouseLeave={() => setSuppressTooltip(false)}
                 className={clsx(
-                    'flex h-10 items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
+                    'flex h-10 items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 base-theme:bg-secondary-container/50 base-theme:hover:bg-secondary-container base-theme:focus-within:bg-secondary-container backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
                     isSearchOpen
                         ? 'w-64 mr-2'
                         : 'w-10 text-on-surface-variant hover:text-primary cursor-pointer'

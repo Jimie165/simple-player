@@ -73,6 +73,8 @@ export const SongListItem = memo(({
     style: gridStyle,
     isSelectionMode,
     selected,
+    previousSelected = false,
+    nextSelected = false,
     onPlay,
     handleItemClick,
     handleContextMenu,
@@ -96,6 +98,8 @@ export const SongListItem = memo(({
     style: React.CSSProperties;
     isSelectionMode?: boolean;
     selected?: boolean;
+    previousSelected?: boolean;
+    nextSelected?: boolean;
     onPlay?: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     handleItemClick?: (e: React.MouseEvent, song: SongMetadata) => void;
     handleContextMenu?: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
@@ -120,15 +124,17 @@ export const SongListItem = memo(({
         <div
             style={gridStyle}
             className={clsx(
-                "group grid h-13.5 gap-4 px-4 items-center transition-colors relative touch-pan-y after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none",
+                "group isolate grid h-13.5 gap-4 px-4 items-center relative touch-pan-y before:absolute before:inset-y-0 before:left-12 before:right-2 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
                 isLast ? "after:left-14" : "after:left-28",
                 isOverlay
-                    ? "bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02]"
+                    ? "rounded-xl bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02] after:opacity-0"
                     : selected
-                        ? "bg-primary/10 hover:bg-primary/15"
+                        ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
                         : isDragging
                             ? "bg-surface-container-high elevation-2 opacity-50"
-                            : "hover:bg-surface-container-highest active:bg-surface-container-high",
+                            : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
+                (!selected || !previousSelected) && "before:rounded-t-xl",
+                (!selected || !nextSelected) && "before:rounded-b-xl",
                 "cursor-default text-[14px]",
                 isDragging && !isOverlay ? "opacity-30" : ""
             )}
@@ -150,13 +156,9 @@ export const SongListItem = memo(({
             onContextMenu={(e) => handleContextMenu && handleContextMenu(e, song, index)}
         >
             {isOverlay && dragCount && dragCount > 1 && (
-                <div className="absolute -top-2 -right-2 bg-primary text-on-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md z-50">
+                <div className="absolute -top-2 -right-2 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md z-50">
                     {dragCount}
                 </div>
-            )}
-
-            {selected && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
             )}
 
             <div className="flex justify-center items-center">
@@ -191,16 +193,13 @@ export const SongListItem = memo(({
                         restartOnPlay
                     />
                 </div>
-                <span className={clsx(
-                    "font-medium truncate pr-4",
-                    selected ? "text-primary" : "text-on-surface"
-                )}>
+                <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}
                 </span>
             </div>
 
             {!hideArtist && (
-                <div className="text-on-surface-variant truncate font-medium">
+                <div className={clsx("truncate font-medium transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                     <span
                         className={clsx(
                             "transition-colors",
@@ -223,7 +222,7 @@ export const SongListItem = memo(({
             )}
 
             {!hideAlbum && (
-                <div className="text-on-surface-variant truncate">
+                <div className={clsx("truncate transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                     <span
                         className={clsx(
                             "transition-colors",
@@ -245,7 +244,7 @@ export const SongListItem = memo(({
                 </div>
             )}
 
-            <div className="text-on-surface-variant text-right pr-2 text-[13px] font-variant-numeric">
+            <div className={clsx("text-right pr-2 text-[13px] font-variant-numeric transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                 {formatDuration(song.duration)}
             </div>
 

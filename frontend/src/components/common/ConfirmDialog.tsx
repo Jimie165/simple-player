@@ -43,7 +43,7 @@ export default function ConfirmDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-white dark:bg-[#2c2c2c] p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
                                 <div className="flex items-center gap-3 mb-4">
                                     {type === 'danger' && (
                                         <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
@@ -75,10 +75,10 @@ export default function ConfirmDialog({
                                     <button
                                         type="button"
                                         className={clsx(
-                                            "inline-flex justify-center rounded-full px-4 py-2 text-sm font-medium text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-colors",
+                                            "inline-flex justify-center rounded-full px-4 py-2 text-sm font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 transition-colors",
                                             type === 'danger'
-                                                ? "bg-red-600 hover:bg-red-700 focus-visible:ring-red-500"
-                                                : "bg-blue-600 hover:bg-blue-700 focus-visible:ring-blue-500"
+                                                ? "bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500"
+                                                : "bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary hover:bg-primary/90 base-theme:dark:hover:bg-on-primary focus-visible:ring-primary"
                                         )}
                                         onClick={() => {
                                             onConfirm();

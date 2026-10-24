@@ -13,6 +13,10 @@ import { useScrollViewport } from '@/hooks/useScrollViewport';
 import { useViewportOverscan } from '@/hooks/useViewportOverscan';
 
 import { getMusicItemId } from '@/utils/musicItemUtils';
+import { sortSongs } from '@/utils/songSort';
+import type { SortKey } from '@/utils/songSort';
+import { changeSongListSorting, persistSongListSorting, readSongListSorting } from '@/features/library/utils/songListSorting';
+import type { SongListSorting } from '@/features/library/utils/songListSorting';
 
 const formatDuration = (sec: number) => {
     const m = Math.floor(sec / 60);
@@ -37,7 +41,7 @@ function SongListFooter({ context }: { context?: SongListVirtuosoContext }) {
 
 interface SongListViewProps {
     songs: SongMetadata[];
-    onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
+    onPlay: (song: SongMetadata, index: number, options: { restartIfCurrent?: boolean } | undefined, songs: SongMetadata[]) => void;
     onDelete?: (song: SongMetadata) => void;
     hideCover?: boolean;
     enableDelete?: boolean;
@@ -50,10 +54,8 @@ interface SongListViewProps {
     onOpenAlbum?: (album: string) => void;
     context?: MusicMenuContext;
     footerSpacerClassName?: string;
+    sortControl?: { value: SongListSorting; onChange: (value: SongListSorting) => void };
 }
-
-type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration' | null;
-type SortOrder = 'asc' | 'desc';
 
 export default function SongListView({
     songs,
@@ -69,7 +71,8 @@ export default function SongListView({
     onOpenArtist,
     onOpenAlbum,
     context = 'library',
-    footerSpacerClassName = "h-12"
+    footerSpacerClassName = "h-12",
+    sortControl,
 }: SongListViewProps) {
     const isLibraryContext = context === 'library';
     const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
@@ -89,30 +92,9 @@ export default function SongListView({
     const effectiveHideAlbum = hideAlbum || shouldHideAlbum;
     const effectiveHideArtist = hideArtist || shouldHideArtist;
 
-    // Persist sort state
-    const [sortKey, setSortKey] = useState<SortKey>(() => {
-        try {
-            const saved = localStorage.getItem('songlist_sort_key');
-            if (saved === 'title' || saved === 'artist' || saved === 'album' || saved === 'duration') {
-                return saved;
-            }
-        } catch (error) {
-            console.warn('Failed to read song list sort key', error);
-        }
-        return null;
-    });
-
-    const [sortOrder, setSortOrder] = useState<SortOrder>(() => {
-        try {
-            const saved = localStorage.getItem('songlist_sort_order');
-            if (saved === 'asc' || saved === 'desc') {
-                return saved;
-            }
-        } catch (error) {
-            console.warn('Failed to read song list sort order', error);
-        }
-        return 'asc';
-    });
+    const [internalSorting, setInternalSorting] = useState(readSongListSorting);
+    const sorting = sortControl?.value ?? internalSorting;
+    const { key: sortKey, order: sortOrder } = sorting;
 
     // Selection Store
     const { isSelectionMode, selectedIds, toggleSelectionMode, toggleSelection, clearSelection, selectionType, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
@@ -140,29 +122,12 @@ export default function SongListView({
     }, [songs, optimisticallyDeletedSongIds]);
 
     const sortedSongs = useMemo(() => {
-        if (!sortKey || sortKey === 'manual') return visibleSongs;
-        return [...visibleSongs].sort((a, b) => {
-            let valA = a[sortKey];
-            let valB = b[sortKey];
-            if (valA === undefined || valA === null) valA = '';
-            if (valB === undefined || valB === null) valB = '';
-
-            if (typeof valA === 'string' && typeof valB === 'string') {
-                const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
-                const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
-
-                if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
-                if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;
-
-                return sortOrder === 'asc'
-                    ? valA.localeCompare(valB, 'zh-CN', { numeric: true, sensitivity: 'base' })
-                    : valB.localeCompare(valA, 'zh-CN', { numeric: true, sensitivity: 'base' });
-            }
-            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
-            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
-            return 0;
-        });
+        return sortSongs(visibleSongs, sortKey ?? 'manual', sortOrder);
     }, [visibleSongs, sortKey, sortOrder]);
+
+    const handlePlay = useCallback((song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
+        onPlay(song, index, options, sortedSongs);
+    }, [onPlay, sortedSongs]);
 
     // Update Selectable IDs
     useEffect(() => {
@@ -183,32 +148,13 @@ export default function SongListView({
     }, [manageSelection, isSelectionMode, sortedSongs, setSelectableIds]);
 
     const handleSort = (key: SortKey) => {
-        if (sortKey === key) {
-            if (sortOrder === 'asc') {
-                setSortOrder('desc');
-                try { localStorage.setItem('songlist_sort_order', 'desc'); } catch (error) {
-                    console.warn('Failed to persist song list sort order', error);
-                }
-            } else {
-                setSortKey(null);
-                setSortOrder('asc');
-                try {
-                    localStorage.removeItem('songlist_sort_key');
-                    localStorage.setItem('songlist_sort_order', 'asc');
-                } catch (error) {
-                    console.warn('Failed to clear song list sort key', error);
-                }
-            }
-        } else {
-            setSortKey(key);
-            setSortOrder('asc');
-            try {
-                if (key) localStorage.setItem('songlist_sort_key', key);
-                localStorage.setItem('songlist_sort_order', 'asc');
-            } catch (error) {
-                console.warn('Failed to persist song list sort settings', error);
-            }
+        const next = changeSongListSorting(sorting, { key });
+        if (sortControl) {
+            sortControl.onChange(next);
+            return;
         }
+        setInternalSorting(next);
+        persistSongListSorting(next);
     };
 
     const renderSortIcon = (colKey: SortKey) => {
@@ -291,6 +237,8 @@ export default function SongListView({
                 rowPaddingClass={rowPaddingClass}
                 isSelectionMode={isSelectionMode}
                 selected={selected}
+                previousSelected={index > 0 && isSelected(getMusicItemId(sortedSongs[index - 1]))}
+                nextSelected={index + 1 < sortedSongs.length && isSelected(getMusicItemId(sortedSongs[index + 1]))}
                 isFav={isFav}
                 hideCover={hideCover}
                 hideArtist={effectiveHideArtist}
@@ -298,7 +246,7 @@ export default function SongListView({
                 context={context}
                 enableDelete={enableDelete}
                 onDelete={onDelete}
-                onPlay={onPlay}
+                onPlay={handlePlay}
                 formatDuration={formatDuration}
                 toggleFavorite={toggleFavorite}
                 onOpenArtist={onOpenArtist}

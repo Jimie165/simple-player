@@ -14,6 +14,7 @@ export default function LibraryHeaderButton({ onClick }: LibraryHeaderButtonProp
                 "bg-on-surface/5 hover:bg-on-surface/10 active:bg-on-surface/15 backdrop-blur-md",
                 "text-on-surface-variant hover:text-on-surface",
                 "border border-outline-variant/20 shadow-sm",
+                "base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80",
                 "hover:elevation-1 active:scale-95"
             )}
         >

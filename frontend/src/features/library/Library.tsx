@@ -11,7 +11,7 @@ import SongListView from '@/features/library/components/SongListView';
 import AlbumGridView from '@/features/library/components/AlbumGridView';
 import ArtistGridView from '@/features/library/components/ArtistGridView';
 import LibraryTabsAndShuffle from '@/features/library/components/LibraryTabsAndShuffle';
-import AlbumSortMenu from '@/features/library/components/AlbumSortMenu';
+import SortMenu from '@/components/common/SortMenu';
 import RestoreExcludedSongsDialog from '@/features/library/dialogs/RestoreExcludedSongsDialog';
 
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
@@ -27,6 +27,9 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { buildAlbums, buildArtists } from '@/features/library/utils/grouping';
 import { getSelectedPath } from '@/utils/dialogSelection';
 import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
+import type { SortOrder } from '@/utils/songSort';
+import { changeSongListSorting, persistSongListSorting, readSongListSorting } from '@/features/library/utils/songListSorting';
+import type { SongListSorting } from '@/features/library/utils/songListSorting';
 
 export default function Library() {
     // Tab State: Synchronized with Navigation Store to support back navigation
@@ -49,6 +52,13 @@ export default function Library() {
 
     // Sort logic
     const [albumSortKey, setAlbumSortKey] = useState<'name' | 'artist'>('name');
+    const [albumSortOrder, setAlbumSortOrder] = useState<SortOrder>('asc');
+    const [artistSortOrder, setArtistSortOrder] = useState<SortOrder>('asc');
+    const [songSorting, setSongSorting] = useState<SongListSorting>(readSongListSorting);
+    const handleSongSortingChange = (sorting: SongListSorting) => {
+        setSongSorting(sorting);
+        persistSongListSorting(sorting);
+    };
     // Store Actions
     // Store Actions
     const { addToRecent, libraryVersion, triggerLibraryUpdate } = useLibraryStore();
@@ -134,16 +144,18 @@ export default function Library() {
     // --------------------------------------------------------
 
     // 1. 生成专辑列表 (带排序)
-    const albums = useMemo(
-        () => activeTab === 'albums' ? buildAlbums(librarySongs, albumSortKey) : [],
-        [activeTab, librarySongs, albumSortKey]
-    );
+    const albums = useMemo(() => {
+        if (activeTab !== 'albums') return [];
+        const list = buildAlbums(librarySongs, albumSortKey);
+        return albumSortOrder === 'desc' ? list.reverse() : list;
+    }, [activeTab, librarySongs, albumSortKey, albumSortOrder]);
 
     // 2. 生成艺人列表 (包含专辑)
-    const artists = useMemo(
-        () => activeTab === 'artists' ? buildArtists(librarySongs) : [],
-        [activeTab, librarySongs]
-    );
+    const artists = useMemo(() => {
+        if (activeTab !== 'artists') return [];
+        const list = buildArtists(librarySongs);
+        return artistSortOrder === 'desc' ? list.reverse() : list;
+    }, [activeTab, librarySongs, artistSortOrder]);
 
 
     // --------------------------------------------------------
@@ -247,6 +259,32 @@ export default function Library() {
                     librarySongs={librarySongs}
                     albums={albums}
                     artists={artists}
+                    sortControl={activeTab === 'albums' ? (
+                        <SortMenu
+                            value={albumSortKey}
+                            onChange={setAlbumSortKey}
+                            order={{ value: albumSortOrder, onChange: setAlbumSortOrder }}
+                            options={[
+                                { value: 'name', label: '按名称' },
+                                { value: 'artist', label: '按艺人' },
+                            ]}
+                        />
+                    ) : (
+                        <SortMenu<SortOrder>
+                            value={activeTab === 'songs' ? songSorting.order : artistSortOrder}
+                            onChange={(order) => {
+                                if (activeTab === 'songs') {
+                                    handleSongSortingChange(changeSongListSorting(songSorting, { order }));
+                                } else {
+                                    setArtistSortOrder(order);
+                                }
+                            }}
+                            options={[
+                                { value: 'asc', label: '升序' },
+                                { value: 'desc', label: '降序' },
+                            ]}
+                        />
+                    )}
                     onShufflePlay={(songsToPlay) => {
                         shufflePlay({
                             songs: songsToPlay,
@@ -263,14 +301,6 @@ export default function Library() {
                     }}
                 />
 
-                {/* Sort for Albums */}
-                {activeTab === 'albums' && (
-                    <AlbumSortMenu
-                        albumSortKey={albumSortKey}
-                        setAlbumSortKey={setAlbumSortKey}
-                    />
-                )}
-
                 {/* Views */}
                 <div className="flex-1 min-h-0 relative">
                     <AnimatePresence mode="wait" initial={false}>
@@ -282,7 +312,8 @@ export default function Library() {
                             >
                                 <SongListView
                                     songs={librarySongs}
-                                    onPlay={(song, index, options) => handlePlaySong(song, index, librarySongs, true, options)}
+                                    onPlay={(song, index, options, songs) => handlePlaySong(song, index, songs, true, options)}
+                                    sortControl={{ value: songSorting, onChange: handleSongSortingChange }}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
                                     footerSpacerClassName="h-6"

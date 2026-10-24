@@ -57,7 +57,7 @@ export default function AlbumDetailView({
             {/* Header Area using Material 3 Styling */}
             <div className="flex flex-col md:flex-row gap-8 mb-8 px-6 pt-6 relative z-10">
                 {/* Cover: Elevation, Large Radius */}
-                <SharedCover source={transitionSource} className="w-[270px] h-[270px] rounded-xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
+                <SharedCover source={transitionSource} className="w-67.5 h-67.5 rounded-xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
                     <CoverImage
                         song={album.songs[0]}
                         src={album.cover}
@@ -68,10 +68,10 @@ export default function AlbumDetailView({
 
                 {/* Details */}
                 <div className="flex flex-col justify-center gap-2 min-w-0 flex-1 pb-2">
-                    <h1 className="text-4xl md:text-5xl font-bold text-on-surface truncate leading-tight tracking-tight mt-2">
+                    <h1 className="text-2xl md:text-[28px] font-bold text-on-surface wrap-break-words leading-snug tracking-tight mt-2">
                         {album.name}
                     </h1>
-                    <h2 className="text-2xl font-medium text-primary truncate">
+                    <h2 className="text-lg md:text-xl font-medium text-primary wrap-break-words">
                         {album.artist}
                     </h2>
 
@@ -91,7 +91,7 @@ export default function AlbumDetailView({
                     <div className="flex flex-wrap items-center gap-3 mt-6">
                         <button
                             onClick={onPlayAll}
-                            className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-on-primary px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
+                            className="flex items-center gap-2 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary px-6 py-2.5 rounded-full font-medium transition-all shadow-md hover:shadow-lg active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
                             播放
@@ -99,7 +99,7 @@ export default function AlbumDetailView({
 
                         <button
                             onClick={onShuffle}
-                            className="flex items-center gap-2 btn-blur text-primary px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
+                            className="flex items-center gap-2 btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                         >
                             <MdShuffle className="text-xl" />
                             随机播放

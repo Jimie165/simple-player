@@ -168,7 +168,7 @@ export default function IgnoredDirsSection() {
                             "rounded-md px-3 py-1 text-[13px] font-medium transition-transform active:scale-[0.97]",
                             !input.trim() || savingIgnored
                                 ? "settings-control cursor-not-allowed text-on-surface-variant"
-                                : "bg-primary text-on-primary hover:brightness-110"
+                                : "bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary hover:brightness-110"
                         )}
                     >
                         添加

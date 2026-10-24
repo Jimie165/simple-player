@@ -165,13 +165,13 @@ export function SettingsPopup<T extends string>({
                                     <ListboxOption
                                         key={option.value}
                                         value={option.value}
-                                        className="group flex cursor-default items-start gap-2 rounded-md px-2 py-1.5 text-[13px] text-on-surface data-focus:bg-primary data-focus:text-on-primary"
+                                        className="group flex cursor-default items-start gap-2 rounded-md px-2 py-1.5 text-[13px] text-on-surface data-selected:bg-secondary-container/50 data-focus:bg-secondary-container data-focus:text-on-secondary-container"
                                     >
                                         <MdCheck className={clsx('mt-0.5 shrink-0 text-sm', option.value === value ? 'opacity-100' : 'opacity-0')} />
                                         <span className="min-w-0">
                                             <span className="block">{option.label}</span>
                                             {option.description && (
-                                                <span className="block text-[11px] text-on-surface-variant group-data-focus:text-on-primary/80">
+                                                <span className="block text-[11px] text-on-surface-variant group-data-focus:text-on-secondary-container/80">
                                                     {option.description}
                                                 </span>
                                             )}

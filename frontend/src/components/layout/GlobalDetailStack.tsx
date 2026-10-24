@@ -151,7 +151,7 @@ function GlobalDetailStack() {
                                 setSettledOverlayDepth(overlayStack.length);
                             }
                         }}
-                        className="absolute inset-0 bg-surface dark:bg-surface-container-low shadow-xl z-50 overflow-hidden"
+                        className="absolute inset-0 bg-surface dark:bg-surface-container-low base-theme:bg-background shadow-xl z-50 overflow-hidden"
                         style={{
                             zIndex: 50 + index,
                             ...(isFrozenOverlay ? { contentVisibility: 'hidden', contain: 'strict' } : {}),

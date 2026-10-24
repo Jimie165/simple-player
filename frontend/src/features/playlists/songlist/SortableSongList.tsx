@@ -82,6 +82,8 @@ type SortableItemProps = {
     isDraggingGroup?: boolean;
     isSelectionMode: boolean;
     selected: boolean;
+    previousSelected: boolean;
+    nextSelected: boolean;
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     handleItemClick: (e: React.MouseEvent, song: SongMetadata) => void;
     handleCheckboxClick: (e: React.MouseEvent | null, song: SongMetadata) => void;
@@ -303,6 +305,8 @@ export default function SortableSongList({
                 style={gridStyle}
                 isSelectionMode={isSelectionMode}
                 selected={isSelected(uniqueId)}
+                previousSelected={index > 0 && isSelected(getSongId(displaySongs[index - 1], index - 1))}
+                nextSelected={index + 1 < displaySongs.length && isSelected(getSongId(displaySongs[index + 1], index + 1))}
                 isLast={index === displaySongs.length - 1}
                 onPlay={onPlay}
                 handleItemClick={(e: React.MouseEvent, s: SongMetadata) => {

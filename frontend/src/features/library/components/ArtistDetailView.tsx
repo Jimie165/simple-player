@@ -148,7 +148,7 @@ export default function ArtistDetailView({
             <div
                 className="flex flex-col md:flex-row gap-6 md:gap-8"
             >
-                <div className="w-[270px] shrink-0 flex flex-col gap-3">
+                <div className="w-67.5 shrink-0 flex flex-col gap-3">
                     <div
                         className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
                         onClick={() => onPlayAlbum(album)}
@@ -156,7 +156,7 @@ export default function ArtistDetailView({
                         {album.songs.length > 0 ? (
                             <CoverImage
                                 song={album.songs[0]}
-                                className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                                className="w-full h-full object-cover"
                                 iconClassName="text-6xl"
                             />
                         ) : (
@@ -227,11 +227,11 @@ export default function ArtistDetailView({
             <DetailScrollHeader />
 
             {/* Header Section */}
-            <div className="flex flex-col md:flex-row gap-6 md:items-end mb-8 pt-6 px-6 relative z-10">
+            <div className="flex flex-col md:flex-row gap-8 mb-8 px-6 pt-6 relative z-10">
                 {/* (Back Button Removed) */}
 
                 {/* Artist Cover */}
-                <SharedCover source={transitionSource} className="w-[270px] h-[270px] rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
+                <SharedCover source={transitionSource} className="w-67.5 h-67.5 rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 mx-auto md:mx-0 mt-8 md:mt-0">
                     {artist.songs.length > 0 ? (
                         <CoverImage
                             song={artist.songs[0]}
@@ -246,9 +246,9 @@ export default function ArtistDetailView({
                 </SharedCover>
 
                 {/* Info & Actions */}
-                <div className="flex flex-col gap-4 text-center md:text-left flex-1">
+                <div className="flex flex-col justify-center gap-4 text-center md:text-left min-w-0 flex-1 pb-2">
                     <div>
-                        <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
+                        <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 dark:text-neutral-50 mb-2 wrap-break-words leading-tight">
                             {artist.name}
                         </h2>
                         <div className="text-neutral-500 dark:text-neutral-400 font-medium flex flex-wrap items-center justify-center md:justify-start gap-2">
@@ -261,21 +261,21 @@ export default function ArtistDetailView({
                     </div>
 
                     {/* Actions */}
-                    <div className="flex items-center justify-center md:justify-start gap-3">
+                    <div className="flex items-center justify-center md:justify-start gap-3 mt-2">
                         <button
                             onClick={() => {
                                 if (sortedSongs.length > 0) {
                                     onPlaySong(sortedSongs[0], 0, { restartIfCurrent: true, disableShuffle: true });
                                 }
                             }}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary hover:bg-primary/90 text-on-primary shadow-md transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary shadow-md transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
                             <span className="font-medium">播放</span>
                         </button>
                         <button
                             onClick={onShuffle}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-full btn-blur text-primary transition-all active:scale-95 hover:bg-surface-container-highest"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-full btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 transition-all active:scale-95 hover:bg-surface-container-highest"
                         >
                             <MdShuffle className="text-xl" />
                             <span className="font-medium">随机播放</span>
@@ -285,7 +285,7 @@ export default function ArtistDetailView({
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex items-center gap-8 px-4 border-b border-neutral-200 dark:border-neutral-800 mb-4">
+            <div className="flex items-center gap-8 px-4 mb-4">
                 <button
                     onClick={() => handleTabChange('albums')}
                     className={clsx(
