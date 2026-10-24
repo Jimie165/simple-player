@@ -16,8 +16,8 @@ export interface OnlineLyricsPayload {
     romanization: string | null;
 }
 export const lyricsProviders = [
-    ['all', '全部来源'], ['netease', '网易云音乐'], ['qq', 'QQ 音乐'],
-    ['kugou', '酷狗音乐'], ['lrclib', 'LRCLIB'], ['amll', 'AMLL 社区'],
+    ['all', '全部来源'], ['amll', 'AMLL 社区'], ['qq', 'QQ 音乐'],
+    ['kugou', '酷狗音乐'], ['netease', '网易云音乐'], ['lrclib', 'LRCLIB'],
 ] as const;
 export function orderedLyricsProviders(order: readonly string[]) {
     const sources = lyricsProviders.filter(([id]) => id !== 'all');

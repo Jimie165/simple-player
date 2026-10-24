@@ -57,7 +57,8 @@ export default function MetadataEditDialogShell<T extends string>({
                 <div className="fixed inset-0 overflow-y-auto p-2 sm:p-4">
                     <div className="flex min-h-full items-center justify-center text-center">
                         <TransitionChild
-                            as={Fragment}
+                            as="div"
+                            className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transition-[opacity,transform,scale] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))]"
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
                             enterTo="opacity-100 scale-100"
@@ -65,7 +66,7 @@ export default function MetadataEditDialogShell<T extends string>({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="relative h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
+                            <DialogPanel className="relative h-full w-full overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl dark:bg-[#202020] sm:rounded-md">
                                 <motion.form onSubmit={onSubmit} inert={Boolean(replacementView)} animate={{ x: replacementView && !reducedMotion ? -32 : 0, opacity: replacementView ? 0 : 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">{title}</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
