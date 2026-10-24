@@ -24,7 +24,7 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
     const canNavigate = !!metadata && typeof metadata.id === 'number';
 
     return (
-        <div className="player-song-info flex min-w-0 justify-start transition-[filter] duration-200">
+        <div className="player-song-info flex min-w-0 justify-start transition-opacity duration-200">
             <div
                 className="group relative flex h-16 w-full min-w-0 items-center rounded-md pb-2 text-left"
             >

@@ -31,6 +31,8 @@ export function generateThemeVariables(sourceHex: string, isDark: boolean): Them
     const surfaceTone = (tone: number) => hexFromArgb(theme.palettes.neutral.tone(tone));
 
     return {
+        '--player-primary-light': hexFromArgb(theme.palettes.primary.tone(35)),
+        '--player-primary-dark': hexFromArgb(theme.palettes.primary.tone(85)),
         // Primary
         '--md-sys-color-primary': hexFromArgb(scheme.primary),
         '--md-sys-color-on-primary': hexFromArgb(scheme.onPrimary),

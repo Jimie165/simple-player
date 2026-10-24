@@ -26,7 +26,7 @@ type PlaylistListItem = Playlist | FavoritesPlaylist;
 export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistCoverPaths, setPlaylistCoverPaths] = useState<Record<number, string[]>>({});
-    const [favoritesCount, setFavoritesCount] = useState(0);
+    const [loadedFavoritesCount, setFavoritesCount] = useState(0);
     const loadedDataVersionRef = useRef<string | null>(null);
     const loadedCoverPlaylistsRef = useRef<Playlist[] | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -51,6 +51,8 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     const { openPlaylistDetail } = useNavigationStore();
     const addMultipleToNext = useLibraryStore(state => state.addMultipleToNext);
     const libraryVersion = useLibraryStore(state => isVisible ? state.libraryVersion : 0);
+    const currentFavoritesCount = useLibraryStore(state => state.favoritesLoaded ? state.favoriteSet.size : null);
+    const favoritesCount = currentFavoritesCount ?? loadedFavoritesCount;
     const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
     const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
     const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);

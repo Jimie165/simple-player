@@ -204,6 +204,16 @@ body {
 }
 
 @layer components {
+  .content-player-shell {
+    --md-sys-color-primary: var(--player-primary-light);
+    --color-primary: var(--player-primary-light);
+  }
+
+  .dark .content-player-shell {
+    --md-sys-color-primary: var(--player-primary-dark);
+    --color-primary: var(--player-primary-dark);
+  }
+
   /* Keep the material behind the controls so nested popups can blur independently. */
   .content-player-shell::before {
     content: '';
@@ -227,8 +237,25 @@ body {
   }
 
   .content-player-shell:has(.player-progress:hover, .player-progress:focus-within, .player-progress[data-dragging]) .player-song-info {
-    filter: blur(8px);
+    opacity: 0.5;
     pointer-events: none;
+  }
+
+  .player-progress::before {
+    content: '';
+    position: absolute;
+    inset-inline: -8px;
+    bottom: 0;
+    height: 72px;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    backdrop-filter: blur(4px);
+    transition: opacity 200ms ease;
+  }
+
+  .player-progress:is(:hover, :focus-within, [data-dragging])::before {
+    opacity: 1;
   }
 
   .player-progress[data-dragging] span {

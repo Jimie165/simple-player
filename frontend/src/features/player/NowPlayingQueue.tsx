@@ -312,6 +312,8 @@ export default function NowPlayingQueue({
                     <Virtuoso
                         ref={virtuosoRef}
                         data={virtualItems}
+                        defaultItemHeight={isContent ? 68 : 82}
+                        itemSize={(element) => element.offsetHeight}
                         customScrollParent={scrollParent}
                         useWindowScroll={false}
                         overscan={VIRTUOSO_OVERSCAN}

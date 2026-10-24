@@ -31,6 +31,7 @@ interface LibraryState {
     currentSongIndex: number;
     favoriteSet: Set<number>;
     favoritesLoaded: boolean;
+    favoritesVersion: number;
     pathMap: Map<string, number>; // Cache for path -> id
     optimisticallyDeletedSongIds: Set<number>;
     markSongsAsOptimisticallyDeleted: (ids: number[]) => void;
@@ -146,6 +147,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
     favoritesLoaded: false,
+    favoritesVersion: 0,
     pathMap: new Map<string, number>(),
     optimisticallyDeletedSongIds: new Set<number>(),
 

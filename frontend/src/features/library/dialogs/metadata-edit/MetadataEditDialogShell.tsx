@@ -12,6 +12,7 @@ export interface MetadataEditTab<T extends string> {
 interface MetadataEditDialogShellProps<T extends string> {
     isOpen: boolean;
     saving: boolean;
+    cancelFirst?: boolean;
     onClose: () => void;
     onSubmit: (event: React.FormEvent) => void;
     title: string;
@@ -31,6 +32,7 @@ interface MetadataEditDialogShellProps<T extends string> {
 export default function MetadataEditDialogShell<T extends string>({
     isOpen,
     saving,
+    cancelFirst = false,
     onClose,
     onSubmit,
     title,
@@ -47,6 +49,28 @@ export default function MetadataEditDialogShell<T extends string>({
     replacementView,
 }: MetadataEditDialogShellProps<T>) {
     const reducedMotion = useReducedMotion();
+    const button = 'rounded-lg border border-neutral-200 px-4 py-2 text-sm dark:border-white/15 disabled:opacity-40';
+    const confirmButton = (
+        <button
+            key="confirm"
+            type="submit"
+            disabled={saving}
+            className={`${button} bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary`}
+        >
+            {saving ? '保存中...' : '确定'}
+        </button>
+    );
+    const cancelButton = (
+        <button
+            key="cancel"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className={button}
+        >
+            取消
+        </button>
+    );
     return (
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-9999" onClose={saving ? () => undefined : onClose}>
@@ -120,21 +144,7 @@ export default function MetadataEditDialogShell<T extends string>({
                                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-6 pb-4 pt-3">
                                         <div>{footerStart}</div>
                                         <div className="flex gap-2">
-                                            <button
-                                                type="submit"
-                                                disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 base-theme:dark:hover:bg-on-primary disabled:opacity-50"
-                                            >
-                                                {saving ? '保存中...' : '确定'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={onClose}
-                                                disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] border border-outline-variant/60 bg-transparent px-7 text-[15px] font-medium text-on-surface-variant transition-colors hover:bg-primary/5 disabled:opacity-50"
-                                            >
-                                                取消
-                                            </button>
+                                            {cancelFirst ? [cancelButton, confirmButton] : [confirmButton, cancelButton]}
                                         </div>
                                     </div>
                                 </motion.form>

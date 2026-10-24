@@ -91,6 +91,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
     const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
     const favoritesLibraryVersion = useLibraryStore(state => isVisible && id === 'favorites' ? state.libraryVersion : 0);
+    const favoritesVersion = useLibraryStore(state => isVisible && id === 'favorites' ? state.favoritesVersion : 0);
     const loadedDataVersionRef = useRef<string | null>(null);
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
@@ -134,7 +135,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
         }
     }, [id, sortKey, sortOrder]);
 
-    const dataVersion = `${id}:${sortKey}:${sortOrder}:${playlistVersion}:${id === 'favorites' ? favoritesLibraryVersion : ''}:${dataRefreshVersion}`;
+    const dataVersion = `${id}:${sortKey}:${sortOrder}:${playlistVersion}:${id === 'favorites' ? `${favoritesLibraryVersion}:${favoritesVersion}` : ''}:${dataRefreshVersion}`;
     useEffect(() => {
         let cancelled = false;
         void runPlaylistDataRefresh({
@@ -168,7 +169,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
         await playSong({
             song,
             index,
-            playlist: songs,
+            playlist: filteredSongs,
             options: {
                 ...options,
                 buildRecentItem: buildRecentForSong
@@ -338,6 +339,11 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             <div className="relative w-full z-20 -mt-10">
 
                 <div className="absolute top-12 right-6 z-50 flex items-center gap-1">
+                    {isSearchOpen && (
+                        <span className="mr-2 whitespace-nowrap text-sm tabular-nums text-on-surface-variant" aria-live="polite">
+                            {filteredSongs.length} 首歌曲
+                        </span>
+                    )}
                     <PlaylistSearchControl
                         isSearchOpen={isSearchOpen}
                         setIsSearchOpen={setIsSearchOpen}
@@ -408,7 +414,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         )}
 
                         <div className="flex items-center gap-2 text-sm text-on-surface-variant font-medium mt-1">
-                            <span>{filteredSongs.length} 首歌曲</span>
+                            <span>{sortedSongs.length} 首歌曲</span>
                             <span>•</span>
                             <span>{formatTotalDuration(totalDuration)}</span>
                         </div>
@@ -417,7 +423,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         <div className="flex items-center gap-3 mt-4">
                             <button
                                 onClick={handlePlayAll}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-lg hover:shadow-xl active:scale-95"
+                                className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-xs hover:shadow-sm active:scale-95"
                             >
                                 <MdPlayArrow className="text-2xl" />
                                 播放

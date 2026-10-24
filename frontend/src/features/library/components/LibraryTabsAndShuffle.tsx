@@ -84,7 +84,7 @@ export default function LibraryTabsAndShuffle({
                             onShufflePlay(songsToPlay);
                         }
                     }}
-                    className="flex h-10 items-center gap-2 px-4 rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary font-medium text-sm transition-colors shadow-sm active:scale-95"
+                    className="flex h-10 items-center gap-2 px-4 rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary font-medium text-sm transition-colors shadow-xs active:scale-95"
                 >
                     <MdShuffle className="text-lg" />
                     随机播放

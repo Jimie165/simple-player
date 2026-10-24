@@ -7,6 +7,7 @@ type PlayerStoreUpdate = Partial<{
     pathMap: Map<string, number>;
     favoriteSet: Set<number>;
     favoritesLoaded: boolean;
+    favoritesVersion: number;
     playlist: SongMetadata[];
     originalPlaylist: SongMetadata[];
 }>;
@@ -47,10 +48,10 @@ export async function toggleFavoriteFn(
         pathMap: Map<string, number>;
         playlist: SongMetadata[];
         originalPlaylist: SongMetadata[];
-        triggerLibraryUpdate: () => void;
+        favoritesLoaded: boolean;
         refreshFavorites: () => Promise<void>;
     },
-    set: (updater: PlayerStoreUpdate | ((state: { pathMap: Map<string, number>; favoriteSet: Set<number> }) => PlayerStoreUpdate)) => void
+    set: (updater: PlayerStoreUpdate | ((state: { pathMap: Map<string, number>; favoriteSet: Set<number>; favoritesVersion: number }) => PlayerStoreUpdate)) => void
 ): Promise<void> {
     let songId: number | undefined;
     const songPath = song.path;
@@ -85,37 +86,33 @@ export async function toggleFavoriteFn(
 
     if (!songId) return;
 
+    if (!get().favoritesLoaded) await get().refreshFavorites();
     const newStatus = await libraryService.toggleFavorite(songId);
 
-    set((state: { favoriteSet: Set<number> }) => {
+    const { playlist, originalPlaylist } = get();
+    const matches = (item: SongMetadata) => item.id === songId || (!!songPath && item.path === songPath);
+    const updateList = (list: SongMetadata[]) => list.some(matches)
+        ? list.map(item => matches(item) ? { ...item, is_favorite: newStatus } : item)
+        : list;
+
+    set((state: { favoriteSet: Set<number>; favoritesVersion: number }) => {
         const newFavoriteSet = new Set(state.favoriteSet);
         if (newStatus) {
             newFavoriteSet.add(songId);
         } else {
             newFavoriteSet.delete(songId);
         }
-        return { favoriteSet: newFavoriteSet, favoritesLoaded: true };
-    });
-
-    get().triggerLibraryUpdate();
-
-    const { playlist, originalPlaylist } = get();
-
-    const updateList = (list: SongMetadata[]) => list.map(item =>
-        (item.id === songId || (songPath && item.path === songPath))
-            ? { ...item, is_favorite: newStatus }
-            : item
-    );
-
-    set({
-        playlist: updateList(playlist),
-        originalPlaylist: updateList(originalPlaylist)
+        return {
+            favoriteSet: newFavoriteSet,
+            favoritesLoaded: true,
+            favoritesVersion: state.favoritesVersion + 1,
+            playlist: updateList(playlist),
+            originalPlaylist: updateList(originalPlaylist),
+        };
     });
 
     const playerMetadata = usePlayerStore.getState().metadata;
     if (playerMetadata && (playerMetadata.id === songId || (songPath && playerMetadata.path === songPath))) {
         usePlayerStore.getState().setMetadata({ ...playerMetadata, is_favorite: newStatus });
     }
-
-    get().refreshFavorites();
 }

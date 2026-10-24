@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { getManualNextIndexFn, getPreviousIndexFn } from '@/store/actions/queueActions';
 import { audioService } from '@/services/audioService';
 import { handleMissingSong } from '@/hooks/playback/handleMissingSong';
 import type { RecentItem, SongMetadata } from '@/types';
@@ -411,7 +412,9 @@ export function usePlaybackActions() {
             const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
 
-            const nextIdx = (currentSongIndex + 1) % playlist.length;
+            const { repeatMode } = usePlayerStore.getState();
+            const nextIdx = getManualNextIndexFn({ playlist, currentSongIndex }, repeatMode);
+            if (nextIdx < 0) return;
             const song = playlist[nextIdx];
             if (song?.path) {
                 await applyQueueItemPlayback(song, nextIdx, transitionId, true);
@@ -433,7 +436,13 @@ export function usePlaybackActions() {
             // Previous follows the visible playback order. For example, manually
             // selecting item 5 and pressing Previous plays item 4, not the item
             // that happened to be playing before item 5 was selected.
-            const prevIdx = (currentSongIndex - 1 + playlist.length) % playlist.length;
+            const { repeatMode } = usePlayerStore.getState();
+            const prevIdx = getPreviousIndexFn({ playlist, currentSongIndex }, repeatMode);
+            if (prevIdx < 0) return;
+            if (prevIdx === currentSongIndex) {
+                await seek(0);
+                return;
+            }
             const song = playlist[prevIdx];
             if (song?.path) {
                 await applyQueueItemPlayback(song, prevIdx, transitionId, true);

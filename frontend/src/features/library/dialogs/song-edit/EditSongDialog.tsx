@@ -65,6 +65,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
     const [searchOpen, setSearchOpen] = useState(false);
+    const [artworkActionsContainer, setArtworkActionsContainer] = useState<HTMLDivElement | null>(null);
 
     const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
     const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
@@ -211,6 +212,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     return (
         <MetadataEditDialogShell
+            cancelFirst
             isOpen={isOpen}
             saving={saving}
             onClose={searchOpen ? () => setSearchOpen(false) : onClose}
@@ -238,7 +240,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             tabLayoutId="edit-song-tab-underline"
             scrollContent={activeTab === 'details'}
             message={message}
-            footerStart={lyricsFooter}
+            footerStart={activeTab === 'artwork' ? <div ref={setArtworkActionsContainer} /> : lyricsFooter}
             replacementView={searchOpen ? (
                 <OnlineLyricsSearch
                     title={resolvedValues.title}
@@ -273,6 +275,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             )}
             {activeTab === 'artwork' && (
                 <SongArtworkFields
+                    actionsContainer={artworkActionsContainer}
                     song={song}
                     artworkSourcePath={resolvedValues.artworkSourcePath}
                     removeArtwork={resolvedValues.removeArtwork}

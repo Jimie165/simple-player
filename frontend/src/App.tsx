@@ -199,7 +199,7 @@ function App() {
 
       <div className="flex-1 min-h-0 relative overflow-hidden">
         <RetainedMediaPage active={currentPage === 'home'}><MusicGrid /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'library'}><Library /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'library'} resetScrollOnEnter><Library /></RetainedMediaPage>
         <RetainedMediaPage active={currentPage === 'videos'}><VideoLibrary /></RetainedMediaPage>
         <RetainedMediaPage active={currentPage === 'playlists'}>
           <PlaylistsRoot isPageVisible={currentPage === 'playlists' && !isBaseLayerFrozen} />

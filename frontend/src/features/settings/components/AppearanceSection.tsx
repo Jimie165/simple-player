@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MdAdd } from 'react-icons/md';
 import clsx from 'clsx';
@@ -36,6 +37,16 @@ export default function AppearanceSection() {
         setMoreTransitionsEnabled,
     } = useTheme();
 
+    const [draftColor, setDraftColor] = useState<string | null>(null);
+    useEffect(() => {
+        if (draftColor === null) return;
+        const timer = window.setTimeout(() => {
+            setSourceColor(draftColor, true);
+            setDraftColor(null);
+        }, 120);
+        return () => window.clearTimeout(timer);
+    }, [draftColor, setSourceColor]);
+
     return (
         <>
             <SettingsGroup title="应用外观">
@@ -60,7 +71,7 @@ export default function AppearanceSection() {
                             return (
                                 <CustomTooltip key={color.id} text={color.name}>
                                     <button
-                                        onClick={() => setSourceColor(color.value, false)}
+                                        onClick={() => { setDraftColor(null); setSourceColor(color.value, false); }}
                                         aria-label={color.name}
                                         aria-pressed={isSelected}
                                         className={clsx(
@@ -83,8 +94,8 @@ export default function AppearanceSection() {
                                     isCustomColor && 'ring-2 ring-on-surface/25 ring-offset-1 ring-offset-transparent'
                                 )}
                                 style={{
-                                    background: isCustomColor
-                                        ? sourceColor
+                                    background: draftColor !== null || isCustomColor
+                                        ? draftColor ?? sourceColor
                                         : 'conic-gradient(from 90deg, #ff3b30, #ff9500, #ffcc00, #34c759, #00c7be, #007aff, #af52de, #ff2d55, #ff3b30)',
                                 }}
                             >
@@ -98,8 +109,13 @@ export default function AppearanceSection() {
                                 <input
                                     type="color"
                                     className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                                    value={sourceColor}
-                                    onChange={(e) => setSourceColor(e.target.value, true)}
+                                    value={draftColor ?? sourceColor}
+                                    onChange={(e) => setDraftColor(e.target.value)}
+                                    onBlur={() => {
+                                        if (draftColor === null) return;
+                                        setSourceColor(draftColor, true);
+                                        setDraftColor(null);
+                                    }}
                                     aria-label="自定义颜色"
                                 />
                             </div>

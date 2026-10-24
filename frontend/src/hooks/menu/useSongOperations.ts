@@ -63,7 +63,11 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     } = options;
 
     // Stores
-    const { isFavorite, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, toggleFavorite } = useLibraryStore();
+    const isFavorite = useLibraryStore(state => state.isFavorite);
+    const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
+    const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
+    const removeFromRecent = useLibraryStore(state => state.removeFromRecent);
+    const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
     const { pausePlayback, playList, shufflePlay } = usePlaybackActions();
     const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const isShuffling = usePlayerStore(s => s.isShuffling);
@@ -81,21 +85,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const isSingle = count === 1;
     const firstItem = items[0];
 
-    // 检查是否可以收藏 (仅歌曲/文件，主要用于 UI 显示初始状态，批量收藏逻辑在 handleFavorite 中处理)
-    // 注意：如果是批量操作，我们通常不显示"已收藏"状态，除非全部都已收藏。
-    // 但是为了 UI 简单，我们只在单选时检查 isFavorite。
-    // 检查是否可以收藏 (仅歌曲/文件)
-    const singleIsFavorite = useMemo(() => {
-        if (!isSingle || !firstItem) return false;
-        // 专门针对 SongMetadata 或带有完整 ID/Path 的项目进行检查
-        return isFavorite(firstItem as SongMetadata);
-    }, [isSingle, firstItem, isFavorite]); // 监听 favoriteSet 确保状态同步
-
-    const isAllFavorited = useMemo(() => {
-        if (!items.length) return false;
-        if (isSingle) return singleIsFavorite;
-        return items.every(i => isFavorite(i as SongMetadata));
-    }, [items, isSingle, singleIsFavorite, isFavorite]);
+    const isAllFavorited = useLibraryStore(state => items.length > 0 && items.every(item =>
+        state.isFavorite(item as SongMetadata)
+    ));
 
     // --- Actions ---
 
@@ -188,8 +180,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 await toggleFavorite(s as SongMetadata);
             }
         }
-        triggerLibraryUpdate();
-    }, [items, isFavorite, toggleFavorite, triggerLibraryUpdate]);
+    }, [items, isFavorite, toggleFavorite]);
 
     // 5. 删除或从音乐库删除
     const handleDeleteFromLibrary = useCallback(async () => {

@@ -76,6 +76,7 @@ export const useThemeStore = create<ThemeState>()(
             setMoreTransitionsEnabled: (enabled) => set({ moreTransitionsEnabled: enabled }),
 
             setSourceColor: (hex, isCustom = false) => {
+                if (get().sourceColor === hex && get().isCustomColor === isCustom) return;
                 set({ sourceColor: hex, isCustomColor: isCustom });
                 get().applyTheme();
             },
@@ -108,7 +109,7 @@ export const useThemeStore = create<ThemeState>()(
                 });
 
                 // Update computed state
-                set({ isDark });
+                if (get().isDark !== isDark) set({ isDark });
             },
 
             init: () => {

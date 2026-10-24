@@ -1,11 +1,21 @@
-import { Activity, useState } from 'react';
+import { Activity, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
 import { pageMotion } from '@/utils/viewTransition';
 
 /** Only the four fixed media pages use this boundary; hidden effects are disconnected. */
-export default function RetainedMediaPage({ active, children }: { active: boolean; children: ReactNode }) {
+export default function RetainedMediaPage({ active, children, resetScrollOnEnter = false }: {
+    active: boolean;
+    children: ReactNode;
+    resetScrollOnEnter?: boolean;
+}) {
+    const viewportRef = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+        if (active && resetScrollOnEnter && viewportRef.current) {
+            viewportRef.current.scrollTop = 0;
+        }
+    }, [active, resetScrollOnEnter]);
     const [visited, setVisited] = useState(active);
     const [exited, setExited] = useState(!active);
     if (active && !visited) setVisited(true);
@@ -27,7 +37,7 @@ export default function RetainedMediaPage({ active, children }: { active: boolea
                 aria-hidden={!active}
                 className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
-                <ScrollArea className="h-full" topOffset={48}>
+                <ScrollArea className="h-full" topOffset={48} viewportRef={viewportRef}>
                     <div className="pt-12 min-h-full pb-24 transition-colors duration-300">{children}</div>
                 </ScrollArea>
             </motion.div>

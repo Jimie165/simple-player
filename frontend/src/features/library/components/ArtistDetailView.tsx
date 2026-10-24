@@ -268,7 +268,7 @@ export default function ArtistDetailView({
                                     onPlaySong(sortedSongs[0], 0, { restartIfCurrent: true, disableShuffle: true });
                                 }
                             }}
-                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary shadow-md transition-all active:scale-95"
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary shadow-xs transition-all active:scale-95"
                         >
                             <MdPlayArrow className="text-xl" />
                             <span className="font-medium">播放</span>

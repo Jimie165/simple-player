@@ -19,7 +19,7 @@ export default function PlaylistSearchControl({
     setSearchQuery,
     suppressTooltip,
     setSuppressTooltip,
-    placeholder = '搜索歌单内...',
+    placeholder = '搜索播放列表内...',
 }: PlaylistSearchControlProps) {
     return (
         <CustomTooltip
