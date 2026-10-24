@@ -36,22 +36,10 @@ export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullS
             >
                 <div className={clsx(
                     "content-player-shell pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full",
-                    mode === 'full' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_178px] px-8",
-                    mode === 'compact' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_40px] px-8",
+                    mode === 'full' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_auto] px-8",
+                    mode === 'compact' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_auto] px-8",
                     isMini && "h-18 max-w-115 grid-cols-[minmax(0,1fr)_104px] px-4"
                 )}>
-                    <button
-                        type="button"
-                        onClick={onToggleFullScreen}
-                        className={clsx(
-                            "absolute top-2 h-8 rounded-full bg-transparent",
-                            mode === 'full' && "left-43 right-32",
-                            mode === 'compact' && "left-43 right-23",
-                            isMini && "hidden"
-                        )}
-                        aria-label="打开播放页"
-                    />
-
                     <PlaybackControls mode={mode} isSuspended={isSuspended} />
 
                     <div className={clsx(

@@ -228,7 +228,7 @@ export default function EditableContextMenu() {
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-9999 w-40 rounded-xl border border-neutral-200/30 bg-white/90 base-theme:bg-surface/95 p-1 text-sm text-neutral-900 base-theme:text-on-surface shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-neutral-900/90 dark:text-white"
+            className="fixed z-9999 w-40 rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1 text-sm text-on-surface shadow-2xl backdrop-blur-[16px] backdrop-saturate-[220%]"
             style={position}
             role="menu"
             onContextMenu={(event) => event.preventDefault()}

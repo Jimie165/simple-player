@@ -226,6 +226,19 @@ body {
     pointer-events: none;
   }
 
+  .content-player-shell:has(.player-progress:hover, .player-progress:focus-within, .player-progress[data-dragging]) .player-song-info {
+    filter: blur(8px);
+    pointer-events: none;
+  }
+
+  .player-progress[data-dragging] span {
+    opacity: 1;
+  }
+
+  .player-progress[data-dragging] .pointer-events-none:not(span) {
+    height: 8px;
+  }
+
   .content-queue-shell {
     transition: background-color 200ms ease, border-color 200ms ease;
     background: var(--content-glass-background);

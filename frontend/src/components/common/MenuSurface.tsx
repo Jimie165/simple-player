@@ -9,8 +9,8 @@ export const MenuSurface = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<'
             {...props}
             ref={ref}
             className={`menu-surface fixed z-9999 w-56 rounded-xl border p-1 text-sm shadow-2xl ring-1 focus:outline-none pointer-events-auto ${variant === 'apple'
-                ? 'bg-neutral-900/60 backdrop-blur-3xl backdrop-saturate-150 border-white/5 ring-white/10 text-white'
-                : 'border-outline-variant/50 bg-surface/95 backdrop-blur-3xl backdrop-saturate-150 text-on-surface ring-on-surface/5'} ${className}`}
+                ? 'bg-neutral-900/60 backdrop-blur-lg backdrop-saturate-220 border-white/5 ring-white/10 text-white'
+                : 'border-(--content-glass-edge) bg-(--content-glass-background) backdrop-blur-lg backdrop-saturate-220 text-on-surface ring-on-surface/5'} ${className}`}
         />;
     },
 );
