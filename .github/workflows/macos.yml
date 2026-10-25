@@ -27,25 +27,25 @@ jobs:
       matrix:
         # Pushes run one check job; manual builds produce both architectures.
         arch: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["x86_64", "aarch64"]' || '["x86_64"]') }}
-    runs-on: ${{ matrix.arch == 'aarch64' && 'macos-15' || 'macos-15-intel' }}
+    runs-on: ${{ matrix.arch == 'aarch64' && 'macos-26' || 'macos-26-intel' }}
     timeout-minutes: 60
     env:
       MACOSX_DEPLOYMENT_TARGET: '12.0'
       SIDECAR_VERSION: ${{ matrix.arch == 'aarch64' && '9.0' || '9.0.2' }}
       SIDECAR_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
         with:
-          version: '11.11.0'
-      - uses: actions/setup-node@v6
+          version: '12.15.0'
+      - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '24'
+          node-version: '24.22.1'
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@1.98.1
+      - uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.3
         if: github.event_name == 'workflow_dispatch'
         with:
           workspaces: backend
@@ -53,7 +53,7 @@ jobs:
           cache-on-failure: true
       - run: pnpm install --frozen-lockfile
 
-      - uses: actions/cache@v5
+      - uses: actions/cache@v6.1.0
         if: github.event_name == 'workflow_dispatch'
         id: sidecars
         with:
@@ -125,7 +125,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent \
             'backend/target/release/bundle/macos/Simple Player.app' \
             'Simple-Player-macos-${{ matrix.arch }}.zip'
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7.0.2
         if: github.event_name == 'workflow_dispatch'
         with:
           name: Simple-Player-macos-${{ matrix.arch }}
@@ -133,7 +133,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7.0.2
         if: github.event_name == 'workflow_dispatch'
         with:
           name: Simple-Player-macos-${{ matrix.arch }}-DMG

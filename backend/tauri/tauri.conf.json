@@ -43,7 +43,6 @@
     "bundle": {
         "publisher": "Jimie165",
         "active": true,
-        "targets": "all",
         "externalBin": [
             "binaries/ffmpeg",
             "binaries/ffprobe"

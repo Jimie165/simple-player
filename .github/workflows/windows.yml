@@ -1,0 +1,107 @@
+name: Windows checks and builds
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Windows x86_64
+    runs-on: windows-2025
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      SIDECAR_VERSION: '9.0.2'
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: pnpm/action-setup@v6.1.0
+        with:
+          version: '12.15.0'
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: '24.22.1'
+          cache: pnpm
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2.9.3
+        with:
+          workspaces: backend
+          shared-key: windows-x86_64-native-release
+          cache-on-failure: true
+      - run: pnpm install --frozen-lockfile
+
+      - uses: actions/cache@v6.1.0
+        id: sidecars
+        with:
+          path: |
+            backend/tauri/binaries/ffmpeg-x86_64-pc-windows-msvc.exe
+            backend/tauri/binaries/ffprobe-x86_64-pc-windows-msvc.exe
+          key: windows-x86_64-sidecars-${{ env.SIDECAR_VERSION }}-v1
+
+      - name: Prepare FFmpeg and FFprobe sidecars
+        if: steps.sidecars.outputs.cache-hit != 'true'
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'ffmpeg.zip'
+          $extractDir = Join-Path $env:RUNNER_TEMP 'ffmpeg'
+          $url = "https://www.gyan.dev/ffmpeg/builds/packages/ffmpeg-$env:SIDECAR_VERSION-essentials_build.zip"
+          Invoke-WebRequest -Uri $url -OutFile $archive
+          $checksum = '60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba'
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $checksum) {
+            throw 'Sidecar archive checksum mismatch.'
+          }
+          Expand-Archive -LiteralPath $archive -DestinationPath $extractDir
+          New-Item -ItemType Directory -Force -Path 'backend/tauri/binaries' | Out-Null
+          foreach ($binary in @('ffmpeg', 'ffprobe')) {
+            $source = Join-Path $extractDir "ffmpeg-$env:SIDECAR_VERSION-essentials_build/bin/$binary.exe"
+            Copy-Item -LiteralPath $source -Destination "backend/tauri/binaries/$binary-x86_64-pc-windows-msvc.exe"
+          }
+
+      - name: Verify sidecars
+        run: |
+          foreach ($binary in @('ffmpeg', 'ffprobe')) {
+            & "./backend/tauri/binaries/$binary-x86_64-pc-windows-msvc.exe" -version
+            if ($LASTEXITCODE -ne 0) { throw "$binary failed to run." }
+          }
+
+      - name: Check frontend
+        run: pnpm lint
+      - name: Compile Windows application once
+        run: pnpm build --no-bundle
+      - name: Test Rust using release dependencies
+        run: cargo test --manifest-path backend/Cargo.toml --release --locked
+
+      - name: Create portable ZIP
+        run: |
+          $version = (Get-Content 'backend/tauri/tauri.conf.json' -Raw | ConvertFrom-Json).version
+          $portableDir = Join-Path $env:RUNNER_TEMP 'Simple-Player-portable'
+          New-Item -ItemType Directory -Path $portableDir | Out-Null
+          Copy-Item -LiteralPath 'backend/target/release/Simple Player.exe' -Destination $portableDir
+          foreach ($binary in @('ffmpeg', 'ffprobe')) {
+            Copy-Item -LiteralPath "backend/tauri/binaries/$binary-x86_64-pc-windows-msvc.exe" -Destination (Join-Path $portableDir "$binary.exe")
+          }
+          Compress-Archive -Path "$portableDir/*" -DestinationPath "Simple-Player_${version}_windows-x86_64_portable.zip"
+
+      - name: Bundle NSIS installer
+        run: pnpm exec tauri bundle --config backend/tauri/tauri.conf.json --bundles nsis
+
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Simple-Player-windows-x86_64-NSIS
+          path: backend/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@v7.0.2
+        with:
+          name: Simple-Player-windows-x86_64-portable
+          path: Simple-Player_*_windows-x86_64_portable.zip
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
