@@ -20,6 +20,8 @@ export function useNarrowPanelControls({
     const narrowControlsRef = useRef<HTMLDivElement | null>(null);
     const isPointerInsideNarrowControlsRef = useRef(false);
     const upwardScrollRevealDistanceRef = useRef(0);
+    const isPointerOnScrollbarRef = useRef(false);
+    const isScrollbarDraggingRef = useRef(false);
 
     useEffect(() => {
         return () => {
@@ -65,7 +67,7 @@ export function useNarrowPanelControls({
     }, [clearNarrowControlsHideTimer]);
 
     const handleNarrowPanelScroll = (direction: 'up' | 'down', delta = 16) => {
-        if (!isNarrowPanelLayout) return;
+        if (!isNarrowPanelLayout || isPointerOnScrollbarRef.current) return;
         if (direction === 'down') {
             hideNarrowControlsNow();
             return;
@@ -85,7 +87,20 @@ export function useNarrowPanelControls({
     };
 
     const handleNarrowPointerMove = (event: PointerEvent<HTMLDivElement>) => {
-        if (!isNarrowPanelLayout || narrowControlsVisible) return;
+        if (!isNarrowPanelLayout) return;
+        const target = event.target;
+        const queueViewport = event.currentTarget.querySelector<HTMLElement>('[data-queue-viewport]');
+        let onScrollbar = target instanceof Element && target.closest('.plain-lyrics-scrollbar') !== null;
+        if (!onScrollbar && queueViewport && target instanceof Node && queueViewport.contains(target)) {
+            const rect = queueViewport.getBoundingClientRect();
+            const contentRight = rect.left + queueViewport.clientLeft + queueViewport.clientWidth;
+            onScrollbar = event.clientX >= contentRight && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+        }
+        if (event.buttons === 0) isScrollbarDraggingRef.current = false;
+        else if (onScrollbar) isScrollbarDraggingRef.current = true;
+        onScrollbar ||= isScrollbarDraggingRef.current;
+        isPointerOnScrollbarRef.current = onScrollbar;
+        if (onScrollbar || narrowControlsVisible) return;
         const controlsRect = narrowControlsRef.current?.getBoundingClientRect();
         const panelViewport = event.currentTarget.querySelector<HTMLElement>('[data-narrow-panel-viewport]');
         // 与队列隐藏控件时的 pb-8 对齐，队列和歌词都从最后一行下方的区域唤出。
@@ -120,6 +135,8 @@ export function useNarrowPanelControls({
     };
 
     useEffect(() => {
+        isPointerOnScrollbarRef.current = false;
+        isScrollbarDraggingRef.current = false;
         if (isOpen && isNarrowPanelLayout) {
             const frame = requestAnimationFrame(() => revealNarrowControls());
             return () => cancelAnimationFrame(frame);

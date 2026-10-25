@@ -64,7 +64,7 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                 <div className="flex min-w-0 flex-1 flex-col justify-center pr-1">
                     <div className="flex w-full min-w-0 items-center gap-1 text-[15px] font-semibold leading-5 text-neutral-900 transition-colors dark:text-white/92">
                         <OverflowMarquee
-                            className="flex-1"
+                            className="shrink"
                             resetToken={`title-${metadata?.path || metadata?.title || 'empty'}`}
                         >
                             <span className="whitespace-nowrap">{metadata?.title || "未播放音乐"}</span>

@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import type { RefObject } from 'react';
 import { motion } from 'framer-motion';
 import type { Variants } from 'framer-motion';
 import { useTheme } from '@/hooks/useTheme';
@@ -11,6 +12,7 @@ import type { LyricsPanelProps } from '@/features/player/lyrics/types';
 
 interface NowPlayingLyricsPanelProps {
     variant?: 'side' | 'narrow';
+    coverShellRef?: RefObject<HTMLDivElement | null>;
     isLyricsOpen: boolean;
     lyricsMounted: boolean;
     panelFlipTarget: 'queue' | 'lyrics' | null;
@@ -25,6 +27,7 @@ interface NowPlayingLyricsPanelProps {
 
 export default function NowPlayingLyricsPanel({
     variant = 'side',
+    coverShellRef,
     isLyricsOpen,
     lyricsMounted,
     panelFlipTarget,
@@ -69,6 +72,7 @@ export default function NowPlayingLyricsPanel({
 
     return (
         <div
+            data-lyrics-panel
             className={clsx(
                 variant === 'side'
                     ? 'absolute inset-y-0 right-0 w-[56%] h-full max-h-[95%] flex flex-col overflow-hidden justify-center pl-[clamp(1rem,3vw,2.25rem)] pr-[clamp(1rem,3vw,2rem)]'
@@ -90,21 +94,15 @@ export default function NowPlayingLyricsPanel({
                     initial="hidden"
                     animate={isVisible ? 'visible' : 'hidden'}
                     variants={variants}
-                    style={variant === 'narrow' ? {
-                        maskImage: narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
-                        WebkitMaskImage: narrowControlsVisible
-                            ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                            : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)',
-                        transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out'
-                    } : undefined}
                 >
                     {lyricsMounted && (
                         !hasTimestamps ? (
                             <PlainLyricsPanel
+                                coverShellRef={coverShellRef}
                                 lyricsDocument={lyricsDocument}
                                 status={lyricsStatus}
+                                variant={variant}
+                                narrowControlsVisible={narrowControlsVisible}
                             />
                         ) : playerEffectMode === 'animation' ? (
                             <AnimatedLyricsPanel

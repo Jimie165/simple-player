@@ -173,7 +173,7 @@ export default function NowPlayingControlsSection({
                 </button>
             </div>
 
-            <div className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
+            <div data-player-volume className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
                 {(() => {
                     if (localVolume === 0) return <IoVolumeOff className="text-white/40 text-xs" />;
                     if (localVolume <= 33) return <IoVolumeLow className="text-white/40 text-xs" />;

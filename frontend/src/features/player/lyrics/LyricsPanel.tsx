@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import LyricsScrollbar from '@/features/player/scrollbar/LyricsScrollbar';
 import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -49,7 +50,11 @@ export default function LyricsPanel({
     onSeek,
     onUserScrollDirection,
     variant,
+    narrowControlsVisible = true,
 }: LyricsPanelProps) {
+    const narrowMaskImage = narrowControlsVisible
+        ? 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+        : narrowScrollMaskStyle.maskImage;
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
@@ -460,7 +465,11 @@ export default function LyricsPanel({
                         ? 'h-full mb-0'
                         : 'h-[calc(100%-3.5rem)] mb-6'
                 )}
-                style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
+                style={variant === 'narrow' ? {
+                    maskImage: narrowMaskImage,
+                    WebkitMaskImage: narrowMaskImage,
+                    clipPath: narrowControlsVisible ? 'inset(0 0 min(14.5rem, 100%) 0)' : 'inset(0)',
+                } : sideScrollMaskStyle}
                 onWheel={(event) => handleUserInteraction(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
                 onTouchStart={(event) => {
                     lastTouchYRef.current = event.touches[0]?.clientY ?? null;
@@ -569,6 +578,14 @@ export default function LyricsPanel({
                     />
                 )}
             </div>
+            {!displayState && <LyricsScrollbar
+                viewportRef={scrollerRef}
+                style={variant === 'narrow' ? {
+                    bottom: narrowControlsVisible ? '18rem' : '1.5rem',
+                    transition: 'bottom 300ms ease-out, opacity 250ms ease',
+                } : { bottom: 56, ...sideScrollMaskStyle }}
+                onUserScroll={delta => handleUserInteraction(delta > 0 ? 'down' : 'up', Math.abs(delta))}
+            />}
         </div>
     );
 }

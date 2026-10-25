@@ -1,4 +1,5 @@
-import { memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState, type WheelEvent } from 'react';
+import { memo, useCallback, useEffect, useInsertionEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import LyricsScrollbar from '@/features/player/scrollbar/LyricsScrollbar';
 import clsx from 'clsx';
 import { flushSync } from 'react-dom';
 import { motion, type PanInfo } from 'framer-motion';
@@ -11,7 +12,6 @@ import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlayb
 import {
     interludeGapOpenDurationMs,
     interludeNextLineFocusLeadMs,
-    manualResumeFollowDelayMs,
     lineSeekSyncToleranceMs,
 } from '@/features/player/lyrics/constants';
 import { getAnimatedLyricsMotionDelays, getAnimatedLyricsSpringParams } from '@/features/player/lyrics/animatedLyricsMotion';
@@ -55,7 +55,11 @@ function AnimatedLyricsPanel({
     onSeek,
     onUserScrollDirection,
     variant = 'side',
+    narrowControlsVisible = true,
 }: LyricsPanelProps) {
+    const narrowMaskImage = narrowControlsVisible
+        ? 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+        : narrowScrollMaskStyle.maskImage;
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
@@ -64,8 +68,6 @@ function AnimatedLyricsPanel({
     // TTML 与 LRC 共用同一套切换/加速/淡出参数
     const timingStrategy = animationLyricsTimingStrategy;
     const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
-    const resumeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-    const previousTargetYRef = useRef(0);
     const manualScrollActiveRef = useRef(false);
     const pausedScrollRef = useRef(false);
     const pendingLineSeekRef = useRef<{
@@ -204,6 +206,7 @@ function AnimatedLyricsPanel({
 
     const {
         activeTargetScrollY,
+        maxScrollY,
         contentHeight,
         itemHeights,
         itemTops,
@@ -257,20 +260,12 @@ function AnimatedLyricsPanel({
         });
     });
 
-    const updateTargetScrollY = useCallback((value: number) => {
-        const nextTarget = setTargetScrollY(value);
-        previousTargetYRef.current = nextTarget;
-    }, [setTargetScrollY]);
-
     useEffect(() => {
-        if (resumeTimeoutRef.current) {
-            clearTimeout(resumeTimeoutRef.current);
-            resumeTimeoutRef.current = null;
-        }
         pausedScrollRef.current = false;
-        previousTargetYRef.current = 0;
+        manualScrollActiveRef.current = false;
         pendingLineSeekRef.current = null;
         const frame = requestAnimationFrame(() => {
+            if (manualScrollActiveRef.current) return;
             setPausedScroll(false);
             setIsUserScrolling(false);
         });
@@ -285,29 +280,6 @@ function AnimatedLyricsPanel({
     }, [isPlaying]);
 
     const animatorTargetScrollY = shouldAutoFollow ? activeTargetScrollY : targetScrollY;
-    useLayoutEffect(() => {
-        manualScrollActiveRef.current = isUserScrolling;
-        // 同步布局修正/边界钳制后的手动目标，避免下一次输入仍从旧位置累计。
-        previousTargetYRef.current = animatorTargetScrollY;
-    }, [animatorTargetScrollY, isUserScrolling]);
-
-    const scheduleResumeFollow = useCallback(() => {
-        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-        resumeTimeoutRef.current = window.setTimeout(() => {
-            resumeTimeoutRef.current = null;
-            setIsUserScrolling(false);
-            if (!usePlayerStore.getState().isPlaying) {
-                pausedScrollRef.current = true;
-                setPausedScroll(true);
-                return;
-            }
-            // 自动跟随直接使用本次渲染的焦点，不回写两秒前捕获的旧目标。
-        }, manualResumeFollowDelayMs);
-    }, []);
-
-    useEffect(() => () => {
-        if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
-    }, []);
 
     const seekContextRef = useRef({ keepCurrentInterludeForExit, isUserScrolling, syncRevision, onSeek, activeIndices, displayItems });
     useInsertionEffect(() => {
@@ -331,10 +303,6 @@ function AnimatedLyricsPanel({
             setSeekExit(current => current === exit ? null : current);
         }, 2500) : null;
         context.keepCurrentInterludeForExit();
-        if (resumeTimeoutRef.current) {
-            clearTimeout(resumeTimeoutRef.current);
-            resumeTimeoutRef.current = null;
-        }
         if (context.isUserScrolling) {
             pendingLineSeekRef.current = {
                 syncRevision: context.syncRevision,
@@ -353,6 +321,7 @@ function AnimatedLyricsPanel({
             if (pendingLineSeekRef.current !== pendingSeek) return;
             pendingLineSeekRef.current = null;
             // seek 已同步到新歌词行后再恢复跟随，避免旧播放位置先进入一次弹簧目标。
+            manualScrollActiveRef.current = false;
             setIsUserScrolling(false);
         });
         return () => cancelAnimationFrame(frame);
@@ -387,7 +356,8 @@ function AnimatedLyricsPanel({
         (displayIndex: number) => motionDelays[displayIndex] ?? 0,
         [motionDelays]
     );
-    const { registerAnimatedRow, beginManualScroll } = useAnimatedLyricsAnimator({
+    const { registerAnimatedRow, beginManualScroll, scrollManualBy, scrollManualTo, canResumeAutoFollow, getAutoFollowDelay, getScrollOffset, subscribeScroll } = useAnimatedLyricsAnimator({
+        manualScrollRef: manualScrollActiveRef,
         activeDisplayIndex,
         activeIndices,
         getDelay: getMotionDelay,
@@ -409,12 +379,39 @@ function AnimatedLyricsPanel({
         syncRevision,
     });
 
-    const handleManualDelta = useCallback((deltaY: number) => {
+    useEffect(() => {
+        if (!isPlaying || !isUserScrolling) return;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let frame: number | null = null;
+        const check = () => {
+            if (!manualScrollActiveRef.current) return;
+            if (!canResumeAutoFollow()) {
+                const delay = getAutoFollowDelay();
+                if (delay !== null) timer = setTimeout(check, Math.max(16, delay));
+                return;
+            }
+            frame = requestAnimationFrame(() => {
+                if (!manualScrollActiveRef.current) return;
+                if (!canResumeAutoFollow()) { check(); return; }
+                flushSync(() => {
+                    manualScrollActiveRef.current = false;
+                    setIsUserScrolling(false);
+                });
+            });
+        };
+        check();
+        return () => {
+            if (timer !== null) clearTimeout(timer);
+            if (frame !== null) cancelAnimationFrame(frame);
+        };
+    }, [activeDisplayIndex, canResumeAutoFollow, getAutoFollowDelay, isPlaying, isUserScrolling]);
+
+    const handleManualDelta = useCallback((deltaY: number, continuous = false) => {
         if (!Number.isFinite(deltaY) || deltaY === 0) return;
         pendingLineSeekRef.current = null;
         if (!manualScrollActiveRef.current) {
             manualScrollActiveRef.current = true;
-            previousTargetYRef.current = beginManualScroll();
+            beginManualScroll();
         }
         onUserScrollDirection?.(deltaY > 0 ? 'down' : 'up', Math.abs(deltaY));
         setIsUserScrolling(true);
@@ -422,9 +419,8 @@ function AnimatedLyricsPanel({
             pausedScrollRef.current = true;
             setPausedScroll(true);
         }
-        updateTargetScrollY(previousTargetYRef.current + deltaY);
-        scheduleResumeFollow();
-    }, [beginManualScroll, isPlaying, onUserScrollDirection, scheduleResumeFollow, updateTargetScrollY]);
+        setTargetScrollY(scrollManualBy(deltaY, maxScrollY, continuous));
+    }, [beginManualScroll, isPlaying, maxScrollY, onUserScrollDirection, scrollManualBy, setTargetScrollY]);
 
     return (
         <LyricsFrameSchedulerContext.Provider value={frameScheduler}>
@@ -437,12 +433,12 @@ function AnimatedLyricsPanel({
                             !lyricLineBlendEnabled && 'z-10',
                             variant === 'narrow' ? 'h-full mb-0' : 'h-[calc(100%-3.5rem)] mb-6'
                         )}
-                        style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
-                        onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y)}
-                        onWheel={(event: WheelEvent<HTMLDivElement>) => {
-                            event.preventDefault();
-                            handleManualDelta(event.deltaY);
-                        }}
+                        style={variant === 'narrow' ? {
+                            maskImage: narrowMaskImage,
+                            WebkitMaskImage: narrowMaskImage,
+                            clipPath: narrowControlsVisible ? 'inset(0 0 min(14.5rem, 100%) 0)' : 'inset(0)',
+                        } : sideScrollMaskStyle}
+                        onPan={(_event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => handleManualDelta(-info.delta.y, true)}
                     >
                         {displayState ? (
                             <div className="h-full flex items-center justify-center text-white/40 text-sm">{displayState}</div>
@@ -463,7 +459,6 @@ function AnimatedLyricsPanel({
                                         <AnimatedLyricsLayoutItem
                                             key={item.type === 'line' ? `line-${item.lineIndex}` : `interlude-${item.afterLineIndex}-${item.startMs}`}
                                             index={displayIndex}
-                                            blendWithBackground={lyricLineBlendEnabled && item.type === 'line'}
                                             onAnimateMount={registerAnimatedRow}
                                             onMount={observeItem}
                                             top={itemTops[displayIndex]}
@@ -522,6 +517,34 @@ function AnimatedLyricsPanel({
                             </div>
                         )}
                     </motion.div>
+                    {!displayState && <LyricsScrollbar
+                        viewportRef={scrollAreaRef}
+                        style={variant === 'narrow' ? {
+                            bottom: narrowControlsVisible ? '18rem' : '1.5rem',
+                            transition: 'bottom 300ms ease-out, opacity 250ms ease',
+                        } : { bottom: 56, ...sideScrollMaskStyle }}
+                        virtual={{
+                            height: contentHeight,
+                            offset: animatorTargetScrollY,
+                            getOffset: getScrollOffset,
+                            subscribe: subscribeScroll,
+                            onWheel: handleManualDelta,
+                            onScrollTo: offset => {
+                                if (!manualScrollActiveRef.current) {
+                                    manualScrollActiveRef.current = true;
+                                    beginManualScroll();
+                                }
+                                const delta = offset - getScrollOffset();
+                                onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
+                                setIsUserScrolling(true);
+                                if (!isPlaying) {
+                                    pausedScrollRef.current = true;
+                                    setPausedScroll(true);
+                                }
+                                setTargetScrollY(scrollManualTo(offset, maxScrollY));
+                            },
+                        }}
+                    />}
                 </div>
             </LyricsFrameTaskRegistryContext.Provider>
         </LyricsFrameSchedulerContext.Provider>
@@ -535,6 +558,7 @@ const areAnimatedLyricsPanelPropsEqual = (previous: LyricsPanelProps, next: Lyri
     previous.onSeek === next.onSeek &&
     previous.onUserScrollDirection === next.onUserScrollDirection &&
     previous.variant === next.variant &&
+    previous.narrowControlsVisible === next.narrowControlsVisible &&
     previous.playerEffectMode === next.playerEffectMode
 );
 

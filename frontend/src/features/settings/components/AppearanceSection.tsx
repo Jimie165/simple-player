@@ -1,3 +1,4 @@
+import { useThemeStore } from '@/store/useThemeStore';
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { MdAdd } from 'react-icons/md';
@@ -37,6 +38,8 @@ export default function AppearanceSection() {
         setMoreTransitionsEnabled,
     } = useTheme();
 
+    const lyricsScrollbarEnabled = useThemeStore(state => state.lyricsScrollbarEnabled);
+    const setLyricsScrollbarEnabled = useThemeStore(state => state.setLyricsScrollbarEnabled);
     const [draftColor, setDraftColor] = useState<string | null>(null);
     useEffect(() => {
         if (draftColor === null) return;
@@ -184,6 +187,9 @@ export default function AppearanceSection() {
                         onChange={setLyricFillMode}
                         options={[{ value: 'line', label: '整行连续推进' }, { value: 'character', label: '逐字符推进' }]}
                     />
+                </SettingsRow>
+                <SettingsRow label="显示歌词滚动条">
+                    <SettingsSwitch label="显示歌词滚动条" checked={lyricsScrollbarEnabled} onChange={setLyricsScrollbarEnabled} />
                 </SettingsRow>
                 <SettingsRow label="歌词背景混合" description="让歌词与背后的画面以增亮方式混合">
                     <SettingsSwitch

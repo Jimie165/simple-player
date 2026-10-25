@@ -343,6 +343,7 @@ export function NowPlayingStandardLayout({
             />
 
             <NowPlayingLyricsPanel
+                coverShellRef={coverShellRef}
                 isLyricsOpen={isLyricsOpen}
                 lyricsMounted={lyricsMounted}
                 panelFlipTarget={panelFlipTarget}

@@ -18,6 +18,7 @@ interface ThemeState {
     fullScreenMode: PlayerEffectMode;
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
+    lyricsScrollbarEnabled: boolean;
     artworkBackgroundEnabled: boolean;
     moreTransitionsEnabled: boolean;
 
@@ -27,6 +28,7 @@ interface ThemeState {
     setLyricFloatMode: (mode: LyricFloatMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
+    setLyricsScrollbarEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
     setArtworkBackgroundEnabled: (enabled: boolean) => void;
     setMoreTransitionsEnabled: (enabled: boolean) => void;
@@ -50,6 +52,7 @@ export const useThemeStore = create<ThemeState>()(
             fullScreenMode: 'performance',
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
+            lyricsScrollbarEnabled: true,
             artworkBackgroundEnabled: false,
             moreTransitionsEnabled: false,
 
@@ -71,6 +74,7 @@ export const useThemeStore = create<ThemeState>()(
             setReactiveBackgroundEnabled: (enabled) => {
                 set({ reactiveBackgroundEnabled: enabled });
             },
+            setLyricsScrollbarEnabled: (enabled) => set({ lyricsScrollbarEnabled: enabled }),
             setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
             setArtworkBackgroundEnabled: (enabled) => set({ artworkBackgroundEnabled: enabled }),
             setMoreTransitionsEnabled: (enabled) => set({ moreTransitionsEnabled: enabled }),
@@ -143,6 +147,7 @@ export const useThemeStore = create<ThemeState>()(
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
+                lyricsScrollbarEnabled: state.lyricsScrollbarEnabled,
                 artworkBackgroundEnabled: state.artworkBackgroundEnabled,
                 moreTransitionsEnabled: state.moreTransitionsEnabled,
             }),
@@ -164,6 +169,7 @@ export const useThemeStore = create<ThemeState>()(
                     fullScreenMode: playerEffectMode,
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
+                    lyricsScrollbarEnabled: persistedState?.lyricsScrollbarEnabled !== false,
                     artworkBackgroundEnabled: persistedState?.artworkBackgroundEnabled === true,
                     moreTransitionsEnabled: persistedState?.moreTransitionsEnabled === true,
                 };

@@ -221,7 +221,10 @@ export default function NowPlayingView({
             style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}
+            data-now-playing-root
             onPointerMove={handleNarrowPointerMove}
+            onPointerUp={handleNarrowPointerMove}
+            onPointerCancel={handleNarrowPointerMove}
         >
             <PlayerBackground
                 src={bgImageSrc}

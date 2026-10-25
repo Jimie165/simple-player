@@ -1,4 +1,5 @@
 import MoreIcon from '@/components/common/MoreIcon';
+import QueueSourceLabel from '@/features/player/queue/QueueSourceLabel';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import clsx from 'clsx';
@@ -28,6 +29,7 @@ import { IoClose } from 'react-icons/io5';
 import CoverImage from '@/components/common/CoverImage';
 import SongCoverOverlay from '@/components/common/SongCoverOverlay';
 import ScrollArea from '@/components/common/ScrollArea';
+import LyricsScrollbar from '@/features/player/scrollbar/LyricsScrollbar';
 import { navigateFromQueueContext } from '@/features/player/utils/queueContextNavigation';
 import { QueueRowMenu, SortableQueueItem } from '@/features/player/queue/SortableQueueItem';
 import {
@@ -95,6 +97,44 @@ export default function NowPlayingQueue({
         virtuosoRef.current.scrollToIndex({ index: 0, align: 'start', behavior: 'auto' });
         lastScrollTopRef.current = 0;
     }, [isOpen, scrollParent, scrollToTopSignal]);
+
+    useLayoutEffect(() => {
+        if (variant !== 'side' || !scrollParent) return;
+        const root = scrollParent.closest<HTMLElement>('[data-now-playing-root]');
+        const volume = root?.querySelector<HTMLElement>('[data-player-volume]');
+        if (!root || !volume) return;
+        let frame: number | null = null;
+        let animateUntil = 0;
+        const update = () => {
+            const viewportRect = scrollParent.getBoundingClientRect();
+            const volumeRect = volume.getBoundingClientRect();
+            const end = Math.max(0, Math.min(viewportRect.height, viewportRect.bottom - volumeRect.top - volumeRect.height / 2));
+            scrollParent.style.setProperty('--queue-mask-end', `${end}px`);
+            scrollParent.style.setProperty('--queue-mask-start', `${end + 64}px`);
+        };
+        const tick = () => {
+            frame = null;
+            update();
+            if (performance.now() < animateUntil) frame = requestAnimationFrame(tick);
+        };
+        const refresh = () => {
+            animateUntil = performance.now() + 1000;
+            if (frame === null) frame = requestAnimationFrame(tick);
+        };
+        const observer = new ResizeObserver(refresh);
+        observer.observe(scrollParent);
+        observer.observe(root);
+        observer.observe(volume);
+        if (volume.parentElement) observer.observe(volume.parentElement);
+        update();
+        refresh();
+        return () => {
+            if (frame !== null) cancelAnimationFrame(frame);
+            observer.disconnect();
+            scrollParent.style.removeProperty('--queue-mask-end');
+            scrollParent.style.removeProperty('--queue-mask-start');
+        };
+    }, [isOpen, scrollParent, variant]);
 
     const sensors = useSensors(
         useSensor(MouseSensor, {
@@ -259,16 +299,18 @@ export default function NowPlayingQueue({
                     ) : (
                         <>
                             <span className={clsx(isContent && 'shrink-0')}>下一首歌来自:</span>
-                            <span
+                            <QueueSourceLabel
+                                label={queueContext?.name || '播放列表'}
+                                blend={!isContent}
+                                isOpen={isOpen !== false}
                                 onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
                                 className={clsx(
                                     'truncate',
-                                    isContent ? 'text-on-surface' : 'text-white/70 transition-colors',
-                                    queueContext && 'hover:text-primary cursor-pointer hover:underline'
+                                    isContent ? 'text-on-surface' : 'text-white opacity-45 mix-blend-plus-lighter transition-opacity',
+                                    queueContext && 'cursor-pointer hover:underline',
+                                    queueContext && (isContent ? 'hover:text-primary' : 'hover:opacity-35 active:opacity-25')
                                 )}
-                            >
-                                {queueContext?.name || '播放列表'}
-                            </span>
+                            />
                         </>
                     )}
                 </div>
@@ -289,7 +331,7 @@ export default function NowPlayingQueue({
                 appearance={isContent ? 'content' : 'immersive'}
             />
         );
-    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext, isContent]);
+    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext, isContent, isOpen]);
 
     const activeDragEntry = useMemo(() => {
         if (!activeDragId) return null;
@@ -384,41 +426,61 @@ song={activeDragEntry.song} className="w-full h-full object-cover" />
                     <div className="pb-6">{queueContent}</div>
                 </ScrollArea>
             ) : (
-                <div
-                    ref={scrollContainerRef}
-                    data-queue-viewport
-                    className={clsx(
-                        'flex-1 min-h-0 overflow-y-auto overflow-x-hidden relative z-10 block',
-                        'immersive-scrollbar',
-                        variant === 'narrow'
-                            ? (narrowControlsVisible ? 'pb-24' : 'pb-8')
-                            : 'pb-24'
-                    )}
-                    onWheel={(event) => onUserScrollDirection?.(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
-                    onScroll={(event) => {
-                        const nextScrollTop = event.currentTarget.scrollTop;
-                        const delta = nextScrollTop - lastScrollTopRef.current;
-                        if (Math.abs(delta) > 2) {
-                            onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
-                        }
-                        lastScrollTopRef.current = nextScrollTop;
-                    }}
-                    style={{
-                        overflowAnchor: 'none',
-                        maskImage: variant === 'narrow'
-                            ? (narrowControlsVisible
-                                ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                                : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
-                            : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
-                        WebkitMaskImage: variant === 'narrow'
-                            ? (narrowControlsVisible
-                                ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
-                                : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
-                            : 'linear-gradient(to bottom, black calc(100% - 96px), transparent 100%)',
-                        transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out',
-                    }}
-                >
-                    {queueContent}
+                <div className="relative flex-1 min-h-0">
+                    <div
+                        ref={scrollContainerRef}
+                        data-queue-viewport
+                        data-queue-variant={variant}
+                        data-controls-visible={narrowControlsVisible}
+                        className={clsx(
+                            'h-full min-h-0 overflow-y-auto overflow-x-hidden relative z-10 block',
+                            variant === 'narrow' ? 'scrollbar-hidden pr-3' : 'immersive-scrollbar queue-immersive-scrollbar',
+                            variant === 'narrow'
+                                ? (narrowControlsVisible ? 'pb-24' : 'pb-8')
+                                : 'pb-24'
+                        )}
+                        onWheel={variant === 'narrow' ? undefined : (event) => onUserScrollDirection?.(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
+                        onScroll={(event) => {
+                            const nextScrollTop = event.currentTarget.scrollTop;
+                            const delta = nextScrollTop - lastScrollTopRef.current;
+                            if (Math.abs(delta) > 2) {
+                                onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
+                            }
+                            lastScrollTopRef.current = nextScrollTop;
+                        }}
+                        style={{
+                            overflowAnchor: 'none',
+                            paddingBottom: variant === 'side'
+                                ? 'var(--queue-mask-start, 96px)'
+                                : (narrowControlsVisible ? '18rem' : '2rem'),
+                            // 渐变遮罩不影响命中测试，裁掉完全透明的区域以阻止隐藏行交互。
+                            clipPath: variant === 'narrow'
+                                ? (narrowControlsVisible ? 'inset(0 0 min(14.5rem, 100%) 0)' : 'inset(0)')
+                                : 'inset(0 0 clamp(0px, var(--queue-mask-end, 32px), 100%) 0)',
+                            maskImage: variant === 'narrow'
+                                ? (narrowControlsVisible
+                                    ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                                    : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
+                                : 'linear-gradient(to bottom, black calc(100% - var(--queue-mask-start, 96px)), transparent calc(100% - var(--queue-mask-end, 32px)))',
+                            WebkitMaskImage: variant === 'narrow'
+                                ? (narrowControlsVisible
+                                    ? 'linear-gradient(to bottom, black 0%, black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+                                    : 'linear-gradient(to bottom, black 0%, black calc(100% - 1.5rem), transparent 100%)')
+                                : 'linear-gradient(to bottom, black calc(100% - var(--queue-mask-start, 96px)), transparent calc(100% - var(--queue-mask-end, 32px)))',
+                            transition: 'mask-image 0.3s ease-out, -webkit-mask-image 0.3s ease-out',
+                        }}
+                    >
+                        {queueContent}
+                    </div>
+                    {variant === 'narrow' && <LyricsScrollbar
+                        enabled
+                        viewportRef={scrollContainerRef}
+                        onUserScroll={delta => onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta))}
+                        style={{
+                            bottom: narrowControlsVisible ? '18rem' : '1.5rem',
+                            transition: 'bottom 300ms ease-out, opacity 250ms ease',
+                        }}
+                    />}
                 </div>
             )}
         </div>

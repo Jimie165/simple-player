@@ -180,12 +180,10 @@ function LyricsLineItem({
             className="lyrics-line-scale-layer"
             style={animatedMotion ? {
                 transformOrigin: rowTransformOrigin,
-                backfaceVisibility: 'hidden',
             } : {
-                transform: 'scale(' + targetScale + ') translateZ(0)',
+                transform: 'scale(' + targetScale + ')',
                 transformOrigin: rowTransformOrigin,
                 transition: 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
-                backfaceVisibility: 'hidden',
             }}
         >
             <span

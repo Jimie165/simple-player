@@ -385,6 +385,37 @@ body {
     opacity: 0;
   }
 
+  .plain-lyrics-scroll { scrollbar-width: none; }
+  .plain-lyrics-scroll::-webkit-scrollbar { display: none; }
+
+  .plain-lyrics-scrollbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    opacity: 0;
+    transition: opacity 250ms ease;
+  }
+
+  .plain-lyrics-scrollbar[data-scrolling],
+  .plain-lyrics-scrollbar:hover,
+  .plain-lyrics-scrollbar[data-dragging] { opacity: 1; }
+
+  .plain-lyrics-scrollbar-thumb {
+    position: absolute;
+    right: 2px;
+    width: 3px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.7);
+    touch-action: none;
+    cursor: default;
+    transition: width 150ms ease;
+  }
+
+  .plain-lyrics-scrollbar:hover .plain-lyrics-scrollbar-thumb,
+  .plain-lyrics-scrollbar[data-dragging] .plain-lyrics-scrollbar-thumb { width: 7px; }
+
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -422,6 +453,14 @@ body {
   }
   .immersive-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
   .immersive-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  /* 保留伪元素轨道的留白，避免标准滚动条样式覆盖遮罩边界。 */
+  .immersive-scrollbar.queue-immersive-scrollbar {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .queue-immersive-scrollbar[data-queue-variant="side"]::-webkit-scrollbar-track {
+    margin-bottom: var(--queue-mask-start, 96px);
+  }
   .immersive-scrollbar::-webkit-scrollbar-corner { background: transparent; }
   .immersive-scrollbar::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0);
