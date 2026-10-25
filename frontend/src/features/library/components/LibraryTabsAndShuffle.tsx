@@ -68,7 +68,6 @@ export default function LibraryTabsAndShuffle({
             </div>
 
             <div className="ml-auto flex items-center gap-2">
-                {sortControl}
                 <button
                     onClick={() => {
                         let songsToPlay: SongMetadata[] = [];
@@ -89,6 +88,7 @@ export default function LibraryTabsAndShuffle({
                     <MdShuffle className="text-lg" />
                     随机播放
                 </button>
+                {sortControl}
             </div>
         </div>
     );

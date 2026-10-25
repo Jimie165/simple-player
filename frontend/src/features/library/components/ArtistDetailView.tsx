@@ -1,7 +1,7 @@
 import SharedCover from '@/components/common/SharedCover';
 import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { pageMotion } from '@/utils/viewTransition';
-import { memo, useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { memo, useId, useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
@@ -76,6 +76,7 @@ export default function ArtistDetailView({
     const overscan = useViewportOverscan(scrollParent);
 
     // Use persistent tab state from store
+    const tabIndicatorId = useId();
     const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
         return (lastArtistDetailTab === 'albums' || lastArtistDetailTab === 'songs')
             ? lastArtistDetailTab
@@ -297,7 +298,7 @@ export default function ArtistDetailView({
                 >
                     专辑 ({albums.length})
                     {activeTab === 'albums' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                        <motion.div layoutId={tabIndicatorId} className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
                     )}
                 </button>
                 <button
@@ -311,7 +312,7 @@ export default function ArtistDetailView({
                 >
                     歌曲 ({artist.songs.length})
                     {activeTab === 'songs' && (
-                        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
+                        <motion.div layoutId={tabIndicatorId} className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-t-full" />
                     )}
                 </button>
             </div>

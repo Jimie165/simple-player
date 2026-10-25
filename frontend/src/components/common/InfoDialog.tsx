@@ -122,6 +122,9 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
 
                         {/* 下半部分：详细技术信息 */}
                         <div className="grid grid-cols-[auto_1fr] gap-x-4 sm:gap-x-6 gap-y-2 text-xs w-full">
+                            <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">文件大小</div>
+                            <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSize(displayMeta?.size)}</div>
+
                             {/* 仅视频显示分辨率 */}
                             {(displayMeta?.width && displayMeta?.height) && (
                                 <>
@@ -142,23 +145,23 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                                 </>
                             )}
 
+                            {!isVideo && (
+                                <>
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">比特率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatBitrate(displayMeta?.bitrate)}</div>
+
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">采样率</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSampleRate(displayMeta?.sample_rate)}</div>
+
+                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">位深</div>
+                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{displayMeta?.bit_depth ? `${displayMeta.bit_depth} bit` : '未知'}</div>
+                                </>
+                            )}
+
                             <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">声道</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">
                                 {formatChannels(displayMeta?.channels)}
                             </div>
-
-                            <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">文件大小</div>
-                            <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSize(displayMeta?.size)}</div>
-
-                            {!isVideo && (
-                                <>
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">采样率</div>
-                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatSampleRate(displayMeta?.sample_rate)}</div>
-
-                                    <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">比特率</div>
-                                    <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text">{formatBitrate(displayMeta?.bitrate)}</div>
-                                </>
-                            )}
 
                             <div className="text-neutral-500 dark:text-neutral-400 text-left sm:text-right whitespace-nowrap">路径</div>
                             <div className="text-neutral-900 dark:text-neutral-200 font-mono select-text break-all">

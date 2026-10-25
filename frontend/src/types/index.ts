@@ -12,6 +12,7 @@ export interface SongMetadata {
     path?: string; // 文件路径
     size?: number; // 字节
     sample_rate?: number; // Hz
+    bit_depth?: number | null;
     bitrate?: number; // kbps
     // 扩展元数据
     album_artist?: string;

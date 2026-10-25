@@ -37,6 +37,7 @@ pub struct SongMetadata {
     pub path: Option<String>,
     pub size: Option<u64>,
     pub sample_rate: Option<u32>,
+    pub bit_depth: Option<u8>,
     pub bitrate: Option<u32>,
     // 扩展元数据
     pub album_artist: Option<String>,
@@ -263,6 +264,7 @@ impl SongMetadata {
             path: Some(song.path.clone()),
             size: None,
             sample_rate: None,
+            bit_depth: None,
             bitrate: None,
             album_artist: song.album_artist.clone(),
             year: song.year,
@@ -349,6 +351,7 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
     let properties = tagged_file.properties();
     let duration = properties.duration().as_secs();
     let sample_rate = properties.sample_rate();
+    let bit_depth = properties.bit_depth().filter(|depth| *depth > 0);
     let bitrate = properties.audio_bitrate();
     let channels = properties.channels();
 
@@ -387,6 +390,7 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         path: Some(normalize_db_path(path_obj)),
         size,
         sample_rate,
+        bit_depth,
         bitrate,
         album_artist,
         year,
