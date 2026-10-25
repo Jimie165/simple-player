@@ -621,7 +621,7 @@ export class AnimatedLyricsAnimator {
             state.lastRenderedFilter = style.filter;
         }
         if (state.lastRenderedOpacity !== style.opacity) {
-            element.style.opacity = style.opacity;
+            (state.scaleElement ?? element).style.opacity = style.opacity;
             state.lastRenderedOpacity = style.opacity;
         }
     }

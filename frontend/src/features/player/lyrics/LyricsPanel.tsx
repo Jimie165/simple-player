@@ -62,7 +62,8 @@ export default function LyricsPanel({
     // TTML 与 LRC 共用同一套切换/加速/淡出参数
     const timingStrategy = performanceLyricsTimingStrategy;
     const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
-    const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
+    const { renderCurrentMs, preciseMsRef, syncRevision } = usePrecisePlaybackTime(currentTime);
+    const pendingLineSeekRef = useRef<{ targetMs: number; revision: number; document: typeof lyricsDocument } | null>(null);
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const scrollerRef = useRef<HTMLElement | null>(null);
     const [autoScroll] = useState(() => new PerformanceLyricsScroll());
@@ -322,18 +323,32 @@ export default function LyricsPanel({
 
     const handleLineSeek = useCallback((time: number) => {
         keepCurrentInterludeForExit();
-        if (userScrollTimeoutRef.current) {
-            clearTimeout(userScrollTimeoutRef.current);
-            userScrollTimeoutRef.current = null;
-        }
-        //歌词点击 Seek 时立即 resetScroll，避免 pointerdown 留下的手动滚动
-        // 状态阻塞新激活行的高亮和跟随。
-        userScrollingRef.current = false;
-        setIsUserScrolling(false);
-        lastAutoScrollIndexRef.current = null;
-        preferSmoothAutoScrollRef.current = true;
+        pendingLineSeekRef.current = { targetMs: time * 1000, revision: syncRevision, document: lyricsDocument };
         onSeek(time);
-    }, [keepCurrentInterludeForExit, onSeek]);
+    }, [keepCurrentInterludeForExit, lyricsDocument, onSeek, syncRevision]);
+
+    useEffect(() => {
+        const pending = pendingLineSeekRef.current;
+        if (pending && (!isOpen || pending.document !== lyricsDocument)) {
+            pendingLineSeekRef.current = null;
+            return;
+        }
+        if (!pending || pending.revision === syncRevision || Math.abs(renderCurrentMs - pending.targetMs) > 400) return;
+        const frame = requestAnimationFrame(() => {
+            if (pendingLineSeekRef.current !== pending) return;
+            pendingLineSeekRef.current = null;
+            if (userScrollTimeoutRef.current) {
+                clearTimeout(userScrollTimeoutRef.current);
+                userScrollTimeoutRef.current = null;
+            }
+            // 播放位置同步后再恢复跟随，避免旧时间轴先让被点击行变暗。
+            userScrollingRef.current = false;
+            setIsUserScrolling(false);
+            lastAutoScrollIndexRef.current = null;
+            preferSmoothAutoScrollRef.current = true;
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, lyricsDocument, renderCurrentMs, syncRevision]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
@@ -483,7 +498,6 @@ export default function LyricsPanel({
                     lastTouchYRef.current = nextY ?? null;
                     handleUserInteraction(direction, previousY === null || nextY === undefined ? undefined : Math.abs(nextY - previousY));
                 }}
-                onPointerDown={() => handleUserInteraction()}
             >
                 {displayState ? (
                     <div className="h-full flex items-center justify-center text-white/40 text-sm">
@@ -541,6 +555,7 @@ export default function LyricsPanel({
                                 <LyricsLineItem
                                     line={item.line}
                                     isActive={isActive}
+                                    isPast={displayIndex < activeDisplayIndex}
                                     isKaraokeActive={isKaraokeActive}
                                     isUserScrolling={isUserScrolling}
                                     pausedScroll={pausedScrollRef.current}
@@ -563,6 +578,8 @@ export default function LyricsPanel({
                                     enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                                     currentTime={renderCurrentMs / 1000}
                                     preciseMsRef={preciseMsRef}
+                                    isPlaying={isPlaying}
+                                    playbackSyncKey={syncRevision}
                                     onSeek={handleLineSeek}
                                     variant={variant}
                                     isBackground={item.line.role === 'background'}

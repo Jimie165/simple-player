@@ -25,7 +25,7 @@ export class PerformanceLyricsScroll {
         }
         this.motion = {
             element, index, target, start: performance.now(), progress: 0,
-            duration: Math.min(450, 220 + Math.abs(target - element.scrollTop) * 0.08),
+            duration: Math.min(450, 360 + Math.abs(target - element.scrollTop) * 0.12),
         };
         this.frame = requestAnimationFrame(this.tick);
     }
@@ -35,7 +35,7 @@ export class PerformanceLyricsScroll {
         const motion = this.motion;
         if (!motion) return;
         const t = Math.min(1, Math.max(0, (now - motion.start) / motion.duration));
-        const progress = 1 - (1 - t) ** 3;
+        const progress = t * t * (3 - 2 * t);
         // 从实际位置推进剩余距离，吸收列表的高度修正，不跳回旧起点。
         const fraction = (progress - motion.progress) / (1 - motion.progress);
         motion.element.scrollTo({

@@ -140,6 +140,9 @@ void main() {
     // 二次曲线保持明度单调递增和起点斜率连续，避免高光层次反转或硬截断。
     float highlightProgress = clamp((okLabColor.x - 0.6) / 0.4, 0.0, 1.0);
     okLabColor.x -= 0.17 * highlightProgress * highlightProgress;
+    // 渐进压低中间调和亮部，保留深暗区域，避免大面积浅色抢过前景文字。
+    float dimming = smoothstep(0.2, 0.8, okLabColor.x);
+    okLabColor.x *= 1.0 - 0.2 * dimming;
     vec3 color = okLabToSrgb(okLabColor);
 
     // 与网格渐变保持相同的亮度自适应暗角：亮色边缘最多额外压暗 40%。

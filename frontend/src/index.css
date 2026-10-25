@@ -727,6 +727,10 @@ body {
   will-change: transform;
 }
 
+[data-animated-lyrics-scale] {
+  transition: opacity 350ms ease-out;
+}
+
 /* 高亮圆角与内容外扩均为 16；负 margin 保留文字宽度与位置。 */
 .lyrics-interaction-layer {
   margin: -16px;
