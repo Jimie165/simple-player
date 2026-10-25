@@ -236,7 +236,7 @@ body {
     pointer-events: none;
   }
 
-  .content-player-shell:has(.player-progress:hover, .player-progress:focus-within, .player-progress[data-dragging]) .player-song-info {
+  .content-player-shell:has(.player-progress:hover, .player-progress[data-dragging]) .player-song-info {
     opacity: 0.5;
     pointer-events: none;
   }
@@ -254,7 +254,7 @@ body {
     transition: opacity 200ms ease;
   }
 
-  .player-progress:is(:hover, :focus-within, [data-dragging])::before {
+  .player-progress:is(:hover, [data-dragging])::before {
     opacity: 1;
   }
 
