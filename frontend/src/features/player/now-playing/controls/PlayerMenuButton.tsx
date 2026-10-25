@@ -1,4 +1,3 @@
-import MoreIcon from '@/components/common/MoreIcon';
 import { useMemo } from 'react';
 
 import type { SongMetadata } from '@/types';
@@ -25,9 +24,14 @@ export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata
             variant="clean"
             buttonClassName="group/player-menu w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center hover:opacity-100!"
         >
-            <span className="flex h-full w-full items-center justify-center rounded-full bg-white/10 group-hover/player-menu:bg-white/20">
-                <MoreIcon className="text-white/80" />
-            </span>
+            <svg viewBox="0 0 36 36" className="block h-full w-full shrink-0 overflow-visible text-white" fill="currentColor" aria-hidden="true">
+                <circle cx="18" cy="18" r="18" className="opacity-10 group-hover/player-menu:opacity-20" />
+                <g className="opacity-80">
+                    <circle cx="10.5" cy="18" r="2.2" />
+                    <circle cx="18" cy="18" r="2.2" />
+                    <circle cx="25.5" cy="18" r="2.2" />
+                </g>
+            </svg>
         </MusicContextMenu>
     );
 }
