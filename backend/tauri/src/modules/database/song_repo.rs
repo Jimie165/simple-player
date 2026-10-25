@@ -487,7 +487,6 @@ impl SongRepo {
         if let Some(value) = genre {
             push_text("genre", value);
         }
-        drop(push_text);
 
         let mut push_number = |column: &'static str, value: Option<i32>| {
             assignments.push(format!("{column} = ?"));
@@ -508,7 +507,6 @@ impl SongRepo {
         if let Some(value) = disc_total {
             push_number("disc_total", value);
         }
-        drop(push_number);
 
         if assignments.is_empty() {
             return Ok(());

@@ -289,7 +289,7 @@ fn search_source(c: &Client, keyword: &str, provider: &str) -> Result<Vec<Candid
                     ));
                 }
             }
-            scored.sort_by(|a, b| b.0.cmp(&a.0));
+            scored.sort_by_key(|item| std::cmp::Reverse(item.0));
             out.extend(scored.into_iter().take(60).map(|(_, item)| item));
         }
         _ => return Err("不支持的歌词来源".into()),
@@ -363,10 +363,9 @@ pub fn fetch(item: &Candidate) -> Result<LyricsPayload, String> {
                 .numeric_id
                 .as_deref()
                 .filter(|id| !id.is_empty() && id.chars().all(|c| c.is_ascii_digit()))
+                && let Ok(payload) = qq_word_lyrics(&c, id)
             {
-                if let Ok(payload) = qq_word_lyrics(&c, id) {
-                    return Ok(payload);
-                }
+                return Ok(payload);
             }
             let v = get(
                 &c,
@@ -476,7 +475,7 @@ fn decode_qrc(raw: &str) -> Result<String, String> {
     if raw.starts_with('[') {
         return Ok(raw.to_owned());
     }
-    if raw.len() % 16 != 0 || !raw.is_ascii() {
+    if !raw.len().is_multiple_of(16) || !raw.is_ascii() {
         return Err("无效 QRC 数据".into());
     }
     let mut bytes: Vec<u8> = (0..raw.len())
@@ -536,45 +535,5 @@ mod tests {
         assert!(fetch(&item).is_err());
         assert!(search("", "all").is_err());
         assert!(search("Hello", "unknown").is_err());
-    }
-
-    #[test]
-    #[ignore = "Requires live platform APIs"]
-    fn live_search_and_download() {
-        match qq_word_lyrics(&client().unwrap(), "105738437") {
-            Ok(p) => eprintln!("QQ QRC probe: {} bytes", p.content.len()),
-            Err(e) => eprintln!("QQ QRC probe: {e}"),
-        }
-        let response = search("Hello Adele", "all").unwrap();
-        for error in &response.errors {
-            eprintln!("source error: {error}");
-        }
-        for provider in ["netease", "qq", "kugou", "lrclib", "amll"] {
-            let items: Vec<_> = response
-                .candidates
-                .iter()
-                .filter(|x| x.provider == provider)
-                .collect();
-            eprintln!("{provider}: {} candidates", items.len());
-            if let Some(item) = items.first() {
-                match fetch(item) {
-                    Ok(p) => eprintln!(
-                        "{provider}: downloaded {} bytes ({})",
-                        p.content.len(),
-                        p.format
-                    ),
-                    Err(e) => eprintln!("{provider}: download error: {e}"),
-                }
-            }
-        }
-        assert!(!response.candidates.is_empty());
-        let amll = search("YOASOBI", "amll").unwrap();
-        let item = amll
-            .candidates
-            .first()
-            .expect("AMLL index should contain YOASOBI");
-        let payload = fetch(item).unwrap();
-        assert!(payload.content.contains("<tt"));
-        eprintln!("amll: downloaded {} bytes (ttml)", payload.content.len());
     }
 }

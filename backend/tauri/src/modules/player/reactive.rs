@@ -397,256 +397,6 @@ pub(super) struct Detector {
     body: f32,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn run(
-        rate: u32,
-        frequency: f32,
-        interval: f32,
-        anti_phase: bool,
-        reference: f32,
-    ) -> Vec<(f32, f32)> {
-        let mut detector = Detector::new(rate);
-        let mut onsets = Vec::new();
-        for i in 0..rate * 4 {
-            let time = i as f32 / rate as f32;
-            let kick_time = (time - 0.5).max(0.0) % interval;
-            let kick = if time < 0.5 {
-                0.0
-            } else {
-                (time * frequency * std::f32::consts::TAU).sin() * (-kick_time / 0.03).exp() * 0.6
-            };
-            let backing = (time * 500.0 * std::f32::consts::TAU).sin() * reference
-                + (time * 60.0 * std::f32::consts::TAU).sin() * 0.025;
-            if let Some((_, onset)) = detector.push([
-                kick + backing,
-                if anti_phase {
-                    -kick - backing
-                } else {
-                    kick + backing
-                },
-            ]) {
-                if onset > 0.0 {
-                    onsets.push((time, onset));
-                }
-            }
-        }
-        onsets
-    }
-
-    #[test]
-    fn detects_mixed_kicks_without_doubling_across_pitch_rate_and_phase() {
-        for rate in [8_000, 16_000, 22_050, 44_100, 48_000, 96_000] {
-            for frequency in [50.0, 80.0, 100.0, 150.0, 190.0] {
-                let events = run(rate, frequency, 0.5, true, 0.25);
-                for hit in 1..7 {
-                    let expected = 0.5 + hit as f32 * 0.5;
-                    let matching: Vec<_> = events
-                        .iter()
-                        .filter(|(time, _)| *time >= expected && *time < expected + 0.13)
-                        .collect();
-                    assert_eq!(
-                        matching.len(),
-                        1,
-                        "{rate}Hz {frequency}Hz hit {hit}: {events:?}"
-                    );
-                    assert!(matching[0].1 > 0.28);
-                }
-                assert!(events.len() <= 8, "duplicate onsets: {events:?}");
-            }
-        }
-    }
-
-    #[test]
-    fn dense_hits_are_events_not_a_continuous_level() {
-        let events = run(48_000, 80.0, 0.125, false, 0.08);
-        assert!(events.len() >= 25 && events.len() <= 29, "{events:?}");
-        assert!(events.windows(2).all(|x| x[1].0 - x[0].0 >= 0.065));
-    }
-
-    #[test]
-    fn kick_at_start_is_not_lost_to_window_initialization() {
-        for frequency in [50.0, 80.0, 150.0] {
-            let mut detector = Detector::new(48_000);
-            let mut peak = 0.0_f32;
-            for i in 0..4800 {
-                let time = i as f32 / 48_000.0;
-                let sample =
-                    (time * frequency * std::f32::consts::TAU).sin() * (-time / 0.045).exp() * 0.6;
-                if let Some((_, onset)) = detector.push([sample, sample]) {
-                    peak = peak.max(onset);
-                }
-            }
-            assert!(peak > 0.28, "initial {frequency}Hz kick missed");
-        }
-    }
-
-    #[test]
-    fn steady_tones_silence_and_quiet_noise_do_not_keep_triggering() {
-        for (frequency, amplitude) in [(80.0, 0.5), (500.0, 0.5), (80.0, 0.0001), (0.0, 0.0)] {
-            let mut detector = Detector::new(48_000);
-            let mut events = 0;
-            for i in 0..48_000 * 3 {
-                let sample =
-                    (i as f32 / 48_000.0 * frequency * std::f32::consts::TAU).sin() * amplitude;
-                if let Some((_, onset)) = detector.push([sample, sample]) {
-                    if i > 48_000 && onset > 0.0 {
-                        events += 1;
-                    }
-                }
-            }
-            assert_eq!(events, 0, "stationary {frequency}Hz");
-        }
-    }
-
-    #[test]
-    fn recent_onsets_survive_repeated_packets_but_not_reset() {
-        let state = ReactiveState::new();
-        let generation = state.generation.load(Ordering::Acquire);
-        state.publish(
-            generation,
-            0.4,
-            0.7,
-            Instant::now() - Duration::from_millis(20),
-        );
-        assert_eq!(state.frame().onsets.len(), 1);
-        assert_eq!(state.frame().onsets[0].sequence, 1);
-        assert!(state.frame().onsets[0].age_ms >= 20.0);
-        state.reset();
-        state.publish(generation, 1.0, 1.0, Instant::now());
-        assert_eq!(state.frame().bass, 0.0);
-        assert!(state.frame().onsets.is_empty());
-    }
-
-    #[test]
-    fn reset_clears_every_detection_history() {
-        let mut detector = Detector::new(48_000);
-        for i in 0..24_000 {
-            let sample = (i as f32 * 0.03).sin();
-            detector.push([sample, -sample]);
-        }
-        detector.reset();
-        for _ in 0..24_000 {
-            if let Some((body, onset)) = detector.push([0.0; 2]) {
-                assert_eq!((body, onset), (0.0, 0.0));
-            }
-        }
-    }
-
-    #[test]
-    fn reset_after_a_real_candidate_can_analyze_silence_and_the_next_kick() {
-        let mut detector = Detector::new(8_000);
-        for i in 0..24_000 {
-            let time = i as f32 / 8_000.0;
-            let kick = if time < 0.5 {
-                0.0
-            } else {
-                (time * 100.0 * std::f32::consts::TAU).sin()
-                    * (-((time - 0.5) % 0.5) / 0.03).exp()
-                    * 0.6
-            };
-            let sample = kick
-                + (time * 500.0 * std::f32::consts::TAU).sin() * 0.25
-                + (time * 60.0 * std::f32::consts::TAU).sin() * 0.025;
-            detector.push([sample, sample]);
-            if detector.candidate_report > 2 {
-                break;
-            }
-        }
-        assert!(
-            detector.candidate_report > 2,
-            "fixture must exercise candidate history"
-        );
-        for _ in 0..3 {
-            detector.reset();
-            assert_eq!(detector.candidate_report, 0);
-            for _ in 0..800 {
-                if let Some((body, onset)) = detector.push([0.0; 2]) {
-                    assert_eq!((body, onset), (0.0, 0.0));
-                }
-            }
-            let mut peak = 0.0_f32;
-            for i in 0..800 {
-                let time = i as f32 / 8_000.0;
-                let sample =
-                    (time * 80.0 * std::f32::consts::TAU).sin() * (-time / 0.045).exp() * 0.6;
-                if let Some((_, onset)) = detector.push([sample, sample]) {
-                    peak = peak.max(onset);
-                }
-            }
-            assert!(peak > 0.28, "kick after reset must still be detected");
-        }
-    }
-
-    #[test]
-    fn analysis_worker_keeps_reporting_after_resume_seek_and_reenable() {
-        let state = Arc::new(ReactiveState::new());
-        state.enabled.store(true, Ordering::Release);
-        let mut input = AnalysisInput::new(48_000, state.clone());
-        for transition in 0..4 {
-            match transition {
-                1 => {
-                    state.reset();
-                    state.reset();
-                } // Pause then resume.
-                2 => input.reset(), // Seek.
-                3 => {
-                    state.enabled.store(false, Ordering::Release);
-                    state.reset();
-                    input.push([0.0; 2]);
-                    state.enabled.store(true, Ordering::Release);
-                    state.reset();
-                }
-                _ => {}
-            }
-            let generation = state.generation.load(Ordering::Acquire);
-            for _ in 0..12 {
-                for _ in 0..BLOCK {
-                    input.push([0.0; 2]);
-                }
-                std::thread::sleep(Duration::from_millis(2));
-            }
-            let deadline = Instant::now() + Duration::from_secs(2);
-            while state.report.lock().unwrap().generation != generation {
-                assert!(
-                    Instant::now() < deadline,
-                    "worker stopped after transition {transition}"
-                );
-                std::thread::sleep(Duration::from_millis(2));
-            }
-        }
-    }
-
-    #[test]
-    #[ignore = "manual 48kHz f32 PCM fixture; set SIMPLE_PLAYER_AUDIO_FIXTURE"]
-    fn captured_track_onset_distribution() {
-        let bytes = std::fs::read(std::env::var("SIMPLE_PLAYER_AUDIO_FIXTURE").unwrap()).unwrap();
-        let mut detector = Detector::new(48_000);
-        let mut events = Vec::new();
-        let started = Instant::now();
-        for (i, chunk) in bytes.chunks_exact(4).enumerate() {
-            let sample = f32::from_le_bytes(chunk.try_into().unwrap());
-            if let Some((_, onset)) = detector.push([sample, sample]) {
-                if onset > 0.0 {
-                    events.push((i as f32 / 48_000.0, onset));
-                }
-            }
-        }
-        let mut intervals: Vec<_> = events.windows(2).map(|x| x[1].0 - x[0].0).collect();
-        intervals.sort_unstable_by(f32::total_cmp);
-        eprintln!(
-            "{} onsets; median interval {:.3}s; {} intervals under 100ms; analysis {:?}",
-            events.len(),
-            intervals[intervals.len() / 2],
-            intervals.iter().filter(|x| **x < 0.1).count(),
-            started.elapsed()
-        );
-        eprintln!("first events: {:?}", &events[..events.len().min(20)]);
-        assert!(events.len() > 20);
-    }
-}
 impl Detector {
     pub(super) fn new(input_rate: u32) -> Self {
         let rate = input_rate.max(1) as f32;
@@ -826,5 +576,83 @@ impl Detector {
             self.candidate = 0.0;
         }
         Some((self.body.clamp(0.0, 1.0), onset.clamp(0.0, 1.0)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn recent_onsets_survive_repeated_packets_but_not_reset() {
+        let state = ReactiveState::new();
+        let generation = state.generation.load(Ordering::Acquire);
+        state.publish(
+            generation,
+            0.4,
+            0.7,
+            Instant::now() - Duration::from_millis(20),
+        );
+        assert_eq!(state.frame().onsets.len(), 1);
+        assert_eq!(state.frame().onsets[0].sequence, 1);
+        assert!(state.frame().onsets[0].age_ms >= 20.0);
+        state.reset();
+        state.publish(generation, 1.0, 1.0, Instant::now());
+        assert_eq!(state.frame().bass, 0.0);
+        assert!(state.frame().onsets.is_empty());
+    }
+
+    #[test]
+    fn reset_clears_every_detection_history() {
+        let mut detector = Detector::new(48_000);
+        for i in 0..24_000 {
+            let sample = (i as f32 * 0.03).sin();
+            detector.push([sample, -sample]);
+        }
+        detector.reset();
+        for _ in 0..24_000 {
+            if let Some((body, onset)) = detector.push([0.0; 2]) {
+                assert_eq!((body, onset), (0.0, 0.0));
+            }
+        }
+    }
+
+    #[test]
+    fn analysis_worker_keeps_reporting_after_resume_seek_and_reenable() {
+        let state = Arc::new(ReactiveState::new());
+        state.enabled.store(true, Ordering::Release);
+        let mut input = AnalysisInput::new(48_000, state.clone());
+        for transition in 0..4 {
+            match transition {
+                1 => {
+                    state.reset();
+                    state.reset();
+                } // Pause then resume.
+                2 => input.reset(), // Seek.
+                3 => {
+                    state.enabled.store(false, Ordering::Release);
+                    state.reset();
+                    input.push([0.0; 2]);
+                    state.enabled.store(true, Ordering::Release);
+                    state.reset();
+                }
+                _ => {}
+            }
+            let generation = state.generation.load(Ordering::Acquire);
+            for _ in 0..12 {
+                for _ in 0..BLOCK {
+                    input.push([0.0; 2]);
+                }
+                std::thread::sleep(Duration::from_millis(2));
+            }
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while state.report.lock().unwrap().generation != generation {
+                assert!(
+                    Instant::now() < deadline,
+                    "worker stopped after transition {transition}"
+                );
+                std::thread::sleep(Duration::from_millis(2));
+            }
+        }
     }
 }

@@ -712,10 +712,8 @@ impl AudioState {
         {
             self.low_frequency_level.reset();
         }
-        if !enabled {
-            if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
-                let _ = app_handle.emit("audio:low-frequency", self.low_frequency_level.frame());
-            }
+        if !enabled && let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+            let _ = app_handle.emit("audio:low-frequency", self.low_frequency_level.frame());
         }
     }
 
