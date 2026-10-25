@@ -2,6 +2,7 @@ import { Activity, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 import { pageMotion } from '@/utils/viewTransition';
 
 /** Only the four fixed media pages use this boundary; hidden effects are disconnected. */
@@ -38,6 +39,7 @@ export default function RetainedMediaPage({ active, children, resetScrollOnEnter
                 className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
                 <ScrollArea className="h-full" topOffset={48} viewportRef={viewportRef}>
+                    <DetailScrollHeader className="-mb-10" />
                     <div className="pt-12 min-h-full pb-24 transition-colors duration-300">{children}</div>
                 </ScrollArea>
             </motion.div>

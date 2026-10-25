@@ -16,6 +16,7 @@ import RetainedMediaPage from '@/components/layout/RetainedMediaPage';
 import { ContentSurface } from '@/components/layout/ContentSurface';
 import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 import { CoverTransitionOverlay } from '@/components/common/SharedCover';
 
 import MusicGrid from '@/features/home/MusicGrid';
@@ -188,16 +189,12 @@ function App() {
       data-main-content-query
       className="main-content-query flex flex-1 flex-col min-w-0 overflow-hidden relative z-0"
     >
-      {/* 标题栏背景，带高斯模糊，衔接窗口圆角 */}
       <div
         data-tauri-drag-region
-        className={`absolute top-0 left-0 right-0 h-12 z-40 border-b transition-colors duration-300 ${activePlaylistDetail
-          ? 'bg-transparent border-transparent'
-          : 'bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl border-outline-variant/5'
-          }`}
+        className="absolute top-0 left-0 right-0 h-12 z-40 bg-transparent"
       />
 
-      <div className="flex-1 min-h-0 relative overflow-hidden">
+      <div className="flex-1 min-h-0 relative z-0 overflow-hidden">
         <RetainedMediaPage active={currentPage === 'home'}><MusicGrid /></RetainedMediaPage>
         <RetainedMediaPage active={currentPage === 'library'} resetScrollOnEnter><Library /></RetainedMediaPage>
         <RetainedMediaPage active={currentPage === 'videos'}><VideoLibrary /></RetainedMediaPage>
@@ -212,6 +209,7 @@ function App() {
               className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
               <ScrollArea className="h-full" topOffset={48}>
+                <DetailScrollHeader className="-mb-10" />
                 <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
                   {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
                 </div>

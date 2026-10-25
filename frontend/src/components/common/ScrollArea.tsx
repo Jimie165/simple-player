@@ -218,7 +218,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
                 data-scroll-viewport
                 className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
             >
-                <div ref={contentRef}>
+                <div ref={contentRef} className="relative isolate">
                     {children}
                 </div>
             </motion.div>
