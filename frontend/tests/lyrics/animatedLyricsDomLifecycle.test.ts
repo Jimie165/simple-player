@@ -43,6 +43,27 @@ describe('animated row DOM lifetime and style submission', () => {
         return { animator, node, mount, flush, frame, writes, createNode };
     };
 
+    it('animates a manual track jump but lets dragging take over immediately', () => {
+        const { animator, mount, frame } = setup();
+        mount();
+        animator.beginManualScroll([0], 0);
+        animator.scrollManualTo(500, 1000, false);
+        const offset = () => animator.getScrollOffset([0], 0, 0);
+        expect(offset()).toBe(0);
+        frame(16);
+        expect(offset()).toBeGreaterThan(0);
+        expect(offset()).toBeLessThan(500);
+        for (let index = 0; index < 300; index++) frame(16);
+        expect(offset()).toBeCloseTo(500, 0);
+        animator.scrollManualTo(800, 1000, false);
+        frame(16);
+        animator.scrollManualTo(200, 1000, true);
+        expect(offset()).toBe(200);
+        frame(16);
+        expect(offset()).toBe(200);
+        animator.dispose();
+    });
+
     it('prepares multiple target updates without touching DOM, then commits the final visual once', () => {
         const { animator, mount, writes, frame, node } = setup();
         mount();

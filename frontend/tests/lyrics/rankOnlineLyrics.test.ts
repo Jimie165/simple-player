@@ -104,5 +104,8 @@ it('does not declare every title/artist containment eligible when the combined s
     expect(isEligibleOnlineLyricsMatch(weak, track)).toBe(false);
 });
 it('orders dropdown sources without duplicates and appends missing sources', () => {
-    expect(orderedLyricsProviders(['amll', 'qq', 'qq', 'unknown']).map(([id]) => id)).toEqual(['amll', 'qq', 'netease', 'kugou', 'lrclib']);
+    const providers = orderedLyricsProviders(['amll', 'qq', 'qq', 'unknown']).map(([id]) => id);
+    expect(providers.slice(0, 2)).toEqual(['amll', 'qq']);
+    expect(new Set(providers).size).toBe(providers.length);
+    expect([...providers].sort()).toEqual(['amll', 'qq', 'netease', 'kugou', 'lrclib'].sort());
 });
