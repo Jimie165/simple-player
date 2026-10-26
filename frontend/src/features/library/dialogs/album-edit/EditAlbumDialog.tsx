@@ -50,6 +50,7 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
 
     useEffect(() => {
         if (!isOpen || !album) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或目标专辑切换时初始化编辑表单状态
         setValues(makeInitialAlbumEditForm(album));
         setOriginals(null);
         setErrors({});

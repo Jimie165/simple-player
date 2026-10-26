@@ -1,4 +1,5 @@
 import clsx from 'clsx';
+import { motion, useReducedMotion } from 'framer-motion';
 import { MdArrowBack, MdMenu } from 'react-icons/md';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import appLogo from '@/assets/logo.png';
@@ -11,29 +12,38 @@ interface SidebarHeaderProps {
 }
 
 export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }: SidebarHeaderProps) {
+  const reducedMotion = useReducedMotion();
+  const transition = reducedMotion ? { duration: 0 } : { type: 'spring' as const, stiffness: 320, damping: 30 };
   return (
     <>
-      {/* Logo & Back (保持不变，仅修改 Tooltip 位置) */}
+      {/* 返回按钮与应用图标 */}
       <div className="relative flex items-center h-14 w-full px-3 overflow-visible">
-        <div className={clsx(
-          "absolute left-3 z-20 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
-          canGoBack ? "opacity-100 translate-x-0 pointer-events-auto" : "opacity-0 -translate-x-8 pointer-events-none"
-        )}>
+        <motion.div
+          initial={false}
+          animate={{ opacity: canGoBack ? 1 : 0, x: canGoBack ? 0 : -24, scale: canGoBack ? 1 : 0.85 }}
+          transition={transition}
+          inert={!canGoBack}
+          aria-hidden={!canGoBack}
+          className={clsx("absolute left-3 z-20", !canGoBack && "pointer-events-none")}
+        >
           {/* 这里也改为 bottom */}
           <CustomTooltip text="返回上级" placement="bottom">
             <button
               onClick={onBack}
+              aria-label="返回上级"
               className="w-12 h-12 flex items-center justify-center rounded-full hover:bg-on-surface/8 transition-colors"
             >
               <MdArrowBack className="text-[24px] text-on-surface-variant" />
             </button>
           </CustomTooltip>
-        </div>
+        </motion.div>
 
-        <div className={clsx(
-          "flex items-center transition-transform duration-500 ease-[cubic-bezier(0.2,0,0,1)]",
-          canGoBack ? "translate-x-[56px]" : "translate-x-0"
-        )}>
+        <motion.div
+          initial={false}
+          animate={{ x: canGoBack ? 56 : 0 }}
+          transition={transition}
+          className="flex items-center"
+        >
           <div className="w-12 h-12 flex items-center justify-center shrink-0">
             <img
               src={appLogo}
@@ -48,7 +58,7 @@ export default function SidebarHeader({ collapsed, onToggle, canGoBack, onBack }
           )}>
             Simple Player
           </span>
-        </div>
+        </motion.div>
       </div>
 
       {/* 汉堡菜单 (重点修改) */}

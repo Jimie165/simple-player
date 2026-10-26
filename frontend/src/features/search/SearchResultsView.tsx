@@ -42,6 +42,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
 
     useEffect(() => {
         let isCancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 搜索词变化进入防抖等待前重置已完成查询标记
         setCompletedQuery(null);
 
         const performSearch = async () => {
@@ -176,6 +177,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             cover: null,
             cover_path: video.thumbnail_path,
             path: video.path,
+            // eslint-disable-next-line react-hooks/purity -- 点击事件回调中记录播放时间戳，非渲染期调用
             lastPlayed: Date.now(),
             artist: "视频",
             album: video.folder_id ? "文件夹" : undefined,
@@ -300,7 +302,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     <div
                                         key={video.id}
                                         onClick={() => handlePlayVideo(video)}
-                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:bg-surface base-theme:hover:bg-surface-variant/30"
+                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:hover:bg-surface-variant/30"
                                     >
                                         <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">
                                             <CoverImage

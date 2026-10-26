@@ -26,6 +26,7 @@ export default function RestoreArchivedVideosDialog({
 
     useEffect(() => {
         if (!isOpen) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或候选视频变化时重置默认全选状态
         setSelectedIds(new Set(videos.map((video) => video.id)));
     }, [isOpen, videos]);
 
@@ -122,7 +123,7 @@ export default function RestoreArchivedVideosDialog({
                                                         onChange={() => toggleVideo(video.id)}
                                                         className="h-4 w-4 shrink-0 accent-primary"
                                                     />
-                                                    <div className="relative h-10 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-surface-container-highest">
+                                                    <div className="relative h-10 w-18 shrink-0 overflow-hidden rounded-lg bg-surface-container-highest">
                                                         <CoverImage
                                                             src={video.thumbnail_path}
                                                             className="absolute inset-0 h-full w-full object-cover"

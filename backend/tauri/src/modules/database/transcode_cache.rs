@@ -70,6 +70,7 @@ impl TranscodeCacheRepo {
              WHERE is_in_use = 0 
              ORDER BY last_accessed_at ASC LIMIT ?",
         )?;
+        let limit = i64::try_from(limit).unwrap_or(i64::MAX);
 
         stmt.query_map(params![limit], |row| {
             Ok(CacheRecord {
@@ -132,7 +133,8 @@ impl TranscodeCacheRepo {
     /// 获取缓存文件数量
     pub fn get_count(conn: &Connection) -> Result<usize> {
         conn.query_row("SELECT COUNT(*) FROM transcoded_cache", [], |row| {
-            row.get(0)
+            let count: i64 = row.get(0)?;
+            Ok(usize::try_from(count).unwrap_or(0))
         })
     }
 }

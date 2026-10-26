@@ -34,6 +34,7 @@ export default function MusicFoldersSection() {
     }, []);
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- reloadFolders 在异步 IPC 返回后更新状态，非同步调用
         reloadFolders();
     }, [reloadFolders, libraryVersion]);
 

@@ -54,8 +54,8 @@ export function parseLyricsWordsToChars(
         let activeCharIndex = 0;
         chars.forEach((char, charIndex) => {
             const isWhitespace = /^\s$/.test(char);
-            let charStart = word.start_time_ms;
-            let charDuration = 0;
+            let charStart: number;
+            let charDuration: number;
             const activeCharIndexInWord = Math.max(0, activeCharIndex - (isWhitespace ? 1 : 0));
 
             if (nonSpaceCount === 0) {

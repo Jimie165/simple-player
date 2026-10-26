@@ -1,4 +1,6 @@
 import clsx from 'clsx';
+import { useId } from 'react';
+import { LayoutGroup } from 'framer-motion';
 import { MdHomeFilled, MdLibraryMusic, MdVideoLibrary, MdFeaturedPlayList, MdSettings } from 'react-icons/md';
 import SidebarHeader from '@/components/layout/sidebar/SidebarHeader';
 import SidebarSearch from '@/components/layout/sidebar/SidebarSearch';
@@ -35,6 +37,7 @@ export default function Sidebar({
     isOverlay = false,
     onRequestClose
 }: SidebarProps) {
+    const animationId = useId();
     const handleNavigate = (id: string) => {
         onNavigate(id);
         if (isOverlay) {
@@ -83,6 +86,7 @@ export default function Sidebar({
                     }}
                 />
                 {/* 3. Inner Fixed Content (always 280px to prevent wrapping) */}
+                <LayoutGroup id={animationId}>
                 <div className="relative z-10 w-70 flex flex-col flex-1 h-full min-h-0">
 
                     {/* Header */}
@@ -126,6 +130,7 @@ export default function Sidebar({
                         />
                     </div>
                 </div>
+                </LayoutGroup>
             </div>
         </div>
     );

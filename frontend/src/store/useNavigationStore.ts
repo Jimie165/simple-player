@@ -248,7 +248,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             scrollKey: state.nextScrollKey,
             nextScrollKey: state.nextScrollKey + 1,
         };
-        const newHistory = appendMainHistory(state);
+        const newHistory = state.currentPage === 'settings' ? state.mainHistory : appendMainHistory(state);
 
         // Update persistent state for library
         const updates: Partial<NavigationState> = {

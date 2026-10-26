@@ -75,6 +75,7 @@ export default function AddToPlaylistSheet() {
 
     useEffect(() => {
         if (isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- 面板打开或歌单版本变化时重置缓存并异步拉取歌单
             setPlaylistSongs({});
             loadPlaylists();
         }

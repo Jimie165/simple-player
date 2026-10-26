@@ -29,6 +29,7 @@ export default function RestoreExcludedSongsDialog({
 
     useEffect(() => {
         if (!isOpen) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或候选歌曲变化时重置默认全选状态
         setSelectedIds(new Set(songs.map(songId).filter((id): id is number => id !== null)));
     }, [isOpen, songs]);
 

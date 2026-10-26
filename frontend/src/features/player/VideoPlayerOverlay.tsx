@@ -345,7 +345,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                             >
                                                 {volume === 0 ? <MdVolumeOff className="text-2xl" /> : <MdVolumeUp className="text-2xl" />}
                                             </button>
-                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 group-focus-within/vol:w-24 any-pointer-coarse:w-24 transition-all duration-300 ease-out flex items-center">
+                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 group-active/vol:w-24 any-pointer-coarse:w-24 transition-all duration-300 ease-out flex items-center">
                                                 <div className="w-20 pl-2">
                                                     <MusicSlider
                                                         value={volume}

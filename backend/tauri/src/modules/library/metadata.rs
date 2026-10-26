@@ -181,7 +181,7 @@ pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
     }
 
     if let Some(tag) = tagged_file.primary_tag()
-        && let Some(content) = tag.get_string(&ItemKey::Lyrics)
+        && let Some(content) = tag.get_string(ItemKey::Lyrics)
         && let Some(lyrics) = build_unsynced_lyrics(content)
     {
         return Ok(lyrics);
@@ -234,7 +234,7 @@ pub fn get_raw_lyrics(path: &str) -> Result<Option<String>, String> {
     }
 
     if let Some(tag) = tagged_file.primary_tag()
-        && let Some(content) = tag.get_string(&ItemKey::Lyrics)
+        && let Some(content) = tag.get_string(ItemKey::Lyrics)
     {
         let trimmed = content.trim();
         if !trimmed.is_empty() {
@@ -331,11 +331,14 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
     // 扩展元数据
     let album_artist = tag.as_ref().and_then(|t| {
         // 尝试获取 album artist，如果没有则使用 artist
-        t.get_string(&lofty::tag::ItemKey::AlbumArtist)
+        t.get_string(lofty::tag::ItemKey::AlbumArtist)
             .map(|s| s.to_string())
     });
 
-    let year = tag.as_ref().and_then(|t| t.year()).map(|y| y as i32);
+    let year = tag
+        .as_ref()
+        .and_then(|t| t.date())
+        .map(|d| i32::from(d.year));
 
     let genre = tag.as_ref().and_then(|t| t.genre().map(|s| s.to_string()));
 

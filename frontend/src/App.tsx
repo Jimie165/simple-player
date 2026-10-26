@@ -111,6 +111,10 @@ function App() {
     navigate: storeNavigate,
     goBack: storeGoBack
   } = useNavigationStore();
+  const [displayedPage, setDisplayedPage] = useState(currentPage);
+  const completePageExit = (page: PageId) => {
+    if (displayedPage === page) setDisplayedPage(currentPage);
+  };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
@@ -194,17 +198,18 @@ function App() {
       />
 
       <div className="flex-1 min-h-0 relative z-0 overflow-hidden">
-        <RetainedMediaPage active={currentPage === 'home'} scrollKey={currentPage === 'home' ? scrollKey : undefined}><MusicGrid /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'library'} scrollKey={currentPage === 'library' ? scrollKey : undefined}><Library /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'videos'} scrollKey={currentPage === 'videos' ? scrollKey : undefined}><VideoLibrary /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'playlists'} scrollKey={currentPage === 'playlists' ? scrollKey : undefined}>
+        <RetainedMediaPage active={currentPage === 'home' && displayedPage === 'home'} onExitComplete={() => completePageExit('home')} scrollKey={currentPage === 'home' ? scrollKey : undefined}><MusicGrid /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'library' && displayedPage === 'library'} onExitComplete={() => completePageExit('library')} scrollKey={currentPage === 'library' ? scrollKey : undefined}><Library /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'videos' && displayedPage === 'videos'} onExitComplete={() => completePageExit('videos')} scrollKey={currentPage === 'videos' ? scrollKey : undefined}><VideoLibrary /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'playlists' && displayedPage === 'playlists'} onExitComplete={() => completePageExit('playlists')} scrollKey={currentPage === 'playlists' ? scrollKey : undefined}>
           <PlaylistsRoot isPageVisible={currentPage === 'playlists' && !isBaseLayerFrozen} />
         </RetainedMediaPage>
-        <AnimatePresence mode="wait">
-          {(currentPage === 'settings' || currentPage === 'search') && (
+        <AnimatePresence mode="wait" onExitComplete={() => completePageExit(displayedPage)}>
+          {currentPage === displayedPage && (currentPage === 'settings' || currentPage === 'search') && (
             <motion.div
               key={currentPage}
               {...pageMotion}
+              style={{ zIndex: 1 }}
               className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
               <ScrollArea className="h-full" topOffset={48} navigationScrollKey={scrollKey}>

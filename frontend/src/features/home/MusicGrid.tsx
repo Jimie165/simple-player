@@ -152,7 +152,7 @@ export default function MusicGrid() {
                             return (
                                 <div
                                     key={item.id}
-                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
+                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:hover:bg-surface-variant/30")}
                                     onClick={(e) => handleItemClick(item, e)}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >

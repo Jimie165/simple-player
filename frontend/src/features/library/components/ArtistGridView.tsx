@@ -98,7 +98,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
         return (
             <div
                 key={id}
-                className={`group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-on-surface/5 transition-colors cursor-pointer min-w-0 ${isSelected ? 'base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80' : 'base-theme:bg-surface base-theme:hover:bg-surface-variant/30'}`}
+                className={`group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-on-surface/5 transition-colors cursor-pointer min-w-0 ${isSelected ? 'base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80' : 'base-theme:hover:bg-surface-variant/30'}`}
                 onClick={(e) => handleItemClick(artist, e)}
                 onContextMenu={(e) => handleContextMenu(e, artist)}
             >

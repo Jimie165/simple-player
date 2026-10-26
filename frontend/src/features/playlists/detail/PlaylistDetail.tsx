@@ -69,6 +69,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     // Reload settings and reset state when ID changes
     useEffect(() => {
         const settings = getPlaylistSettings(id.toString());
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 切换歌单 ID 时同步排序偏好并重置列表状态
         setLocalSortKey(settings.sortKey);
         setLocalSortOrder(settings.sortOrder);
 
@@ -292,6 +293,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     }, [songs, sortKey, sortOrder, isFavorites, favoriteSet, favoritesLoaded]);
 
 
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- 保持既有手动 useMemo 依赖边界，避免改变列表过滤的引用稳定性
     const filteredSongs = useMemo(() => {
         if (!searchQuery) return sortedSongs;
         const query = searchQuery.toLowerCase();
@@ -380,7 +382,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
                         <SharedCover source={transitionSource} className={clsx(
-                            "w-[270px] h-[270px] rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
+                            "w-67.5 h-67.5 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
                             isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (

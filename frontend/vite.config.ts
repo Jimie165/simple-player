@@ -1,27 +1,16 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
-import legacy from '@vitejs/plugin-legacy'
 import path from 'path'
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    legacy({
-      renderLegacyChunks: false,
-      modernTargets: ['edge>=109', 'safari>=13'],
-      modernPolyfills: true,
-      additionalModernPolyfills: [
-        'core-js/modules/es.object.has-own.js',
-        'core-js/modules/web.structured-clone.js',
-        'core-js/modules/es.array.at.js',
-      ],
-    }),
   ],
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
   server: {
@@ -29,53 +18,54 @@ export default defineConfig({
     strictPort: true,
   },
   build: {
-    rollupOptions: {
+    target: ['edge111', 'safari16.4'],
+    rolldownOptions: {
       output: {
-        onlyExplicitManualChunks: true,
-        manualChunks(id) {
-          if (
-            id.includes('/src/features/player/now-playing/') ||
-            id.includes('/src/features/player/lyrics/')
-          ) {
-            return 'immersive-player'
-          }
-
-          if (!id.includes('/node_modules/')) return
-
-          if (
-            id.includes('/node_modules/react/') ||
-            id.includes('/node_modules/react-dom/') ||
-            id.includes('/node_modules/scheduler/')
-          ) {
-            return 'react-vendor'
-          }
-
-          if (
-            id.includes('/node_modules/framer-motion/') ||
-            id.includes('/node_modules/motion-dom/') ||
-            id.includes('/node_modules/motion-utils/')
-          ) {
-            return 'motion-vendor'
-          }
-
-          if (id.includes('/node_modules/react-icons/')) {
-            return 'icons-vendor'
-          }
-
-          if (
-            id.includes('/node_modules/@dnd-kit/') ||
-            id.includes('/node_modules/@headlessui/') ||
-            id.includes('/node_modules/react-hot-toast/') ||
-            id.includes('/node_modules/react-virtuoso/')
-          ) {
-            return 'ui-vendor'
-          }
-
-          if (id.includes('/node_modules/@tauri-apps/')) {
-            return 'tauri-vendor'
-          }
-
-          return 'vendor'
+        strictExecutionOrder: true,
+        codeSplitting: {
+          includeDependenciesRecursively: false,
+          groups: [
+            {
+              name: 'immersive-player',
+              test: /src[\\/]features[\\/]player[\\/](?:now-playing|lyrics)[\\/]/,
+              priority: 5,
+            },
+            {
+              name: 'library',
+              test: /src[\\/]features[\\/]library[\\/]/,
+              priority: 5,
+            },
+            {
+              name: 'react-vendor',
+              test: /node_modules[\\/](?:react|react-dom|scheduler)[\\/]/,
+              priority: 60,
+            },
+            {
+              name: 'motion-vendor',
+              test: /node_modules[\\/](?:framer-motion|motion-dom|motion-utils)[\\/]/,
+              priority: 50,
+            },
+            {
+              name: 'icons-vendor',
+              test: /node_modules[\\/]react-icons[\\/]/,
+              priority: 40,
+            },
+            {
+              name: 'ui-vendor',
+              test: /node_modules[\\/](?:@dnd-kit[\\/][^\\/]+|@headlessui[\\/][^\\/]+|react-hot-toast|react-virtuoso)[\\/]/,
+              priority: 30,
+            },
+            {
+              name: 'tauri-vendor',
+              test: /node_modules[\\/]@tauri-apps[\\/]/,
+              priority: 20,
+            },
+            {
+              name: 'vendor',
+              test: /node_modules[\\/]/,
+              priority: 10,
+            },
+          ],
         },
       },
     },

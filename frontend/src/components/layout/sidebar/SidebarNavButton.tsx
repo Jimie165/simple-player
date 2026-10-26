@@ -1,6 +1,8 @@
 import React from 'react';
 import clsx from 'clsx';
+import { motion, useReducedMotion } from 'framer-motion';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import { useThemeStore } from '@/store/useThemeStore';
 
 export type NavItem = {
     icon: React.ElementType;
@@ -19,6 +21,8 @@ interface SidebarNavButtonProps {
 
 export default function SidebarNavButton({ item, isActive, collapsed, onClick, isBottom = false, isOverlay = false }: SidebarNavButtonProps) {
     const [isClicked, setIsClicked] = React.useState(false);
+    const reducedMotion = useReducedMotion();
+    const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
 
     const handleClick = () => {
         setIsClicked(true);
@@ -35,8 +39,10 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
             placement={isBottom ? "top" : "bottom"}
             className={clsx(collapsed ? "w-[72px]" : "w-full", isBottom && "mt-auto")}
         >
-            <button
+            <motion.button
                 onClick={handleClick}
+                aria-current={isActive ? 'page' : undefined}
+                whileTap={reducedMotion || !moreTransitionsEnabled ? undefined : { scale: 0.96 }}
                 className={clsx(
                     "group relative flex items-center min-h-[56px] mb-1 outline-none",
                     collapsed ? "w-[72px]" : "w-full"
@@ -47,13 +53,17 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                     "absolute top-1/2 -translate-y-1/2 h-10 rounded-full transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                     "left-3",
                     collapsed ? "w-12" : "w-[calc(100%-24px)]",
-                    isActive
-                        ? "bg-primary/15" // 稍微加深点 active 状态
-                        : clsx(
-                            "bg-transparent",
-                            !isClicked && "group-hover:bg-on-surface/8" // 如果点击了就不再显示 hover 背景
-                        )
+                    isActive && !moreTransitionsEnabled ? "bg-primary/15" : "bg-transparent",
+                    !isActive && !isClicked && "group-hover:bg-on-surface/8"
                 )} />
+                {isActive && moreTransitionsEnabled && (
+                    <motion.div
+                        layoutId="sidebar-active"
+                        initial={false}
+                        transition={reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 35 }}
+                        className={clsx("absolute top-2 left-3 h-10 rounded-full bg-primary/15", collapsed ? "w-12" : "w-[calc(100%-24px)]")}
+                    />
+                )}
 
                 {/* 2. 内容容器 (图标 + 文字) */}
                 <div className="relative z-10 flex items-center w-full px-3">
@@ -80,7 +90,7 @@ export default function SidebarNavButton({ item, isActive, collapsed, onClick, i
                         <span className="text-sm tracking-wide">{item.label}</span>
                     </span>
                 </div>
-            </button>
+            </motion.button>
         </CustomTooltip>
     );
 }

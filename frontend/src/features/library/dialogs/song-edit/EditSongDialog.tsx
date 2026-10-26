@@ -77,6 +77,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     useEffect(() => {
         if (!isOpen || !song) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或目标歌曲切换时初始化编辑表单状态
         setValues(makeInitialSongEditForm(song));
         setOriginalValues(null);
         setErrors({});

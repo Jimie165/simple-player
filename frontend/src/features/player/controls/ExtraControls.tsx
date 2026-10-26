@@ -22,6 +22,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
 
     // 当全局 volume 因为其他原因本身发生改变（比如松开手保存后，或初始化时），同步给外部按钮显示
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 外部全局音量变化时同步本地滑块显示值
         setLocalVolume(volume);
     }, [volume]);
 

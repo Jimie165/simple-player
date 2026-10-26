@@ -60,7 +60,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
 
     return (
         <div
-            className="group flex flex-col gap-3 rounded-xl p-3 -mx-3 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 base-theme:bg-surface base-theme:hover:bg-surface-variant/30 transition-colors cursor-pointer relative"
+            className="group flex flex-col gap-3 rounded-xl p-3 -mx-3 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 base-theme:hover:bg-surface-variant/30 transition-colors cursor-pointer relative"
         >
             <div
                 onClick={onClick}

@@ -30,6 +30,7 @@ export default function EditPlaylistDialog({
     // Sync props to state when dialog opens
     useEffect(() => {
         if (isOpen) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开时将初始属性同步到表单状态
             setName(initialName);
             setDescription(initialDescription || '');
             setCoverPath(initialCover);

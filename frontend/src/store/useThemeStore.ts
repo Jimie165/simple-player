@@ -90,7 +90,7 @@ export const useThemeStore = create<ThemeState>()(
                 const root = window.document.documentElement;
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-                let isDark = false;
+                let isDark: boolean;
                 if (themeMode === 'dark') {
                     isDark = true;
                 } else if (themeMode === 'light') {
