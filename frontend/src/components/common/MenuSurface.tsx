@@ -27,7 +27,7 @@ export function MenuEntries({ groups, onClose, headless = false, variant = 'defa
         {group.map(item => {
             const button = <button
                 onClick={event => { event.stopPropagation(); item.onClick(); onClose(); }}
-                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-on-surface/8 data-focus:bg-on-surface/8 ${apple ? 'font-medium' : 'base-theme:hover:bg-surface-variant/40 base-theme:data-focus:bg-surface-variant/40'} ${item.variant === 'danger' ? (apple ? 'text-red-400' : 'text-red-600 dark:text-red-400') : ''}`}
+                className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 text-left transition-colors hover:bg-menu-hover data-focus:bg-menu-hover ${apple ? 'font-medium' : ''} ${item.variant === 'danger' ? (apple ? 'text-red-400' : 'text-red-600 dark:text-red-400') : ''}`}
             >
                 <div className="flex flex-1 items-center gap-3">
                     {item.icon && <item.icon className={`text-lg ${apple ? '' : 'opacity-70'}`} />}

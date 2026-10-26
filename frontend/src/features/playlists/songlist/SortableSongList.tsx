@@ -202,7 +202,7 @@ export default function SortableSongList({
 
     const [activeId, setActiveId] = useState<string | null>(null);
 
-    const restrictToScrollViewport = createRestrictToViewportModifier('[data-scroll-viewport]');
+    const restrictToScrollViewport = useMemo(() => createRestrictToViewportModifier(scrollParent), [scrollParent]);
 
     // Prevent body scroll during drag, only allow viewport scroll
     useEffect(() => {
@@ -350,6 +350,7 @@ export default function SortableSongList({
                 collisionDetection={closestCenter}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                onDragCancel={() => setActiveId(null)}
                 modifiers={[restrictToVerticalAxis, restrictToScrollViewport]}
                 autoScroll={{
                     enabled: true,
@@ -391,8 +392,8 @@ export default function SortableSongList({
                                 <div className="relative" style={gridStyle}>
                                     {showStack && (
                                         <>
-                                            <div className="absolute inset-0 translate-y-2 scale-[0.99] rounded-lg bg-surface-container-high opacity-60 shadow-md pointer-events-none" />
-                                            <div className="absolute inset-0 translate-y-4 scale-[0.98] rounded-lg bg-surface-container-high opacity-40 shadow-sm pointer-events-none" />
+                                            <div className="absolute inset-0 translate-y-2 scale-[0.99] rounded-lg bg-(--content-glass-background) opacity-60 shadow-md backdrop-blur-lg pointer-events-none" />
+                                            <div className="absolute inset-0 translate-y-4 scale-[0.98] rounded-lg bg-(--content-glass-background) opacity-40 shadow-sm backdrop-blur-lg pointer-events-none" />
                                         </>
                                     )}
                                     <SongListItem

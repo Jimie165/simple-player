@@ -12,14 +12,17 @@ export function ContentSurface({ children, hidePageBackground }: {
     const [target, setTarget] = useState<HTMLDivElement | null>(null);
 
     return (
-        <div className="relative flex flex-1 min-w-0 overflow-hidden rounded-tl-2xl">
-            <div aria-hidden className="pointer-events-none absolute inset-0 bg-surface dark:bg-surface-container-low base-theme:bg-background transition-colors duration-300" />
+        <div className="relative isolate flex flex-1 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background transition-colors duration-300">
             <div
                 ref={setTarget}
                 aria-hidden
                 className={clsx('pointer-events-none absolute inset-0 overflow-hidden', hidePageBackground && 'invisible')}
             />
             <BackgroundTarget.Provider value={target}>{children}</BackgroundTarget.Provider>
+            {/* Paint the corner without rounding the clipping ancestor of backdrop filters. */}
+            <svg aria-hidden className="content-surface-corner pointer-events-none absolute left-0 top-0 z-90 size-4" viewBox="0 0 16 16">
+                <path d="M0 0H16A16 16 0 0 0 0 16Z" />
+            </svg>
         </div>
     );
 }

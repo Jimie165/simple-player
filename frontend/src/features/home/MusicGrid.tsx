@@ -152,7 +152,7 @@ export default function MusicGrid() {
                             return (
                                 <div
                                     key={item.id}
-                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
+                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
                                     onClick={(e) => handleItemClick(item, e)}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >
@@ -199,7 +199,7 @@ export default function MusicGrid() {
                                                     className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                                                 >
                                                     {isSelected
-                                                        ? <MdCheckBox className="text-primary text-xl" />
+                                                        ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                                         : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                                                     }
                                                 </div>

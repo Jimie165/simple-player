@@ -148,6 +148,7 @@ export default function SongListView({
     }, [manageSelection, isSelectionMode, sortedSongs, setSelectableIds]);
 
     const handleSort = (key: SortKey) => {
+        if (isSelectionMode) return;
         const next = changeSongListSorting(sorting, { key });
         if (sortControl) {
             sortControl.onChange(next);
@@ -164,10 +165,12 @@ export default function SongListView({
 
     const renderHeaderCell = (label: React.ReactNode, colKey: SortKey, className?: string, allowSort = true) => (
         <div
+            aria-disabled={allowSort && (disableSort || isSelectionMode)}
             onClick={() => allowSort && !disableSort && handleSort(colKey)}
             className={clsx(
                 "flex items-center gap-1 select-none transition-colors",
-                (allowSort && !disableSort) ? "cursor-pointer hover:text-on-surface" : "",
+                (allowSort && !disableSort && !isSelectionMode) ? "cursor-pointer hover:text-on-surface" : "",
+                allowSort && isSelectionMode && 'opacity-40 pointer-events-none',
                 className
             )}
         >

@@ -298,14 +298,13 @@ export default function NowPlayingQueue({
                         <span>下一首</span>
                     ) : (
                         <>
-                            <span className={clsx(isContent && 'shrink-0')}>下一首歌来自:</span>
+                            <span className="shrink-0 whitespace-nowrap">下一首歌来自:</span>
                             <QueueSourceLabel
                                 label={queueContext?.name || '播放列表'}
                                 blend={!isContent}
-                                isOpen={isOpen !== false}
                                 onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
                                 className={clsx(
-                                    'truncate',
+                                    'min-w-0 flex-1 truncate',
                                     isContent ? 'text-on-surface' : 'text-white opacity-45 mix-blend-plus-lighter transition-opacity',
                                     queueContext && 'cursor-pointer hover:underline',
                                     queueContext && (isContent ? 'hover:text-primary' : 'hover:opacity-35 active:opacity-25')
@@ -331,7 +330,7 @@ export default function NowPlayingQueue({
                 appearance={isContent ? 'content' : 'immersive'}
             />
         );
-    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext, isContent, isOpen]);
+    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext, isContent]);
 
     const activeDragEntry = useMemo(() => {
         if (!activeDragId) return null;
@@ -380,7 +379,7 @@ export default function NowPlayingQueue({
                                 width: draggedItemWidth ? `${draggedItemWidth}px` : 'auto',
                             }}
                         >
-                            <div className={clsx('group flex items-center rounded-md shadow-xl backdrop-blur-sm', isContent ? 'gap-3 p-2 bg-surface-container-high' : 'gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.5rem,1.5vw,1rem)] py-[clamp(0.375rem,1vw,0.75rem)] bg-white/10')}>
+                            <div className={clsx('group flex items-center rounded-md shadow-xl backdrop-blur-lg backdrop-saturate-220', isContent ? 'gap-3 p-2 border border-(--content-glass-edge) bg-(--content-glass-background)' : 'gap-[clamp(0.5rem,1.5vw,1rem)] px-[clamp(0.5rem,1.5vw,1rem)] py-[clamp(0.375rem,1vw,0.75rem)] bg-white/10')}>
                                 <div
                                     className={clsx('relative rounded-sm overflow-hidden shrink-0 bg-neutral-800', isContent && 'w-12 h-12')}
                                     style={isContent ? undefined : { width: 'clamp(2.75rem, 4.25vw, 4.25rem)', height: 'clamp(2.75rem, 4.25vw, 4.25rem)' }}

@@ -33,6 +33,8 @@ export function generateThemeVariables(sourceHex: string, isDark: boolean): Them
     return {
         '--player-primary-light': hexFromArgb(theme.palettes.primary.tone(35)),
         '--player-primary-dark': hexFromArgb(theme.palettes.primary.tone(85)),
+        '--player-on-primary-light': hexFromArgb(theme.palettes.primary.tone(100)),
+        '--player-on-primary-dark': hexFromArgb(theme.palettes.primary.tone(20)),
         // Primary
         '--md-sys-color-primary': hexFromArgb(scheme.primary),
         '--md-sys-color-on-primary': hexFromArgb(scheme.onPrimary),

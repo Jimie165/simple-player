@@ -209,9 +209,11 @@ function App() {
               className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
               <ScrollArea className="h-full" topOffset={48}>
-                <DetailScrollHeader className="-mb-10" />
-                <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
-                  {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
+                <div className="relative">
+                  <DetailScrollHeader className="-mb-10" />
+                  <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                    {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
+                  </div>
                 </div>
               </ScrollArea>
             </motion.div>
@@ -237,7 +239,13 @@ function App() {
         <ContentTheme>
           {/* 1. 标题栏（始终在最顶层 z-100） */}
           <TitleBar />
-          <SelectionMenuBar />
+          <SelectionMenuBar leftOffset={sidebarOffset} />
+          {isSidebarOverlay && !sidebarCollapsed && (
+            <div
+              className="absolute inset-y-0 left-18 right-0 z-96 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
+              onClick={() => setSidebarCollapsed(true)}
+            />
+          )}
           {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
           <div className="app-shell-background absolute inset-0 flex">
             <Sidebar
@@ -256,14 +264,6 @@ function App() {
             />
 
             <ContentSurface hidePageBackground={hasOverlay}>
-              {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
-              {isSidebarOverlay && !sidebarCollapsed && (
-                <div
-                  className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
-                  onClick={() => setSidebarCollapsed(true)}
-                />
-              )}
-
               {/* Reuse mainContent variable content inline or wrapper */}
               {mainContent}
 

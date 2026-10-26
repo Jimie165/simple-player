@@ -56,7 +56,7 @@ export function ContentTheme({ children }: { children: ReactNode }) {
             <ContentThemeContext.Provider value={setTheme}>
                 <div
                     ref={rootRef}
-                    className={clsx('flex min-h-0 flex-1 overflow-hidden relative', theme?.isDark && 'dark')}
+                    className={clsx('flex min-h-0 flex-1 overflow-hidden relative isolate bg-surface-container', theme?.isDark && 'dark')}
                     data-artwork-theme={theme ? 'active' : undefined}
                     style={style}
                 >

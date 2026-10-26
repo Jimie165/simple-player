@@ -127,11 +127,11 @@ export const SongListItem = memo(({
                 "group isolate grid h-13.5 gap-4 px-4 items-center relative touch-pan-y before:absolute before:inset-y-0 before:left-12 before:right-2 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
                 isLast ? "after:left-14" : "after:left-28",
                 isOverlay
-                    ? "rounded-xl bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02] after:opacity-0"
+                    ? "rounded-xl bg-(--content-glass-background) backdrop-blur-lg backdrop-saturate-220 border border-(--content-glass-edge) cursor-grabbing shadow-2xl scale-[1.02] after:opacity-0"
                     : selected
                         ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
                         : isDragging
-                            ? "bg-surface-container-high elevation-2 opacity-50"
+                            ? "bg-(--content-glass-background) backdrop-blur-lg opacity-50"
                             : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
                 (!selected || !previousSelected) && "before:rounded-t-xl",
                 (!selected || !nextSelected) && "before:rounded-b-xl",

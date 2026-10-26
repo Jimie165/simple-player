@@ -53,6 +53,8 @@
   /* Custom Blur Button Utility */
   --color-glass-surface: var(--glass-surface);
   --color-glass-border: var(--glass-border);
+  --color-menu-highlight: var(--menu-highlight);
+  --color-menu-hover: var(--menu-hover);
 }
 
 @property --kf {
@@ -115,6 +117,8 @@
   --content-glass-edge: rgba(0, 0, 0, 0.05);
   --content-glass-divider: rgba(0, 0, 0, 0.1);
   --content-glass-shadow: rgba(0, 0, 0, 0.1);
+  --menu-highlight: rgba(0, 0, 0, 0.1);
+  --menu-hover: rgba(0, 0, 0, 0.06);
 
   /* Settings use a foreground-first hierarchy: cards and controls are brighter
      than the surrounding page, rather than following the generic MD surface ramp. */
@@ -172,6 +176,8 @@
   --content-glass-edge: rgba(255, 255, 255, 0.2);
   --content-glass-divider: rgba(255, 255, 255, 0.1);
   --content-glass-shadow: rgba(0, 0, 0, 0.2);
+  --menu-highlight: rgba(0, 0, 0, 0.24);
+  --menu-hover: rgba(0, 0, 0, 0.12);
 
   --settings-card: rgba(255, 255, 255, 0.05);
   --settings-option: #3A3A3C;
@@ -204,14 +210,26 @@ body {
 }
 
 @layer components {
-  .content-player-shell {
+  .content-player-shell,
+  .selection-accent {
     --md-sys-color-primary: var(--player-primary-light);
     --color-primary: var(--player-primary-light);
   }
 
-  .dark .content-player-shell {
+  .dark .content-player-shell,
+  .dark .selection-accent {
     --md-sys-color-primary: var(--player-primary-dark);
     --color-primary: var(--player-primary-dark);
+  }
+
+  .selection-accent {
+    --md-sys-color-on-primary: var(--player-on-primary-light);
+    --color-on-primary: var(--player-on-primary-light);
+  }
+
+  .dark .selection-accent {
+    --md-sys-color-on-primary: var(--player-on-primary-dark);
+    --color-on-primary: var(--player-on-primary-dark);
   }
 
   /* Keep the material behind the controls so nested popups can blur independently. */
@@ -350,8 +368,10 @@ body {
 @layer utilities {
   /* 侧栏与内容圆角外侧共用背景，避免接缝处重复叠色。 */
   .app-shell-background {
+    --app-shell-base: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+    --app-shell-corner: var(--app-shell-base);
     transition: background-color 200ms ease;
-    background-color: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+    background-color: var(--app-shell-base);
   }
 
   /* Keep the gradient layer mounted: background-image cannot interpolate when artwork takes over. */
@@ -366,7 +386,8 @@ body {
   }
 
   .dark .app-shell-background {
-    background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
+    --app-shell-base: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
+    --app-shell-corner: color-mix(in srgb, var(--app-shell-gradient-color) 12%, var(--app-shell-base));
   }
 
   .dark .app-shell-background::before {
@@ -374,7 +395,8 @@ body {
   }
 
   [data-artwork-theme] .app-shell-background {
-    background-color: var(--artwork-sidebar-background);
+    --app-shell-base: var(--artwork-sidebar-background);
+    --app-shell-corner: var(--app-shell-base);
     --md-sys-color-primary: var(--md-sys-color-on-surface);
     --md-sys-color-on-primary: var(--artwork-on-primary);
     --color-primary: var(--md-sys-color-on-surface);
@@ -383,6 +405,11 @@ body {
 
   [data-artwork-theme] .app-shell-background::before {
     opacity: 0;
+  }
+
+  .content-surface-corner {
+    fill: var(--app-shell-corner);
+    transition: fill 200ms ease;
   }
 
   .plain-lyrics-scroll { scrollbar-width: none; }

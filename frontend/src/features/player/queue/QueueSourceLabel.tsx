@@ -4,11 +4,10 @@ interface QueueSourceLabelProps {
     label: string;
     className: string;
     blend: boolean;
-    isOpen: boolean;
     onClick: () => void;
 }
 
-export default function QueueSourceLabel({ label, className, blend, isOpen, onClick }: QueueSourceLabelProps) {
+export default function QueueSourceLabel({ label, className, blend, onClick }: QueueSourceLabelProps) {
     const sourceRef = useRef<HTMLSpanElement>(null);
 
     useLayoutEffect(() => {
@@ -77,7 +76,11 @@ export default function QueueSourceLabel({ label, className, blend, isOpen, onCl
         observer.observe(source);
         observer.observe(viewport);
         // 面板缩放不会触发布局尺寸变化，需要跟随祖先动画样式更新混合层。
-        const motionObserver = new MutationObserver(refresh);
+        const motionObserver = new MutationObserver(() => {
+            // Synchronize after the animation writes its transform, before this frame is painted.
+            update();
+            refresh();
+        });
         for (let parent = source.parentElement; parent; parent = parent.parentElement) {
             motionObserver.observe(parent, { attributes: true, attributeFilter: ['style', 'class'] });
             if (parent === root) break;
@@ -96,7 +99,7 @@ export default function QueueSourceLabel({ label, className, blend, isOpen, onCl
             layer.remove();
             source.style.color = originalColor;
         };
-    }, [blend, isOpen, label]);
+    }, [blend, label]);
 
     return <span ref={sourceRef} className={className} onClick={onClick}>{label}</span>;
 }

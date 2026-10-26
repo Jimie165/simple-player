@@ -39,8 +39,10 @@ export default function RetainedMediaPage({ active, children, resetScrollOnEnter
                 className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
                 <ScrollArea className="h-full" topOffset={48} viewportRef={viewportRef}>
-                    <DetailScrollHeader className="-mb-10" />
-                    <div className="pt-12 min-h-full pb-24 transition-colors duration-300">{children}</div>
+                    <div className="relative">
+                        <DetailScrollHeader className="-mb-10" />
+                        <div className="pt-12 min-h-full pb-24 transition-colors duration-300">{children}</div>
+                    </div>
                 </ScrollArea>
             </motion.div>
         </Activity>

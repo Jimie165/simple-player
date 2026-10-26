@@ -5,7 +5,7 @@ import { MenuSurface, MenuEntries } from '@/components/common/MenuSurface';
 import MoreIcon from '@/components/common/MoreIcon';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
-import { useMenuDismiss } from '@/hooks/menu/useMenuDismiss';
+import { useMenuDismiss, useMenuScrollLock } from '@/hooks/menu/useMenuDismiss';
 import {
     MdPlayArrow,
     MdShuffle,
@@ -216,6 +216,7 @@ function MenuLifecycleEffects({
 }) {
     const wasOpenRef = useRef(false);
     useMenuDismiss(open, menuRef, close, buttonRef);
+    useMenuScrollLock(open, menuRef);
 
     useEffect(() => {
         if (!open) {
@@ -231,52 +232,6 @@ function MenuLifecycleEffects({
         wasOpenRef.current = true;
         return;
     }, [open, buttonRef]);
-
-    useEffect(() => {
-        if (!open) return;
-
-        const shouldAllowEvent = (target: EventTarget | null) => {
-            const node = target instanceof Node ? target : null;
-            return !!node && !!menuRef.current?.contains(node);
-        };
-
-        const blockScrollGesture = (event: WheelEvent | TouchEvent) => {
-            if (shouldAllowEvent(event.target)) return;
-            event.preventDefault();
-            event.stopPropagation();
-        };
-
-        const blockScrollKeys = (event: KeyboardEvent) => {
-            if (shouldAllowEvent(event.target)) return;
-            const blockedKeys = new Set([
-                'ArrowUp',
-                'ArrowDown',
-                'PageUp',
-                'PageDown',
-                'Home',
-                'End',
-                ' ',
-                'Spacebar',
-            ]);
-
-            if (!blockedKeys.has(event.key)) return;
-            event.preventDefault();
-            event.stopPropagation();
-        };
-
-        const nonPassiveCapture = { capture: true, passive: false } as const;
-        const captureOnly = { capture: true } as const;
-
-        window.addEventListener('wheel', blockScrollGesture, nonPassiveCapture);
-        window.addEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
-        window.addEventListener('keydown', blockScrollKeys, captureOnly);
-
-        return () => {
-            window.removeEventListener('wheel', blockScrollGesture, nonPassiveCapture);
-            window.removeEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
-            window.removeEventListener('keydown', blockScrollKeys, captureOnly);
-        };
-    }, [open, menuRef]);
 
     return null;
 }

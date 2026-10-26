@@ -5,6 +5,7 @@ import { useIsPresent } from 'framer-motion';
 import { MdPlayArrow, MdShuffle, MdEdit } from 'react-icons/md';
 import favoritesCover from '@/assets/favorites-cover.svg';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 import { ContentBackground } from '@/components/layout/ContentSurface';
@@ -228,12 +229,20 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     // Modification Actions
     // Modification Actions
     const handleReorder = async (newOrder: SongMetadata[]) => {
-        setSongs(newOrder); // Optimistic update
+        const previousSongs = songs;
+        const storedOrder = sortOrder === 'desc' ? [...newOrder].reverse() : newOrder;
+        setSongs(storedOrder);
         if (id !== 'favorites') {
-            const songIds = newOrder.map(s => s.id!);
-            await libraryService.reorderPlaylistSongs(id as number, songIds);
-            triggerLibraryUpdate();
-            triggerPlaylistUpdate();
+            try {
+                const songIds = storedOrder.map(s => s.id!);
+                await libraryService.reorderPlaylistSongs(id, songIds);
+                triggerLibraryUpdate();
+                triggerPlaylistUpdate();
+            } catch (error) {
+                setSongs(previousSongs);
+                console.error('Failed to reorder playlist songs:', error);
+                toast.error('保存歌曲顺序失败，请重试');
+            }
         }
     };
 

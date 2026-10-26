@@ -67,7 +67,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                             className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                         >
                             {isSelected
-                                ? <MdCheckBox className="text-primary text-xl" />
+                                ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                 : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                             }
                         </div>

@@ -22,12 +22,9 @@ export function getGridTemplateColumns(shouldHideAlbum: boolean, shouldHideArtis
     return cols;
 }
 
-export function createRestrictToViewportModifier(viewportSelector: string): Modifier {
-    return ({ transform, draggingNodeRect, containerNodeRect }) => {
-        if (!draggingNodeRect || !containerNodeRect) return transform;
-
-        const viewport = document.querySelector(viewportSelector);
-        if (!viewport) return transform;
+export function createRestrictToViewportModifier(viewport: HTMLElement | null): Modifier {
+    return ({ transform, draggingNodeRect }) => {
+        if (!draggingNodeRect || !viewport) return transform;
 
         const viewportRect = viewport.getBoundingClientRect();
         const draggedTop = draggingNodeRect.top + transform.y;

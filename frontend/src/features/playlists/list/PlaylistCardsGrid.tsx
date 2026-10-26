@@ -78,7 +78,7 @@ export default function PlaylistCardsGrid({
                                 setContextMenu(null);
                                 setFavoritesContextMenu({ x: e.clientX, y: e.clientY });
                             }}
-                            className={clsx("group flex flex-col gap-3 cursor-pointer", isSelected ? "base-theme:bg-secondary-container/60" : "base-theme:bg-surface")}
+                            className={clsx("group relative flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
                         >
                             <SharedCover data-transition-cover="playlist-cover-favorites" layoutId="playlist-cover-favorites"
                                 className="relative aspect-square rounded-xl overflow-hidden bg-linear-to-br from-red-500 to-pink-600 shadow-sm group-hover:shadow-md transition-shadow"
@@ -94,7 +94,7 @@ export default function PlaylistCardsGrid({
                                         className={clsx(
                                             'absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer',
                                             isSelected
-                                                ? 'bg-white text-primary opacity-100'
+                                                ? 'selection-accent bg-primary text-on-primary opacity-100'
                                                 : 'bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100'
                                         )}
                                     >
@@ -161,7 +161,7 @@ export default function PlaylistCardsGrid({
                             setFavoritesContextMenu(null);
                             setContextMenu({ x: e.clientX, y: e.clientY, playlist });
                         }}
-                        className={clsx("group flex flex-col gap-3 cursor-pointer", isSelected ? "base-theme:bg-secondary-container/60" : "base-theme:bg-surface")}
+                        className={clsx("group relative flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:bg-surface base-theme:hover:bg-surface-variant/30")}
                     >
                         <SharedCover data-transition-cover={`playlist-cover-${playlist.id}`} layoutId={`playlist-cover-${playlist.id}`} className="relative aspect-square rounded-2xl overflow-hidden bg-neutral-100 dark:bg-neutral-800 shadow-sm group-hover:shadow-md transition-shadow">
                             {playlist.cover_path ? (
@@ -182,7 +182,7 @@ export default function PlaylistCardsGrid({
                                     className={clsx(
                                         'absolute top-2 left-2 z-30 w-6 h-6 rounded-md flex items-center justify-center transition-all shadow-md cursor-pointer',
                                         isSelected
-                                            ? 'bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary opacity-100'
+                                            ? 'selection-accent bg-primary text-on-primary opacity-100'
                                             : 'bg-black/20 backdrop-blur-md text-white border border-white/30 opacity-100'
                                     )}
                                 >

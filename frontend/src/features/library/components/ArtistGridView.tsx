@@ -123,7 +123,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                 className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shadow-sm"
                             >
                                 {isSelected
-                                    ? <MdCheckBox className="text-primary text-xl" />
+                                    ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                     : <MdCheckBoxOutlineBlank className="text-white text-xl" />
                                 }
                             </div>
