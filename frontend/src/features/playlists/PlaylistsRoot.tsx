@@ -34,7 +34,7 @@ export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
         <AnimatePresence initial={false} custom={{ page: currentPage, coverTransition }}>
             {detail && (
                 <ArtworkThemeLayer
-                    key={detail.id}
+                    key={`${detail.id}-${detail.scrollKey}`}
                     data-transition-layer={detail.transitionSource?.coverId}
                     {...getDetailMotion(detail.transitionSource, undefined, moreTransitionsEnabled)}
                     animate={{
@@ -58,7 +58,7 @@ export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
                     className="absolute inset-0 z-50 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
                 >
                     <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
-                    <ScrollArea className="h-full" topOffset={48}>
+                    <ScrollArea className="h-full" topOffset={48} navigationScrollKey={detail.scrollKey} navigationActive={isVisible}>
                         <div className="min-h-full pb-24">
                             <PlaylistDetail
                                 id={detail.id}

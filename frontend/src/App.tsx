@@ -103,6 +103,8 @@ function App() {
 
   const {
     currentPage,
+    scrollKey,
+    searchQuery,
     mainHistory,
     hasOverlay,
     activePlaylistDetail,
@@ -121,8 +123,6 @@ function App() {
     toggle: toggleFullScreenPlayer,
     handleOpened: handleFullScreenPlayerOpened,
   } = useImmersivePlayerTransition();
-
-  const [searchQuery, setSearchQuery] = useState('');
 
   useQueuePersistence(); // Activate queue persistence
   useGlobalEvents(); // Activate global event listeners
@@ -149,9 +149,9 @@ function App() {
   const queueOffset = isQueueOpen && canShowQueue ? CONTENT_QUEUE_WIDTH : 0;
   const playerWidth = mainContentWidth - queueOffset;
   const playerMode = playerWidth < 560 ? 'mini' : playerWidth < FULL_PLAYER_MIN_WIDTH ? 'compact' : 'full';
-  const handleNavigate = (page: string) => {
+  const handleNavigate = (page: string, query?: string) => {
     const target = page as PageId;
-    storeNavigate(target);
+    storeNavigate(target, undefined, query);
 
     // Clear selection mode when switching pages
     useSelectionStore.getState().clearSelection();
@@ -160,8 +160,7 @@ function App() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    handleNavigate('search');
+    handleNavigate('search', query);
   };
 
   const handleBack = () => {
@@ -195,10 +194,10 @@ function App() {
       />
 
       <div className="flex-1 min-h-0 relative z-0 overflow-hidden">
-        <RetainedMediaPage active={currentPage === 'home'}><MusicGrid /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'library'} resetScrollOnEnter><Library /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'videos'}><VideoLibrary /></RetainedMediaPage>
-        <RetainedMediaPage active={currentPage === 'playlists'}>
+        <RetainedMediaPage active={currentPage === 'home'} scrollKey={currentPage === 'home' ? scrollKey : undefined}><MusicGrid /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'library'} scrollKey={currentPage === 'library' ? scrollKey : undefined}><Library /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'videos'} scrollKey={currentPage === 'videos' ? scrollKey : undefined}><VideoLibrary /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'playlists'} scrollKey={currentPage === 'playlists' ? scrollKey : undefined}>
           <PlaylistsRoot isPageVisible={currentPage === 'playlists' && !isBaseLayerFrozen} />
         </RetainedMediaPage>
         <AnimatePresence mode="wait">
@@ -208,7 +207,7 @@ function App() {
               {...pageMotion}
               className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
-              <ScrollArea className="h-full" topOffset={48}>
+              <ScrollArea className="h-full" topOffset={48} navigationScrollKey={scrollKey}>
                 <div className="relative">
                   <DetailScrollHeader className="-mb-10" />
                   <div className="pt-12 min-h-full pb-24 transition-colors duration-300">

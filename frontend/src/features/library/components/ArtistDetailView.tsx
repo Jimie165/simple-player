@@ -22,6 +22,7 @@ import { useNavigationStore } from '@/store/useNavigationStore';
 import DetailScrollHeader from '@/components/common/DetailScrollHeader';
 
 interface ArtistDetailViewProps {
+    initialTab?: string;
     artist: ArtistData;
     albums: AlbumData[];
     onShuffle: () => void;
@@ -44,6 +45,7 @@ const ArtistAlbumSection = memo(function ArtistAlbumSection({ album, index, rend
 });
 
 export default function ArtistDetailView({
+    initialTab,
     artist,
     albums,
     onShuffle,
@@ -78,12 +80,14 @@ export default function ArtistDetailView({
     // Use persistent tab state from store
     const tabIndicatorId = useId();
     const [activeTab, setActiveTab] = useState<'albums' | 'songs'>(() => {
-        return (lastArtistDetailTab === 'albums' || lastArtistDetailTab === 'songs')
-            ? lastArtistDetailTab
+        const tab = initialTab ?? lastArtistDetailTab;
+        return (tab === 'albums' || tab === 'songs')
+            ? tab
             : 'songs';
     });
 
     const handleTabChange = (tab: 'albums' | 'songs') => {
+        scrollParent?.scrollTo({ top: 0, behavior: 'instant' });
         useSelectionStore.getState().clearSelection();
         setActiveTab(tab);
         setArtistDetailTab(tab);

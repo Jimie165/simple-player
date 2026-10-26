@@ -8,18 +8,23 @@ import { useThemeStore } from '@/store/useThemeStore';
 export type ViewType = 'artist_detail' | 'album_detail';
 
 export interface PlaylistDetailState {
+    scrollKey?: number;
     id: number | 'favorites';
     name: string;
     transitionSource?: CoverTransitionSource;
 }
 
 export interface ViewState {
+    scrollKey?: number;
+    tab?: string;
     type: ViewType;
     data?: unknown; // artist, album, or playlist data
     transitionSource?: CoverTransitionSource;
 }
 
 interface MainState {
+    scrollKey: number;
+    searchQuery: string;
     page: PageId;
     tab?: string;
     overlayStack?: ViewState[];
@@ -27,6 +32,11 @@ interface MainState {
 }
 
 interface NavigationState {
+    scrollKey: number;
+    nextScrollKey: number;
+    scrollPositions: Record<number, number>;
+    saveScrollPosition: (key: number, top: number) => void;
+    searchQuery: string;
     // Main Page Navigation
     currentPage: PageId;
     currentTab: string;
@@ -48,10 +58,11 @@ interface NavigationState {
     // Persistent UI State
     lastLibraryTab: string;
     lastVideoTab: string;
+    lastSettingsTab: string;
     lastArtistDetailTab: string;
 
     // Actions
-    navigate: (page: PageId, tab?: string) => void;
+    navigate: (page: PageId, tab?: string, query?: string) => void;
     setTab: (tab: string) => void; // For tab-only changes within current page
     setArtistDetailTab: (tab: string) => void;
     openPlaylistDetail: (detail: PlaylistDetailState) => void;
@@ -73,6 +84,16 @@ interface NavigationState {
 
 const OVERLAY_PUSH_DEBOUNCE_MS = 260;
 
+function captureScrollPositions(state: NavigationState): Record<number, number> {
+    if (typeof document === 'undefined') return state.scrollPositions;
+    const positions = { ...state.scrollPositions };
+    for (const viewport of document.querySelectorAll<HTMLElement>('[data-navigation-scroll-key]')) {
+        if (viewport.clientHeight === 0 || viewport.hasAttribute('data-navigation-scroll-restoring')) continue;
+        positions[Number(viewport.dataset.navigationScrollKey)] = viewport.scrollTop;
+    }
+    return positions;
+}
+
 function historyCover(source?: CoverTransitionSource): CoverTransitionSource | undefined {
     return source ? { ...source, images: undefined, flight: undefined } : undefined;
 }
@@ -82,6 +103,8 @@ function appendMainHistory(state: NavigationState): MainState[] {
     return [
         ...state.mainHistory,
         {
+            scrollKey: state.scrollKey,
+            searchQuery: state.searchQuery,
             page: state.currentPage,
             tab: state.currentTab,
             overlayStack: state.overlayStack.length > 0 ? state.overlayStack.map(view => ({
@@ -109,6 +132,12 @@ function getOverlayKey(view: ViewState): string {
 }
 
 export const useNavigationStore = create<NavigationState>()((set, get) => ({
+    scrollKey: 0,
+    nextScrollKey: 1,
+    scrollPositions: {},
+    saveScrollPosition: (key, top) => set(state => state.scrollPositions[key] === top
+        ? state : { scrollPositions: { ...state.scrollPositions, [key]: top } }),
+    searchQuery: '',
     currentPage: 'home',
     currentTab: 'songs',
     mainHistory: [],
@@ -155,12 +184,24 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     // Persistent UI State
     lastLibraryTab: 'songs',
     lastVideoTab: 'all',
+    lastSettingsTab: 'general',
     lastArtistDetailTab: 'songs',
 
-    navigate: (page, tab) => set((state) => {
-        // If navigating to the exact same spot, do nothing
-        if (state.currentPage === page && (tab === undefined || state.currentTab === tab)) {
-            return state;
+    navigate: (page, tab, query) => set((state) => {
+        // Re-entering the current destination resets its viewport without adding duplicate history.
+        if (state.currentPage === page && (tab === undefined || state.currentTab === tab)
+            && (page !== 'search' || query === undefined || query === state.searchQuery)) {
+            return {
+                scrollPositions: captureScrollPositions(state),
+                scrollKey: state.nextScrollKey,
+                nextScrollKey: state.nextScrollKey + 1,
+                activePlaylistDetail: null,
+                playlistDetailEntered: false,
+                overlayStack: [],
+                activeOverlay: null,
+                hasOverlay: false,
+                coverTransition: null,
+            };
         }
 
         const newHistory = appendMainHistory(state);
@@ -173,12 +214,18 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             if (tab) targetTab = tab;
         } else if (page === 'videos') {
             targetTab = tab || state.lastVideoTab || 'all';
+        } else if (page === 'settings') {
+            targetTab = tab || 'general';
         }
 
         // Update persistence immediately for target page
         // tailored for library and videos
         const updates: Partial<NavigationState> = {
+            scrollPositions: captureScrollPositions(state),
+            scrollKey: state.nextScrollKey,
+            nextScrollKey: state.nextScrollKey + 1,
             currentPage: page,
+            searchQuery: page === 'search' ? query ?? state.searchQuery : state.searchQuery,
             currentTab: targetTab,
             mainHistory: newHistory,
             coverTransition: null,
@@ -190,16 +237,24 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
         if (page === 'library') updates.lastLibraryTab = targetTab;
         if (page === 'videos') updates.lastVideoTab = targetTab;
+        if (page === 'settings') updates.lastSettingsTab = targetTab;
 
         return updates;
     }),
 
     setTab: (tab) => set((state) => {
-        if (state.currentTab === tab) return state;
+        if (state.currentTab === tab) return {
+            scrollPositions: captureScrollPositions(state),
+            scrollKey: state.nextScrollKey,
+            nextScrollKey: state.nextScrollKey + 1,
+        };
         const newHistory = appendMainHistory(state);
 
         // Update persistent state for library
         const updates: Partial<NavigationState> = {
+            scrollPositions: captureScrollPositions(state),
+            scrollKey: state.nextScrollKey,
+            nextScrollKey: state.nextScrollKey + 1,
             currentTab: tab,
             mainHistory: newHistory,
             coverTransition: null,
@@ -209,17 +264,26 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             updates.lastLibraryTab = tab;
         } else if (state.currentPage === 'videos') {
             updates.lastVideoTab = tab;
+        } else if (state.currentPage === 'settings') {
+            updates.lastSettingsTab = tab;
         }
 
         return updates;
     }),
 
-    setArtistDetailTab: (tab) => set({ lastArtistDetailTab: tab }),
+    setArtistDetailTab: (tab) => set(state => {
+        if (state.activeOverlay?.type !== 'artist_detail') return { lastArtistDetailTab: tab };
+        const view = { ...state.activeOverlay, tab };
+        return { lastArtistDetailTab: tab, activeOverlay: view,
+            overlayStack: [...state.overlayStack.slice(0, -1), view] };
+    }),
 
     openPlaylistDetail: (detail) => set((state) => {
         if (state.currentPage === 'playlists') {
             return {
-                activePlaylistDetail: detail,
+                activePlaylistDetail: { ...detail, scrollKey: state.nextScrollKey },
+                scrollPositions: captureScrollPositions(state),
+                nextScrollKey: state.nextScrollKey + 1,
                 playlistDetailEntered: false,
                 coverTransition: null,
                 overlayStack: [],
@@ -230,9 +294,12 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
 
         return {
             currentPage: 'playlists',
+            scrollPositions: captureScrollPositions(state),
+            scrollKey: state.nextScrollKey,
+            nextScrollKey: state.nextScrollKey + 2,
             currentTab: 'songs',
             mainHistory: appendMainHistory(state),
-            activePlaylistDetail: detail,
+            activePlaylistDetail: { ...detail, scrollKey: state.nextScrollKey + 1 },
             playlistDetailEntered: false,
             coverTransition: null,
             overlayStack: [],
@@ -249,7 +316,8 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
     closePlaylistDetail: () => {
         const coverTransition = useThemeStore.getState().moreTransitionsEnabled
             ? captureReturnCover(get().activePlaylistDetail?.transitionSource) : null;
-        set({ activePlaylistDetail: null, playlistDetailEntered: false, coverTransition });
+        set(state => ({ activePlaylistDetail: null, playlistDetailEntered: false, coverTransition,
+            scrollPositions: captureScrollPositions(state) }));
     },
 
     push: (view) => set((state) => {
@@ -268,10 +336,14 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             };
         }
 
-        const newStack = [...state.overlayStack, view];
+        const destination = { ...view, scrollKey: state.nextScrollKey,
+            tab: view.type === 'artist_detail' ? view.tab ?? state.lastArtistDetailTab : view.tab };
+        const newStack = [...state.overlayStack, destination];
         return {
             overlayStack: newStack,
-            activeOverlay: view,
+            activeOverlay: destination,
+            scrollPositions: captureScrollPositions(state),
+            nextScrollKey: state.nextScrollKey + 1,
             hasOverlay: true,
             coverTransition: null,
             _lastPushedOverlayKey: incomingKey,
@@ -286,6 +358,7 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
         const newStack = state.overlayStack.slice(0, -1);
         return {
             overlayStack: newStack,
+            scrollPositions: captureScrollPositions(state),
             activeOverlay: newStack.length > 0 ? newStack[newStack.length - 1] : null,
             hasOverlay: newStack.length > 0,
             coverTransition,
@@ -316,8 +389,14 @@ export const useNavigationStore = create<NavigationState>()((set, get) => ({
             const prevState = newHistory.pop();
             if (prevState) {
                 set({
+                    scrollPositions: captureScrollPositions(get()),
+                    scrollKey: prevState.scrollKey,
+                    searchQuery: prevState.searchQuery,
                     currentPage: prevState.page,
                     currentTab: prevState.tab || 'songs',
+                    ...(prevState.page === 'library' ? { lastLibraryTab: prevState.tab || 'songs' } : {}),
+                    ...(prevState.page === 'videos' ? { lastVideoTab: prevState.tab || 'all' } : {}),
+                    ...(prevState.page === 'settings' ? { lastSettingsTab: prevState.tab || 'general' } : {}),
                     mainHistory: newHistory,
                     coverTransition: null,
                     activePlaylistDetail: prevState.playlistDetail ?? null,

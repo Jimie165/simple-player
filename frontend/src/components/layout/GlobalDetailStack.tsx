@@ -124,7 +124,7 @@ function GlobalDetailStack() {
                 const detailMotion = getDetailMotion(activeView.transitionSource, undefined, moreTransitionsEnabled);
                 const isTopOverlay = index === overlayStack.length - 1;
                 const isFrozenOverlay = !isTopOverlay && transitionDirection !== 'push';
-                let key = `${activeView.type}-${index}`;
+                let key = `${activeView.type}-${index}-${activeView.scrollKey}`;
                 if (activeView.type === 'album_detail') key += `-${(activeView.data as AlbumData).name}`;
                 if (activeView.type === 'artist_detail') key += `-${(activeView.data as ArtistData).name}`;
 
@@ -160,7 +160,7 @@ function GlobalDetailStack() {
                         aria-hidden={!isTopOverlay}
                     >
                         <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
-                        <ScrollArea className="h-full" topOffset={48}>
+                        <ScrollArea className="h-full" topOffset={48} navigationScrollKey={activeView.scrollKey} navigationActive={isTopOverlay}>
                             <ErrorBoundary>
                                 {(() => {
                                     switch (activeView.type) {
@@ -178,6 +178,7 @@ function GlobalDetailStack() {
                                         case 'artist_detail':
                                             return (
                                                 <ArtistOverlay
+                                                    initialTab={activeView.tab}
                                                     data={activeView.data as ArtistData}
                                                     transitionSource={activeView.transitionSource}
                                                     onPlaySong={handlePlaySong}
@@ -205,6 +206,7 @@ export default memo(GlobalDetailStack);
 // --- Internal Sub-Components to Isolate Hooks ---
 
 interface OverlayProps {
+    initialTab?: string;
     transitionSource?: CoverTransitionSource;
     data: AlbumData | ArtistData;
     onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
@@ -302,7 +304,7 @@ function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuff
     );
 }
 
-function ArtistOverlay({ data: initialData, transitionSource, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
+function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const artistInitialData = useMemo<ArtistData>(() => {
         const data = initialData as Partial<ArtistData>;
@@ -379,6 +381,7 @@ function ArtistOverlay({ data: initialData, transitionSource, onPlaySong, onShuf
 
     return (
         <ArtistDetailView
+            initialTab={initialTab}
             transitionSource={transitionSource}
             artist={artistData}
             albums={artistAlbums}

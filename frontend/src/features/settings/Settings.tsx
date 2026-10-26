@@ -1,5 +1,5 @@
 import { viewMotion } from '@/utils/viewTransition';
-import { useState } from 'react';
+import { useNavigationStore } from '@/store/useNavigationStore';
 import { AnimatePresence, motion } from 'framer-motion';
 import type { IconType } from 'react-icons';
 import { MdFolder, MdInfoOutline, MdMemory, MdPalette, MdTune } from 'react-icons/md';
@@ -27,7 +27,9 @@ const TABS: { id: SettingsTab; label: string; icon: IconType }[] = [
 ];
 
 export default function Settings() {
-    const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+    const currentTab = useNavigationStore(state => state.currentPage === 'settings' ? state.currentTab : state.lastSettingsTab);
+    const setActiveTab = useNavigationStore(state => state.setTab);
+    const activeTab = TABS.find(tab => tab.id === currentTab)?.id ?? 'general';
 
     return (
         <PageContainer title="设置">
