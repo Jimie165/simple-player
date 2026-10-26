@@ -61,7 +61,7 @@ Simple Player 是一款本地音乐与视频播放器。添加文件夹后即可
   </tr>
   <tr>
     <td><img src="docs/assets/screenshots/音乐库.png" alt="音乐库中的歌曲列表" width="100%" /></td>
-    <td><img src="docs/assets/screenshots/音乐库专辑视图.png" alt="音乐库中的专辑视图" width="100%" /></td>
+    <td><img src="docs/assets/screenshots/专辑详情界面.png" alt="专辑的详细界面" width="100%" /></td>
   </tr>
   <tr>
     <th>歌单</th>
