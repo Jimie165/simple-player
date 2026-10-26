@@ -849,7 +849,7 @@ export function useAnimatedLyricsAnimator({
     }, [animator]);
 
     const scrollManualBy = useCallback((delta: number, max: number, continuous = false) => animator.scrollManualBy(delta, max, continuous), [animator]);
-    const scrollManualTo = useCallback((offset: number, max: number) => animator.scrollManualTo(offset, max, true), [animator]);
+    const scrollManualTo = useCallback((offset: number, max: number, continuous = true) => animator.scrollManualTo(offset, max, continuous), [animator]);
     const canResumeAutoFollow = useCallback(() => {
         const targets = latestTargetsRef.current;
         return animator.canResumeAutoFollow(getEffectiveIndex(targets.activeDisplayIndex, targets.parentDisplayIndexMap));

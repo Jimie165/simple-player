@@ -529,19 +529,19 @@ function AnimatedLyricsPanel({
                             getOffset: getScrollOffset,
                             subscribe: subscribeScroll,
                             onWheel: handleManualDelta,
-                            onScrollTo: offset => {
+                            onScrollTo: (offset, behavior) => {
                                 if (!manualScrollActiveRef.current) {
                                     manualScrollActiveRef.current = true;
                                     beginManualScroll();
                                 }
                                 const delta = offset - getScrollOffset();
-                                onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
+                                if (delta !== 0) onUserScrollDirection?.(delta > 0 ? 'down' : 'up', Math.abs(delta));
                                 setIsUserScrolling(true);
                                 if (!isPlaying) {
                                     pausedScrollRef.current = true;
                                     setPausedScroll(true);
                                 }
-                                setTargetScrollY(scrollManualTo(offset, maxScrollY));
+                                setTargetScrollY(scrollManualTo(offset, maxScrollY, behavior !== 'smooth'));
                             },
                         }}
                     />}

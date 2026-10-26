@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, RefObject } from 'react';
+import { useReducedMotion } from 'framer-motion';
 import { useThemeStore } from '@/store/useThemeStore';
 import { getLyricsScrollbarGeometry, getLyricsWheelDelta } from '@/features/player/scrollbar/lyricsScrollbarGeometry';
+import { LyricsScrollbarScroll } from '@/features/player/scrollbar/lyricsScrollbarScroll';
 
 interface LyricsScrollbarProps {
     enabled?: boolean;
@@ -13,7 +15,7 @@ interface LyricsScrollbarProps {
         offset: number;
         getOffset?: () => number;
         subscribe?: (listener: () => void) => () => void;
-        onScrollTo: (offset: number) => void;
+        onScrollTo: (offset: number, behavior: ScrollBehavior) => void;
         onWheel: (delta: number) => void;
     };
 }
@@ -24,7 +26,8 @@ export default function LyricsScrollbar(props: LyricsScrollbarProps) {
 }
 
 function LyricsScrollbarImpl({ viewportRef, style, virtual, onUserScroll, enabled }: LyricsScrollbarProps & { enabled: boolean }) {
-    const [wheelScroll] = useState(() => new ScrollbarWheelScroll());
+    const reducedMotion = useReducedMotion();
+    const [wheelScroll] = useState(() => new LyricsScrollbarScroll());
     const barRef = useRef<HTMLDivElement>(null);
     const thumbRef = useRef<HTMLDivElement>(null);
     const sourceRef = useRef({ virtual, onUserScroll });
@@ -52,15 +55,17 @@ function LyricsScrollbarImpl({ viewportRef, style, virtual, onUserScroll, enable
         if (timerRef.current !== null) window.clearTimeout(timerRef.current);
         timerRef.current = window.setTimeout(() => barRef.current?.removeAttribute('data-scrolling'), 1000);
     }, []);
-    const scrollTo = (offset: number) => {
+    const scrollTo = (offset: number, behavior: ScrollBehavior = 'instant') => {
         wheelScroll.cancel();
         const source = sourceRef.current;
         const value = metrics();
         const target = Math.max(0, Math.min(value.max, offset));
-        if (source.virtual) source.virtual.onScrollTo(target);
+        if (source.virtual) source.virtual.onScrollTo(target, behavior);
         else if (viewportRef.current) {
             source.onUserScroll?.(target - value.offset);
-            viewportRef.current.scrollTop = target;
+            // 虚拟列表的向上测量补偿会打断原生 smooth，逐帧从实际位置继续推进。
+            if (behavior === 'smooth') wheelScroll.moveTo(viewportRef.current, target);
+            else viewportRef.current.scrollTo({ top: target, behavior });
         }
         update();
         show();
@@ -118,18 +123,18 @@ function LyricsScrollbarImpl({ viewportRef, style, virtual, onUserScroll, enable
     };
     return (
         <div ref={barRef} className="plain-lyrics-scrollbar z-30" style={style} onPointerDown={event => {
-            if (event.target !== event.currentTarget) return;
+            if (event.target !== event.currentTarget || !event.isPrimary || event.button !== 0) return;
             event.preventDefault();
             event.stopPropagation();
             const value = metrics();
             const travel = value.height - value.thumbHeight;
-            if (travel > 0) scrollTo((event.clientY - event.currentTarget.getBoundingClientRect().top - value.thumbHeight / 2) / travel * value.max);
+            if (travel > 0) scrollTo((event.clientY - event.currentTarget.getBoundingClientRect().top - value.thumbHeight / 2) / travel * value.max, reducedMotion ? 'instant' : 'smooth');
         }}>
             <div ref={thumbRef} className="plain-lyrics-scrollbar-thumb" onPointerDown={event => {
                 if (!event.isPrimary || event.button !== 0) return;
                 event.preventDefault();
                 event.stopPropagation();
-                wheelScroll.cancel();
+                scrollTo(metrics().offset);
                 dragRef.current = { pointerId: event.pointerId, y: event.clientY };
                 barRef.current?.setAttribute('data-dragging', '');
                 event.currentTarget.setPointerCapture(event.pointerId);
@@ -146,42 +151,4 @@ function LyricsScrollbarImpl({ viewportRef, style, virtual, onUserScroll, enable
             }} onPointerUp={finishDrag} onPointerCancel={finishDrag} onLostPointerCapture={finishDrag} />
         </div>
     );
-}
-
-class ScrollbarWheelScroll {
-    private frame: number | null = null;
-    private motion: { element: HTMLElement; target: number; lastTime: number } | null = null;
-
-    cancel() {
-        if (this.frame !== null) cancelAnimationFrame(this.frame);
-        this.frame = null;
-        this.motion = null;
-    }
-
-    moveBy(element: HTMLElement, delta: number) {
-        if (!Number.isFinite(delta) || delta === 0) return;
-        if (this.motion?.element !== element) {
-            this.cancel();
-            this.motion = { element, target: element.scrollTop, lastTime: performance.now() };
-        }
-        const motion = this.motion;
-        motion.target = Math.max(0, Math.min(element.scrollHeight - element.clientHeight, motion.target + delta));
-        if (this.frame === null) this.frame = requestAnimationFrame(this.tick);
-    }
-
-    private tick = (now: number) => {
-        this.frame = null;
-        const motion = this.motion;
-        if (!motion) return;
-        const deltaMs = Math.min(64, Math.max(0, now - motion.lastTime));
-        motion.lastTime = now;
-        const max = Math.max(0, motion.element.scrollHeight - motion.element.clientHeight);
-        motion.target = Math.min(max, motion.target);
-        const remaining = motion.target - motion.element.scrollTop;
-        const finished = Math.abs(remaining) <= 0.5;
-        const step = Math.sign(remaining) * Math.min(Math.abs(remaining), Math.max(1, Math.abs(remaining) * (1 - Math.exp(-deltaMs / 70))));
-        motion.element.scrollTo({ top: finished ? motion.target : motion.element.scrollTop + step, behavior: 'instant' });
-        if (finished) this.motion = null;
-        else this.frame = requestAnimationFrame(this.tick);
-    };
 }

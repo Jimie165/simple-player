@@ -15,7 +15,7 @@ export default function OpenFileMenu({ onOpenFile, onOpenFolder }: OpenFileMenuP
     const triggerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
     return (
-        <Menu key={disabled ? 'disabled' : 'enabled'} as="div" className={clsx('relative z-20 inline-flex', disabled && 'opacity-40 pointer-events-none')}>
+        <Menu key={disabled ? 'disabled' : 'enabled'} as="div" className={clsx('relative z-20 inline-flex dark:[--menu-hover:rgba(255,255,255,0.08)] dark:[--menu-highlight:rgba(255,255,255,0.16)]', disabled && 'opacity-40 pointer-events-none')}>
             {({ open, close }) => (
                 <>
                     <MenuDismiss open={open} menuRef={menuRef} triggerRef={triggerRef} onClose={close} />
@@ -60,7 +60,7 @@ export default function OpenFileMenu({ onOpenFile, onOpenFolder }: OpenFileMenuP
                         modal={false}
                         transition
                         anchor={{ to: 'bottom end', gap: 8 }}
-                        className="z-9999 w-52 origin-top-right overflow-hidden rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1.5 text-on-surface shadow-xl ring-1 ring-on-surface/5 backdrop-blur-lg backdrop-saturate-220 focus:outline-none transition duration-150 ease-out data-closed:-translate-y-1 data-closed:scale-[0.98] data-closed:opacity-0"
+                        className="z-9999 w-52 origin-top-right overflow-hidden rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1.5 text-on-surface shadow-xl ring-1 ring-on-surface/5 backdrop-blur-lg backdrop-saturate-220 focus:outline-none transition duration-150 ease-out data-closed:-translate-y-1 data-closed:scale-[0.98] data-closed:opacity-0 dark:[--menu-hover:rgba(255,255,255,0.08)] dark:[--menu-highlight:rgba(255,255,255,0.16)]"
                     >
                         <MenuItem>
                             <button
