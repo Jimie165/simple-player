@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import LyricsScrollbar from '@/features/player/scrollbar/LyricsScrollbar';
 import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -49,7 +50,11 @@ export default function LyricsPanel({
     onSeek,
     onUserScrollDirection,
     variant,
+    narrowControlsVisible = true,
 }: LyricsPanelProps) {
+    const narrowMaskImage = narrowControlsVisible
+        ? 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
+        : narrowScrollMaskStyle.maskImage;
     const isPlaying = usePlayerStore(state => state.isPlaying);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
@@ -57,7 +62,8 @@ export default function LyricsPanel({
     // TTML 与 LRC 共用同一套切换/加速/淡出参数
     const timingStrategy = performanceLyricsTimingStrategy;
     const hasDuetLine = useMemo(() => lines.some((line) => line.is_duet === true), [lines]);
-    const { renderCurrentMs, preciseMsRef } = usePrecisePlaybackTime(currentTime);
+    const { renderCurrentMs, preciseMsRef, syncRevision } = usePrecisePlaybackTime(currentTime);
+    const pendingLineSeekRef = useRef<{ targetMs: number; revision: number; document: typeof lyricsDocument } | null>(null);
     const virtuosoRef = useRef<VirtuosoHandle | null>(null);
     const scrollerRef = useRef<HTMLElement | null>(null);
     const [autoScroll] = useState(() => new PerformanceLyricsScroll());
@@ -317,18 +323,32 @@ export default function LyricsPanel({
 
     const handleLineSeek = useCallback((time: number) => {
         keepCurrentInterludeForExit();
-        if (userScrollTimeoutRef.current) {
-            clearTimeout(userScrollTimeoutRef.current);
-            userScrollTimeoutRef.current = null;
-        }
-        //歌词点击 Seek 时立即 resetScroll，避免 pointerdown 留下的手动滚动
-        // 状态阻塞新激活行的高亮和跟随。
-        userScrollingRef.current = false;
-        setIsUserScrolling(false);
-        lastAutoScrollIndexRef.current = null;
-        preferSmoothAutoScrollRef.current = true;
+        pendingLineSeekRef.current = { targetMs: time * 1000, revision: syncRevision, document: lyricsDocument };
         onSeek(time);
-    }, [keepCurrentInterludeForExit, onSeek]);
+    }, [keepCurrentInterludeForExit, lyricsDocument, onSeek, syncRevision]);
+
+    useEffect(() => {
+        const pending = pendingLineSeekRef.current;
+        if (pending && (!isOpen || pending.document !== lyricsDocument)) {
+            pendingLineSeekRef.current = null;
+            return;
+        }
+        if (!pending || pending.revision === syncRevision || Math.abs(renderCurrentMs - pending.targetMs) > 400) return;
+        const frame = requestAnimationFrame(() => {
+            if (pendingLineSeekRef.current !== pending) return;
+            pendingLineSeekRef.current = null;
+            if (userScrollTimeoutRef.current) {
+                clearTimeout(userScrollTimeoutRef.current);
+                userScrollTimeoutRef.current = null;
+            }
+            // 播放位置同步后再恢复跟随，避免旧时间轴先让被点击行变暗。
+            userScrollingRef.current = false;
+            setIsUserScrolling(false);
+            lastAutoScrollIndexRef.current = null;
+            preferSmoothAutoScrollRef.current = true;
+        });
+        return () => cancelAnimationFrame(frame);
+    }, [isOpen, lyricsDocument, renderCurrentMs, syncRevision]);
 
     useEffect(() => {
         const previousMs = previousPlaybackMsRef.current;
@@ -460,7 +480,11 @@ export default function LyricsPanel({
                         ? 'h-full mb-0'
                         : 'h-[calc(100%-3.5rem)] mb-6'
                 )}
-                style={variant === 'narrow' ? narrowScrollMaskStyle : sideScrollMaskStyle}
+                style={variant === 'narrow' ? {
+                    maskImage: narrowMaskImage,
+                    WebkitMaskImage: narrowMaskImage,
+                    clipPath: narrowControlsVisible ? 'inset(0 0 min(14.5rem, 100%) 0)' : 'inset(0)',
+                } : sideScrollMaskStyle}
                 onWheel={(event) => handleUserInteraction(event.deltaY > 0 ? 'down' : 'up', Math.abs(event.deltaY))}
                 onTouchStart={(event) => {
                     lastTouchYRef.current = event.touches[0]?.clientY ?? null;
@@ -474,7 +498,6 @@ export default function LyricsPanel({
                     lastTouchYRef.current = nextY ?? null;
                     handleUserInteraction(direction, previousY === null || nextY === undefined ? undefined : Math.abs(nextY - previousY));
                 }}
-                onPointerDown={() => handleUserInteraction()}
             >
                 {displayState ? (
                     <div className="h-full flex items-center justify-center text-white/40 text-sm">
@@ -532,6 +555,7 @@ export default function LyricsPanel({
                                 <LyricsLineItem
                                     line={item.line}
                                     isActive={isActive}
+                                    isPast={displayIndex < activeDisplayIndex}
                                     isKaraokeActive={isKaraokeActive}
                                     isUserScrolling={isUserScrolling}
                                     pausedScroll={pausedScrollRef.current}
@@ -554,6 +578,8 @@ export default function LyricsPanel({
                                     enableTightHandoffTailCompression={enableTightHandoffTailCompression}
                                     currentTime={renderCurrentMs / 1000}
                                     preciseMsRef={preciseMsRef}
+                                    isPlaying={isPlaying}
+                                    playbackSyncKey={syncRevision}
                                     onSeek={handleLineSeek}
                                     variant={variant}
                                     isBackground={item.line.role === 'background'}
@@ -569,6 +595,14 @@ export default function LyricsPanel({
                     />
                 )}
             </div>
+            {!displayState && <LyricsScrollbar
+                viewportRef={scrollerRef}
+                style={variant === 'narrow' ? {
+                    bottom: narrowControlsVisible ? '18rem' : '1.5rem',
+                    transition: 'bottom 300ms ease-out, opacity 250ms ease',
+                } : { bottom: 56, ...sideScrollMaskStyle }}
+                onUserScroll={delta => handleUserInteraction(delta > 0 ? 'down' : 'up', Math.abs(delta))}
+            />}
         </div>
     );
 }

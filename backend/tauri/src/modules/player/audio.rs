@@ -1,8 +1,3 @@
-// rodio 0.22 标了 DeviceTrait::name 为 deprecated（推荐 id()/description()），
-// 但 id() 返回的是不可序列化的 DeviceId，对我们「按设备名持久化用户偏好」的用法
-// 反而更复杂；这里继续用 name()，集中在本模块抑制相关 deprecation 警告。
-#![allow(deprecated)]
-
 use cpal::traits::{DeviceTrait, HostTrait};
 use rodio::{
     ChannelCount, Decoder, DeviceSinkBuilder, MixerDeviceSink, Player, SampleRate, Source,
@@ -396,16 +391,15 @@ impl AudioState {
     }
 
     fn device_id(device: &cpal::Device) -> Option<String> {
-        device.id().ok().map(|id| id.1)
+        device.id().ok().map(|id| id.id().to_string())
     }
 
     fn device_display_name(device: &cpal::Device) -> Option<String> {
         let description = device.description().ok()?;
         description
             .extended()
-            .iter()
             .find(|line| !line.trim().is_empty())
-            .cloned()
+            .map(str::to_string)
             .or_else(|| Some(description.name().to_string()))
     }
 
@@ -430,8 +424,12 @@ impl AudioState {
         }
 
         devices.into_iter().find_map(|device| {
-            let matches_old_name = device.name().ok().as_deref() == Some(value)
-                || Self::device_display_name(&device).as_deref() == Some(value);
+            let matches_old_name = Self::device_display_name(&device).as_deref() == Some(value)
+                || device
+                    .description()
+                    .ok()
+                    .map(|description| description.name() == value)
+                    .unwrap_or(false);
             matches_old_name.then(|| Self::device_id(&device)).flatten()
         })
     }
@@ -722,10 +720,8 @@ impl AudioState {
         {
             self.low_frequency_level.reset();
         }
-        if !enabled {
-            if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
-                let _ = app_handle.emit("audio:low-frequency", self.low_frequency_level.frame());
-            }
+        if !enabled && let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
+            let _ = app_handle.emit("audio:low-frequency", self.low_frequency_level.frame());
         }
     }
 

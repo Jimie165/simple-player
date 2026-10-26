@@ -1,36 +1,22 @@
-import { MdAdd, MdSearch } from 'react-icons/md';
+import { MdAdd } from 'react-icons/md';
+import { useSelectionStore } from '@/store/useSelectionStore';
 
 interface PlaylistListActionsProps {
-    searchQuery: string;
-    setSearchQuery: (value: string) => void;
     setIsCreateOpen: (value: boolean) => void;
 }
 
 export default function PlaylistListActions({
-    searchQuery,
-    setSearchQuery,
     setIsCreateOpen,
 }: PlaylistListActionsProps) {
+    const disabled = useSelectionStore(state => state.isSelectionMode);
     return (
-        <div className="flex items-center gap-2">
-            <div className="relative group">
-                <MdSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 group-focus-within:text-primary transition-colors" />
-                <input
-                    type="text"
-                    placeholder="搜索..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="bg-surface-container-low dark:bg-surface-container-high border-none rounded-full py-1.5 pl-9 pr-4 text-sm w-40 outline-none ring-0 focus:w-60 focus:outline-none focus-visible:outline-none focus:ring-0 focus:bg-surface-container-lowest dark:focus:bg-surface-container-highest transition-all duration-300 placeholder:text-neutral-500"
-                />
-            </div>
-
-            <button
-                onClick={() => setIsCreateOpen(true)}
-                className="flex items-center gap-1 bg-primary text-on-primary px-4 py-1.5 rounded-full text-sm font-medium hover:bg-primary/90 transition-all shadow-sm active:scale-95"
-            >
-                <MdAdd className="text-lg" />
-                新建
-            </button>
-        </div>
+        <button
+            disabled={disabled}
+            onClick={() => setIsCreateOpen(true)}
+            className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-primary px-4 text-sm font-medium text-on-primary shadow-sm transition-[background-color,scale] duration-200 hover:bg-primary/90 active:scale-95 base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container base-theme:dark:hover:bg-on-primary disabled:opacity-40 disabled:pointer-events-none"
+        >
+            <MdAdd className="text-lg" />
+            新建播放列表
+        </button>
     );
 }

@@ -71,6 +71,10 @@ fn main() {
                     "--disable-features=HardwareMediaKeyHandling,MediaSessionService",
                 );
             window_builder.build()?;
+            #[cfg(target_os = "windows")]
+            if let Some(window) = app.get_webview_window("main") {
+                modules::window_fullscreen::initialize(&window)?;
+            }
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
 
@@ -94,6 +98,9 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             commands::window::set_macos_window_buttons_visible,
             modules::player::media_controls::update_macos_media,
+            commands::online_lyrics::search_online_lyrics,
+            commands::online_lyrics::fetch_online_lyrics,
+            commands::online_lyrics::save_online_lyrics_if_missing,
             modules::player::media_controls::update_windows_video_media,
             // Player commands
             commands::player::play_audio,
@@ -167,6 +174,7 @@ fn main() {
             commands::video::query::video_file_exists,
             commands::video::query::search_videos,
             commands::video::query::toggle_video_favorite,
+            commands::video::query::record_video_playback,
             commands::video::query::batch_delete_videos,
             commands::video::prepare::prepare_video_for_playback,
             commands::video::cache::get_transcode_cache_info,

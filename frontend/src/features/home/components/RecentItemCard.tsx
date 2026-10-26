@@ -60,11 +60,11 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
 
     return (
         <div
-            className="group flex flex-col gap-3 rounded-xl p-3 -mx-3 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer relative"
+            className="group flex flex-col gap-3 rounded-xl p-3 -mx-3 hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 base-theme:hover:bg-surface-variant/30 transition-colors cursor-pointer relative"
         >
             <div
                 onClick={onClick}
-                className="aspect-square w-full rounded-lg shadow-sm bg-neutral-200 dark:bg-neutral-800 group-hover:shadow-md group-hover:scale-[1.02] transition-all duration-300 relative overflow-hidden flex items-center justify-center"
+                className="aspect-square w-full rounded-lg shadow-sm bg-neutral-200 dark:bg-neutral-800 group-hover:shadow-md transition-all duration-300 relative overflow-hidden flex items-center justify-center"
             >
                 {coverUrl ? (
                     <img src={coverUrl} alt={item.title} className="w-full h-full object-cover" />
@@ -72,13 +72,13 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                     <PlaylistCoverCollage songs={playlistSongs} className="w-full h-full" />
                 ) : (
                     item.type === 'folder'
-                        ? <MdFolder className="text-5xl text-blue-400" />
+                        ? <MdFolder className="text-5xl text-blue-400 base-theme:text-secondary" />
                         : <MdMusicNote className="text-5xl text-neutral-400" />
                 )}
 
                 {/* 播放遮罩 */}
                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/10">
-                    <div className="w-12 h-12 rounded-full bg-blue-600 flex items-center justify-center shadow-lg text-white translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                    <div className="w-12 h-12 rounded-full bg-blue-600 base-theme:bg-primary base-theme:text-on-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container flex items-center justify-center shadow-lg text-white translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
                         <MdPlayArrow className="ml-1" />
                     </div>
                 </div>
@@ -96,7 +96,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                         <MenuItems
                             transition
                             anchor="bottom end"
-                            className="w-48 origin-top-right rounded-xl border border-neutral-200 bg-white p-1 text-sm text-neutral-900 shadow-xl ring-1 ring-black/5 focus:outline-none dark:bg-[#2c2c2c] dark:border-neutral-700 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-50"
+                            className="w-48 origin-top-right rounded-xl border border-neutral-200/30 bg-white/50 base-theme:bg-surface/95 p-1 text-sm text-neutral-900 base-theme:text-on-surface shadow-xl ring-1 ring-black/5 focus:outline-none backdrop-blur-3xl dark:bg-neutral-900/50 dark:border-white/10 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-50"
                         >
                             {/* 播放 */}
                             <MenuItem>
@@ -105,7 +105,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                         onClick={onClick}
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdPlayArrow className="text-lg opacity-70" />
@@ -120,7 +120,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                     <button
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdQueueMusic className="text-lg opacity-70" />
@@ -135,7 +135,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                     <button
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdAdd className="text-lg opacity-70" />
@@ -153,7 +153,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                         onClick={() => onDelete?.(item)}
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdDelete className="text-lg opacity-70" />
@@ -170,7 +170,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                             onClick={() => onShowProperties(item)}
                                             className={clsx(
                                                 "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                                focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                                focus ? "bg-on-surface/8" : ""
                                             )}
                                         >
                                             <MdInfo className="text-lg opacity-70" />
@@ -188,7 +188,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                     <button
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdAlbum className="text-lg opacity-70" />
@@ -203,7 +203,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                                     <button
                                         className={clsx(
                                             "group flex w-full items-center gap-3 rounded-lg py-2 px-3",
-                                            focus ? "bg-neutral-100 dark:bg-white/10" : ""
+                                            focus ? "bg-on-surface/8" : ""
                                         )}
                                     >
                                         <MdPerson className="text-lg opacity-70" />

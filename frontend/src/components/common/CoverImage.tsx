@@ -1,10 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { MdMusicNote, MdVideocam } from 'react-icons/md';
 import clsx from 'clsx';
 import { getCoverThumbnailPath, resolveCover, resolveMediaPath } from '@/utils/mediaPath';
 import type { CoverThumbnailSize } from '@/utils/mediaPath';
 import type { SongMetadata } from '@/types';
 import { useLibraryStore } from '@/store/useLibraryStore';
+import { useThemeStore } from '@/store/useThemeStore';
+import { ArtworkColorCacheContext } from '@/hooks/artworkThemeContexts';
 // Actually MusicGrid logic is not exported or complex. We can just check extension.
 const VIDEO_EXTENSIONS = ['mp4', 'mkv', 'avi', 'mov', 'webm', 'flv', 'm4v', '3gp', 'ts', 'rmvb', 'wmv', 'asf', 'ogv'];
 const isVideo = (song?: SongMetadata | null) => {
@@ -34,8 +36,11 @@ export default function CoverImage({
 }: CoverImageProps) {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
+    const [imageIdentity, setImageIdentity] = useState<{ path: string; version: number } | null>(null);
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const blobUrlRef = useRef<string | null>(null);
+    const artworkCache = useContext(ArtworkColorCacheContext);
+    const artworkBackgroundEnabled = useThemeStore(state => state.artworkBackgroundEnabled);
 
     useEffect(() => {
         let isMounted = true;
@@ -56,6 +61,7 @@ export default function CoverImage({
                 ]);
                 if (isMounted) {
                     if (url && url.startsWith('blob:')) blobUrlRef.current = url;
+                    setImageIdentity({ path: originalPath, version: libraryVersion });
                     setFallbackSrc(originalUrl);
                     setImageSrc(url);
                 }
@@ -64,13 +70,17 @@ export default function CoverImage({
 
             // 2. Try song metadata
             if (!song) {
-                if (isMounted) setImageSrc(null);
+                if (isMounted) {
+                    setImageIdentity(null);
+                    setImageSrc(null);
+                }
                 return;
             }
 
             const url = await resolveCover(song);
             if (isMounted) {
                 if (url && url.startsWith('blob:')) blobUrlRef.current = url;
+                setImageIdentity(null);
                 setImageSrc(url);
             }
         };
@@ -94,6 +104,11 @@ export default function CoverImage({
                 alt={song?.title || "Cover"}
                 loading="lazy"
                 decoding="async"
+                onLoad={event => {
+                    if (artworkBackgroundEnabled && imageIdentity) {
+                        artworkCache?.prime(imageIdentity.path, imageIdentity.version, event.currentTarget);
+                    }
+                }}
                 onError={() => {
                     if (fallbackSrc && imageSrc !== fallbackSrc) {
                         setImageSrc(fallbackSrc);

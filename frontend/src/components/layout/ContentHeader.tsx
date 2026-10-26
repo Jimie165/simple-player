@@ -34,7 +34,7 @@ export default function ContentHeader({ title, canGoBack, onToggleSidebar, onBac
 
             {/* 当前页面标题 (可选) */}
             {title && (
-                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100 animate-in fade-in slide-in-from-left-2">
+                <h2 className="text-lg font-semibold text-neutral-800 dark:text-neutral-100">
                     {title}
                 </h2>
             )}

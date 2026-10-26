@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import clsx from 'clsx';
 import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdFavorite, MdVideocam } from 'react-icons/md';
 import PageContainer from '@/components/layout/PageContainer';
@@ -8,7 +8,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { libraryService } from '@/services/libraryService';
 
-import type { RecentItem } from '@/types';
+import type { RecentItem, SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
@@ -18,7 +18,7 @@ import CardPlayButton from '@/components/common/CardPlayButton';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 /**
@@ -43,9 +43,19 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
     return <PlaylistCoverCollage songs={[]} coverPaths={coverPaths} className="w-full h-full" />;
 }
 export default function MusicGrid() {
-    const mainContentWidth = useMainContentWidth();
     // Store Actions
     const { recentHistory } = useLibraryStore();
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(recentHistory.length, 'cover'));
+    // 虚拟网格会在尺寸变化时重复渲染卡片，封面数据需保持引用稳定。
+    const recentCoverSongs = useMemo(() => new Map<string, SongMetadata>(recentHistory.map((item) => [item.id, {
+        title: item.title,
+        artist: item.artist || '',
+        album: '',
+        duration: 0,
+        path: item.path,
+        cover: null,
+        cover_path: item.cover_path,
+    }])), [recentHistory]);
     const { isSelectionMode, selectedIds, toggleSelection, toggleSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, setSelectableIds } = useSelectionStore();
     const {
         contextMenu,
@@ -83,7 +93,7 @@ export default function MusicGrid() {
             <section>
                 {pendingFolderPlay && (
                     <div className="fixed inset-0 z-80 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                        <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
+                        <div className="w-full max-w-md rounded-2xl bg-white/90 dark:bg-neutral-900/90 base-theme:bg-surface border border-neutral-200/70 dark:border-neutral-700/70 shadow-2xl p-5">
                             <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-100">
                                 检测到混合媒体
                             </h3>
@@ -98,7 +108,7 @@ export default function MusicGrid() {
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
                                         await playVideoList(videoSongs, recentItem);
                                     }}
-                                    className="flex-1 rounded-xl bg-primary text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 transition-colors"
+                                    className="flex-1 rounded-xl bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-colors"
                                 >
                                     播放视频
                                 </button>
@@ -142,18 +152,18 @@ export default function MusicGrid() {
                             return (
                                 <div
                                     key={item.id}
-                                    className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
+                                    className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:hover:bg-surface-variant/30")}
                                     onClick={(e) => handleItemClick(item, e)}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
                                         {item.type === 'folder' ? (
-                                            <MdFolder className="text-6xl text-blue-400 opacity-80" />
+                                            <MdFolder className="text-6xl text-blue-400 base-theme:text-secondary opacity-80" />
                                         ) : item.type === 'video' ? (
                                             item.cover_path ? (
                                                 <CoverImage
                                                     src={item.cover_path}
-                                                    className="w-full h-full group-hover:scale-110 transition-transform duration-500"
+                                                    className="w-full h-full"
                                                 />
                                             ) : (
                                                 <div className="w-full h-full bg-neutral-900 flex items-center justify-center">
@@ -172,16 +182,8 @@ export default function MusicGrid() {
                                             )
                                         ) : (
                                             <CoverImage
-                                                song={{
-                                                    title: item.title,
-                                                    artist: item.artist || '',
-                                                    album: '',
-                                                    duration: 0,
-                                                    path: item.path,
-                                                    cover: null,
-                                                    cover_path: item.cover_path
-                                                }}
-                                                className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+                                                song={recentCoverSongs.get(item.id)}
+                                                className="w-full h-full"
                                                 iconClassName="text-6xl opacity-50"
                                             />
                                         )}
@@ -197,7 +199,7 @@ export default function MusicGrid() {
                                                     className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                                                 >
                                                     {isSelected
-                                                        ? <MdCheckBox className="text-primary text-xl" />
+                                                        ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                                         : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                                                     }
                                                 </div>

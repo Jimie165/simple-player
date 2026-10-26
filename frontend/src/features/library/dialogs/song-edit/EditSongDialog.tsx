@@ -11,6 +11,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import SongInfoFields from '@/features/library/dialogs/song-edit/SongInfoFields';
 import SongLyricsFields from '@/features/library/dialogs/song-edit/SongLyricsFields';
+import OnlineLyricsSearch from '@/features/library/dialogs/song-edit/OnlineLyricsSearch';
 import SongArtworkFields from '@/features/library/dialogs/song-edit/SongArtworkFields';
 import {
     buildUpdateSongDetailsRequest,
@@ -63,6 +64,8 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
     const [errors, setErrors] = useState<SongEditFormErrors>({});
     const [message, setMessage] = useState('');
     const [saving, setSaving] = useState(false);
+    const [searchOpen, setSearchOpen] = useState(false);
+    const [artworkActionsContainer, setArtworkActionsContainer] = useState<HTMLDivElement | null>(null);
 
     const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
     const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
@@ -74,11 +77,13 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     useEffect(() => {
         if (!isOpen || !song) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或目标歌曲切换时初始化编辑表单状态
         setValues(makeInitialSongEditForm(song));
         setOriginalValues(null);
         setErrors({});
         setMessage('');
         setActiveTab('details');
+        setSearchOpen(false);
     }, [isOpen, song]);
 
     useEffect(() => {
@@ -208,9 +213,10 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     return (
         <MetadataEditDialogShell
+            cancelFirst
             isOpen={isOpen}
             saving={saving}
-            onClose={onClose}
+            onClose={searchOpen ? () => setSearchOpen(false) : onClose}
             onSubmit={handleSubmit}
             title="编辑歌曲信息"
             cover={(
@@ -235,7 +241,21 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             tabLayoutId="edit-song-tab-underline"
             scrollContent={activeTab === 'details'}
             message={message}
-            footerStart={lyricsFooter}
+            footerStart={activeTab === 'artwork' ? <div ref={setArtworkActionsContainer} /> : lyricsFooter}
+            replacementView={searchOpen ? (
+                <OnlineLyricsSearch
+                    title={resolvedValues.title}
+                    artist={resolvedValues.artist}
+                    album={resolvedValues.album}
+                    durationMs={song.duration * 1000}
+                    onClose={() => setSearchOpen(false)}
+                    onDismiss={onClose}
+                    onApply={content => {
+                        handleChange({ lyricsText: content, lyricsSourcePath: '', customLyricsEnabled: true });
+                        setSearchOpen(false);
+                    }}
+                />
+            ) : undefined}
         >
             {activeTab === 'details' && (
                 <SongInfoFields
@@ -251,10 +271,12 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
                     values={resolvedValues}
                     onChange={handleChange}
                     onError={setMessage}
+                    onSearchOnline={() => setSearchOpen(true)}
                 />
             )}
             {activeTab === 'artwork' && (
                 <SongArtworkFields
+                    actionsContainer={artworkActionsContainer}
                     song={song}
                     artworkSourcePath={resolvedValues.artworkSourcePath}
                     removeArtwork={resolvedValues.removeArtwork}

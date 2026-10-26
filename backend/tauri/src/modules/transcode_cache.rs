@@ -28,7 +28,9 @@ pub fn compute_source_hash(path: &str) -> Result<String, String> {
     hasher.update(size.to_le_bytes());
     hasher.update(modified_secs.to_le_bytes());
 
-    Ok(format!("{:x}", hasher.finalize())[..32].to_string())
+    Ok(crate::modules::library::covers::encode_hex(
+        &hasher.finalize()[..16],
+    ))
 }
 
 /// 估算转码后文件大小（用于提前清理）

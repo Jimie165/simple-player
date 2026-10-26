@@ -1,8 +1,17 @@
+import SharedCover from '@/components/common/SharedCover';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { MdPlayArrow, MdShuffle, MdEdit, MdFavorite } from 'react-icons/md';
+import { useIsPresent } from 'framer-motion';
+import { MdPlayArrow, MdShuffle, MdEdit } from 'react-icons/md';
+import favoritesCover from '@/assets/favorites-cover.svg';
 import clsx from 'clsx';
+import toast from 'react-hot-toast';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import { useScrollBlur } from '@/hooks/useScrollBlur';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
+import { ContentBackground } from '@/components/layout/ContentSurface';
+import { useThemeStore } from '@/store/useThemeStore';
+import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 
 import SortableSongList from '@/features/playlists/songlist/SortableSongList';
@@ -12,7 +21,8 @@ import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog'
 import CoverImage from '@/components/common/CoverImage';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
-import PlaylistSortControl from '@/features/playlists/detail/PlaylistSortControl';
+import SortMenu from '@/components/common/SortMenu';
+import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -22,23 +32,28 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 interface PlaylistDetailProps {
     id: number | 'favorites';
     name: string;
+    isVisible: boolean;
     onClose?: () => void;
+    transitionSource?: CoverTransitionSource;
 }
 
-export default function PlaylistDetail({ id, name: initialName }: PlaylistDetailProps) {
+export default function PlaylistDetail({ id, name: initialName, transitionSource, isVisible }: PlaylistDetailProps) {
+    const isPresent = useIsPresent();
+    const entered = useNavigationStore(state => state.playlistDetailEntered);
     const [songs, setSongs] = useState<SongMetadata[]>([]);
     const [loading, setLoading] = useState(false);
     const [playlistInfo, setPlaylistInfo] = useState<Playlist | null>(null);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [dataRefreshVersion, setDataRefreshVersion] = useState(0);
     const initialLoadRef = useRef(true);
 
     // Sort State - Load initial state from store if available, else default
-    const { getPlaylistSettings, setPlaylistSettings } = useLibraryStore();
+    const getPlaylistSettings = useLibraryStore(state => state.getPlaylistSettings);
+    const setPlaylistSettings = useLibraryStore(state => state.setPlaylistSettings);
     const savedSettings = getPlaylistSettings(id.toString());
 
     const [sortKey, setLocalSortKey] = useState<SortKey>(savedSettings.sortKey);
     const [sortOrder, setLocalSortOrder] = useState<SortOrder>(savedSettings.sortOrder);
-    const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
 
     // Sync state changes to store
     const updateSortKey = (key: SortKey) => {
@@ -54,6 +69,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     // Reload settings and reset state when ID changes
     useEffect(() => {
         const settings = getPlaylistSettings(id.toString());
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 切换歌单 ID 时同步排序偏好并重置列表状态
         setLocalSortKey(settings.sortKey);
         setLocalSortOrder(settings.sortOrder);
 
@@ -67,20 +83,27 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     // 当用户通过点击 × 关闭搜索时，短暂抑制 Tooltip 显示，直到鼠标移出搜索按钮区域
     const [suppressTooltip, setSuppressTooltip] = useState(false);
-    const [suppressSortTooltip, setSuppressSortTooltip] = useState(false);
 
     // Store Actions
     // Store Actions
-    const { triggerLibraryUpdate, triggerPlaylistUpdate, favoriteSet, favoritesLoaded, updateRecentItemCover, playlistVersion } = useLibraryStore();
+    const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
+    const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
+    const favoriteSet = useLibraryStore(state => state.favoriteSet);
+    const favoritesLoaded = useLibraryStore(state => isVisible && state.favoritesLoaded);
+    const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
+    const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
+    const favoritesLibraryVersion = useLibraryStore(state => isVisible && id === 'favorites' ? state.libraryVersion : 0);
+    const favoritesVersion = useLibraryStore(state => isVisible && id === 'favorites' ? state.favoritesVersion : 0);
+    const loadedDataVersionRef = useRef<string | null>(null);
     const { playSong, playList, shufflePlay } = usePlaybackActions();
 
     // Scroll Detection for Sticky Header (reusable)
-    const { isScrolled, topSentinelRef } = useScrollBlur();
+
 
     // Load Data
 
     // Load Data
-    const loadData = useCallback(async () => {
+    const loadData = useCallback(async (isCurrent: () => boolean) => {
         if (initialLoadRef.current) {
             setLoading(true);
         }
@@ -92,23 +115,42 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             } else {
                 list = await libraryService.getPlaylistSongs(id);
             }
+            if (!isCurrent()) return false;
             setSongs(list);
 
             // 2. Load Playlist Info (for description, cover updates)
             if (id !== 'favorites') {
                 const playlists = await libraryService.getPlaylists();
+                if (!isCurrent()) return false;
                 const pl = playlists.find(p => p.id === id);
                 if (pl) setPlaylistInfo(pl);
             }
+            return true;
         } catch (error) {
             console.error(error);
+            return false;
         } finally {
-            setLoading(false);
-            initialLoadRef.current = false;
+            if (isCurrent()) {
+                setLoading(false);
+                initialLoadRef.current = false;
+            }
         }
     }, [id, sortKey, sortOrder]);
 
-    useEffect(() => { loadData(); }, [loadData, playlistVersion]);
+    const dataVersion = `${id}:${sortKey}:${sortOrder}:${playlistVersion}:${id === 'favorites' ? `${favoritesLibraryVersion}:${favoritesVersion}` : ''}:${dataRefreshVersion}`;
+    useEffect(() => {
+        let cancelled = false;
+        void runPlaylistDataRefresh({
+            isVisible,
+            loadedVersion: loadedDataVersionRef.current,
+            currentVersion: dataVersion,
+            isCurrent: () => !cancelled,
+            load: () => loadData(() => !cancelled),
+        }).then(result => {
+            if (result?.data) loadedDataVersionRef.current = result.version;
+        });
+        return () => { cancelled = true; };
+    }, [dataVersion, isVisible, loadData]);
 
     // Actions
     const buildRecentForSong = (song: SongMetadata): RecentItem => ({
@@ -129,7 +171,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
         await playSong({
             song,
             index,
-            playlist: songs,
+            playlist: filteredSongs,
             options: {
                 ...options,
                 buildRecentItem: buildRecentForSong
@@ -159,7 +201,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
             });
             // Track playlist play time
             if (id !== 'favorites' && typeof id === 'number') {
-                libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                void libraryService.markPlaylistAsPlayed(id).then(triggerPlaylistUpdate).catch(console.error);
             }
         }
     };
@@ -180,7 +222,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
             // Track playlist play time
             if (id !== 'favorites' && typeof id === 'number') {
-                libraryService.markPlaylistAsPlayed(id).catch(console.error);
+                void libraryService.markPlaylistAsPlayed(id).then(triggerPlaylistUpdate).catch(console.error);
             }
         }
     };
@@ -188,12 +230,20 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     // Modification Actions
     // Modification Actions
     const handleReorder = async (newOrder: SongMetadata[]) => {
-        setSongs(newOrder); // Optimistic update
+        const previousSongs = songs;
+        const storedOrder = sortOrder === 'desc' ? [...newOrder].reverse() : newOrder;
+        setSongs(storedOrder);
         if (id !== 'favorites') {
-            const songIds = newOrder.map(s => s.id!);
-            await libraryService.reorderPlaylistSongs(id as number, songIds);
-            triggerLibraryUpdate();
-            triggerPlaylistUpdate();
+            try {
+                const songIds = storedOrder.map(s => s.id!);
+                await libraryService.reorderPlaylistSongs(id, songIds);
+                triggerLibraryUpdate();
+                triggerPlaylistUpdate();
+            } catch (error) {
+                setSongs(previousSongs);
+                console.error('Failed to reorder playlist songs:', error);
+                toast.error('保存歌曲顺序失败，请重试');
+            }
         }
     };
 
@@ -208,7 +258,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 updateRecentItemCover(`playlist:${id}`, coverPath || null);
             }
             triggerLibraryUpdate();
-            loadData();
+            setDataRefreshVersion(version => version + 1);
         }
     };
 
@@ -243,6 +293,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
     }, [songs, sortKey, sortOrder, isFavorites, favoriteSet, favoritesLoaded]);
 
 
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization -- 保持既有手动 useMemo 依赖边界，避免改变列表过滤的引用稳定性
     const filteredSongs = useMemo(() => {
         if (!searchQuery) return sortedSongs;
         const query = searchQuery.toLowerCase();
@@ -255,19 +306,15 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
 
     const displayName = isFavorites ? '喜爱歌曲' : (playlistInfo?.name || initialName);
     const displayDesc = isFavorites ? undefined : playlistInfo?.description;
+    const artworkBackgroundEnabled = useThemeStore(state => state.artworkBackgroundEnabled);
     const coverPath = isFavorites ? undefined : playlistInfo?.cover_path;
+    const isActive = useNavigationStore(state => !state.hasOverlay
+        && state.currentPage === 'playlists' && state.activePlaylistDetail?.id === id);
+    useContentArtworkTheme(sortedSongs[0]?.cover_path, isActive);
 
     return (
         <div className="w-full min-h-full relative isolate">
-            <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none z-0" />
-
-            {/* Sticky Header Guard (Blurs content that scrolls under TitleBar) */}
-            <div className={clsx(
-                "sticky top-0 left-0 right-0 h-10 z-60 transition-all duration-300 border-b",
-                isScrolled
-                    ? "bg-surface/60 dark:bg-black/40 backdrop-blur-xl border-outline-variant/10 opacity-100 pointer-events-auto"
-                    : "bg-transparent border-transparent opacity-0 pointer-events-none"
-            )} data-tauri-drag-region />
+            <DetailScrollHeader />
 
             <EditPlaylistDialog
                 isOpen={isEditOpen}
@@ -278,28 +325,36 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                 initialCover={coverPath || undefined}
             />
 
-            {/* Immersive Background */}
-            <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
-                {coverPath ? (
-                    <CoverImage src={coverPath} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
-                ) : (
-                    sortedSongs.length > 0 && !isFavorites ? (
-                        <PlaylistCoverCollage songs={sortedSongs} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
+            {!artworkBackgroundEnabled && (
+            <ContentBackground>
+                <div className="absolute inset-0 z-0 select-none pointer-events-none overflow-hidden bg-neutral-100 dark:bg-surface-container-low">
+                    {coverPath ? (
+                        <CoverImage src={coverPath} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
                     ) : (
-                        <div className={clsx(
-                            "w-full h-full bg-linear-to-br opacity-30",
-                            isFavorites ? "from-red-500 to-pink-600" : "from-primary/20 to-secondary/20"
-                        )} />
-                    )
-                )}
-                {/* Gradient Scrim for Readability - Optimized gradient for smoother transition */}
-                <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
-            </div>
+                        sortedSongs.length > 0 && !isFavorites ? (
+                            <PlaylistCoverCollage songs={sortedSongs} className="w-full h-full object-cover blur-[100px] opacity-40 dark:opacity-20 scale-110" />
+                        ) : (
+                            <div className={clsx(
+                                "w-full h-full bg-linear-to-br opacity-30",
+                                isFavorites ? "from-red-500 to-pink-600" : "from-primary/20 to-secondary/20"
+                            )} />
+                        )
+                    )}
+                    {/* Gradient Scrim for Readability - Optimized gradient for smoother transition */}
+                    <div className="absolute inset-0 bg-linear-to-b from-transparent via-surface/50 to-surface dark:via-surface-container/60 dark:to-surface-container" />
+                </div>
+            </ContentBackground>
+            )}
 
             {/* Header Section */}
             <div className="relative w-full z-20 -mt-10">
 
                 <div className="absolute top-12 right-6 z-50 flex items-center gap-1">
+                    {isSearchOpen && (
+                        <span className="mr-2 whitespace-nowrap text-sm tabular-nums text-on-surface-variant" aria-live="polite">
+                            {filteredSongs.length} 首歌曲
+                        </span>
+                    )}
                     <PlaylistSearchControl
                         isSearchOpen={isSearchOpen}
                         setIsSearchOpen={setIsSearchOpen}
@@ -309,28 +364,30 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         setSuppressTooltip={setSuppressTooltip}
                     />
 
-                    <PlaylistSortControl
-                        isSortMenuOpen={isSortMenuOpen}
-                        setIsSortMenuOpen={setIsSortMenuOpen}
-                        suppressSortTooltip={suppressSortTooltip}
-                        setSuppressSortTooltip={setSuppressSortTooltip}
-                        sortKey={sortKey}
-                        sortOrder={sortOrder}
-                        updateSortKey={updateSortKey}
-                        updateSortOrder={updateSortOrder}
+                    <SortMenu
+                        value={sortKey}
+                        onChange={updateSortKey}
+                        order={{ value: sortOrder, onChange: updateSortOrder }}
+                        options={[
+                            { value: 'manual', label: '播放列表顺序' },
+                            { value: 'title', label: '标题' },
+                            { value: 'album', label: '专辑' },
+                            { value: 'artist', label: '艺人' },
+                            { value: 'duration', label: '时长' },
+                        ]}
                     />
                 </div>
 
                 <div className="relative z-10 p-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
-                        <div className={clsx(
-                            "w-56 h-56 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
+                        <SharedCover source={transitionSource} className={clsx(
+                            "w-67.5 h-67.5 rounded-xl shadow-2xl flex items-center justify-center overflow-hidden",
                             isFavorites ? "bg-linear-to-br from-red-500 to-pink-600" : "bg-neutral-200 dark:bg-neutral-800"
                         )}>
                             {isFavorites ? (
-                                <MdFavorite className="text-8xl text-white drop-shadow-md" />
-                            ) : coverPath ? (
+                                <img src={favoritesCover} alt="" loading="eager" decoding="sync" className="w-full h-full object-cover" />
+                            ) : loading ? null : coverPath ? (
                                 <CoverImage src={coverPath} className="w-full h-full object-cover" />
                             ) : (
                                 <PlaylistCoverCollage
@@ -338,10 +395,10 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                                     className="w-full h-full"
                                 />
                             )}
-                        </div>
+                        </SharedCover>
 
                         {/* Edit Button Overlay */}
-                        {!isFavorites && (
+                        {!isFavorites && entered && isPresent && isActive && (
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                                 <CustomTooltip text="编辑信息" placement="top">
                                     <button
@@ -356,7 +413,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                     </div>
 
                     {/* Metadata */}
-                    <div className="flex-1 flex flex-col gap-2 text-center md:text-left items-center md:items-start">
+                    <div className="flex-1 min-w-0 flex flex-col gap-2 text-center md:text-left items-center md:items-start">
                         <h1 className="text-3xl md:text-5xl font-bold text-on-surface text-balance">
                             {displayName}
                         </h1>
@@ -368,7 +425,7 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         )}
 
                         <div className="flex items-center gap-2 text-sm text-on-surface-variant font-medium mt-1">
-                            <span>{filteredSongs.length} 首歌曲</span>
+                            <span>{sortedSongs.length} 首歌曲</span>
                             <span>•</span>
                             <span>{formatTotalDuration(totalDuration)}</span>
                         </div>
@@ -377,14 +434,14 @@ export default function PlaylistDetail({ id, name: initialName }: PlaylistDetail
                         <div className="flex items-center gap-3 mt-4">
                             <button
                                 onClick={handlePlayAll}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-primary text-on-primary rounded-full hover:bg-primary/90 transition-all font-medium shadow-lg hover:shadow-xl active:scale-95"
+                                className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-xs hover:shadow-sm active:scale-95"
                             >
                                 <MdPlayArrow className="text-2xl" />
                                 播放
                             </button>
                             <button
                                 onClick={handleShuffle}
-                                className="flex items-center gap-2 btn-blur text-primary px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
+                                className="flex items-center gap-2 btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                             >
                                 <MdShuffle className="text-xl" />
                                 随机播放

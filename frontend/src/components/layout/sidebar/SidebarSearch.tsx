@@ -54,7 +54,7 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                 <div
                     onClick={collapsed ? handleSearchClick : undefined}
                     className={clsx(
-                        "relative flex items-center w-full min-h-12",
+                        "group/search relative flex items-center w-full min-h-12",
                         collapsed && "cursor-pointer"
                     )}
                 >
@@ -63,8 +63,8 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                         "absolute top-1/2 -translate-y-1/2 h-12 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)]",
                         "left-0",
                         collapsed
-                            ? "w-12 rounded-full bg-transparent group-hover/tooltip:bg-neutral-100 dark:group-hover/tooltip:bg-neutral-800"
-                            : "w-full rounded-full bg-neutral-100 dark:bg-neutral-800"
+                            ? "w-12 rounded-full bg-transparent group-hover/tooltip:bg-on-surface/8"
+                            : "w-full rounded-full bg-on-surface/5 backdrop-blur-md group-hover/search:bg-on-surface/10 group-focus-within/search:bg-on-surface/10"
                     )} />
 
                     {/* 内容容器 */}
@@ -83,7 +83,7 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                         >
                             <MdSearch className={clsx(
                                 "text-[24px] transition-colors",
-                                collapsed ? "text-neutral-600 dark:text-neutral-400" : "text-neutral-500"
+                                "text-on-surface-variant"
                             )} />
                         </button>
 
@@ -95,7 +95,7 @@ export default function SidebarSearch({ collapsed, onToggle, onSearch }: Sidebar
                             readOnly={collapsed}
                             onKeyDown={handleKeyDown}
                             className={clsx(
-                                "bg-transparent text-base text-neutral-900 dark:text-neutral-100 placeholder-neutral-500 focus:outline-none min-w-0 transition-all duration-300",
+                                "bg-transparent text-base text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none min-w-0 transition-all duration-300",
                                 collapsed ? "w-0 opacity-0 pointer-events-none" : "w-full opacity-100 ml-2 mr-4"
                             )}
                         />

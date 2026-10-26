@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { open } from '@tauri-apps/plugin-dialog';
 import { MdAdd, MdDeleteOutline } from 'react-icons/md';
 import CoverImage from '@/components/common/CoverImage';
@@ -8,6 +9,7 @@ import type { SongMetadata } from '@/types';
 
 interface ArtworkEditorProps {
     song?: SongMetadata;
+    actionsContainer?: HTMLElement | null;
     coverPath: string | null;
     hasCustomArtwork: boolean;
     hasMixedCovers?: boolean;
@@ -24,6 +26,7 @@ interface MenuPosition {
 
 export default function ArtworkEditor({
     song,
+    actionsContainer,
     coverPath,
     hasCustomArtwork,
     hasMixedCovers = false,
@@ -60,11 +63,36 @@ export default function ArtworkEditor({
         onError('');
     };
 
+    const actions = (
+        <div className={actionsContainer !== undefined ? "flex items-center gap-2" : "mt-4 flex items-center justify-between"}>
+            {hasCustomArtwork ? (
+                <button
+                    type="button"
+                    onClick={handleRemove}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
+                >
+                    <MdDeleteOutline className="text-[20px]" />
+                    移除封面
+                </button>
+            ) : (
+                <div />
+            )}
+            <button
+                type="button"
+                onClick={handleSelect}
+                className={`inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-primary transition-colors hover:bg-primary/10 ${actionsContainer !== undefined ? 'order-first' : ''}`}
+            >
+                <MdAdd className="text-[24px]" />
+                添加封面
+            </button>
+        </div>
+    );
+
     return (
         <div className="flex h-full min-h-0 flex-col items-center justify-center">
-            <div className="w-[min(430px,100%)]">
+            <div className={actionsContainer !== undefined ? "aspect-square h-[90%] max-h-[460px] max-w-full" : "w-[min(430px,100%)]"}>
                 <div
-                    className="relative aspect-square overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 shadow-sm dark:border-white/10 dark:bg-neutral-800"
+                    className="relative aspect-square max-h-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 shadow-sm dark:border-white/10 dark:bg-neutral-800"
                     onContextMenu={(event) => {
                         event.preventDefault();
                         if (hasCustomArtwork) {
@@ -86,30 +114,10 @@ export default function ArtworkEditor({
                         </span>
                     )}
                 </div>
-
-                <div className="mt-4 flex items-center justify-between">
-                    {hasCustomArtwork ? (
-                        <button
-                            type="button"
-                            onClick={handleRemove}
-                            className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-red-500 transition-colors hover:bg-red-500/10 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300"
-                        >
-                            <MdDeleteOutline className="text-[20px]" />
-                            移除封面
-                        </button>
-                    ) : (
-                        <div />
-                    )}
-                    <button
-                        type="button"
-                        onClick={handleSelect}
-                        className="inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-primary transition-colors hover:bg-primary/10"
-                    >
-                        <MdAdd className="text-[24px]" />
-                        添加封面
-                    </button>
-                </div>
+                {actionsContainer === undefined && actions}
             </div>
+
+            {actionsContainer && createPortal(actions, actionsContainer)}
 
             {menuPosition && (
                 <CursorContextMenu

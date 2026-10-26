@@ -1,4 +1,5 @@
 import { useCallback, useInsertionEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { RefObject } from 'react';
 import type { AnimatedSpringParams } from '@/features/player/lyrics/animatedLyricsSpring';
 import { AnimatedLyricsSpring } from '@/features/player/lyrics/animatedLyricsSpring';
 import {
@@ -7,6 +8,7 @@ import {
 } from '@/features/player/lyrics/animatedLyricsMotion';
 import type { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
+import { manualResumeFollowDelayMs } from '@/features/player/lyrics/constants';
 
 const SCALE_SPRING: AnimatedSpringParams = {
     stiffness: 100,
@@ -19,6 +21,8 @@ const SCALE_SPRING: AnimatedSpringParams = {
 const ACTIVE_SCALE = 1;
 const INACTIVE_SCALE = 0.98;
 const SPATIAL_OVERSCAN_PX = 300;
+const MANUAL_SCROLL_SPRING: AnimatedSpringParams = { stiffness: 90, damping: 2 * Math.sqrt(90), mass: 1 };
+const MANUAL_SCROLL_IDLE_MS = 150 + 500;
 
 interface RowAnimationState {
     index: number;
@@ -39,6 +43,7 @@ interface RowAnimationState {
 }
 
 interface AnimatedLyricsAnimatorArgs {
+    manualScrollRef?: RefObject<boolean>;
     activeDisplayIndex: number;
     activeIndices: Set<number>;
     getDelay: (displayIndex: number) => number;
@@ -134,6 +139,8 @@ export class AnimatedLyricsAnimator {
     private readonly rows = new Map<number, RowAnimationState>();
     private readonly animatingRows = new Set<number>();
     private readonly mountedRows = new Set<RowAnimationState>();
+    private manualScroll: { origin: number; target: number; layoutOffset: number; anchor: number | undefined; lastInput: number; spring: AnimatedLyricsSpring } | null = null;
+    private readonly scrollListeners = new Set<() => void>();
     private modelIdentity: object | null = null;
     private readonly frameScheduler: LyricsFrameScheduler;
     private unsubscribeFrame: (() => void) | null = null;
@@ -152,7 +159,19 @@ export class AnimatedLyricsAnimator {
         this.frameScheduler = frameScheduler;
     }
 
-    beginManualScroll(visualShifts: readonly number[], fallbackScrollY: number) {
+    subscribeScroll = (listener: () => void) => {
+        this.scrollListeners.add(listener);
+        return () => { this.scrollListeners.delete(listener); };
+    };
+
+    getScrollOffset(visualShifts: readonly number[], fallback: number, anchor: number) {
+        if (this.manualScroll) return this.manualScroll.origin - this.manualScroll.layoutOffset - this.manualScroll.spring.getPosition();
+        const state = this.rows.get(anchor);
+        return state ? (visualShifts[anchor] ?? 0) - getRowY(state) : fallback;
+    }
+
+    beginManualScroll(visualShifts: readonly number[], fallbackScrollY: number, anchor?: number) {
+        this.finishManualScroll();
         let scrollY = fallbackScrollY;
         let nearestDistance = Infinity;
         const spatial = this.spatialState;
@@ -166,13 +185,71 @@ export class AnimatedLyricsAnimator {
                 scrollY = (visualShifts[index] ?? 0) - getRowY(state);
             });
         }
+        if (anchor !== undefined && this.rows.has(anchor)) {
+            scrollY = this.getScrollOffset(visualShifts, scrollY, anchor);
+        }
         // 手动接管只停止旧滚动的速度和待执行延迟，保留每行当前坐标与激活缩放。
         this.rows.forEach(state => {
             const y = state.translateY.getPosition();
             state.translateY.setPosition(y);
             state.targetTranslateY = y;
         });
+        this.manualScroll = { origin: scrollY, target: scrollY, layoutOffset: 0, anchor, lastInput: performance.now(), spring: new AnimatedLyricsSpring(0, MANUAL_SCROLL_SPRING) };
         return scrollY;
+    }
+
+    scrollManualBy(delta: number, max: number, continuous = false) {
+        return this.scrollManualTo((this.manualScroll?.target ?? 0) + delta, max, continuous);
+    }
+
+    scrollManualTo(offset: number, max: number, continuous = false) {
+        const manual = this.manualScroll;
+        if (!manual) return 0;
+        manual.target = Math.max(0, Math.min(Math.max(0, max), offset));
+        manual.lastInput = performance.now();
+        const position = manual.origin - manual.layoutOffset - manual.target;
+        if (continuous) {
+            manual.spring.setPosition(position);
+            this.mountedRows.forEach(state => this.renderState(state));
+            this.updateSpatialVisibility();
+            this.scrollListeners.forEach(listener => listener());
+        } else {
+            manual.spring.setTarget(position, MANUAL_SCROLL_SPRING);
+            if (manual.spring.isAnimating()) this.start();
+        }
+        return manual.target;
+    }
+
+    canResumeAutoFollow(index: number) {
+        const manual = this.manualScroll;
+        if (!manual) return false;
+        const idle = performance.now() - manual.lastInput;
+        if (idle >= manualResumeFollowDelayMs) return true;
+        const spatial = this.spatialState;
+        const state = this.rows.get(index);
+        if (!spatial || !state || index === manual.anchor || idle < MANUAL_SCROLL_IDLE_MS) return false;
+        const top = spatial.itemTops[index] + this.getRowY(state);
+        return top < spatial.viewportHeight && top + (spatial.itemHeights[index] ?? 0) > 0;
+    }
+
+    getAutoFollowDelay() {
+        return this.manualScroll ? Math.max(0, manualResumeFollowDelayMs - (performance.now() - this.manualScroll.lastInput)) : null;
+    }
+
+    private getRowY(state: RowAnimationState) {
+        return getRowY(state) + (this.manualScroll ? this.manualScroll.spring.getPosition() + this.manualScroll.layoutOffset : 0);
+    }
+
+    private finishManualScroll() {
+        if (!this.manualScroll) return;
+        const offset = this.manualScroll.spring.getPosition() + this.manualScroll.layoutOffset;
+        this.rows.forEach(state => {
+            if (state.parent) return;
+            const y = state.translateY.getPosition() + offset;
+            state.translateY.setPosition(y);
+            state.targetTranslateY = y;
+        });
+        this.manualScroll = null;
     }
 
     syncModels(
@@ -213,6 +290,7 @@ export class AnimatedLyricsAnimator {
         rowVisualStyle: AnimatedLyricsRowVisualStyle,
     ) {
         const state = this.ensureModel(index, targetY, targetScale);
+        if (this.manualScroll) targetY = state.translateY.getPosition();
         const wasAttached = state.element === element;
         const wasDetached = state.detachedAt !== null;
         // React StrictMode replays layout effects without removing the DOM
@@ -303,6 +381,30 @@ export class AnimatedLyricsAnimator {
         if (previous && !targetChanged && previous.itemTops === itemTops &&
             previous.itemHeights === itemHeights && previous.viewportHeight === viewportHeight &&
             previous.onVisibleIndicesChange === onVisibleIndicesChange) return;
+        if (this.manualScroll && previous && previous.itemTops !== itemTops) {
+            let anchor = -1;
+            let nearest = Infinity;
+            this.mountedRows.forEach(state => {
+                if (state.parent) return;
+                const top = previous.itemTops[state.index] + this.getRowY(state);
+                const height = previous.itemHeights[state.index] ?? 0;
+                if (top >= previous.viewportHeight || top + height <= 0) return;
+                const distance = Math.abs(top + height / 2 - previous.viewportHeight / 2);
+                if (distance >= nearest) return;
+                nearest = distance;
+                anchor = state.index;
+            });
+            if (anchor >= 0) {
+                const correction = itemTops[anchor] - previous.itemTops[anchor];
+                if (Number.isFinite(correction) && correction !== 0) {
+                    // 重测累计高度时保持可见锚点不动，同时修正逻辑目标，避免下一次输入回跳。
+                    this.manualScroll.layoutOffset -= correction;
+                    this.manualScroll.target += correction;
+                    this.mountedRows.forEach(state => this.renderState(state));
+                    this.scrollListeners.forEach(listener => listener());
+                }
+            }
+        }
         this.spatialState = {
             itemTops,
             itemHeights,
@@ -356,7 +458,9 @@ export class AnimatedLyricsAnimator {
         getDelay: (index: number) => number,
         getRowVisual: (index: number, delay: number) => AnimatedLyricsRowVisualStyle,
         parentDisplayIndexMap?: Map<number, number>,
+        manualScrolling = false,
     ) {
+        if (!manualScrolling) this.finishManualScroll();
         this.rows.forEach((state, index) => {
             const delay = getDelay(index);
             this.setTarget(
@@ -382,6 +486,7 @@ export class AnimatedLyricsAnimator {
             this.setScaleWillChange(state,
                 state.translateY.isAnimating() || state.scale.isAnimating() ? 'transform' : '');
         });
+        this.scrollListeners.forEach(listener => listener());
     }
 
     setTarget(
@@ -394,6 +499,7 @@ export class AnimatedLyricsAnimator {
     ) {
         const state = this.rows.get(index);
         if (!state) return;
+        if (this.manualScroll) translateY = state.translateY.getPosition();
         state.targetTranslateY = translateY;
         state.targetScale = scale;
 
@@ -435,6 +541,8 @@ export class AnimatedLyricsAnimator {
 
     private readonly update = (_time: number, deltaMs: number) => {
         const deltaSeconds = Math.max(0, deltaMs) / 1000;
+        const manualMoving = this.manualScroll?.spring.isAnimating() ?? false;
+        this.manualScroll?.spring.advance(deltaSeconds);
 
         this.animatingRows.forEach(index => {
             const state = this.rows.get(index);
@@ -448,7 +556,7 @@ export class AnimatedLyricsAnimator {
 
         // 先推进所有模型再绘制，和声始终读取父行在本帧的位置（包括最后一帧）。
         this.mountedRows.forEach(state => {
-            if (!this.animatingRows.has(state.index) &&
+            if (!manualMoving && !this.animatingRows.has(state.index) &&
                 !(state.parent && this.animatingRows.has(state.parent.index))) return;
             // The snapped final value passes through the same formatted-string
             // cache; an identical final transform needs no extra DOM write.
@@ -465,8 +573,9 @@ export class AnimatedLyricsAnimator {
         });
 
         this.updateSpatialVisibility();
+        this.scrollListeners.forEach(listener => listener());
 
-        if (this.animatingRows.size === 0) {
+        if (this.animatingRows.size === 0 && !this.manualScroll?.spring.isAnimating()) {
             this.unsubscribeFrame?.();
             this.unsubscribeFrame = null;
         }
@@ -487,7 +596,7 @@ export class AnimatedLyricsAnimator {
 
     private renderState(state: RowAnimationState) {
         if (state.element) {
-            const y = getRowY(state);
+            const y = this.getRowY(state);
             const transform = `translateY(${y.toFixed(1)}px)`;
             if (state.lastRenderedY !== transform) {
                 state.lastRenderedY = transform;
@@ -496,7 +605,7 @@ export class AnimatedLyricsAnimator {
         }
         if (state.scaleElement) {
             const s = state.scale.getPosition();
-            const transform = `scale(${s.toFixed(3)}) translateZ(0)`;
+            const transform = `scale(${s.toFixed(3)})`;
             if (state.lastRenderedScale !== transform) {
                 state.lastRenderedScale = transform;
                 state.scaleElement.style.transform = transform;
@@ -512,7 +621,7 @@ export class AnimatedLyricsAnimator {
             state.lastRenderedFilter = style.filter;
         }
         if (state.lastRenderedOpacity !== style.opacity) {
-            element.style.opacity = style.opacity;
+            (state.scaleElement ?? element).style.opacity = style.opacity;
             state.lastRenderedOpacity = style.opacity;
         }
     }
@@ -543,6 +652,7 @@ export class AnimatedLyricsAnimator {
     }
 
     private resetRows() {
+        this.manualScroll = null;
         this.unsubscribeFrame?.();
         this.unsubscribeFrame = null;
         this.rows.clear();
@@ -563,7 +673,7 @@ export class AnimatedLyricsAnimator {
         for (let index = 0; index < spatialState.itemTops.length; index++) {
             const state = this.rows.get(index);
             if (!state) continue;
-            const top = spatialState.itemTops[index] + getRowY(state);
+            const top = spatialState.itemTops[index] + this.getRowY(state);
             const height = spatialState.itemHeights[index] ?? 0;
             if (top + height >= minimum && top <= maximum) membership.add(index);
         }
@@ -603,6 +713,7 @@ export class AnimatedLyricsAnimator {
 }
 
 export function useAnimatedLyricsAnimator({
+    manualScrollRef,
     activeDisplayIndex,
     activeIndices,
     getDelay,
@@ -682,8 +793,9 @@ export function useAnimatedLyricsAnimator({
                 delay, targets.parentDisplayIndexMap,
             ),
             targets.parentDisplayIndexMap,
+            (manualScrollRef?.current ?? targets.isUserScrolling) || targets.pausedScroll,
         );
-    }, [activeDisplayIndex, activeIndices, animator, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, modelIdentity, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, rowCount, springParams, syncRevision, targetScrollY, variant, viewportHeight, visualShifts]);
+    }, [activeDisplayIndex, activeIndices, animator, fallbackVisibleIndices, getDelay, isUserScrolling, itemHeights, itemTops, manualScrollRef, modelIdentity, onVisibleIndicesChange, parentDisplayIndexMap, pausedScroll, rowCount, springParams, syncRevision, targetScrollY, variant, viewportHeight, visualShifts]);
     const registerAnimatedRow = useCallback((index: number, element: HTMLDivElement) => {
         const targets = latestTargetsRef.current;
         // StrictMode 会重放 layout effect，但不会重放 insertion effect。
@@ -726,8 +838,23 @@ export function useAnimatedLyricsAnimator({
 
     const beginManualScroll = useCallback(() => {
         const targets = latestTargetsRef.current;
-        return animator.beginManualScroll(targets.visualShifts, targets.targetScrollY);
+        return animator.beginManualScroll(targets.visualShifts, targets.targetScrollY,
+            getEffectiveIndex(targets.activeDisplayIndex, targets.parentDisplayIndexMap));
     }, [animator]);
 
-    return { registerAnimatedRow, beginManualScroll };
+    const getScrollOffset = useCallback(() => {
+        const targets = latestTargetsRef.current;
+        return animator.getScrollOffset(targets.visualShifts, targets.targetScrollY,
+            getEffectiveIndex(targets.activeDisplayIndex, targets.parentDisplayIndexMap));
+    }, [animator]);
+
+    const scrollManualBy = useCallback((delta: number, max: number, continuous = false) => animator.scrollManualBy(delta, max, continuous), [animator]);
+    const scrollManualTo = useCallback((offset: number, max: number, continuous = true) => animator.scrollManualTo(offset, max, continuous), [animator]);
+    const canResumeAutoFollow = useCallback(() => {
+        const targets = latestTargetsRef.current;
+        return animator.canResumeAutoFollow(getEffectiveIndex(targets.activeDisplayIndex, targets.parentDisplayIndexMap));
+    }, [animator]);
+    const getAutoFollowDelay = useCallback(() => animator.getAutoFollowDelay(), [animator]);
+
+    return { registerAnimatedRow, beginManualScroll, scrollManualBy, scrollManualTo, canResumeAutoFollow, getAutoFollowDelay, getScrollOffset, subscribeScroll: animator.subscribeScroll };
 }

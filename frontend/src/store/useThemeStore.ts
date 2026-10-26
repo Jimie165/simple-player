@@ -19,6 +19,9 @@ interface ThemeState {
     reactiveBackgroundEnabled: boolean;
     lyricLineBlendEnabled: boolean;
     graphicsUnavailable: boolean;
+    lyricsScrollbarEnabled: boolean;
+    artworkBackgroundEnabled: boolean;
+    moreTransitionsEnabled: boolean;
 
     setThemeMode: (mode: ThemeMode) => void;
     setPlayerEffectMode: (mode: PlayerEffectMode) => void;
@@ -26,8 +29,11 @@ interface ThemeState {
     setLyricFloatMode: (mode: LyricFloatMode) => void;
     setFullScreenMode: (mode: PlayerEffectMode) => void;
     setReactiveBackgroundEnabled: (enabled: boolean) => void;
+    setLyricsScrollbarEnabled: (enabled: boolean) => void;
     setLyricLineBlendEnabled: (enabled: boolean) => void;
     setGraphicsUnavailable: () => void;
+    setArtworkBackgroundEnabled: (enabled: boolean) => void;
+    setMoreTransitionsEnabled: (enabled: boolean) => void;
     setSourceColor: (hex: string, isCustom?: boolean) => void;
 
     // Internal use: update computed state and apply CSS
@@ -49,6 +55,9 @@ export const useThemeStore = create<ThemeState>()(
             reactiveBackgroundEnabled: false,
             lyricLineBlendEnabled: false,
             graphicsUnavailable: false,
+            lyricsScrollbarEnabled: true,
+            artworkBackgroundEnabled: false,
+            moreTransitionsEnabled: false,
 
             setThemeMode: (mode) => {
                 set({ themeMode: mode });
@@ -68,10 +77,14 @@ export const useThemeStore = create<ThemeState>()(
             setReactiveBackgroundEnabled: (enabled) => {
                 set({ reactiveBackgroundEnabled: enabled });
             },
+            setLyricsScrollbarEnabled: (enabled) => set({ lyricsScrollbarEnabled: enabled }),
             setLyricLineBlendEnabled: (enabled) => set({ lyricLineBlendEnabled: enabled }),
             setGraphicsUnavailable: () => set({ graphicsUnavailable: true }),
+            setArtworkBackgroundEnabled: (enabled) => set({ artworkBackgroundEnabled: enabled }),
+            setMoreTransitionsEnabled: (enabled) => set({ moreTransitionsEnabled: enabled }),
 
             setSourceColor: (hex, isCustom = false) => {
+                if (get().sourceColor === hex && get().isCustomColor === isCustom) return;
                 set({ sourceColor: hex, isCustomColor: isCustom });
                 get().applyTheme();
             },
@@ -81,7 +94,7 @@ export const useThemeStore = create<ThemeState>()(
                 const root = window.document.documentElement;
                 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
 
-                let isDark = false;
+                let isDark: boolean;
                 if (themeMode === 'dark') {
                     isDark = true;
                 } else if (themeMode === 'light') {
@@ -104,7 +117,7 @@ export const useThemeStore = create<ThemeState>()(
                 });
 
                 // Update computed state
-                set({ isDark });
+                if (get().isDark !== isDark) set({ isDark });
             },
 
             init: () => {
@@ -138,6 +151,9 @@ export const useThemeStore = create<ThemeState>()(
                 fullScreenMode: state.fullScreenMode,
                 reactiveBackgroundEnabled: state.reactiveBackgroundEnabled,
                 lyricLineBlendEnabled: state.lyricLineBlendEnabled,
+                lyricsScrollbarEnabled: state.lyricsScrollbarEnabled,
+                artworkBackgroundEnabled: state.artworkBackgroundEnabled,
+                moreTransitionsEnabled: state.moreTransitionsEnabled,
             }),
             merge: (persisted, current) => {
                 const persistedState = persisted as Partial<ThemeState> | undefined;
@@ -160,6 +176,9 @@ export const useThemeStore = create<ThemeState>()(
                     reactiveBackgroundEnabled: persistedState?.reactiveBackgroundEnabled === true,
                     lyricLineBlendEnabled: persistedState?.lyricLineBlendEnabled === true,
                     graphicsUnavailable: false,
+                    lyricsScrollbarEnabled: persistedState?.lyricsScrollbarEnabled !== false,
+                    artworkBackgroundEnabled: persistedState?.artworkBackgroundEnabled === true,
+                    moreTransitionsEnabled: persistedState?.moreTransitionsEnabled === true,
                 };
             },
         }

@@ -1,4 +1,6 @@
 import clsx from 'clsx';
+import { useId } from 'react';
+import { LayoutGroup } from 'framer-motion';
 import { MdHomeFilled, MdLibraryMusic, MdVideoLibrary, MdFeaturedPlayList, MdSettings } from 'react-icons/md';
 import SidebarHeader from '@/components/layout/sidebar/SidebarHeader';
 import SidebarSearch from '@/components/layout/sidebar/SidebarSearch';
@@ -35,6 +37,7 @@ export default function Sidebar({
     isOverlay = false,
     onRequestClose
 }: SidebarProps) {
+    const animationId = useId();
     const handleNavigate = (id: string) => {
         onNavigate(id);
         if (isOverlay) {
@@ -51,7 +54,8 @@ export default function Sidebar({
         // 1. Layout Placeholder (participates in Flex flow)
         <div
             className={clsx(
-                "relative z-80 shrink-0 h-full",
+                "relative shrink-0 h-full",
+                isOverlay && !collapsed ? 'z-97' : 'z-80',
                 "transition-[width] duration-300 cubic-bezier(0.2, 0.0, 0.0, 1.0)",
                 layoutWidth
             )}
@@ -83,6 +87,7 @@ export default function Sidebar({
                 />
                 {/* 3. Inner Fixed Content (always 280px to prevent wrapping) */}
                 <div data-tauri-drag-region aria-hidden="true" className="absolute inset-x-0 top-0 z-20 h-[var(--macos-sidebar-inset,0px)]" />
+                <LayoutGroup id={animationId}>
                 <div className="relative z-10 w-70 flex flex-col flex-1 h-full min-h-0 pt-[var(--macos-sidebar-inset,0px)]">
 
                     {/* Header */}
@@ -126,6 +131,7 @@ export default function Sidebar({
                         />
                     </div>
                 </div>
+                </LayoutGroup>
             </div>
         </div>
     );

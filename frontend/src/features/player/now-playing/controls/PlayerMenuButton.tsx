@@ -24,12 +24,12 @@ export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata
             variant="clean"
             buttonClassName="group/player-menu w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center hover:opacity-100!"
         >
-            <svg viewBox="0 0 60 60" className="block w-full h-full shrink-0 overflow-visible text-white" fill="currentColor" aria-hidden="true">
-                <circle cx="30" cy="30" r="30" className="opacity-10 group-hover/player-menu:opacity-20" />
+            <svg viewBox="0 0 36 36" className="block h-full w-full shrink-0 overflow-visible text-white" fill="currentColor" aria-hidden="true">
+                <circle cx="18" cy="18" r="18" className="opacity-10 group-hover/player-menu:opacity-20" />
                 <g className="opacity-80">
-                    <circle cx="18" cy="30" r="3.5" />
-                    <circle cx="30" cy="30" r="3.5" />
-                    <circle cx="42" cy="30" r="3.5" />
+                    <circle cx="10.5" cy="18" r="2.2" />
+                    <circle cx="18" cy="18" r="2.2" />
+                    <circle cx="25.5" cy="18" r="2.2" />
                 </g>
             </svg>
         </MusicContextMenu>

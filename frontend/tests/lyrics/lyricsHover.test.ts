@@ -8,7 +8,7 @@ vi.mock('@/store/useThemeStore', () => ({
         selector({ lyricFillMode: 'character', lyricLineBlendEnabled: false }),
 }));
 
-describe('shared lyric row hover feedback', () => {
+describe('lyric seek availability', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     const render = (animatedMotion: boolean, patch: Partial<React.ComponentProps<typeof LyricsLineItem>> = {}) => {
@@ -22,16 +22,13 @@ describe('shared lyric row hover feedback', () => {
         }));
     };
 
-    it.each([true, false])('does not show hover feedback for invisible backgrounds (animated=%s)', animatedMotion => {
-        expect(render(animatedMotion, { isBackground: true })).not.toContain('lyrics-hover-target');
-        expect(render(animatedMotion, { isBackground: true, isActive: true })).toContain('lyrics-hover-target');
-    });
-
     it.each([true, false])('does not show a seek affordance for untimed lyrics (animated=%s)', animatedMotion => {
         const html = render(animatedMotion, {
             line: { id: 'untimed', role: 'main', text: 'Untimed', words: [], start_time_ms: null, end_time_ms: null },
         });
         expect(html).toContain('disabled=""');
-        expect(html).not.toContain('lyrics-hover-target');
+    });
+    it.each([true, false])('allows seeking timed lyrics (animated=%s)', animatedMotion => {
+        expect(render(animatedMotion)).not.toContain('disabled=""');
     });
 });

@@ -17,24 +17,30 @@ export function useGlobalEvents() {
     const { togglePlayback } = usePlaybackActions();
 
     useEffect(() => {
+        let disposed = false;
         let unlistenLibrary: (() => void) | undefined;
         let unlistenVideo: (() => void) | undefined;
 
         const setupListeners = async () => {
             try {
                 unlistenLibrary = await listen('library_scan_complete', () => {
+                    if (disposed) return;
                     console.log('Global Event: library_scan_complete');
                     refreshFavorites();
                     refreshRecentHistory();
                     triggerLibraryUpdate(); // Triggers re-render in components subscribing to version
                 });
+                // Release handles returned after the effect has already been cleaned up.
+                if (disposed) { unlistenLibrary(); return; }
 
                 unlistenVideo = await listen('video_scan_complete', () => {
+                    if (disposed) return;
                     console.log('Global Event: video_scan_complete');
                     refreshRecentHistory();
                     // Video library might have its own state or components handle it locally, 
                     // but refreshing recent history is global.
                 });
+                if (disposed) unlistenVideo();
             } catch (err) {
                 console.error('Failed to listen to global events:', err);
             }
@@ -43,6 +49,7 @@ export function useGlobalEvents() {
         setupListeners();
 
         return () => {
+            disposed = true;
             if (unlistenLibrary) unlistenLibrary();
             if (unlistenVideo) unlistenVideo();
         };

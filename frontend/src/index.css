@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant base-theme (&:not(:where([data-artwork-theme], [data-artwork-theme] *)));
 
 /* WebView2 native caption hit testing also supports touch and pen dragging. */
 *[data-tauri-drag-region]:not([data-tauri-drag-region="false"]) {
@@ -34,6 +35,7 @@
   --color-on-error: var(--md-sys-color-on-error);
   
   --color-surface: var(--md-sys-color-surface);
+  --color-background: var(--md-sys-color-background);
   --color-on-surface: var(--md-sys-color-on-surface);
   --color-surface-variant: var(--md-sys-color-surface-variant);
   --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
@@ -51,6 +53,8 @@
   /* Custom Blur Button Utility */
   --color-glass-surface: var(--glass-surface);
   --color-glass-border: var(--glass-border);
+  --color-menu-highlight: var(--menu-highlight);
+  --color-menu-hover: var(--menu-hover);
 }
 
 @property --kf {
@@ -70,6 +74,7 @@
 :root {
   /* Default Primary Fallback (Blue) - will be overridden by JS */
   --md-sys-color-primary: #005AC1;
+  --app-shell-gradient-color: var(--md-sys-color-primary);
   --md-sys-color-on-primary: #FFFFFF;
   --md-sys-color-primary-container: #D8E2FF;
   --md-sys-color-on-primary-container: #001A41;
@@ -89,6 +94,7 @@
 
   /* Fixed Surface Colors (Neutral) */
   --md-sys-color-surface: #F9F9FC;
+  --md-sys-color-background: #FDFBFF;
   --md-sys-color-on-surface: #191C20;
   --md-sys-color-surface-variant: #E1E2EC;
   --md-sys-color-on-surface-variant: #44474F;
@@ -107,15 +113,22 @@
   --glass-surface: rgba(255, 255, 255, 0.6);
   --glass-border: rgba(255, 255, 255, 0.5);
 
+  --content-glass-background: rgba(245, 245, 247, 0.55);
+  --content-glass-edge: rgba(0, 0, 0, 0.05);
+  --content-glass-divider: rgba(0, 0, 0, 0.1);
+  --content-glass-shadow: rgba(0, 0, 0, 0.1);
+  --menu-highlight: rgba(0, 0, 0, 0.1);
+  --menu-hover: rgba(0, 0, 0, 0.06);
+
   /* Settings use a foreground-first hierarchy: cards and controls are brighter
      than the surrounding page, rather than following the generic MD surface ramp. */
-  --settings-card: #FFFFFF;
-  --settings-option: #FBFBFD;
-  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 6%, var(--settings-option));
-  --settings-subtle: #F5F6FA;
-  --settings-border: rgba(68, 71, 79, 0.16);
-  --settings-divider: rgba(68, 71, 79, 0.12);
-  --settings-shadow: 0 10px 28px rgba(25, 28, 32, 0.05);
+  --settings-card: rgba(255, 255, 255, 0.82);
+  --settings-option: #FFFFFF;
+  --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--settings-option));
+  --settings-subtle: rgba(0, 0, 0, 0.05);
+  --settings-border: rgba(0, 0, 0, 0.08);
+  --settings-divider: rgba(0, 0, 0, 0.07);
+  --settings-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* Root scope also reaches menus rendered through portals. Keep modal scrims
@@ -163,6 +176,7 @@
 
   /* Fixed Surface Colors (Neutral Dark) */
   --md-sys-color-surface: #1f1f1f;
+  --md-sys-color-background: #0D0D0F;
   --md-sys-color-on-surface: #E2E2E6;
   --md-sys-color-surface-variant: #4A4D56;
   --md-sys-color-on-surface-variant: #C4C6D0;
@@ -181,13 +195,20 @@
   --glass-surface: rgba(30, 30, 30, 0.5);
   --glass-border: rgba(255, 255, 255, 0.1);
 
-  --settings-card: #2A2A2A;
-  --settings-option: #353535;
+  --content-glass-background: rgba(38, 38, 40, 0.6);
+  --content-glass-edge: rgba(255, 255, 255, 0.2);
+  --content-glass-divider: rgba(255, 255, 255, 0.1);
+  --content-glass-shadow: rgba(0, 0, 0, 0.2);
+  --menu-highlight: rgba(0, 0, 0, 0.24);
+  --menu-hover: rgba(0, 0, 0, 0.12);
+
+  --settings-card: rgba(255, 255, 255, 0.05);
+  --settings-option: #3A3A3C;
   --settings-option-hover: color-mix(in srgb, var(--md-sys-color-primary) 9%, var(--settings-option));
-  --settings-subtle: #303030;
-  --settings-border: rgba(255, 255, 255, 0.11);
-  --settings-divider: rgba(255, 255, 255, 0.08);
-  --settings-shadow: 0 10px 28px rgba(0, 0, 0, 0.16);
+  --settings-subtle: rgba(255, 255, 255, 0.07);
+  --settings-border: rgba(255, 255, 255, 0.09);
+  --settings-divider: rgba(255, 255, 255, 0.07);
+  --settings-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 body {
@@ -199,52 +220,163 @@ body {
   cursor: default;
 }
 
+/* Palette commits are atomic; normal hover and layout transitions resume on the next frame. */
+[data-artwork-updating],
+[data-artwork-updating] *,
+[data-artwork-updating] *::before,
+[data-artwork-updating] *::after,
+[data-navigation-updating],
+[data-navigation-updating] *,
+[data-navigation-updating] *::before,
+[data-navigation-updating] *::after {
+  transition: none !important;
+}
+
 @layer components {
-  .settings-card {
+  .content-player-shell,
+  .selection-accent {
+    --md-sys-color-primary: var(--player-primary-light);
+    --color-primary: var(--player-primary-light);
+  }
+
+  .dark .content-player-shell,
+  .dark .selection-accent {
+    --md-sys-color-primary: var(--player-primary-dark);
+    --color-primary: var(--player-primary-dark);
+  }
+
+  .selection-accent {
+    --md-sys-color-on-primary: var(--player-on-primary-light);
+    --color-on-primary: var(--player-on-primary-light);
+  }
+
+  .dark .selection-accent {
+    --md-sys-color-on-primary: var(--player-on-primary-dark);
+    --color-on-primary: var(--player-on-primary-dark);
+  }
+
+  /* Keep the material behind the controls so nested popups can blur independently. */
+  .content-player-shell::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    border-radius: inherit;
+    background: var(--content-glass-background);
+    backdrop-filter: saturate(220%) blur(16px);
+    box-shadow: 0 10px 40px var(--content-glass-shadow);
+    pointer-events: none;
+  }
+
+  .content-player-shell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 0.5px var(--content-glass-edge);
+    pointer-events: none;
+  }
+
+  .content-player-shell:has(.player-progress:hover, .player-progress[data-dragging]) .player-song-info {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .player-progress::before {
+    content: '';
+    position: absolute;
+    inset-inline: -8px;
+    bottom: 0;
+    height: 72px;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    backdrop-filter: blur(4px);
+    transition: opacity 200ms ease;
+  }
+
+  .player-progress:is(:hover, [data-dragging])::before {
+    opacity: 1;
+  }
+
+  .player-progress[data-dragging] span {
+    opacity: 1;
+  }
+
+  .player-progress[data-dragging] .pointer-events-none:not(span) {
+    height: 8px;
+  }
+
+  .content-queue-shell {
+    transition: background-color 200ms ease, border-color 200ms ease;
+    background: var(--content-glass-background);
+    backdrop-filter: saturate(220%) blur(16px);
+    border-left: 0.5px solid var(--content-glass-divider);
+    box-shadow: 0 10px 40px var(--content-glass-shadow);
+  }
+
+  /* macOS 风格分组表单：低对比分组卡片，行与行之间使用左右内缩的发丝分隔线。 */
+  .settings-group {
     background-color: var(--settings-card);
-    border: 1px solid var(--settings-border);
-    box-shadow: var(--settings-shadow);
+    box-shadow: 0 0 0 0.5px var(--settings-border), var(--settings-shadow);
   }
 
-  .settings-list {
+  .settings-group > * {
+    position: relative;
+  }
+
+  .settings-group > * + *::before,
+  .settings-row-dividers > * + *::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 14px;
+    right: 14px;
+    height: 1px;
     background-color: var(--settings-divider);
-    border: 1px solid var(--settings-border);
-    box-shadow: var(--settings-shadow);
-  }
-
-  .settings-row {
-    background-color: var(--settings-option);
-    transition: background-color 180ms ease, box-shadow 180ms ease;
-  }
-
-  .settings-row:hover {
-    background-color: var(--settings-option-hover);
-  }
-
-  .settings-static-row {
-    background-color: var(--settings-option);
+    pointer-events: none;
   }
 
   .settings-control {
     background-color: var(--settings-option);
-    border-color: var(--settings-border);
+    box-shadow: 0 0 0 0.5px var(--settings-border), 0 1px 1.5px rgba(0, 0, 0, 0.08);
+    transition: background-color 150ms ease;
   }
 
   .settings-control:not(:disabled):hover {
     background-color: var(--settings-option-hover);
   }
 
+  .settings-control.settings-segment-indicator {
+    background-color: var(--md-sys-color-secondary-container);
+  }
+
+  .dark .settings-control.settings-segment-indicator {
+    background-color: var(--md-sys-color-secondary-container);
+    box-shadow: inset 0 0 0 0.5px rgba(255, 255, 255, 0.25), 0 1px 3px rgba(0, 0, 0, 0.25);
+  }
+
   .settings-subtle {
     background-color: var(--settings-subtle);
   }
 
-  .settings-divider {
-    border-color: var(--settings-divider);
+  /* 顶部分类栏与弹出菜单使用半透明玻璃材质。 */
+  .settings-glass {
+    background: var(--glass-surface);
+    backdrop-filter: saturate(180%) blur(20px);
+    box-shadow: inset 0 0 0 0.5px var(--glass-border), 0 0 0 0.5px var(--settings-border), 0 2px 6px rgba(0, 0, 0, 0.04);
+  }
+
+  .settings-menu {
+    background: color-mix(in srgb, var(--md-sys-color-surface) 95%, transparent);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: 0 0 0 0.5px var(--settings-border), 0 12px 32px rgba(0, 0, 0, 0.18);
   }
 }
 
-:where(button, [role="button"]):focus,
-:where(button, [role="button"]):focus-visible {
+/* 设置控件的阴影同时绘制边框，获得焦点时仍需保留。 */
+:where(button:not(.settings-control), [role="button"]:not(.settings-control)):focus,
+:where(button:not(.settings-control), [role="button"]:not(.settings-control)):focus-visible {
   outline: none;
   box-shadow: none;
 }
@@ -259,13 +391,80 @@ body {
 @layer utilities {
   /* 侧栏与内容圆角外侧共用背景，避免接缝处重复叠色。 */
   .app-shell-background {
-    background-color: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+    --app-shell-base: color-mix(in srgb, var(--md-sys-color-primary) 5%, var(--md-sys-color-surface-container));
+    --app-shell-corner: var(--app-shell-base);
+    transition: background-color 200ms ease;
+    background-color: var(--app-shell-base);
+  }
+
+  /* Keep the gradient layer mounted: background-image cannot interpolate when artwork takes over. */
+  .app-shell-background::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: linear-gradient(180deg, color-mix(in srgb, var(--app-shell-gradient-color) 12%, transparent) 0%, color-mix(in srgb, var(--app-shell-gradient-color) 7%, transparent) 38%, transparent 100%);
+    opacity: 0;
+    transition: opacity 200ms ease;
   }
 
   .dark .app-shell-background {
-    background-color: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
-    background-image: linear-gradient(180deg, color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent) 0%, color-mix(in srgb, var(--md-sys-color-primary) 7%, transparent) 38%, transparent 100%);
+    --app-shell-base: color-mix(in srgb, var(--md-sys-color-primary) 8%, var(--md-sys-color-surface-container));
+    --app-shell-corner: color-mix(in srgb, var(--app-shell-gradient-color) 12%, var(--app-shell-base));
   }
+
+  .dark .app-shell-background::before {
+    opacity: 1;
+  }
+
+  [data-artwork-theme] .app-shell-background {
+    --app-shell-base: var(--artwork-sidebar-background);
+    --app-shell-corner: var(--app-shell-base);
+    --md-sys-color-primary: var(--md-sys-color-on-surface);
+    --md-sys-color-on-primary: var(--artwork-on-primary);
+    --color-primary: var(--md-sys-color-on-surface);
+    --color-on-primary: var(--artwork-on-primary);
+  }
+
+  [data-artwork-theme] .app-shell-background::before {
+    opacity: 0;
+  }
+
+  .content-surface-corner {
+    fill: var(--app-shell-corner);
+    transition: fill 200ms ease;
+  }
+
+  .plain-lyrics-scroll { scrollbar-width: none; }
+  .plain-lyrics-scroll::-webkit-scrollbar { display: none; }
+
+  .plain-lyrics-scrollbar {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 12px;
+    opacity: 0;
+    transition: opacity 250ms ease;
+  }
+
+  .plain-lyrics-scrollbar[data-scrolling],
+  .plain-lyrics-scrollbar:hover,
+  .plain-lyrics-scrollbar[data-dragging] { opacity: 1; }
+
+  .plain-lyrics-scrollbar-thumb {
+    position: absolute;
+    right: 2px;
+    width: 3px;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.7);
+    touch-action: none;
+    cursor: default;
+    transition: width 150ms ease;
+  }
+
+  .plain-lyrics-scrollbar:hover .plain-lyrics-scrollbar-thumb,
+  .plain-lyrics-scrollbar[data-dragging] .plain-lyrics-scrollbar-thumb { width: 7px; }
 
   /* Modern Scrollbar - Restore default for other areas (like textarea or sidebar if needed) */
   ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -304,6 +503,14 @@ body {
   }
   .immersive-scrollbar::-webkit-scrollbar { width: 10px; height: 10px; }
   .immersive-scrollbar::-webkit-scrollbar-track { background: transparent; }
+  /* 保留伪元素轨道的留白，避免标准滚动条样式覆盖遮罩边界。 */
+  .immersive-scrollbar.queue-immersive-scrollbar {
+    scrollbar-width: auto;
+    scrollbar-color: auto;
+  }
+  .queue-immersive-scrollbar[data-queue-variant="side"]::-webkit-scrollbar-track {
+    margin-bottom: var(--queue-mask-start, 96px);
+  }
   .immersive-scrollbar::-webkit-scrollbar-corner { background: transparent; }
   .immersive-scrollbar::-webkit-scrollbar-thumb {
     background-color: rgba(255, 255, 255, 0);
@@ -484,7 +691,8 @@ body {
 
 /* 长音从挂载到卸载始终保持同一种合成状态，避免高光结束时因
    图层降级和文字重新栅格化产生肉眼可见的位置跳变。 */
-.karaoke-char-long-tone {
+.karaoke-char-long-tone,
+.karaoke-char-word-lift {
   will-change: transform;
   backface-visibility: hidden;
 }
@@ -504,7 +712,6 @@ body {
   padding: inherit;
   pointer-events: none;
   color: rgba(255, 255, 255, var(--kfa, 1));
-  transition: color 450ms ease-out;
   -webkit-mask-image: linear-gradient(
     to right,
     black 0%,
@@ -543,20 +750,17 @@ body {
 }
 
 .karaoke-text-background-blend .karaoke-char {
-  transition: color 300ms ease-out;
   text-shadow: none;
 }
 
 .karaoke-text-background-blend .karaoke-char::before {
   /* Keep the glow inside the bright layer's moving mask. */
   mix-blend-mode: plus-lighter;
-  transition: color 300ms ease-out;
   text-shadow: 0 0 var(--kgb, 5px) rgba(255, 255, 255, var(--kg, 0));
 }
 
 .karaoke-text-background-blend.karaoke-text-exiting .karaoke-char {
   transition:
-    color 300ms ease-out,
     transform 250ms ease-in-out,
     --kg 250ms ease-in-out;
 }
@@ -571,6 +775,10 @@ body {
 
 .lyrics-motion-row[data-in-lyrics-viewport] .lyrics-line-scale-layer {
   will-change: transform;
+}
+
+[data-animated-lyrics-scale] {
+  transition: opacity 350ms ease-out;
 }
 
 /* 高亮圆角与内容外扩均为 16；负 margin 保留文字宽度与位置。 */
@@ -661,7 +869,8 @@ body {
   will-change: transform;
 }
 
-.karaoke-text-word-float .karaoke-char:not(.karaoke-char-long-tone) {
+/* Only glyphs carried by the word container can opt out of motion compositing. */
+.karaoke-text-word-float .karaoke-char:not(.karaoke-char-long-tone):not(.karaoke-char-word-lift) {
   transform: none;
   will-change: auto;
   backface-visibility: visible;
@@ -685,26 +894,34 @@ body {
   mask-image: none;
 }
 
-/* Animate the shared brightness inputs, not the colors after mask compensation.
-   This keeps the dim tail stable throughout activation and interrupted fades. */
-@property --kw-base {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0.3;
+/* Fixed mask contrast lets brightness fades run on opacity alone.
+   Add the complementary layers inside an isolated group to avoid a dark midpoint. */
+.karaoke-brightness-layer {
+  mix-blend-mode: plus-lighter;
+  transition: opacity 450ms ease-out;
 }
 
-@property --kw-fill {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
+.karaoke-text-background-blend .karaoke-brightness-layer {
+  transition-duration: 300ms;
 }
 
-.karaoke-word-brightness {
-  transition: --kw-base 450ms ease-out, --kw-fill 450ms ease-out;
-  --kw-tail: calc(
-    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill) * var(--kfd, 0)) /
-    (var(--kw-base) + (1 - var(--kw-base)) * var(--kw-fill))
-  );
+.karaoke-dim-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.karaoke-dim-layer .karaoke-char {
+  text-shadow: none;
+}
+
+.karaoke-dim-layer .karaoke-char::before {
+  content: none;
+}
+
+.karaoke-text-word-float .karaoke-dim-layer .karaoke-word-motion {
+  mask-image: none;
 }
 
 .karaoke-text-word-float .karaoke-char,
@@ -714,4 +931,18 @@ body {
 
 .karaoke-text-word-float.karaoke-text-exiting .karaoke-char {
   transition: transform 250ms ease-in-out, --kg 250ms ease-in-out;
+}
+
+/* Use one animation owner for cursor and button menus; leave no inline opacity/transform. */
+@keyframes menu-surface-enter {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.menu-surface {
+  animation: menu-surface-enter 150ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-surface { animation: none; }
 }

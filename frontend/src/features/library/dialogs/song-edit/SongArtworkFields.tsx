@@ -3,6 +3,7 @@ import type { SongMetadata } from '@/types';
 
 interface SongArtworkFieldsProps {
     song: SongMetadata;
+    actionsContainer?: HTMLElement | null;
     artworkSourcePath: string | null;
     removeArtwork: boolean;
     onChange: (patch: { artworkSourcePath: string | null; removeArtwork: boolean }) => void;
@@ -11,6 +12,7 @@ interface SongArtworkFieldsProps {
 
 export default function SongArtworkFields({
     song,
+    actionsContainer,
     artworkSourcePath,
     removeArtwork,
     onChange,
@@ -25,6 +27,7 @@ export default function SongArtworkFields({
 
     return (
         <ArtworkEditor
+            actionsContainer={actionsContainer}
             song={song}
             coverPath={displayedCoverPath}
             hasCustomArtwork={hasCustomArtwork}

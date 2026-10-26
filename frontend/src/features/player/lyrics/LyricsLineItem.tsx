@@ -2,12 +2,12 @@ import clsx from 'clsx';
 import { memo, useEffect, useRef, type CSSProperties, type RefObject } from 'react';
 import type { LyricsLine } from '@/types';
 import KaraokeText from '@/features/player/lyrics/KaraokeText';
-import { getAnimatedLyricsRowVisualStyle } from '@/features/player/lyrics/animatedLyricsMotion';
 import { useThemeStore } from '@/store/useThemeStore';
 
 interface LyricsLineItemProps {
     line: LyricsLine;
     isActive: boolean;
+    isPast?: boolean;
     isKaraokeActive?: boolean;
     isSeekExiting?: boolean;
     isUserScrolling: boolean;
@@ -48,6 +48,7 @@ const getLyricsViewportObserver = () => {
 function LyricsLineItem({
     line,
     isActive,
+    isPast = false,
     isKaraokeActive = isActive,
     isSeekExiting = false,
     isUserScrolling,
@@ -65,7 +66,6 @@ function LyricsLineItem({
     onSeek,
     animatedMotion = false,
     motionDelay = 0,
-    variant,
     isBackground = false,
     hasDuetLine = false,
     onBackgroundHeight,
@@ -75,17 +75,15 @@ function LyricsLineItem({
     const interactionRef = useRef<HTMLDivElement | null>(null);
     const pressAnimationRef = useRef<Animation | null>(null);
     useEffect(() => () => pressAnimationRef.current?.cancel(), []);
-    const rowVisualStyle = getAnimatedLyricsRowVisualStyle({
-        distanceFromActive,
-        isActive,
-        isUserScrolling,
-        pausedScroll,
-        variant: variant ?? 'side',
-    });
-    const canSeek = line.start_time_ms !== null;
     const currentMs = currentTime * 1000;
+    const rowOpacity = isActive
+        ? 1
+        : isUserScrolling || pausedScroll
+            ? (lyricLineBlendEnabled ? 0.28 : 0.35)
+            : Math.max(0.05, 0.28 * 0.6 ** (Math.max(0, distanceFromActive - 1) + (isPast ? 1 : 0)));
+    const canSeek = line.start_time_ms !== null;
     const karaokeWords = line.words ?? [];
-    const shouldRenderKaraoke = karaokeWords.length > 0;
+    const shouldRenderKaraoke = karaokeWords.length > 0 && (animatedMotion || isKaraokeActive);
     // 背景和声只在主句激活时显示，未激活完全不可见。
     // 行保持完整高度（内容常驻），由面板的 visualShifts 在未激活时上移后续行补偿，
     // 与间奏三点同一机制：出现时撑开距离 + 淡入，消失时淡出 + 后续行顶上来。
@@ -180,12 +178,12 @@ function LyricsLineItem({
             className="lyrics-line-scale-layer"
             style={animatedMotion ? {
                 transformOrigin: rowTransformOrigin,
-                backfaceVisibility: 'hidden',
             } : {
-                transform: 'scale(' + targetScale + ') translateZ(0)',
+                opacity: rowOpacity,
+                transform: 'scale(' + targetScale + ')',
                 transformOrigin: rowTransformOrigin,
-                transition: 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
-                backfaceVisibility: 'hidden',
+                // 切换逐字树时同步文字亮度，交互背景不参与距离减淡。
+                transition: (karaokeWords.length > 0 ? '' : 'opacity 300ms, ') + 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
             }}
         >
             <span
@@ -199,13 +197,16 @@ function LyricsLineItem({
                         : isBackground
                             ? (isActive ? bgTextActive : bgTextInactive)
                             : 'transition-[opacity,color] duration-500 ease-in-out',
-                    // 逐字行由暗底色和高光层交叉淡出；纯文本仍使用整行透明度。
+                    // 性能模式统一由行透明度控制，避免文字再减淡一次。
                     isBackground
                         ? undefined
-                        : (!shouldRenderKaraoke && (isActive ? 'opacity-100' : 'opacity-30'))
+                        : (!shouldRenderKaraoke && (animatedMotion && !isActive ? 'opacity-30' : 'opacity-100'))
                 )}
                 style={{
                     ...(!shouldRenderKaraoke ? { transitionDelay: `${motionDelay}s` } : {}),
+                    ...(!shouldRenderKaraoke && karaokeWords.length > 0 ? {
+                        whiteSpace: 'pre-wrap', fontKerning: 'none', fontVariantLigatures: 'none',
+                    } as const : {}),
                     // 没有逐字时间的和声保留纯文本透明度。
                     color: (isBackground && !shouldRenderKaraoke) ? 'rgba(255,255,255,0.3)' : undefined,
                 }}
@@ -305,10 +306,8 @@ function LyricsLineItem({
             disabled={!canSeek}
             style={{
                 ...renderingIsolationStyle,
-                filter: rowVisualStyle.filter,
-                opacity: rowVisualStyle.opacity,
                 transform: 'translateY(' + interludeShift + 'px)',
-                transition: 'filter 300ms, opacity 300ms, transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
+                transition: 'transform ' + interludeShiftDurationMs + 'ms cubic-bezier(0.25, 1, 0.5, 1)',
             }}
             className={className}
         >
@@ -320,6 +319,7 @@ function LyricsLineItem({
 const areLyricsLineItemPropsEqual = (prev: LyricsLineItemProps, next: LyricsLineItemProps) => (
     prev.line === next.line &&
     prev.isActive === next.isActive &&
+    prev.isPast === next.isPast &&
     prev.isKaraokeActive === next.isKaraokeActive &&
     prev.isSeekExiting === next.isSeekExiting &&
     prev.isUserScrolling === next.isUserScrolling &&

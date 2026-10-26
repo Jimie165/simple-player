@@ -88,12 +88,21 @@ pub fn ensure_covers_dir(app_cache_dir: &Path) -> std::io::Result<PathBuf> {
     Ok(covers_dir)
 }
 
+pub(crate) fn encode_hex(bytes: &[u8]) -> String {
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        use std::fmt::Write as _;
+        let _ = write!(out, "{byte:02x}");
+    }
+    out
+}
+
 /// 仅根据图片内容生成封面文件名哈希，让不同歌曲复用完全相同的封面缓存。
 pub fn generate_cover_hash(cover_bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(cover_bytes);
     let result = hasher.finalize();
-    format!("{:x}", result)[..16].to_string()
+    encode_hex(&result[..8])
 }
 
 fn song_artwork_extension(bytes: &[u8]) -> Result<&'static str, String> {
@@ -117,7 +126,7 @@ pub fn save_song_artwork(
 ) -> Result<SavedSongArtwork, String> {
     let bytes = fs::read(source_path).map_err(|e| format!("读取封面失败: {e}"))?;
     let extension = song_artwork_extension(&bytes)?;
-    let hash = format!("{:x}", Sha256::digest(&bytes));
+    let hash = encode_hex(&Sha256::digest(&bytes));
     let filename = format!("{hash}.{extension}");
     let relative_path = format!("{SONG_ARTWORK_DIR}/{filename}");
     let artwork_dir = app_data_dir.join(SONG_ARTWORK_DIR);

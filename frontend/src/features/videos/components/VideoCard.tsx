@@ -1,3 +1,4 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import React from 'react';
 import clsx from 'clsx';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
@@ -47,8 +48,8 @@ export const VideoCard: React.FC<VideoCardProps> = ({
             className={clsx(
                 "group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer h-full",
                 isSelected
-                    ? "bg-primary/10 hover:bg-primary/20"
-                    : "hover:bg-black/5 dark:hover:bg-white/5"
+                    ? "bg-primary/10 hover:bg-primary/20 base-theme:bg-secondary-container base-theme:hover:bg-secondary-container/80"
+                    : "hover:bg-black/5 dark:hover:bg-white/5 base-theme:hover:bg-surface-variant/30"
             )}
         >
             {/* Thumbnail */}
@@ -66,7 +67,7 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                             className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                         >
                             {isSelected
-                                ? <MdCheckBox className="text-primary text-xl" />
+                                ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                 : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                             }
                         </div>
@@ -87,7 +88,9 @@ export const VideoCard: React.FC<VideoCardProps> = ({
                             onPlay={() => onPlay(video)}
                             onSelect={() => onToggleSelection(id, 'video', video)}
                             onShowProperties={() => onShowProperties(video)}
-                        />
+                        >
+                            <MoreIcon />
+                        </SmartMusicContextMenu>
                     </div>
                 )}
 

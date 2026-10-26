@@ -75,7 +75,7 @@ export default function CreatePlaylistDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-white dark:bg-[#2c2c2c] text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
                                 <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
                                     <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-5 flex flex-col items-center">
                                         <DialogTitle
@@ -94,7 +94,7 @@ export default function CreatePlaylistDialog({
                                                     <img
                                                         src={convertFileSrc(coverPath)}
                                                         alt="Cover"
-                                                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                                        className="w-full h-full object-cover"
                                                     />
                                                 ) : (
                                                     <MdImage className="text-4xl text-neutral-400 group-hover:text-primary transition-colors" />
@@ -161,17 +161,17 @@ export default function CreatePlaylistDialog({
                                         </div>
                                     </div>
 
-                                    <div className="shrink-0 px-6 py-4 bg-neutral-50 dark:bg-[#252525] border-t border-neutral-200 dark:border-neutral-700 flex gap-3">
+                                    <div className="shrink-0 px-6 py-4 bg-surface-container-low border-t border-neutral-200 dark:border-neutral-700 flex gap-3">
                                         <button
                                             type="submit"
                                             disabled={!name.trim() || loading}
-                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-white bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             {loading ? '创建中...' : '创建'}
                                         </button>
                                         <button
                                             type="button"
-                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-neutral-700 bg-white border border-neutral-300 hover:bg-neutral-50 dark:bg-neutral-800 dark:text-neutral-300 dark:border-neutral-600 dark:hover:bg-neutral-700 transition-colors focus:outline-none"
+                                            className="flex-1 justify-center rounded-lg px-4 py-2 text-sm font-medium text-on-surface-variant bg-transparent border border-outline-variant/60 hover:bg-primary/5 transition-colors focus:outline-none"
                                             onClick={onClose}
                                             disabled={loading}
                                         >

@@ -1,42 +1,42 @@
+import MoreIcon from '@/components/common/MoreIcon';
 import { useState, useRef, useEffect } from 'react';
-import { MdVolumeUp, MdVolumeDown, MdVolumeMute, MdInfoOutline, MdQueueMusic, MdMoreHoriz } from 'react-icons/md';
+import { MdVolumeUp, MdVolumeDown, MdVolumeMute, MdInfoOutline, MdQueueMusic } from 'react-icons/md';
 import clsx from 'clsx';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import VolumePopup from '@/components/common/VolumePopup';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import PlayQueuePopup from '@/features/player/controls/PlayQueuePopup'; // 引入新组件
 
 interface ExtraControlsProps {
     onInfoClick: () => void;
     mode: 'full' | 'compact' | 'mini';
+    isQueueOpen: boolean;
+    canShowQueue: boolean;
+    onToggleQueue: () => void;
 }
 
-export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps) {
+export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQueue, onToggleQueue }: ExtraControlsProps) {
     const volume = usePlayerStore(s => s.volume);
     const [localVolume, setLocalVolume] = useState(volume);
     const [showVolumePopup, setShowVolumePopup] = useState(false);
-    const [showQueuePopup, setShowQueuePopup] = useState(false); // 队列弹窗状态
     const [showCompactMenu, setShowCompactMenu] = useState(false);
 
     // 当全局 volume 因为其他原因本身发生改变（比如松开手保存后，或初始化时），同步给外部按钮显示
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 外部全局音量变化时同步本地滑块显示值
         setLocalVolume(volume);
     }, [volume]);
 
     const volumeRef = useRef<HTMLDivElement>(null);
-    const queueRef = useRef<HTMLDivElement>(null);
     const compactRef = useRef<HTMLDivElement>(null);
 
     const closeCompactMenu = () => {
         setShowCompactMenu(false);
-        setShowQueuePopup(false);
         setShowVolumePopup(false);
     };
 
     const toggleCompactMenu = () => {
         setShowCompactMenu((value) => {
             if (value) {
-                setShowQueuePopup(false);
                 setShowVolumePopup(false);
             }
             return !value;
@@ -55,9 +55,6 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
             if (volumeRef.current && !volumeRef.current.contains(event.target as Node)) {
                 setShowVolumePopup(false);
             }
-            if (queueRef.current && !queueRef.current.contains(event.target as Node)) {
-                setShowQueuePopup(false);
-            }
             if (compactRef.current && !compactRef.current.contains(event.target as Node)) {
                 setShowCompactMenu(false);
             }
@@ -67,28 +64,27 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
     }, []);
 
     const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";
+    const volumeIconClass = clsx("text-xl", showVolumePopup && "text-primary");
+    const queueButton = (
+        <CustomTooltip text="播放队列">
+            <button
+                onClick={() => {
+                    onToggleQueue();
+                    setShowVolumePopup(false);
+                    setShowCompactMenu(false);
+                }}
+                aria-label="播放队列"
+                aria-expanded={isQueueOpen}
+                aria-controls="content-play-queue"
+                className={clsx(utilityButtonClass, isQueueOpen && "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary")}
+            >
+                <MdQueueMusic className={clsx("text-xl", isQueueOpen && "text-primary")} />
+            </button>
+        </CustomTooltip>
+    );
     const controls = (
         <>
-            <div className="relative" ref={queueRef}>
-                <PlayQueuePopup show={showQueuePopup} onNavigateClose={() => setShowQueuePopup(false)} />
-                <CustomTooltip text="播放队列" disabled={showQueuePopup}>
-                    <button
-                        onClick={() => {
-                            setShowQueuePopup((value) => !value);
-                            setShowVolumePopup(false);
-                            if (mode === 'full') setShowCompactMenu(false);
-                        }}
-                        className={clsx(
-                            utilityButtonClass,
-                            showQueuePopup
-                                ? "bg-black/5 text-[#d60017] dark:bg-white/10 dark:text-[#ff375f]"
-                                : ""
-                        )}
-                    >
-                        <MdQueueMusic className="text-xl" />
-                    </button>
-                </CustomTooltip>
-            </div>
+            {canShowQueue && queueButton}
 
             <div className="relative" ref={volumeRef}>
                 <VolumePopup show={showVolumePopup} onChange={setLocalVolume} />
@@ -96,18 +92,17 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
                     <button
                         onClick={() => {
                             setShowVolumePopup((value) => !value);
-                            setShowQueuePopup(false);
                             if (mode === 'full') setShowCompactMenu(false);
                         }}
                         className={clsx(
                             utilityButtonClass,
-                            showVolumePopup ? "bg-black/5 text-[#d60017] dark:bg-white/10 dark:text-[#ff375f]" : ""
+                            showVolumePopup ? "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary" : ""
                         )}
                     >
                         {(() => {
-                            if (localVolume === 0) return <MdVolumeMute className="text-xl" />;
-                            if (localVolume <= 50) return <MdVolumeDown className="text-xl" />;
-                            return <MdVolumeUp className="text-xl" />;
+                            if (localVolume === 0) return <MdVolumeMute className={volumeIconClass} />;
+                            if (localVolume <= 50) return <MdVolumeDown className={volumeIconClass} />;
+                            return <MdVolumeUp className={volumeIconClass} />;
                         })()}
                     </button>
                 </CustomTooltip>
@@ -145,7 +140,7 @@ export default function ExtraControls({ onInfoClick, mode }: ExtraControlsProps)
                             showCompactMenu && "bg-black/5 dark:bg-white/10"
                         )}
                     >
-                        <MdMoreHoriz className="text-2xl" />
+                        <MoreIcon />
                     </button>
                 </CustomTooltip>
             </div>

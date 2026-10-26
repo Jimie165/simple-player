@@ -1,9 +1,11 @@
 import MusicContextMenu from '@/components/common/MusicContextMenu';
+import type { ReactNode } from 'react';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import type { MusicItem } from '@/utils/musicItemUtils';
 
 interface SmartMusicContextMenuProps {
+    children?: ReactNode;
     items: MusicItem[] | MusicItem; // 支持单个或数组，方便使用
     context: MusicMenuContext;
     playlistId?: number;
@@ -33,7 +35,7 @@ interface SmartMusicContextMenuProps {
  */
 export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps) {
     const {
-        items, context, playlistId,
+        items, context, playlistId, children,
         className, buttonClassName, variant, tooltipText, onOpen, suppressCloseEvent,
         onPlay, onDelete, onDeleted, onEdit, onShuffle, onSelect, onShowProperties, hideSelect, selectText, isSelected, onNavigate
     } = props;
@@ -66,6 +68,8 @@ export default function SmartMusicContextMenu(props: SmartMusicContextMenuProps)
             tooltipText={tooltipText}
             onOpen={onOpen}
             suppressCloseEvent={suppressCloseEvent}
-        />
+        >
+            {children}
+        </MusicContextMenu>
     );
 }

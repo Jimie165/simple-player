@@ -297,6 +297,7 @@ export function useAnimatedLyricsLayout({
 
     return {
         activeTargetScrollY,
+        maxScrollY,
         contentHeight: layout.contentHeight,
         fallbackVisibleIndices,
         itemHeights: layout.itemHeights,

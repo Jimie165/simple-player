@@ -1,16 +1,22 @@
-import { useRef, useEffect, useState, useCallback } from 'react';
-import type { ReactNode } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useCallback, useImperativeHandle } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import clsx from 'clsx';
+import { motion } from 'framer-motion';
+import { useNavigationStore } from '@/store/useNavigationStore';
 
 interface ScrollAreaProps {
     children: ReactNode;
     className?: string;
     topOffset?: number;
     resetOnKeyChange?: unknown;
+    navigationScrollKey?: number;
+    navigationActive?: boolean;
+    viewportRef?: RefObject<HTMLDivElement | null>;
 }
 
-export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange }: ScrollAreaProps) {
+export default function ScrollArea({ children, className, topOffset = 0, resetOnKeyChange, navigationScrollKey, navigationActive = true, viewportRef: externalViewportRef }: ScrollAreaProps) {
     const viewportRef = useRef<HTMLDivElement>(null);
+    useImperativeHandle<HTMLDivElement | null, HTMLDivElement | null>(externalViewportRef, () => viewportRef.current, []);
     const thumbRef = useRef<HTMLDivElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
 
@@ -26,6 +32,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
     const [isHovering, setIsHovering] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const requestRef = useRef<number | undefined>(undefined);
+    const resetStateRef = useRef<{ initialized: boolean; key: unknown }>({ initialized: false, key: undefined });
 
     const updateThumb = useCallback(() => {
         if (!viewportRef.current || !thumbRef.current) return;
@@ -73,29 +80,82 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
     }, [updateThumb]);
 
     useEffect(() => {
+        if (navigationScrollKey !== undefined) return;
         if (viewportRef.current) {
-            viewportRef.current.scrollTop = 0;
+            // Activity resumes effects without remounting the retained scroll viewport.
+            if (!resetStateRef.current.initialized || !Object.is(resetStateRef.current.key, resetOnKeyChange)) {
+                viewportRef.current.scrollTop = 0;
+                resetStateRef.current = { initialized: true, key: resetOnKeyChange };
+            }
             updateThumb();
         }
-    }, [resetOnKeyChange, updateThumb]);
+    }, [resetOnKeyChange, updateThumb, navigationScrollKey]);
+
+    useLayoutEffect(() => {
+        const viewport = viewportRef.current;
+        const content = contentRef.current;
+        if (navigationScrollKey === undefined || !navigationActive || !viewport || !content) return;
+        const top = useNavigationStore.getState().scrollPositions[navigationScrollKey] ?? 0;
+        let position = top;
+        let restoring = true;
+        viewport.setAttribute('data-navigation-scroll-restoring', '');
+        const observer = new ResizeObserver(restore);
+        function restore() {
+            if (!restoring || !viewport) return;
+            viewport.scrollTop = top;
+            updateThumb();
+            if (Math.abs(viewport.scrollTop - top) < 1) stopRestoring();
+        }
+        function stopRestoring() {
+            restoring = false;
+            observer.disconnect();
+            viewport?.removeAttribute('data-navigation-scroll-restoring');
+        }
+        const recordPosition = () => {
+            if (!restoring && viewport.clientHeight > 0) position = viewport.scrollTop;
+        };
+        // Data and virtual-list measurements may arrive after the retained page is revealed.
+        observer.observe(viewport);
+        observer.observe(content);
+        restore();
+        viewport.addEventListener('wheel', stopRestoring, { passive: true });
+        viewport.addEventListener('pointerdown', stopRestoring);
+        viewport.addEventListener('keydown', stopRestoring);
+        viewport.addEventListener('scroll', recordPosition, { passive: true });
+        return () => {
+            observer.disconnect();
+            viewport.removeAttribute('data-navigation-scroll-restoring');
+            viewport.removeEventListener('wheel', stopRestoring);
+            viewport.removeEventListener('pointerdown', stopRestoring);
+            viewport.removeEventListener('keydown', stopRestoring);
+            viewport.removeEventListener('scroll', recordPosition);
+            const navigation = useNavigationStore.getState();
+            const visibleKey = navigation.activeOverlay?.scrollKey
+                ?? navigation.activePlaylistDetail?.scrollKey ?? navigation.scrollKey;
+            // Navigation already captured departing views before their layout could collapse.
+            if (visibleKey === navigationScrollKey) {
+                navigation.saveScrollPosition(navigationScrollKey, restoring ? top : position);
+            }
+        };
+    }, [navigationScrollKey, navigationActive, updateThumb]);
 
     useEffect(() => {
         const viewport = viewportRef.current;
         const content = contentRef.current;
         if (!viewport || !content) return;
 
-        const resizeObserver = new ResizeObserver(() => updateThumb());
+        const resizeObserver = new ResizeObserver(onScroll);
 
         // Observe both viewport (for resize) and content (for height change)
         resizeObserver.observe(viewport);
         resizeObserver.observe(content);
 
         // Also use MutationObserver as a backup for non-size-changing layout shifts that might affect scrollHeight (rare but possible)
-        const mutationObserver = new MutationObserver(() => updateThumb());
+        const mutationObserver = new MutationObserver(onScroll);
         mutationObserver.observe(content, { childList: true, subtree: true });
 
         viewport.addEventListener('scroll', onScroll);
-        window.addEventListener('resize', updateThumb);
+        window.addEventListener('resize', onScroll);
 
         updateThumb();
 
@@ -103,8 +163,11 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             resizeObserver.disconnect();
             mutationObserver.disconnect();
             viewport.removeEventListener('scroll', onScroll);
-            window.removeEventListener('resize', updateThumb);
-            if (requestRef.current) cancelAnimationFrame(requestRef.current);
+            window.removeEventListener('resize', onScroll);
+            if (requestRef.current) {
+                cancelAnimationFrame(requestRef.current);
+                requestRef.current = undefined;
+            }
         };
     }, [onScroll, updateThumb]);
 
@@ -144,11 +207,12 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         };
 
         setIsDragging(true);
-        document.body.style.userSelect = 'none';
     };
 
     useEffect(() => {
         if (!isDragging) return;
+        const previousUserSelect = document.body.style.userSelect;
+        document.body.style.userSelect = 'none';
 
         const handlePointerMove = (e: PointerEvent) => {
             if (!viewportRef.current) return;
@@ -164,7 +228,6 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
 
             activePointerId.current = null;
             setIsDragging(false);
-            document.body.style.userSelect = '';
             scheduleThumbUpdate();
         };
 
@@ -173,6 +236,7 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
         window.addEventListener('pointercancel', stopDragging);
 
         return () => {
+            document.body.style.userSelect = previousUserSelect;
             window.removeEventListener('pointermove', handlePointerMove);
             window.removeEventListener('pointerup', stopDragging);
             window.removeEventListener('pointercancel', stopDragging);
@@ -200,15 +264,17 @@ export default function ScrollArea({ children, className, topOffset = 0, resetOn
             onMouseEnter={() => setIsHovering(true)}
             onMouseLeave={() => setIsHovering(false)}
         >
-            <div
+            <motion.div
                 ref={viewportRef}
+                layoutScroll
                 data-scroll-viewport
+                data-navigation-scroll-key={navigationScrollKey}
                 className="flex-1 w-full h-full overflow-y-auto overflow-x-hidden scrollbar-hidden"
             >
-                <div ref={contentRef}>
+                <div ref={contentRef} className="relative isolate">
                     {children}
                 </div>
-            </div>
+            </motion.div>
 
             <div
                 className={clsx(

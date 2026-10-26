@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
-import { MdBlockFlipped, MdClose } from 'react-icons/md';
+import { MdClose } from 'react-icons/md';
 import clsx from 'clsx';
 
 import { libraryService, type ScopedIgnoredDirNames } from '@/services/libraryService';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import { SettingsGroup } from '@/features/settings/components/SettingsControls';
 
 type IgnoreScope = keyof ScopedIgnoredDirNames;
 
@@ -119,28 +120,28 @@ export default function IgnoredDirsSection() {
         const input = inputs[scope];
 
         return (
-            <div className="space-y-3">
-                <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-on-surface">{config.title}</span>
-                    <span className="text-xs text-on-surface-variant">{config.description}</span>
+            <div className="space-y-2.5 px-3.5 py-3">
+                <div>
+                    <div className="text-sm text-on-surface">{config.title}</div>
+                    <div className="mt-0.5 text-xs text-on-surface-variant">{config.description}</div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                     {dirs.length === 0 && (
-                        <span className="text-sm text-on-surface-variant/70">{config.emptyText}</span>
+                        <span className="text-xs text-on-surface-variant/70">{config.emptyText}</span>
                     )}
                     {dirs.map((name) => (
                         <div
                             key={name}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-secondary-container text-on-secondary-container text-sm"
+                            className="settings-subtle inline-flex items-center gap-1 rounded-md py-0.5 pl-2 pr-1 text-[13px] text-on-surface"
                         >
                             {name}
                             <CustomTooltip text="移除">
                                 <button
                                     onClick={() => removeIgnoredDir(scope, name)}
                                     aria-label={`移除 ${name}`}
-                                    className="ml-1 -mr-1 w-5 h-5 rounded-full flex items-center justify-center hover:bg-on-secondary-container/10 active:scale-90"
+                                    className="flex h-4 w-4 items-center justify-center rounded-full text-on-surface-variant hover:bg-on-surface/10 hover:text-on-surface active:scale-90"
                                 >
-                                    <MdClose className="text-sm" />
+                                    <MdClose className="text-xs" />
                                 </button>
                             </CustomTooltip>
                         </div>
@@ -158,16 +159,16 @@ export default function IgnoredDirsSection() {
                             }
                         }}
                         placeholder={config.placeholder}
-                        className="settings-control flex-1 px-3 py-2 rounded-xl text-sm text-on-surface placeholder:text-on-surface-variant/60 border focus:outline-none focus:border-primary/50"
+                        className="settings-control flex-1 rounded-md px-2.5 py-1 text-[13px] text-on-surface placeholder:text-on-surface-variant/60 focus:outline-none focus:ring-2 focus:ring-primary/50"
                     />
                     <button
                         onClick={() => addIgnoredDir(scope)}
                         disabled={!input.trim() || savingIgnored}
                         className={clsx(
-                            "px-4 py-2 rounded-xl font-medium text-sm transition-all active:scale-95",
+                            "rounded-md px-3 py-1 text-[13px] font-medium transition-transform active:scale-[0.97]",
                             !input.trim() || savingIgnored
-                                ? "settings-control text-on-surface-variant cursor-not-allowed"
-                                : "bg-primary text-on-primary hover:shadow-md hover:brightness-110"
+                                ? "settings-control cursor-not-allowed text-on-surface-variant"
+                                : "bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary hover:brightness-110"
                         )}
                     >
                         添加
@@ -178,28 +179,13 @@ export default function IgnoredDirsSection() {
     };
 
     return (
-        <section className="space-y-4">
-            <div className="flex items-center gap-2 text-sm font-semibold text-primary uppercase tracking-wider px-1">
-                <MdBlockFlipped className="text-lg" />
-                <span>扫描忽略目录</span>
-            </div>
-
-            <div className="settings-list flex flex-col gap-px rounded-2xl overflow-hidden">
-                <div className="settings-static-row p-4">
-                    <p className="text-sm text-on-surface-variant">
-                        扫描时会跳过名称匹配以下任一项的目录（不区分大小写）。常用于排除项目目录里的非音乐内容。
-                    </p>
-                </div>
-                <div className="settings-static-row p-4">
-                    {renderScope('common')}
-                </div>
-                <div className="settings-static-row p-4">
-                    {renderScope('music')}
-                </div>
-                <div className="settings-static-row p-4">
-                    {renderScope('video')}
-                </div>
-            </div>
-        </section>
+        <SettingsGroup
+            title="扫描忽略目录"
+            footer="扫描时会跳过名称匹配以下任一项的目录（不区分大小写）。常用于排除项目目录里的非音乐内容。"
+        >
+            {renderScope('common')}
+            {renderScope('music')}
+            {renderScope('video')}
+        </SettingsGroup>
     );
 }

@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { getName, getVersion } from '@tauri-apps/api/app';
 import { open } from '@tauri-apps/plugin-shell';
-import clsx from 'clsx';
 import { FaGithub } from 'react-icons/fa';
-import { MdCloudDownload, MdInfoOutline, MdOpenInNew, MdRefresh } from 'react-icons/md';
+import { MdCloudDownload, MdOpenInNew, MdRefresh } from 'react-icons/md';
 import { toast } from 'react-hot-toast';
 
 import logo from '@/assets/logo.png';
-import CustomTooltip from '@/components/common/CustomTooltip';
+import { SettingsGroup, SettingsRow, SettingsSwitch } from '@/features/settings/components/SettingsControls';
 import { useUpdateStore } from '@/store/useUpdateStore';
 
 const GITHUB_URL = 'https://github.com/Jimie165/simple-player';
@@ -64,102 +63,87 @@ export default function AboutSection() {
     const updateButtonText = status === 'checking'
         ? '正在检查...'
         : status === 'available' && latestRelease
-            ? `前往下载 v${latestRelease.version}`
+            ? '前往下载'
             : '检查更新';
+    const updateStatusText = {
+        idle: '尚未检查更新',
+        checking: '正在获取最新版本信息',
+        'up-to-date': '当前已是最新版本',
+        available: latestRelease ? `发现新版本 v${latestRelease.version}` : '发现新版本',
+        error: '检查失败，请重试',
+    }[status];
 
     return (
-        <section className="space-y-4">
-            <div className="flex items-center gap-2 px-1 text-sm font-semibold uppercase tracking-wider text-primary">
-                <MdInfoOutline className="text-lg" />
-                <span>关于</span>
+        <>
+            <div className="flex flex-col items-center pb-2 pt-2 text-center">
+                <img
+                    src={logo}
+                    alt=""
+                    className="h-24 w-24 object-contain drop-shadow-md"
+                />
+                <h3 className="mt-4 text-xl font-semibold text-on-surface">
+                    {appName || 'Simple Player'}
+                </h3>
+                <p className="mt-1 text-[13px] text-on-surface-variant">
+                    版本 {appVersion || '—'}
+                </p>
+                <p className="mt-2 text-[13px] text-on-surface-variant">
+                    专注本地音乐与视频播放的桌面播放器
+                </p>
             </div>
 
-            <div className="settings-card overflow-hidden rounded-2xl">
-                <div className="flex flex-col items-center px-6 pb-6 pt-8 text-center">
-                    <img
-                        src={logo}
-                        alt=""
-                        className="h-28 w-28 object-contain"
+            <SettingsGroup title="软件更新">
+                <SettingsRow label="自动检查更新" description="应用启动时检查最新版本">
+                    <SettingsSwitch
+                        label="自动检查更新"
+                        checked={autoCheckEnabled}
+                        onChange={setAutoCheckEnabled}
                     />
-                    <h3 className="mt-5 text-xl font-bold text-on-surface">
-                        {appName || 'Simple Player'}
-                    </h3>
-                    <span className="mt-2 rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
-                        v{appVersion || '—'}
-                    </span>
-                    <p className="mt-3 text-sm text-on-surface-variant">
-                        专注本地音乐与视频播放的桌面播放器
-                    </p>
-
-                    <div className="mt-5 flex items-center justify-center gap-3">
-                        <CustomTooltip text="GitHub 仓库">
-                            <button
-                                type="button"
-                                aria-label="打开 GitHub 仓库"
-                                onClick={() => void openExternal(GITHUB_URL)}
-                                className="settings-subtle grid h-12 w-12 place-items-center rounded-full text-xl text-on-surface-variant transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
-                            >
-                                <FaGithub />
-                            </button>
-                        </CustomTooltip>
-                        <CustomTooltip text="发布与下载">
-                            <button
-                                type="button"
-                                aria-label="打开发布与下载页面"
-                                onClick={() => void openExternal(RELEASES_URL)}
-                                className="settings-subtle grid h-12 w-12 place-items-center rounded-full text-xl text-on-surface-variant transition-all hover:bg-primary/10 hover:text-primary active:scale-95"
-                            >
-                                <MdCloudDownload />
-                            </button>
-                        </CustomTooltip>
-                    </div>
-                </div>
-
-                <div className="border-t border-outline-variant/20 bg-surface-container/30 p-4">
-                    <div className="settings-subtle flex items-center justify-between gap-4 rounded-2xl px-4 py-3">
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium text-on-surface">自动检查更新</p>
-                            <p className="mt-0.5 text-xs text-on-surface-variant">应用启动时检查最新版本</p>
-                        </div>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-label="自动检查更新"
-                            aria-checked={autoCheckEnabled}
-                            onClick={() => setAutoCheckEnabled(!autoCheckEnabled)}
-                            className="-mr-2 flex shrink-0 items-center justify-center rounded-full p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                        >
-                            <span
-                                className={clsx(
-                                    'relative block h-6 w-11 rounded-full transition-colors',
-                                    autoCheckEnabled ? 'bg-primary' : 'bg-outline-variant/50'
-                                )}
-                            >
-                                <span
-                                    className={clsx(
-                                        'absolute left-1 top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
-                                        autoCheckEnabled ? 'translate-x-5' : 'translate-x-0'
-                                    )}
-                                />
-                            </span>
-                        </button>
-                    </div>
-
+                </SettingsRow>
+                <SettingsRow
+                    label="版本状态"
+                    description={updateStatusText}
+                >
                     <button
                         type="button"
                         disabled={status === 'checking'}
                         onClick={() => void handleUpdateAction()}
-                        className="mt-3 flex w-full items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-medium text-on-primary shadow-sm transition-all hover:brightness-110 active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+                        className={status === 'available'
+                            ? "flex items-center gap-1.5 rounded-md bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-3 py-1 text-[13px] font-medium text-on-primary transition-transform hover:brightness-110 active:scale-[0.97]"
+                            : "settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"}
                     >
                         {status === 'checking'
-                            ? <MdRefresh className="animate-spin text-lg" />
+                            ? <MdRefresh className="animate-spin text-base" />
                             : status === 'available'
-                                ? <MdOpenInNew className="text-lg" />
-                                : <MdRefresh className="text-lg" />}
+                                ? <MdOpenInNew className="text-base" />
+                                : <MdRefresh className="text-base" />}
                         {updateButtonText}
                     </button>
-                </div>
-            </div>
-        </section>
+                </SettingsRow>
+            </SettingsGroup>
+
+            <SettingsGroup title="链接">
+                <button
+                    type="button"
+                    aria-label="打开 GitHub 仓库"
+                    onClick={() => void openExternal(GITHUB_URL)}
+                    className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-on-surface/4"
+                >
+                    <FaGithub className="text-lg text-on-surface" />
+                    <span className="flex-1 text-sm text-on-surface">GitHub 仓库</span>
+                    <MdOpenInNew className="text-base text-on-surface-variant" />
+                </button>
+                <button
+                    type="button"
+                    aria-label="打开发布与下载页面"
+                    onClick={() => void openExternal(RELEASES_URL)}
+                    className="flex min-h-11 w-full items-center gap-3 px-3.5 py-2.5 text-left transition-colors hover:bg-on-surface/4"
+                >
+                    <MdCloudDownload className="text-lg text-on-surface" />
+                    <span className="flex-1 text-sm text-on-surface">发布与下载</span>
+                    <MdOpenInNew className="text-base text-on-surface-variant" />
+                </button>
+            </SettingsGroup>
+        </>
     );
 }

@@ -1,3 +1,6 @@
+import SharedCover from '@/components/common/SharedCover';
+import { getCoverTransitionSource } from '@/utils/viewTransition';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
 import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
 import clsx from 'clsx';
@@ -13,7 +16,7 @@ import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义专辑数据结构
@@ -26,18 +29,20 @@ export interface AlbumData {
 }
 
 interface AlbumGridViewProps {
+    coverScope?: string;
     albums: AlbumData[];
     onPlayAlbum: (album: AlbumData) => void;
     onShuffleAlbum?: (album: AlbumData) => void;
-    onOpenAlbum: (album: AlbumData) => void;
+    onOpenAlbum: (album: AlbumData, source?: CoverTransitionSource) => void;
     onOpenArtist?: (artistName: string) => void; // Add handler for Artist navigation
     onDeleteAlbum?: (album: AlbumData) => void;
     hideArtist?: boolean; // New prop: hide artist context
     hideYear?: boolean;
 }
 
-export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false, hideYear = false }: AlbumGridViewProps) {
-    const mainContentWidth = useMainContentWidth();
+export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false, hideYear = false, coverScope = 'library-albums' }: AlbumGridViewProps) {
+    // Motion retains shared-layout IDs after unmount; reuse IDs across page visits.
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(albums.length, 'cover'));
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
     const openEditAlbum = useDialogStore(state => state.openEditAlbum);
@@ -86,13 +91,13 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
     // Helper key for selection (Album Name + Artist as specific ID)
     const getAlbumId = (album: AlbumData) => getMusicItemId(album);
 
-    const handleItemClick = (album: AlbumData, e: React.MouseEvent) => {
+    const handleItemClick = (album: AlbumData, e: React.MouseEvent<HTMLDivElement>) => {
         if (isSelectionMode) {
             e.stopPropagation();
             toggleSelection(getAlbumId(album), 'album', album);
             return;
         }
-        onOpenAlbum(album);
+        onOpenAlbum(album, getCoverTransitionSource(e.currentTarget));
     };
 
     return (
@@ -120,15 +125,15 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
 
                     return (
                         <div
-                            className="group flex flex-col gap-3 rounded-2xl p-4 -mx-4 hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer relative"
+                            className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:hover:bg-surface-variant/30")}
                             onClick={(e) => handleItemClick(album, e)}
                             onContextMenu={(e) => handleContextMenu(e, album)}
                         >
-                            <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5">
+                            <SharedCover data-transition-cover={`${coverScope}-${id}`} layoutId={`${coverScope}-${id}`} className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5">
                                 <CoverImage
                                     song={album.songs[0]}
                                     src={album.cover}
-                                    className="w-full h-full group-hover:scale-[1.02] transition-transform duration-500 ease-out"
+                                    className="w-full h-full"
                                     iconClassName="text-6xl opacity-50"
                                 />
 
@@ -139,7 +144,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                             className="w-6 h-6 rounded bg-white/40 backdrop-blur-sm flex items-center justify-center hover:bg-white/60 transition-colors"
                                         >
                                             {isSelected
-                                                ? <MdCheckBox className="text-primary text-xl" />
+                                                ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                                 : <MdCheckBoxOutlineBlank className="text-neutral-700 text-xl" />
                                             }
                                         </div>
@@ -169,7 +174,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
                                         />
                                     </div>
                                 )}
-                            </div>
+                            </SharedCover>
 
                             <div className="flex flex-col gap-0.5 px-1">
                                 <CustomTooltip text={album.name} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">

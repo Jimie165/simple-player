@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { getMusicItemId } from '@/utils/musicItemUtils';
@@ -14,18 +14,24 @@ import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
 import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
 import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
-import PlaylistSortMenu, { type PlaylistSortKey } from '@/features/playlists/list/PlaylistSortMenu';
+import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
+import SortMenu from '@/components/common/SortMenu';
 import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
+import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
-type SortKey = PlaylistSortKey;
+type SortKey = 'name' | 'recently_added' | 'recently_played';
 type FavoritesPlaylist = Omit<Playlist, 'id'> & { id: 'favorites'; hidden?: boolean };
 type PlaylistListItem = Playlist | FavoritesPlaylist;
 
-export default function PlaylistList() {
+export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     const [playlists, setPlaylists] = useState<Playlist[]>([]);
     const [playlistCoverPaths, setPlaylistCoverPaths] = useState<Record<number, string[]>>({});
-    const [favoritesCount, setFavoritesCount] = useState(0);
+    const [loadedFavoritesCount, setFavoritesCount] = useState(0);
+    const loadedDataVersionRef = useRef<string | null>(null);
+    const loadedCoverPlaylistsRef = useRef<Playlist[] | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [suppressSearchTooltip, setSuppressSearchTooltip] = useState(false);
     const [sortKey, setSortKey] = useState<SortKey>(() => {
         try {
             const saved = localStorage.getItem('playlist_sort_key');
@@ -43,28 +49,53 @@ export default function PlaylistList() {
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
     const { openPlaylistDetail } = useNavigationStore();
-    const { addMultipleToNext, libraryVersion, playlistVersion, triggerLibraryUpdate, updateRecentItemCover } = useLibraryStore();
+    const addMultipleToNext = useLibraryStore(state => state.addMultipleToNext);
+    const libraryVersion = useLibraryStore(state => isVisible ? state.libraryVersion : 0);
+    const currentFavoritesCount = useLibraryStore(state => state.favoritesLoaded ? state.favoriteSet.size : null);
+    const favoritesCount = currentFavoritesCount ?? loadedFavoritesCount;
+    const playlistVersion = useLibraryStore(state => isVisible ? state.playlistVersion : 0);
+    const triggerLibraryUpdate = useLibraryStore(state => state.triggerLibraryUpdate);
+    const updateRecentItemCover = useLibraryStore(state => state.updateRecentItemCover);
     const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const { playList, shufflePlay } = usePlaybackActions();
     const { isSelectionMode, selectedIds, toggleSelection, selectAllRequested, setSelectAllRequested, selectAll, toggleSelectionMode, setSelectableIds } = useSelectionStore();
 
-    const loadPlaylists = useCallback(async () => {
-        try {
-            const list = await libraryService.getPlaylists();
-            setPlaylists(list);
-        } catch (error) {
-            console.error(error);
-        }
-    }, []);
-
+    const dataVersion = `${libraryVersion}:${playlistVersion}`;
     useEffect(() => {
+        if (!isVisible) return;
+        let cancelled = false;
         const frame = requestAnimationFrame(() => {
-            setPlaylistCoverPaths({});
-            loadPlaylists();
-            libraryService.getFavorites().then(songs => setFavoritesCount(songs.length));
+            if (cancelled) return;
+            void runPlaylistDataRefresh({
+                isVisible,
+                loadedVersion: loadedDataVersionRef.current,
+                currentVersion: dataVersion,
+                isCurrent: () => !cancelled,
+                load: () => Promise.allSettled([libraryService.getPlaylists(), libraryService.getFavorites()]),
+            }).then(result => {
+                if (!result) return;
+                const [playlistsResult, favoritesResult] = result.data;
+                let loaded = true;
+                if (playlistsResult.status === 'fulfilled') {
+                    setPlaylists(playlistsResult.value);
+                } else {
+                    loaded = false;
+                    console.error(playlistsResult.reason);
+                }
+                if (favoritesResult.status === 'fulfilled') {
+                    setFavoritesCount(favoritesResult.value.length);
+                } else {
+                    loaded = false;
+                    console.error(favoritesResult.reason);
+                }
+                if (loaded) loadedDataVersionRef.current = result.version;
+            });
         });
-        return () => cancelAnimationFrame(frame);
-    }, [libraryVersion, playlistVersion, loadPlaylists]);
+        return () => {
+            cancelled = true;
+            cancelAnimationFrame(frame);
+        };
+    }, [dataVersion, isVisible]);
 
     useEffect(() => {
         try {
@@ -75,8 +106,8 @@ export default function PlaylistList() {
     }, [sortKey]);
 
     // Filter & Sort
-    const filteredPlaylists = useMemo(() => {
-        let list: PlaylistListItem[] = [...playlists];
+    const filteredPlaylists = useMemo<PlaylistListItem[]>(() => {
+        let list = [...playlists];
 
         // Construct Favorites Pseudo-Playlist
         const favoritesItem: FavoritesPlaylist = {
@@ -107,20 +138,17 @@ export default function PlaylistList() {
             if (sortKey === 'name') return a.name.localeCompare(b.name);
             if (sortKey === 'recently_played') {
                 // Sort by last_played_at descending, null values at the end
-                const aTime = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
-                const bTime = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
-                return bTime - aTime;
+                const aTime = new Date(a.last_played_at || '').getTime() || 0;
+                const bTime = new Date(b.last_played_at || '').getTime() || 0;
+                return bTime - aTime || b.id - a.id;
             }
             // recently_added (基于内容更新时间 desc)
-            return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+            return (new Date(b.updated_at).getTime() || 0) - (new Date(a.updated_at).getTime() || 0)
+                || b.id - a.id;
         });
 
         // Always prepend Favorites if not hidden
-        if (!favoritesItem.hidden) {
-            list.unshift(favoritesItem);
-        }
-
-        return list;
+        return favoritesItem.hidden ? list : [favoritesItem, ...list];
     }, [playlists, searchQuery, sortKey, favoritesCount]);
 
     // Handle Select All Request
@@ -151,7 +179,6 @@ export default function PlaylistList() {
             await libraryService.updatePlaylistCover(newPl.id, coverPath);
         }
         triggerLibraryUpdate();
-        loadPlaylists();
     };
 
     // 完整歌曲只在播放或加入队列时按需查询，不再为卡片常驻缓存。
@@ -166,17 +193,23 @@ export default function PlaylistList() {
 
     // 卡片只查询并保存最多四条封面路径。
     useEffect(() => {
+        if (!isVisible || loadedCoverPlaylistsRef.current === playlists) return;
         let cancelled = false;
         const loadCoverPaths = async () => {
             const entries = await Promise.all(playlists.map(async playlist => [
                 playlist.id,
                 await libraryService.getPlaylistCoverPaths(playlist.id, useLibraryStore.getState().getPlaylistSettings(playlist.id.toString())),
             ] as const));
-            if (!cancelled) setPlaylistCoverPaths(Object.fromEntries(entries));
+            if (!cancelled) {
+                setPlaylistCoverPaths(Object.fromEntries(entries));
+                loadedCoverPlaylistsRef.current = playlists;
+            }
         };
-        void loadCoverPaths();
+        void loadCoverPaths().catch(error => {
+            if (!cancelled) console.warn('Failed to load playlist cover paths', error);
+        });
         return () => { cancelled = true; };
-    }, [playlists]);
+    }, [isVisible, playlists]);
     // 播放播放列表
     const handlePlayPlaylist = async (pl: Playlist, shuffle = false) => {
         const songs = await loadPlaylistSongs(pl.id);
@@ -218,7 +251,7 @@ export default function PlaylistList() {
         }
 
         // 更新最近播放时间
-        libraryService.markPlaylistAsPlayed(pl.id).catch(console.error);
+        void libraryService.markPlaylistAsPlayed(pl.id).then(() => triggerLibraryUpdate()).catch(console.error);
     };
 
     // 添加到播放队列
@@ -292,13 +325,12 @@ export default function PlaylistList() {
         }
         triggerLibraryUpdate();
         setEditPlaylist(null);
-        loadPlaylists();
     };
 
     return (
         <PageContainer
             title="播放列表"
-            actions={<PlaylistListActions searchQuery={searchQuery} setSearchQuery={setSearchQuery} setIsCreateOpen={setIsCreateOpen} />}
+            actions={<PlaylistListActions setIsCreateOpen={setIsCreateOpen} />}
         >
             {/* confirm dialog removed, handled by useSongOperations globally */}
 
@@ -318,11 +350,30 @@ export default function PlaylistList() {
             />
 
             {/* Toolbar */}
-            <div className="flex items-center justify-between mb-4">
-                <div className="text-sm text-neutral-500 dark:text-neutral-400 font-medium">
+            <div className="mb-5 flex h-14 items-center justify-between gap-3 pb-2">
+                <div className="min-w-0 truncate text-sm font-medium text-on-surface-variant">
                     {filteredPlaylists.length} 个播放列表
                 </div>
-                <PlaylistSortMenu sortKey={sortKey} setSortKey={setSortKey} />
+                <div className="flex shrink-0 items-center gap-2">
+                    <PlaylistSearchControl
+                        isSearchOpen={isSearchOpen}
+                        setIsSearchOpen={setIsSearchOpen}
+                        searchQuery={searchQuery}
+                        setSearchQuery={setSearchQuery}
+                        suppressTooltip={suppressSearchTooltip}
+                        setSuppressTooltip={setSuppressSearchTooltip}
+                        placeholder="搜索播放列表..."
+                    />
+                    <SortMenu
+                        value={sortKey}
+                        onChange={setSortKey}
+                        options={[
+                            { value: 'recently_played', label: '最近播放' },
+                            { value: 'recently_added', label: '最近添加' },
+                            { value: 'name', label: '名称' },
+                        ]}
+                    />
+                </div>
             </div>
 
             <PlaylistCardsGrid

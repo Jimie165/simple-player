@@ -1,5 +1,6 @@
 import type { AnimatedSpringParams } from '@/features/player/lyrics/animatedLyricsSpring';
 import type { DisplayItem } from '@/features/player/lyrics/types';
+import { getLineKaraokeEndMs } from '@/features/player/lyrics/lyricsDisplay';
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(max, Math.max(min, value));
@@ -72,23 +73,35 @@ export function getAnimatedLyricsSpringParams({
     }
 
     const currentItem = displayItems[activeDisplayIndex];
-    const previousItem = displayItems[activeDisplayIndex - 1];
-    if (currentItem.type === 'interlude' || previousItem.type === 'interlude') {
+    if (currentItem.type === 'interlude' || currentItem.line.role !== 'main' ||
+        currentItem.line.start_time_ms === null) {
         return { stiffness: 90, damping: 15, mass: 1 };
     }
 
-    const currentStartMs = currentItem.line.start_time_ms ?? 0;
-    const previousStartMs = previousItem.line.start_time_ms ?? 0;
-    const clampedInterval = clamp(currentStartMs - previousStartMs, 100, 800);
-    let speedRatio = 1 - (clampedInterval - 100) / 700;
-    speedRatio = Math.pow(speedRatio, 0.2);
+    const currentStartMs = currentItem.line.start_time_ms;
+    let nextMainStartMs = currentStartMs;
+    let previousGroupEndMs: number | null = null;
+    let hasPreviousMain = false;
+    // 取实际演唱词尾，避免 <p> 延长时间和压缩后的视觉词尾影响节奏判断。
+    // 同时保留此前仍在演唱的重叠声部、背景和声的尾部。
+    for (let index = activeDisplayIndex - 1; index >= 0; index--) {
+        const item = displayItems[index];
+        if (item.type === 'interlude') break;
+        const endMs = getLineKaraokeEndMs(item.line, nextMainStartMs);
+        if (endMs !== null) previousGroupEndMs = Math.max(previousGroupEndMs ?? endMs, endMs);
+        if (item.line.role === 'main') {
+            hasPreviousMain = true;
+            nextMainStartMs = item.line.start_time_ms ?? nextMainStartMs;
+        }
+    }
+    if (!hasPreviousMain || previousGroupEndMs === null) return { stiffness: 90, damping: 15, mass: 1 };
 
-    // 以 100/18/1 为慢速基准；快速切行只小幅提高刚度，
-    // 阻尼比固定为 0.9，使不同速度下都保留一致的细微自然超调。
-    const stiffness = 100 + speedRatio * 30;
+    const slowRatio = (clamp(currentStartMs - previousGroupEndMs, 150, 700) - 150) / 550;
+    const stiffness = 130 - 60 * slowRatio;
+    const dampingRatio = 0.92 - 0.13 * slowRatio;
     return {
         stiffness,
-        damping: Math.sqrt(stiffness) * 1.8,
+        damping: 2 * dampingRatio * Math.sqrt(stiffness),
         mass: 1,
     };
 }

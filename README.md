@@ -61,7 +61,7 @@ Simple Player 是一款本地音乐与视频播放器。添加文件夹后即可
   </tr>
   <tr>
     <td><img src="docs/assets/screenshots/音乐库.png" alt="音乐库中的歌曲列表" width="100%" /></td>
-    <td><img src="docs/assets/screenshots/音乐库专辑视图.png" alt="音乐库中的专辑视图" width="100%" /></td>
+    <td><img src="docs/assets/screenshots/专辑详情界面.png" alt="专辑的详细界面" width="100%" /></td>
   </tr>
   <tr>
     <th>歌单</th>
@@ -137,6 +137,13 @@ pnpm build
 ## 反馈与贡献
 
 欢迎提交 [Issue](https://github.com/Jimie165/simple-player/issues) 或 Pull Request。反馈问题时请附上应用版本、操作系统版本、设备架构、复现步骤和错误信息；播放问题请注明文件格式。参与开发前请阅读对应平台的开发说明。
+
+## 致谢
+
+在线歌词功能使用了以下开源项目的代码或数据，感谢作者与贡献者：
+
+- [Lyricify-Lyrics-Helper](https://github.com/WXRIW/Lyricify-Lyrics-Helper)：QQ 音乐 QRC 歌词解密实现参考并改编了其中的 DES 代码，采用 Apache-2.0 许可证，见 [许可证全文](backend/tauri/src/modules/qrc_cipher.LICENSE)。
+- [OpenCC](https://github.com/BYVoid/OpenCC)：使用其繁简体与日文新字体字符字典，减少字形差异对歌曲匹配的影响，采用 Apache-2.0 许可证，见 [许可证全文](frontend/src/features/library/dialogs/song-edit/lyricsMatchCharacters.LICENSE)。
 
 ## 许可证
 

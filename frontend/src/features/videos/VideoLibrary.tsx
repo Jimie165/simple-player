@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { pageMotion } from '@/utils/viewTransition';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useVideoStore } from '@/store/useVideoStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import clsx from 'clsx';
@@ -10,8 +11,8 @@ import LibraryHeaderButton from '@/features/library/components/LibraryHeaderButt
 import { AnimatePresence, motion } from 'framer-motion';
 import PageContainer from '@/components/layout/PageContainer';
 import type { VideoMetadata } from '@/types';
-import { Menu, MenuButton, MenuItems, MenuItem } from '@headlessui/react';
-import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdSort, MdCheck, MdExpandMore, MdExpandLess } from 'react-icons/md';
+import SortMenu from '@/components/common/SortMenu';
+import { MdFolder, MdCheckBox, MdCheckBoxOutlineBlank, MdExpandMore, MdExpandLess } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { Virtuoso } from 'react-virtuoso';
 import { VideoGrid } from '@/features/videos/components/VideoGrid';
@@ -26,7 +27,8 @@ export const VideoLibrary: React.FC = () => {
     const { videos, fetchVideos, setVideos, videoFolders, fetchVideoFolders, foldersRefreshing, collapsedFolderIds, toggleFolderCollapse, sortBy, sortOrder, setSortBy, setSortOrder } = useVideoStore();
     const { currentTab, currentPage, lastVideoTab, setTab } = useNavigationStore();
     const { isSelectionMode, selectAllRequested, setSelectAllRequested, selectAll, selectionType, setSelectableIds, selectItem, deselectItem, selectedIds } = useSelectionStore();
-    const scrollParent = useScrollViewport(true);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(true, contentRef);
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [restorePrompt, setRestorePrompt] = useState<{
         folderPath: string;
@@ -108,13 +110,15 @@ export const VideoLibrary: React.FC = () => {
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;
                 const timeB = new Date(b.created_at).getTime() || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'played') {
-                const timeA = a.last_played_at ? new Date(a.last_played_at).getTime() : 0;
-                const timeB = b.last_played_at ? new Date(b.last_played_at).getTime() : 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                const timeA = new Date(a.last_played_at || '').getTime() || 0;
+                const timeB = new Date(b.last_played_at || '').getTime() || 0;
+                res = timeA - timeB
+                    || (new Date(a.created_at).getTime() || 0) - (new Date(b.created_at).getTime() || 0)
+                    || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             }
             return res;
         });
@@ -192,7 +196,7 @@ export const VideoLibrary: React.FC = () => {
                 groups.get(v.folder_id)!.push(v);
 
                 const currentMax = groupMaxPlayed.get(v.folder_id) || 0;
-                const videoPlayed = v.last_played_at ? new Date(v.last_played_at).getTime() : 0;
+                const videoPlayed = new Date(v.last_played_at || '').getTime() || 0;
                 if (videoPlayed > currentMax) {
                     groupMaxPlayed.set(v.folder_id, videoPlayed);
                 }
@@ -219,13 +223,15 @@ export const VideoLibrary: React.FC = () => {
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;
                 const timeB = new Date(b.created_at).getTime() || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'played') {
                 const timeA = groupMaxPlayed.get(a.id) || 0;
                 const timeB = groupMaxPlayed.get(b.id) || 0;
-                res = timeA - timeB;
-                if (sortOrder === 'desc') res = timeB - timeA;
+                res = timeA - timeB
+                    || (new Date(a.created_at).getTime() || 0) - (new Date(b.created_at).getTime() || 0)
+                    || a.id - b.id;
+                if (sortOrder === 'desc') res = -res;
             }
             return res;
         });
@@ -239,13 +245,6 @@ export const VideoLibrary: React.FC = () => {
 
     const handleTabChange = (tab: 'all' | 'folders') => {
         setTab(tab);
-    };
-
-    const getSortLabel = () => {
-        if (sortBy === 'name') return '名称';
-        if (sortBy === 'created') return '添加日期';
-        if (sortBy === 'played') return '播放日期';
-        return '排序';
     };
 
     return (
@@ -264,12 +263,24 @@ export const VideoLibrary: React.FC = () => {
                             <span className="tabular-nums">{progress.processed}/{progress.total}</span>
                         </div>
                     )}
+                    <SortMenu
+                        value={sortBy}
+                        onChange={(value) => {
+                            setSortBy(value);
+                            setSortOrder(value === 'name' ? 'asc' : 'desc');
+                        }}
+                        options={[
+                            { value: 'played', label: '最近播放' },
+                            { value: 'created', label: '最近添加' },
+                            { value: 'name', label: '名称' },
+                        ]}
+                    />
                     <LibraryHeaderButton onClick={handleAddFolder} />
                 </div>
             }
         >
-            <div className="h-full flex flex-col animate-fade-in">
-                {/* Tabs and Sort */}
+            <div ref={contentRef} className="h-full flex flex-col">
+                {/* Tabs */}
                 <div className="flex items-center justify-between border-b border-outline-variant/20 mb-6 px-1">
                     <div className="flex items-center gap-8">
                         <button
@@ -307,49 +318,15 @@ export const VideoLibrary: React.FC = () => {
                             )}
                         </button>
                     </div>
-
-                    {/* Sort Menu */}
-                    <Menu as="div" className="relative mb-3">
-                        <MenuButton className="flex items-center gap-2 text-sm text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-200 transition-colors">
-                            <MdSort className="text-lg" />
-                            {getSortLabel()}
-                        </MenuButton>
-                        <MenuItems
-                            anchor="bottom end"
-                            className="w-40 origin-top-right rounded-xl border border-neutral-200/50 bg-white/80 dark:bg-neutral-900/80 backdrop-blur-xl p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-neutral-700/50 dark:text-white z-50 mt-2"
-                        >
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('played'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    最近播放
-                                    {sortBy === 'played' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('created'); setSortOrder('desc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    最近添加
-                                    {sortBy === 'created' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                            <MenuItem>
-                                <button onClick={() => { setSortBy('name'); setSortOrder('asc'); }} className="group flex w-full items-center justify-between gap-2 rounded-lg py-1.5 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10">
-                                    名称
-                                    {sortBy === 'name' && <MdCheck />}
-                                </button>
-                            </MenuItem>
-                        </MenuItems>
-                    </Menu>
                 </div>
 
                 {/* Content */}
                 <div className="flex-1 overflow-hidden min-h-0">
-                    <AnimatePresence mode="wait">
+                    <AnimatePresence mode="wait" initial={false}>
                         {activeTab === 'all' ? (
                             <motion.div
                                 key="all"
-                                initial={{ opacity: 0, x: -10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 10 }}
-                                transition={{ duration: 0.2 }}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 <VideoGrid videos={sortedVideos} playSingleItem={true} virtualized={true} />
@@ -357,10 +334,7 @@ export const VideoLibrary: React.FC = () => {
                         ) : (
                             <motion.div
                                 key="folders"
-                                initial={{ opacity: 0, x: 10 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -10 }}
-                                transition={{ duration: 0.2 }}
+                                {...pageMotion}
                                 className="h-full"
                             >
                                 {groupedVideos.length === 0 ? (

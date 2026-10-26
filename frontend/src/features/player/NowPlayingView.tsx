@@ -16,7 +16,7 @@ import {
 } from '@/features/player/now-playing/layouts/NowPlayingLayouts';
 import { useNowPlayingPanels } from '@/features/player/now-playing/hooks/useNowPlayingPanels';
 import { useCoverBackground } from '@/features/player/now-playing/hooks/useCoverBackground';
-import { useImmersiveFullscreen } from '@/features/player/now-playing/hooks/useImmersiveFullscreen';
+import { usePlayerFullscreen } from '@/features/player/hooks/usePlayerFullscreen';
 import { useImmersivePlaybackControls } from '@/features/player/now-playing/hooks/useImmersivePlaybackControls';
 import { useNarrowPanelControls } from '@/features/player/now-playing/hooks/useNarrowPanelControls';
 import { useLowFrequencyLevel } from '@/features/player/now-playing/hooks/useLowFrequencyLevel';
@@ -57,7 +57,11 @@ export default function NowPlayingView({
     const [marqueeResetToken, setMarqueeResetToken] = useState(0);
     const isNarrowPanelLayout = mainContentWidth < 560 && (isQueueOpen || isLyricsOpen);
     const coverScale = isPlaying ? 1 : 0.85;
-    const bgImageSrc = useCoverBackground(metadata);
+    // Load on first open, then reuse the paused renderer instead of recreating WebGL on every open.
+    const [resourcesMounted, setResourcesMounted] = useState(false);
+    if (isOpen && !resourcesMounted) setResourcesMounted(true);
+    const visibleMetadata = resourcesMounted ? metadata : null;
+    const bgImageSrc = useCoverBackground(visibleMetadata);
     const coverRef = useRef<HTMLDivElement>(null);
     const coverShellRef = useRef<HTMLDivElement>(null);
     const controlsRef = useRef<HTMLDivElement>(null);
@@ -117,7 +121,7 @@ export default function NowPlayingView({
         onNarrowActivity: handleNarrowActivity,
     });
 
-    const { isFullscreen, toggleFullscreen } = useImmersiveFullscreen(isOpen);
+    const { isFullscreen, toggleFullscreen } = usePlayerFullscreen(isOpen);
     useEffect(() => {
         void systemService.setWindowButtonsVisible(!isOpen).catch(console.error);
     }, [isOpen, isFullscreen]);
@@ -173,7 +177,7 @@ export default function NowPlayingView({
     }, [isOpen, isNarrowPanelLayout]);
 
     const layoutProps = {
-        metadata,
+        metadata: visibleMetadata,
         bgImageSrc,
         coverScale,
         isPlaying,
@@ -225,7 +229,10 @@ export default function NowPlayingView({
             style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}
+            data-now-playing-root
             onPointerMove={handleNarrowPointerMove}
+            onPointerUp={handleNarrowPointerMove}
+            onPointerCancel={handleNarrowPointerMove}
         >
             <PlayerBackground
                 src={bgImageSrc}

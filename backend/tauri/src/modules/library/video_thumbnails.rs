@@ -38,7 +38,7 @@ fn extension_from_mime(mime: &str) -> &'static str {
 fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>, String), String> {
     let file = StorageFile::GetFileFromPathAsync(&HSTRING::from(file_path))
         .map_err(|e| format!("GetFileFromPathAsync failed: {e}"))?
-        .get()
+        .join()
         .map_err(|e| format!("GetFileFromPathAsync get failed: {e}"))?;
 
     let thumb = file
@@ -48,7 +48,7 @@ fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>
             ThumbnailOptions::None,
         )
         .map_err(|e| format!("GetThumbnailAsync failed: {e}"))?
-        .get()
+        .join()
         .map_err(|e| format!("GetThumbnailAsync get failed: {e}"))?;
 
     let mime = thumb
@@ -71,7 +71,7 @@ fn read_thumbnail_bytes(file_path: &str, requested_size: u32) -> Result<(Vec<u8>
     reader
         .LoadAsync(size)
         .map_err(|e| format!("LoadAsync failed: {e}"))?
-        .get()
+        .join()
         .map_err(|e| format!("LoadAsync get failed: {e}"))?;
 
     let mut buf = vec![0u8; size as usize];
@@ -96,7 +96,7 @@ pub fn ensure_video_thumbnail(app: &AppHandle, video_path: &str) -> Result<Optio
 
     let mut hasher = Sha256::new();
     hasher.update(video_path.as_bytes());
-    let hash = format!("{:x}", hasher.finalize())[..16].to_string();
+    let hash = super::covers::encode_hex(&hasher.finalize()[..8]);
 
     // Optimization: Check if thumbnail already exists
     let common_exts = ["jpg", "png", "webp", "img", "bmp"];

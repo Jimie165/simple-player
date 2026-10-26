@@ -104,9 +104,12 @@ export function PlaybackControlButtons({
                                 : "text-neutral-700 dark:text-white/70"
                         )}
                     >
-                        <MdRepeat />
-                        {repeatMode === 'one' && (
-                            <span className="absolute top-[5px] right-[5px] grid h-2.5 w-2.5 place-items-center rounded-full bg-white text-[7px] font-bold leading-none text-primary dark:bg-neutral-950">1</span>
+                        {repeatMode === 'one' ? (
+                            <svg stroke="currentColor" fill="currentColor" strokeWidth="0" viewBox="0 0 24 24" height="1em" width="1em" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M7 7h5v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4zm1.7-14.5h1.8v7h-1.8V4.1l-1.5 1V3.6l1.5-1.1z" />
+                            </svg>
+                        ) : (
+                            <MdRepeat />
                         )}
                     </button>
                 </CustomTooltip>

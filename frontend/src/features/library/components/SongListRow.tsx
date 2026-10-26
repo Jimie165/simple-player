@@ -11,14 +11,17 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
-export function SongListRow({
+function SongListRowImpl({
     index,
+    isLast,
     song,
     gridStyle,
     gridGapClass,
     rowPaddingClass,
     isSelectionMode,
     selected,
+    previousSelected = false,
+    nextSelected = false,
     isFav,
     hideCover,
     hideArtist,
@@ -36,12 +39,15 @@ export function SongListRow({
     onSelect,
 }: {
     index: number;
+    isLast: boolean;
     song: SongMetadata;
     gridStyle: React.CSSProperties;
     gridGapClass: string;
     rowPaddingClass: string;
     isSelectionMode: boolean;
     selected: boolean;
+    previousSelected?: boolean;
+    nextSelected?: boolean;
     isFav: boolean;
     hideCover: boolean;
     hideArtist: boolean;
@@ -56,7 +62,7 @@ export function SongListRow({
     onOpenAlbum?: (album: string) => void;
     onContextMenu: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
     onRowClick: (e: React.MouseEvent, song: SongMetadata) => void;
-    onSelect: () => void;
+    onSelect: (song: SongMetadata) => void;
 }) {
     const id = getMusicItemId(song);
     const { togglePlayback } = usePlaybackActions();
@@ -82,19 +88,22 @@ export function SongListRow({
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group grid py-2 items-center rounded-lg transition-colors relative",
+                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
+                "h-13.5",
+                context === 'library' ? "before:left-9 before:right-0" : "before:left-12 before:right-2",
+                isLast ? (context === 'library' ? "after:left-11" : "after:left-14") : hideCover
+                    ? (context === 'library' ? "after:left-19" : "after:left-22")
+                    : (context === 'library' ? "after:left-25" : "after:left-28"),
                 gridGapClass,
                 rowPaddingClass,
                 selected
-                    ? "bg-primary/10 hover:bg-primary/15"
-                    : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
+                    ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
+                    : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
+                (!selected || !previousSelected) && "before:rounded-t-xl",
+                (!selected || !nextSelected) && "before:rounded-b-xl",
                 "cursor-default text-[14px]"
             )}
         >
-            {selected && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
-            )}
-
             <div className="flex justify-center items-center">
                 <CustomTooltip text={isFav ? "取消喜爱" : "喜爱"} placement="top">
                     <button
@@ -109,8 +118,8 @@ export function SongListRow({
                         className={clsx(
                             "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
                             isFav
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                ? "text-red-500 hover:bg-red-500/10 opacity-100"
+                                : "text-on-surface-variant hover:text-red-500 hover:bg-on-surface/8 opacity-0 group-hover:opacity-100"
                         )}
                     >
                         {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
@@ -120,7 +129,7 @@ export function SongListRow({
 
             <div className="flex items-center gap-3 overflow-hidden">
                 {!hideCover && (
-                    <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                    <div className="w-11 h-11 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                         <SongCoverOverlay
                             song={song}
                             className="w-full h-full"
@@ -129,10 +138,10 @@ export function SongListRow({
                         />
                     </div>
                 )}
-                <span className={clsx(
-                    "font-medium truncate pr-4",
-                    selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
-                )}>
+                {hideCover && (
+                    <span className="w-5 shrink-0 text-center text-on-surface-variant tabular-nums">{index + 1}</span>
+                )}
+                <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}
                 </span>
             </div>
@@ -140,7 +149,8 @@ export function SongListRow({
             {!hideArtist && (
                 <div
                     className={clsx(
-                        "text-neutral-500 dark:text-neutral-400 truncate font-medium transition-colors",
+                        "truncate font-medium transition-colors group-hover:text-on-surface",
+                        selected ? "text-on-surface" : "text-on-surface-variant",
                         !isSelectionMode && onOpenArtist && song.artist && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -163,7 +173,8 @@ export function SongListRow({
             {!effectiveHideAlbum && (
                 <div
                     className={clsx(
-                        "text-neutral-500 dark:text-neutral-400 truncate transition-colors",
+                        "truncate transition-colors group-hover:text-on-surface",
+                        selected ? "text-on-surface" : "text-on-surface-variant",
                         !isSelectionMode && onOpenAlbum && song.album && "hover:text-primary cursor-pointer"
                     )}
                     onClick={(e) => {
@@ -183,15 +194,12 @@ export function SongListRow({
                 </div>
             )}
 
-            <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
+            <div className={clsx("text-right pr-2 text-[13px] font-variant-numeric transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                 {formatDuration(song.duration)}
             </div>
 
             <div
-                className={clsx(
-                    "flex justify-end transition-opacity",
-                    isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 any-pointer-coarse:opacity-100"
-                )}
+                className="flex justify-end"
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >
@@ -199,12 +207,15 @@ export function SongListRow({
                     items={song}
                     context={context}
                     variant="clean"
+                    buttonClassName="w-8 h-8 [&_svg]:size-4 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
                     onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
                     onDelete={enableDelete && onDelete ? () => onDelete(song) : undefined}
                     isSelected={selected}
-                    onSelect={onSelect}
+                    onSelect={() => onSelect(song)}
                 />
             </div>
         </div>
     );
 }
+
+export const SongListRow = React.memo(SongListRowImpl);

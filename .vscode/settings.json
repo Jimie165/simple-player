@@ -4,5 +4,6 @@
     },
     "editor.quickSuggestions": {
         "strings": true
-    }
+    },
+    "js/ts.tsdk.path": "frontend/node_modules/typescript/lib"
 }

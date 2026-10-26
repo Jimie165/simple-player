@@ -1,3 +1,4 @@
+import { createPlainLyricsDocument } from '@/utils/lyrics/createPlainLyricsDocument';
 import type {
     LyricsDocument,
     LyricsLine,
@@ -245,6 +246,9 @@ export function buildLyricsLinesFromEntries(
 
 export function convertLrcToLyricsDocument(rawText: string): LyricsDocument {
     const rawLines = rawText.split(/\r?\n/);
+    if (!rawLines.some(line => line.match(LRC_TIMESTAMP_RE))) {
+        return createPlainLyricsDocument(rawText.split(/\r\n?|\n/).map(text => ({ text, time_ms: null })));
+    }
     let hasTimestamps = false;
     const entries: LrcParsedEntry[] = [];
     const metaEntries: LrcParsedEntry[] = [];

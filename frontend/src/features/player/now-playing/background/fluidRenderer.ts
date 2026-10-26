@@ -5,7 +5,12 @@ import {
     type LowFrequencyFrame,
 } from '@/features/player/now-playing/background/audioResponse';
 import { ARTWORK_TEXTURE_SIZE, preprocessArtwork } from '@/features/player/now-playing/background/artworkPreprocess';
-import { createMesh, meshMorphMix } from '@/features/player/now-playing/background/meshGradient';
+import {
+    catmullRomWeights,
+    DEFAULT_SPLINE_TENSION,
+    MeshSplineGenerator,
+    MORPH_SEGMENT_MS,
+} from '@/features/player/now-playing/background/meshGradient';
 
 const RENDER_SCALE = 0.75;
 const FLOW_SPEED = 0.2;
@@ -14,15 +19,20 @@ const MATERIAL_SIZE = 128;
 
 const MESH_VERTEX_SHADER = `
 precision highp float;
-attribute vec2 a_position;
-attribute vec2 a_morphPosition;
+attribute vec2 a_p0;
+attribute vec2 a_p1;
+attribute vec2 a_p2;
+attribute vec2 a_p3;
 attribute vec2 a_uv;
 varying vec2 v_uv;
 uniform float u_aspect;
-uniform float u_meshMix;
+uniform vec4 u_splineWeights;
 void main() {
     v_uv = a_uv;
-    vec2 position = mix(a_position, a_morphPosition, u_meshMix);
+    vec2 position = a_p0 * u_splineWeights.x
+        + a_p1 * u_splineWeights.y
+        + a_p2 * u_splineWeights.z
+        + a_p3 * u_splineWeights.w;
     if (u_aspect > 1.0) {
         position.y *= u_aspect;
     } else {
@@ -163,10 +173,7 @@ interface RenderTarget {
 }
 
 interface MeshState {
-    vertexBuffer: WebGLBuffer;
-    indexBuffer: WebGLBuffer;
     texture: WebGLTexture;
-    indexCount: number;
     alpha: number;
 }
 
@@ -221,13 +228,22 @@ export class FluidRenderer {
     private readonly materialProgram: ProgramInfo;
     private readonly blurProgram: ProgramInfo;
     private readonly quadBuffer: WebGLBuffer;
+    private readonly splineGenerator: MeshSplineGenerator;
+    private positionBuffers: [WebGLBuffer, WebGLBuffer, WebGLBuffer, WebGLBuffer];
+    private standbyBuffer: WebGLBuffer;
+    private readonly uvBuffer: WebGLBuffer;
+    private readonly indexBuffer: WebGLBuffer;
+    private readonly indexCount: number;
+    private standbyUploaded = false;
+    private splineTension: number;
+    private segmentElapsed = 0;
+    private materialElapsed = 0;
     private meshStates: MeshState[] = [];
     private target: RenderTarget | null = null;
     private blurTarget: RenderTarget | null = null;
     private animationFrame = 0;
     private lastFrame = 0;
     private lastAudioFrame = 0;
-    private startTime = performance.now();
     private artworkRequest = 0;
     private hasArtwork = false;
     private readonly audioResponse = new AudioResponse();
@@ -236,9 +252,14 @@ export class FluidRenderer {
     private disposed = false;
     private resizeTimer: number | null = null;
 
-    constructor(canvas: HTMLCanvasElement, lowFrequencyRef?: RefObject<LowFrequencyFrame>) {
+    constructor(
+        canvas: HTMLCanvasElement,
+        lowFrequencyRef?: RefObject<LowFrequencyFrame>,
+        splineTension = DEFAULT_SPLINE_TENSION,
+    ) {
         this.canvas = canvas;
         this.lowFrequencyRef = lowFrequencyRef;
+        this.splineTension = splineTension;
         const gl = canvas.getContext('webgl', {
             alpha: false,
             antialias: true,
@@ -250,8 +271,8 @@ export class FluidRenderer {
             gl,
             MESH_VERTEX_SHADER,
             MESH_FRAGMENT_SHADER,
-            ['a_position', 'a_morphPosition', 'a_uv'],
-            ['u_texture', 'u_colorScale', 'u_aspect', 'u_meshMix', 'u_alpha'],
+            ['a_p0', 'a_p1', 'a_p2', 'a_p3', 'a_uv'],
+            ['u_texture', 'u_colorScale', 'u_aspect', 'u_splineWeights', 'u_alpha'],
         );
         this.materialProgram = compileProgram(
             gl,
@@ -274,14 +295,54 @@ export class FluidRenderer {
         }
 
         const quadBuffer = gl.createBuffer();
-        if (!quadBuffer) throw new Error('无法创建网格背景缓冲区');
+        const b0 = gl.createBuffer();
+        const b1 = gl.createBuffer();
+        const b2 = gl.createBuffer();
+        const b3 = gl.createBuffer();
+        const standbyBuffer = gl.createBuffer();
+        const uvBuffer = gl.createBuffer();
+        const indexBuffer = gl.createBuffer();
+        if (!quadBuffer || !b0 || !b1 || !b2 || !b3 || !standbyBuffer || !uvBuffer || !indexBuffer) {
+            for (const buffer of [quadBuffer, b0, b1, b2, b3, standbyBuffer, uvBuffer, indexBuffer]) {
+                if (buffer) gl.deleteBuffer(buffer);
+            }
+            gl.deleteProgram(this.meshProgram.program);
+            gl.deleteProgram(this.materialProgram.program);
+            gl.deleteProgram(this.blurProgram.program);
+            throw new Error('无法创建网格背景缓冲区');
+        }
         this.quadBuffer = quadBuffer;
+        this.positionBuffers = [b0, b1, b2, b3];
+        this.standbyBuffer = standbyBuffer;
+        this.uvBuffer = uvBuffer;
+        this.indexBuffer = indexBuffer;
 
         gl.bindBuffer(gl.ARRAY_BUFFER, quadBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]), gl.STATIC_DRAW);
+
+        this.splineGenerator = new MeshSplineGenerator(undefined, undefined, undefined, splineTension);
+        const keyframes = this.splineGenerator.getKeyframes();
+        for (let index = 0; index < 4; index += 1) {
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffers[index]);
+            gl.bufferData(gl.ARRAY_BUFFER, keyframes[index], gl.DYNAMIC_DRAW);
+        }
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.standbyBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.splineGenerator.getStandbyPositions().byteLength, gl.DYNAMIC_DRAW);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.uvBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, this.splineGenerator.createUvs(), gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, this.splineGenerator.indices, gl.STATIC_DRAW);
+        this.indexCount = this.splineGenerator.indices.length;
+
         this.meshStates.push(this.createMeshState());
         this.resizeNow();
         this.requestFrame();
+    }
+
+    setSplineTension(tension: number) {
+        this.splineGenerator.setTension(tension);
+        this.splineTension = this.splineGenerator.getTension();
     }
 
     private configureArtworkTexture() {
@@ -294,13 +355,8 @@ export class FluidRenderer {
 
     private createMeshState(imageData?: ImageData): MeshState {
         const gl = this.gl;
-        const vertexBuffer = gl.createBuffer();
-        const indexBuffer = gl.createBuffer();
         const texture = gl.createTexture();
-        if (!vertexBuffer || !indexBuffer || !texture) {
-            if (vertexBuffer) gl.deleteBuffer(vertexBuffer);
-            if (indexBuffer) gl.deleteBuffer(indexBuffer);
-            if (texture) gl.deleteTexture(texture);
+        if (!texture) {
             throw new Error('无法创建网格背景状态');
         }
         try {
@@ -322,30 +378,17 @@ export class FluidRenderer {
                 );
             }
             this.configureArtworkTexture();
-
-            const { vertices, indices } = createMesh();
-            gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
-            gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
             return {
-                vertexBuffer,
-                indexBuffer,
                 texture,
-                indexCount: indices.length,
                 alpha: 1,
             };
         } catch (error) {
-            gl.deleteBuffer(vertexBuffer);
-            gl.deleteBuffer(indexBuffer);
             gl.deleteTexture(texture);
             throw error;
         }
     }
 
     private deleteMeshState(state: MeshState) {
-        this.gl.deleteBuffer(state.vertexBuffer);
-        this.gl.deleteBuffer(state.indexBuffer);
         this.gl.deleteTexture(state.texture);
     }
 
@@ -405,8 +448,7 @@ export class FluidRenderer {
         this.gl.uniform1f(this.meshProgram.uniforms.u_aspect, width / height);
         // 修改 canvas backing store 会立即清空默认 framebuffer。必须在同一任务中
         // 完成新尺寸的首帧呈现，避免全屏切换时把清空后的黑帧交给合成器。
-        const now = performance.now();
-        this.renderFrame(now);
+        this.renderFrame();
         this.canvas.style.visibility = 'visible';
         this.requestFrame();
     }
@@ -415,15 +457,49 @@ export class FluidRenderer {
         this.gl.bindTexture(this.gl.TEXTURE_2D, texture);
     }
 
-    private prepareMeshFrame(time: number) {
+    private uploadStandbyBuffer() {
+        if (this.standbyUploaded) return;
+        const gl = this.gl;
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.standbyBuffer);
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.splineGenerator.getStandbyPositions());
+        this.standbyUploaded = true;
+    }
+
+    private stepSplinePreparation() {
+        if (this.standbyUploaded) return;
+        if (!this.splineGenerator.isStandbyReady()) {
+            this.splineGenerator.stepPreparation();
+            return;
+        }
+        this.uploadStandbyBuffer();
+    }
+
+    private advanceSplineTime(frameElapsed: number) {
+        this.segmentElapsed += frameElapsed;
+        this.materialElapsed += frameElapsed;
+        this.stepSplinePreparation();
+        while (this.segmentElapsed >= MORPH_SEGMENT_MS) {
+            this.segmentElapsed -= MORPH_SEGMENT_MS;
+            if (!this.standbyUploaded) {
+                this.splineGenerator.finishPreparationNow();
+                this.uploadStandbyBuffer();
+            }
+            this.splineGenerator.advanceSegment();
+            const [recycledBuffer, b1, b2, b3] = this.positionBuffers;
+            this.positionBuffers = [b1, b2, b3, this.standbyBuffer];
+            this.standbyBuffer = recycledBuffer;
+            this.standbyUploaded = false;
+        }
+    }
+
+    private prepareMeshFrame() {
         const gl = this.gl;
         const program = this.meshProgram;
+        const progress = this.segmentElapsed / MORPH_SEGMENT_MS;
+        const [w0, w1, w2, w3] = catmullRomWeights(progress, this.splineTension);
         gl.useProgram(program.program);
-        gl.uniform1f(program.uniforms.u_meshMix, meshMorphMix(time - this.startTime));
-        gl.uniform1f(
-            program.uniforms.u_colorScale,
-            1,
-        );
+        gl.uniform4f(program.uniforms.u_splineWeights, w0, w1, w2, w3);
+        gl.uniform1f(program.uniforms.u_colorScale, 1);
     }
 
     private renderMesh(state: MeshState) {
@@ -436,19 +512,25 @@ export class FluidRenderer {
         gl.enable(gl.BLEND);
         gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
         gl.uniform1f(program.uniforms.u_alpha, easeInOutSine(state.alpha));
-        gl.bindBuffer(gl.ARRAY_BUFFER, state.vertexBuffer);
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, state.indexBuffer);
-        gl.enableVertexAttribArray(program.attributes.a_position);
-        gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 24, 0);
-        gl.enableVertexAttribArray(program.attributes.a_morphPosition);
-        gl.vertexAttribPointer(program.attributes.a_morphPosition, 2, gl.FLOAT, false, 24, 8);
+
+        const pointAttributeNames = ['a_p0', 'a_p1', 'a_p2', 'a_p3'] as const;
+        for (let index = 0; index < 4; index += 1) {
+            const location = program.attributes[pointAttributeNames[index]];
+            gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffers[index]);
+            gl.enableVertexAttribArray(location);
+            gl.vertexAttribPointer(location, 2, gl.FLOAT, false, 0, 0);
+        }
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.uvBuffer);
         gl.enableVertexAttribArray(program.attributes.a_uv);
-        gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 24, 16);
+        gl.vertexAttribPointer(program.attributes.a_uv, 2, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
         this.bindTexture(this.target.texture);
-        gl.drawElements(gl.TRIANGLES, state.indexCount, gl.UNSIGNED_SHORT, 0);
+        gl.drawElements(gl.TRIANGLES, this.indexCount, gl.UNSIGNED_SHORT, 0);
     }
 
-    private renderMaterial(state: MeshState, time: number) {
+    private renderMaterial(state: MeshState) {
         if (!this.target || !this.blurTarget) return;
         const gl = this.gl;
         const program = this.materialProgram;
@@ -457,14 +539,15 @@ export class FluidRenderer {
         gl.disable(gl.BLEND);
         gl.useProgram(program.program);
         gl.bindBuffer(gl.ARRAY_BUFFER, this.quadBuffer);
-        // Quad passes must not retain attributes backed by a replaced mesh's deleted buffers.
-        gl.disableVertexAttribArray(this.meshProgram.attributes.a_position);
-        gl.disableVertexAttribArray(this.meshProgram.attributes.a_morphPosition);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_p0);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_p1);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_p2);
+        gl.disableVertexAttribArray(this.meshProgram.attributes.a_p3);
         gl.disableVertexAttribArray(this.meshProgram.attributes.a_uv);
         gl.enableVertexAttribArray(program.attributes.a_position);
         gl.vertexAttribPointer(program.attributes.a_position, 2, gl.FLOAT, false, 0, 0);
         this.bindTexture(state.texture);
-        const angle = ((time - this.startTime) / 10000) * FLOW_SPEED * 2;
+        const angle = (this.materialElapsed / 10000) * FLOW_SPEED * 2;
         gl.uniform4f(program.uniforms.u_rotation01,
             Math.cos(angle), Math.sin(angle), Math.cos(angle * 120 / 70), Math.sin(angle * 120 / 70));
         gl.uniform2f(program.uniforms.u_rotation2, Math.cos(angle * 120 / 90), Math.sin(angle * 120 / 90));
@@ -488,7 +571,7 @@ export class FluidRenderer {
         gl.drawArrays(gl.TRIANGLES, 0, 6);
     }
 
-    private renderFrame(time: number) {
+    private renderFrame() {
         if (!this.target) return;
         const gl = this.gl;
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -496,10 +579,10 @@ export class FluidRenderer {
         gl.disable(gl.BLEND);
         gl.clearColor(0, 0, 0, 1);
         gl.clear(gl.COLOR_BUFFER_BIT);
-        this.prepareMeshFrame(time);
+        this.prepareMeshFrame();
         for (let index = 0; index < this.meshStates.length; index += 1) {
             const state = this.meshStates[index];
-            this.renderMaterial(state, time);
+            this.renderMaterial(state);
             this.renderMesh(state);
         }
     }
@@ -522,18 +605,23 @@ export class FluidRenderer {
     private draw = (time: number) => {
         this.animationFrame = 0;
         if (!this.active || !this.visible || this.disposed || !this.target) return;
+        if (this.lastFrame === 0) {
+            this.lastFrame = time;
+        }
         const elapsed = time - this.lastFrame;
         const frameInterval = 1000 / 30;
         if (elapsed < frameInterval) {
             this.requestFrame();
             return;
         }
+        const frameElapsed = Math.min(elapsed, 250);
         this.lastFrame = time - elapsed % frameInterval;
         const audioElapsed = this.lastAudioFrame === 0 ? frameInterval : time - this.lastAudioFrame;
         this.lastAudioFrame = time;
         this.audioResponse.update(this.lowFrequencyRef?.current, audioElapsed, time);
-        this.advanceArtworkTransition(elapsed);
-        this.renderFrame(time);
+        this.advanceSplineTime(frameElapsed);
+        this.advanceArtworkTransition(frameElapsed);
+        this.renderFrame();
         this.canvas.style.visibility = 'visible';
         this.requestFrame();
     };
@@ -551,20 +639,26 @@ export class FluidRenderer {
 
     setActive(active: boolean) {
         this.active = active;
-        if (active) this.requestFrame();
-        else {
+        if (active) {
+            this.lastFrame = 0;
+            this.requestFrame();
+        } else {
             this.cancelFrame();
             this.audioResponse.reset();
+            this.lastFrame = 0;
             this.lastAudioFrame = 0;
         }
     }
 
     setVisible(visible: boolean) {
         this.visible = visible;
-        if (visible) this.requestFrame();
-        else {
+        if (visible) {
+            this.lastFrame = 0;
+            this.requestFrame();
+        } else {
             this.cancelFrame();
             this.audioResponse.reset();
+            this.lastFrame = 0;
             this.lastAudioFrame = 0;
         }
     }
@@ -638,6 +732,10 @@ export class FluidRenderer {
         }
         for (const state of this.meshStates) this.deleteMeshState(state);
         this.meshStates = [];
+        for (const buffer of this.positionBuffers) this.gl.deleteBuffer(buffer);
+        this.gl.deleteBuffer(this.standbyBuffer);
+        this.gl.deleteBuffer(this.uvBuffer);
+        this.gl.deleteBuffer(this.indexBuffer);
         this.gl.deleteBuffer(this.quadBuffer);
         this.gl.deleteProgram(this.meshProgram.program);
         this.gl.deleteProgram(this.materialProgram.program);

@@ -1,3 +1,4 @@
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { useState, useEffect, useMemo } from 'react';
 import type { SongMetadata } from '@/types';
 import type { VideoMetadata } from '@/types/video';
@@ -14,7 +15,7 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
 import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { buildAlbums } from '@/features/library/utils/grouping';
 
@@ -23,9 +24,9 @@ interface SearchResultsViewProps {
 }
 
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
-    const mainContentWidth = useMainContentWidth();
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
+    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videoResults.length, 'video'));
     const [completedQuery, setCompletedQuery] = useState<string | null>(null);
     // 防抖等待也属于加载阶段，只有当前关键词的请求结束后才展示结果或空态。
     const loading = Boolean(query.trim()) && completedQuery !== query;
@@ -41,6 +42,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
 
     useEffect(() => {
         let isCancelled = false;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 搜索词变化进入防抖等待前重置已完成查询标记
         setCompletedQuery(null);
 
         const performSearch = async () => {
@@ -175,6 +177,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             cover: null,
             cover_path: video.thumbnail_path,
             path: video.path,
+            // eslint-disable-next-line react-hooks/purity -- 点击事件回调中记录播放时间戳，非渲染期调用
             lastPlayed: Date.now(),
             artist: "视频",
             album: video.folder_id ? "文件夹" : undefined,
@@ -228,6 +231,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 </span>
                             </h2>
                             <ArtistGridView
+                                coverScope="search-artists"
                                 artists={matchingArtists}
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
@@ -250,6 +254,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 </span>
                             </h2>
                             <AlbumGridView
+                                coverScope="search-albums"
                                 albums={matchingAlbums}
                                 hideYear={true}
                                 onPlayAlbum={(album) => {
@@ -288,15 +293,16 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     {videoResults.length}
                                 </span>
                             </h2>
-                            <div
-                                className="grid content-grid-video gap-4"
-                                style={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
-                            >
-                                {videoResults.map((video) => (
+                            <VirtualizedGrid
+                                data={videoResults}
+                                itemKey={(_index, video) => video.id}
+                                listClassName="grid content-grid-video gap-4"
+                                listStyle={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
+                                itemContent={(_index, video) => (
                                     <div
                                         key={video.id}
                                         onClick={() => handlePlayVideo(video)}
-                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5"
+                                        className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:hover:bg-surface-variant/30"
                                     >
                                         <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">
                                             <CoverImage
@@ -327,8 +333,8 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                             </p>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
+                                )}
+                            />
                         </section>
                     )}
                 </div>

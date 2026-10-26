@@ -1,4 +1,4 @@
-import { useState, useEffect, memo, useMemo } from 'react';
+import { useState, useEffect, memo, useMemo, useRef } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
@@ -52,6 +52,7 @@ export type SortOrder = 'asc' | 'desc';
 
 const HIDE_ALBUM_BREAKPOINT = 900;
 const HIDE_ARTIST_BREAKPOINT = 650;
+const SONG_LIST_BREAKPOINTS = [HIDE_ARTIST_BREAKPOINT, HIDE_ALBUM_BREAKPOINT];
 
 const renderHeaderCell = (label: ReactNode, className?: string, alignRight = false) => (
     <div
@@ -76,10 +77,13 @@ interface SortableSongListProps {
 type SortableItemProps = {
     song: SongMetadata;
     index: number;
+    isLast: boolean;
     style: CSSProperties;
     isDraggingGroup?: boolean;
     isSelectionMode: boolean;
     selected: boolean;
+    previousSelected: boolean;
+    nextSelected: boolean;
     onPlay: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     handleItemClick: (e: React.MouseEvent, song: SongMetadata) => void;
     handleCheckboxClick: (e: React.MouseEvent | null, song: SongMetadata) => void;
@@ -142,8 +146,9 @@ export default function SortableSongList({
     playlistId,
     context = 'playlist' // Default to playlist
 }: SortableSongListProps & { playlistId?: number; context?: MusicMenuContext }) {
-    const mainContentWidth = useMainContentWidth();
-    const scrollParent = useScrollViewport(true);
+    const mainContentWidth = useMainContentWidth(SONG_LIST_BREAKPOINTS);
+    const listRef = useRef<HTMLDivElement>(null);
+    const scrollParent = useScrollViewport(true, listRef);
     const overscan = useViewportOverscan(scrollParent);
     const shouldHideAlbum = mainContentWidth < HIDE_ALBUM_BREAKPOINT;
     const shouldHideArtist = mainContentWidth < HIDE_ARTIST_BREAKPOINT;
@@ -197,7 +202,7 @@ export default function SortableSongList({
 
     const [activeId, setActiveId] = useState<string | null>(null);
 
-    const restrictToScrollViewport = createRestrictToViewportModifier('[data-scroll-viewport]');
+    const restrictToScrollViewport = useMemo(() => createRestrictToViewportModifier(scrollParent), [scrollParent]);
 
     // Prevent body scroll during drag, only allow viewport scroll
     useEffect(() => {
@@ -300,6 +305,9 @@ export default function SortableSongList({
                 style={gridStyle}
                 isSelectionMode={isSelectionMode}
                 selected={isSelected(uniqueId)}
+                previousSelected={index > 0 && isSelected(getSongId(displaySongs[index - 1], index - 1))}
+                nextSelected={index + 1 < displaySongs.length && isSelected(getSongId(displaySongs[index + 1], index + 1))}
+                isLast={index === displaySongs.length - 1}
                 onPlay={onPlay}
                 handleItemClick={(e: React.MouseEvent, s: SongMetadata) => {
                     e.stopPropagation();
@@ -326,8 +334,8 @@ export default function SortableSongList({
     };
 
     return (
-        <div className="w-full relative select-none">
-            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 border-b border-white/10 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl">
+        <div ref={listRef} className="w-full relative select-none">
+            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl after:absolute after:bottom-0 after:left-14 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none">
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 {renderHeaderCell('标题')}
@@ -342,6 +350,7 @@ export default function SortableSongList({
                 collisionDetection={closestCenter}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                onDragCancel={() => setActiveId(null)}
                 modifiers={[restrictToVerticalAxis, restrictToScrollViewport]}
                 autoScroll={{
                     enabled: true,
@@ -383,8 +392,8 @@ export default function SortableSongList({
                                 <div className="relative" style={gridStyle}>
                                     {showStack && (
                                         <>
-                                            <div className="absolute inset-0 translate-y-2 scale-[0.99] rounded-lg bg-surface-container-high opacity-60 shadow-md pointer-events-none" />
-                                            <div className="absolute inset-0 translate-y-4 scale-[0.98] rounded-lg bg-surface-container-high opacity-40 shadow-sm pointer-events-none" />
+                                            <div className="absolute inset-0 translate-y-2 scale-[0.99] rounded-lg bg-(--content-glass-background) opacity-60 shadow-md backdrop-blur-lg pointer-events-none" />
+                                            <div className="absolute inset-0 translate-y-4 scale-[0.98] rounded-lg bg-(--content-glass-background) opacity-40 shadow-sm backdrop-blur-lg pointer-events-none" />
                                         </>
                                     )}
                                     <SongListItem

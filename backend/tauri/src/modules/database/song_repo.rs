@@ -373,6 +373,23 @@ impl SongRepo {
         Ok(())
     }
 
+    /// Atomic guard prevents a background download from overwriting user edits.
+    pub fn set_lyrics_if_missing(
+        conn: &Connection,
+        id: i64,
+        path: &str,
+        lyrics: &str,
+    ) -> Result<bool> {
+        let changed = conn.execute(
+            "UPDATE songs SET lyrics_text = ?3, updated_at = datetime('now')
+             WHERE id = ?1 AND path = ?2 AND status = 'active'
+               AND trim(COALESCE(lyrics_text, '')) = ''
+               AND trim(COALESCE(lyrics_source_path, '')) = ''",
+            params![id, path, lyrics],
+        )?;
+        Ok(changed > 0)
+    }
+
     /// 更新用户可编辑的歌曲信息和自定义歌词
     #[allow(clippy::too_many_arguments)]
     pub fn update_details(
@@ -470,7 +487,6 @@ impl SongRepo {
         if let Some(value) = genre {
             push_text("genre", value);
         }
-        drop(push_text);
 
         let mut push_number = |column: &'static str, value: Option<i32>| {
             assignments.push(format!("{column} = ?"));
@@ -491,7 +507,6 @@ impl SongRepo {
         if let Some(value) = disc_total {
             push_number("disc_total", value);
         }
-        drop(push_number);
 
         if assignments.is_empty() {
             return Ok(());
@@ -682,6 +697,35 @@ impl SongRepo {
 mod tests {
     use super::*;
     use crate::modules::database::init_schema;
+
+    #[test]
+    fn automatic_lyrics_only_fill_active_empty_tracks() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE songs (id INTEGER PRIMARY KEY, path TEXT, status TEXT,
+                title TEXT, lyrics_text TEXT, lyrics_source_path TEXT, updated_at TEXT);
+             INSERT INTO songs VALUES
+                (1, 'D:/song.flac', 'active', 'Original title', NULL, NULL, NULL),
+                (2, 'D:/edited.flac', 'active', 'Edited title', 'User lyrics', NULL, NULL),
+                (3, 'D:/local.flac', 'active', 'Local title', NULL, 'D:/local.lrc', NULL),
+                (4, 'D:/archived.flac', 'excluded', 'Archived title', NULL, NULL, NULL);",
+        )
+        .unwrap();
+        assert!(!SongRepo::set_lyrics_if_missing(&conn, 1, "D:/wrong.flac", "online").unwrap());
+        assert!(SongRepo::set_lyrics_if_missing(&conn, 1, "D:/song.flac", "online").unwrap());
+        assert!(!SongRepo::set_lyrics_if_missing(&conn, 1, "D:/song.flac", "replacement").unwrap());
+        assert!(!SongRepo::set_lyrics_if_missing(&conn, 2, "D:/edited.flac", "online").unwrap());
+        assert!(!SongRepo::set_lyrics_if_missing(&conn, 3, "D:/local.flac", "online").unwrap());
+        assert!(!SongRepo::set_lyrics_if_missing(&conn, 4, "D:/archived.flac", "online").unwrap());
+        let values: (String, String) = conn
+            .query_row(
+                "SELECT title, lyrics_text FROM songs WHERE id = 1",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(values, ("Original title".into(), "online".into()));
+    }
 
     #[test]
     fn delete_excludes_song_and_clears_library_relations() {

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { pageMotion } from '@/utils/viewTransition';
+import { Activity, useState, useEffect, useRef } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAudioOutputStore } from '@/store/useAudioOutputStore';
@@ -11,8 +12,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import TitleBar from '@/components/layout/TitleBar';
 import Sidebar from '@/components/layout/Sidebar';
 import GlobalDetailStack from '@/components/layout/GlobalDetailStack';
+import RetainedMediaPage from '@/components/layout/RetainedMediaPage';
+import { ContentSurface } from '@/components/layout/ContentSurface';
+import { ContentTheme } from '@/components/layout/ContentTheme';
 import ScrollArea from '@/components/common/ScrollArea';
-import { useScrollBlur } from '@/hooks/useScrollBlur';
+import DetailScrollHeader from '@/components/common/DetailScrollHeader';
+import { CoverTransitionOverlay } from '@/components/common/SharedCover';
 
 import MusicGrid from '@/features/home/MusicGrid';
 import Library from '@/features/library/Library';
@@ -20,11 +25,12 @@ import { VideoLibrary } from '@/features/videos/VideoLibrary';
 import Settings from '@/features/settings/Settings';
 import PlayerControl from '@/features/player/PlayerControl';
 import NowPlayingView from '@/features/player/NowPlayingView';
+import NowPlayingQueue from '@/features/player/NowPlayingQueue';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PageId } from '@/types/index';
 import SearchResultsView from '@/features/search/SearchResultsView';
-import PlaylistsRoot from '@/features/playlists/PlaylistsRoot';
+import PlaylistsRoot, { PlaylistDetailOverlay } from '@/features/playlists/PlaylistsRoot';
 import { useQueuePersistence } from '@/hooks/playback/useQueuePersistence';
 import { useGlobalEvents } from '@/hooks/useGlobalEvents';
 import { useImmersivePlayerTransition } from '@/features/player/hooks/useImmersivePlayerTransition';
@@ -37,6 +43,9 @@ import EditableContextMenu from '@/components/common/EditableContextMenu';
 import { PlaybackRuntime } from '@/features/player/runtime/usePlaybackRuntime';
 import { useAutoUpdateCheck } from '@/hooks/useAutoUpdateCheck';
 import { systemService } from '@/services/systemService';
+
+const FULL_PLAYER_MIN_WIDTH = 820;
+const CONTENT_QUEUE_WIDTH = 300;
 
 function App() {
   const [nativeFullscreen, setNativeFullscreen] = useState(false);
@@ -129,16 +138,23 @@ function App() {
 
   const {
     currentPage,
+    scrollKey,
+    searchQuery,
     mainHistory,
     hasOverlay,
     activePlaylistDetail,
     navigate: storeNavigate,
     goBack: storeGoBack
   } = useNavigationStore();
+  const [displayedPage, setDisplayedPage] = useState(currentPage);
+  const completePageExit = (page: PageId) => {
+    if (displayedPage === page) setDisplayedPage(currentPage);
+  };
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const [isCompactSidebar, setIsCompactSidebar] = useState(() => window.innerWidth < 768);
   const [windowWidth, setWindowWidth] = useState(() => window.innerWidth);
+  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const {
     isOpen: isFullScreen,
     isBaseLayerFrozen,
@@ -146,8 +162,6 @@ function App() {
     toggle: toggleFullScreenPlayer,
     handleOpened: handleFullScreenPlayerOpened,
   } = useImmersivePlayerTransition();
-
-  const [searchQuery, setSearchQuery] = useState('');
 
   useQueuePersistence(); // Activate queue persistence
   useGlobalEvents(); // Activate global event listeners
@@ -160,17 +174,23 @@ function App() {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
       setIsCompactSidebar(window.innerWidth < 768);
+      const nextSidebarOffset = window.innerWidth < 768 || sidebarCollapsed ? 72 : 280;
+      if (window.innerWidth - nextSidebarOffset < FULL_PLAYER_MIN_WIDTH) setIsQueueOpen(false);
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [sidebarCollapsed]);
 
   const sidebarOffset = isSidebarOverlay || sidebarCollapsed ? 72 : 280;
   const mainContentWidth = windowWidth - sidebarOffset;
-  const playerMode = mainContentWidth < 560 ? 'mini' : mainContentWidth < 820 ? 'compact' : 'full';
-  const handleNavigate = (page: string) => {
+  // 以队列收起时的完整控件为基准，避免队列自身占宽触发关闭。
+  const canShowQueue = mainContentWidth >= FULL_PLAYER_MIN_WIDTH;
+  const queueOffset = isQueueOpen && canShowQueue ? CONTENT_QUEUE_WIDTH : 0;
+  const playerWidth = mainContentWidth - queueOffset;
+  const playerMode = playerWidth < 560 ? 'mini' : playerWidth < FULL_PLAYER_MIN_WIDTH ? 'compact' : 'full';
+  const handleNavigate = (page: string, query?: string) => {
     const target = page as PageId;
-    storeNavigate(target);
+    storeNavigate(target, undefined, query);
 
     // Clear selection mode when switching pages
     useSelectionStore.getState().clearSelection();
@@ -179,8 +199,7 @@ function App() {
   };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    handleNavigate('search');
+    handleNavigate('search', query);
   };
 
   const handleBack = () => {
@@ -203,53 +222,46 @@ function App() {
     });
   };
 
-  const renderContent = () => {
-    switch (currentPage) {
-      case 'home': return <MusicGrid />;
-      case 'library': return <Library />;
-      case 'videos': return <VideoLibrary />;
-      case 'settings': return <Settings />;
-      case 'search': return <SearchResultsView query={searchQuery} />;
-      case 'playlists': return <PlaylistsRoot />;
-      default: return null;
-    }
-  };
-
-  const { isScrolled, topSentinelRef } = useScrollBlur();
-
   const mainContent = (
     <div
       data-main-content-query
-      className="main-content-query flex flex-1 flex-col min-w-0 bg-surface dark:bg-surface-container-low rounded-tl-2xl overflow-hidden relative z-0 transition-colors duration-300"
+      className="main-content-query flex flex-1 flex-col min-w-0 overflow-hidden relative z-0"
     >
-      {/* 顶部透明，滚动后用毛玻璃遮住进入拖动区域的内容。 */}
       <div
         data-tauri-drag-region
-        className={`absolute top-0 left-0 right-0 h-12 z-40 border-b transition-colors duration-300 ${isScrolled && !activePlaylistDetail
-          ? 'bg-surface/70 dark:bg-surface-container-low/70 backdrop-blur-xl border-outline-variant/5'
-          : 'bg-transparent border-transparent'
-          }`}
+        className="absolute top-0 left-0 right-0 h-12 z-40 bg-transparent"
       />
 
-      <ScrollArea className="flex-1 relative" topOffset={48} resetOnKeyChange={currentPage}>
-        <div className="relative pt-12 min-h-full pb-24 transition-colors duration-300">
-          <div ref={topSentinelRef} className="absolute top-0 h-1 w-full pointer-events-none" />
-          <AnimatePresence mode="wait">
+      <div className="flex-1 min-h-0 relative z-0 overflow-hidden">
+        <RetainedMediaPage active={currentPage === 'home' && displayedPage === 'home'} onExitComplete={() => completePageExit('home')} scrollKey={currentPage === 'home' ? scrollKey : undefined}><MusicGrid /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'library' && displayedPage === 'library'} onExitComplete={() => completePageExit('library')} scrollKey={currentPage === 'library' ? scrollKey : undefined}><Library /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'videos' && displayedPage === 'videos'} onExitComplete={() => completePageExit('videos')} scrollKey={currentPage === 'videos' ? scrollKey : undefined}><VideoLibrary /></RetainedMediaPage>
+        <RetainedMediaPage active={currentPage === 'playlists' && displayedPage === 'playlists'} onExitComplete={() => completePageExit('playlists')} scrollKey={currentPage === 'playlists' ? scrollKey : undefined}>
+          <PlaylistsRoot isPageVisible={currentPage === 'playlists' && !isBaseLayerFrozen} />
+        </RetainedMediaPage>
+        <AnimatePresence mode="wait" onExitComplete={() => completePageExit(displayedPage)}>
+          {currentPage === displayedPage && (currentPage === 'settings' || currentPage === 'search') && (
             <motion.div
               key={currentPage}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className="h-full"
+              {...pageMotion}
+              style={{ zIndex: 1 }}
+              className="absolute inset-0 min-w-0 overflow-hidden bg-surface dark:bg-surface-container-low base-theme:bg-background"
             >
-              {renderContent()}
+              <ScrollArea className="h-full" topOffset={48} navigationScrollKey={scrollKey}>
+                <div className="relative">
+                  <DetailScrollHeader className="-mb-10" />
+                  <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                    {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
+                  </div>
+                </div>
+              </ScrollArea>
             </motion.div>
-          </AnimatePresence>
-        </div>
-      </ScrollArea>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* --- 层级 2: 全局详情栈 (Overlay inside Main Content) --- */}
+      <PlaylistDetailOverlay isVisible={!isBaseLayerFrozen && !hasOverlay} />
       <GlobalDetailStack />
     </div>
   );
@@ -264,18 +276,26 @@ function App() {
         inert={isFullScreen}
         aria-hidden={isFullScreen}
       >
-        {/* 1. 标题栏（始终在最顶层 z-100） */}
-        <TitleBar />
-        <SelectionMenuBar />
-
-        <div className="flex flex-1 overflow-hidden relative">
+        <ContentTheme>
+          {/* 1. 标题栏（始终在最顶层 z-100） */}
+          <TitleBar />
+          <SelectionMenuBar leftOffset={sidebarOffset} />
+          {isSidebarOverlay && !sidebarCollapsed && (
+            <div
+              className="absolute inset-y-0 left-18 right-0 z-96 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
+              onClick={() => setSidebarCollapsed(true)}
+            />
+          )}
           {/* --- 层级 1: 正常布局 (侧边栏 + 主内容) --- */}
           <div className="app-shell-background absolute inset-0 flex">
             <Sidebar
               activeId={currentPage}
               onNavigate={handleNavigate}
               collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed((prev) => !prev)}
+              onToggle={() => {
+                setSidebarCollapsed((prev) => !prev);
+                if (windowWidth - 280 < FULL_PLAYER_MIN_WIDTH) setIsQueueOpen(false);
+              }}
               canGoBack={mainHistory.length > 0 || hasOverlay || activePlaylistDetail !== null || isFullScreen}
               onBack={handleBack}
               onSearch={handleSearch}
@@ -283,31 +303,54 @@ function App() {
               onRequestClose={() => setSidebarCollapsed(true)}
             />
 
-            <div className="flex-1 flex flex-col min-w-0 relative">
-              {/* Backdrop for overlay mode - positioned relative to content container but covering it */}
-              {isSidebarOverlay && !sidebarCollapsed && (
-                <div
-                  className="absolute inset-0 z-40 bg-primary/5 backdrop-blur-[2px] animate-in fade-in duration-200 rounded-2xl"
-                  onClick={() => setSidebarCollapsed(true)}
-                />
-              )}
-
+            <ContentSurface hidePageBackground={hasOverlay}>
               {/* Reuse mainContent variable content inline or wrapper */}
               {mainContent}
-            </div>
-          </div>
-        </div>
 
-        {/* 4. 底部播放控制 - M3 Surface Container */}
-        <div className="relative z-70">
-          <PlayerControl
-            isFullScreen={isFullScreen}
-            isSuspended={isFullScreen}
-            onToggleFullScreen={toggleFullScreenPlayer}
-            sidebarOffset={sidebarOffset}
-            mode={playerMode}
-          />
-        </div>
+              <AnimatePresence initial={false}>
+                {isQueueOpen && canShowQueue && (
+                  <motion.aside
+                    id="content-play-queue"
+                    aria-label="播放队列"
+                    initial={{ width: 0 }}
+                    animate={{ width: CONTENT_QUEUE_WIDTH }}
+                    exit={{ width: 0 }}
+                    transition={{ duration: 0.3, ease: [0.2, 0, 0, 1] }}
+                    className="content-queue-shell relative z-30 shrink-0 min-h-0"
+                  >
+                    <div className="relative h-full w-full overflow-hidden">
+                      <div className="absolute inset-y-0 left-0 flex flex-col w-75 pt-12">
+                      <div data-tauri-drag-region className="absolute inset-x-0 top-0 h-10" />
+                      <Activity mode={isBaseLayerFrozen ? 'hidden' : 'visible'}>
+                      <NowPlayingQueue
+                        variant="content"
+                        isOpen={isQueueOpen}
+                        onClose={() => setIsQueueOpen(false)}
+                        onNavigate={() => setIsQueueOpen(false)}
+                      />
+                      </Activity>
+                      </div>
+                    </div>
+                  </motion.aside>
+                )}
+              </AnimatePresence>
+            </ContentSurface>
+          </div>
+          {/* 4. 底部播放控制 - M3 Surface Container */}
+          <div className="relative z-70">
+            <PlayerControl
+              isFullScreen={isFullScreen}
+              isSuspended={isFullScreen}
+              onToggleFullScreen={toggleFullScreenPlayer}
+              sidebarOffset={sidebarOffset}
+              rightOffset={queueOffset}
+              mode={playerMode}
+              isQueueOpen={isQueueOpen}
+              canShowQueue={canShowQueue}
+              onToggleQueue={() => setIsQueueOpen((open) => !open)}
+            />
+          </div>
+        </ContentTheme>
       </div>
       <AddToPlaylistSheet />
       <GlobalDialogLayer />
@@ -321,6 +364,7 @@ function App() {
         }}
       />
       <EditableContextMenu />
+      <CoverTransitionOverlay />
 
       <NowPlayingView
         isOpen={isFullScreen}

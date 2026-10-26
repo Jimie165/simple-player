@@ -7,6 +7,7 @@ import type { SystemMediaAction } from '@/services/mediaControlService';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PlaybackSnapshot } from '@/types';
+import { useAutoOnlineLyrics } from '@/features/player/runtime/useAutoOnlineLyrics';
 
 /**
  * Keeps media-side effects alive independently of the bottom player UI.
@@ -229,5 +230,6 @@ function usePlaybackRuntime() {
 /** Isolates playback-store subscriptions from the application render tree. */
 export function PlaybackRuntime() {
     usePlaybackRuntime();
+    useAutoOnlineLyrics();
     return null;
 }

@@ -1,3 +1,4 @@
+import { viewMotion } from '@/utils/viewTransition';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 import { usePlayerStore } from '@/store/usePlayerStore';
@@ -10,7 +11,6 @@ import {
 import { motion } from 'framer-motion';
 import MusicSlider from '@/components/common/MusicSlider';
 import { systemService } from '@/services/systemService';
-import { getCurrentWindow } from '@tauri-apps/api/window';
 import { VscChromeMinimize, VscChromeMaximize, VscChromeRestore, VscChromeClose } from 'react-icons/vsc';
 import { VideoPlaylistDrawer } from '@/features/player/video/VideoPlaylistDrawer';
 import { VideoStatusOverlays } from '@/features/player/video/VideoStatusOverlays';
@@ -40,7 +40,8 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         isPlaylistOpen,
         setIsPlaylistOpen,
         toggleAppFullscreen,
-    } = useVideoControls();
+        exitFullscreen,
+    } = useVideoControls(isOpen);
 
     const autoHideEnabled = true;
     const showControls = useCallback(() => {
@@ -144,10 +145,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         }
 
         try {
-            const win = getCurrentWindow();
-            if (await win.isFullscreen()) {
-                await win.setFullscreen(false);
-            }
+            await exitFullscreen();
         } catch (error) {
             console.error('[VideoPlayer] 退出全屏失败:', error);
         }
@@ -169,9 +167,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
     return (
         <>
             <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+                {...viewMotion}
                 className={`fixed inset-0 z-100 bg-black grid grid-cols-1 grid-rows-1 overflow-hidden group select-none isolate ${!isControlsVisible && !isPreparing ? 'cursor-none' : ''}`}
                 data-controls-visible={isControlsVisible}
                 onPointerMove={showControls}
@@ -349,7 +345,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                             >
                                                 {volume === 0 ? <MdVolumeOff className="text-2xl" /> : <MdVolumeUp className="text-2xl" />}
                                             </button>
-                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 group-focus-within/vol:w-24 any-pointer-coarse:w-24 transition-all duration-300 ease-out flex items-center">
+                                            <div className="w-0 overflow-hidden group-hover/vol:w-24 group-active/vol:w-24 any-pointer-coarse:w-24 transition-all duration-300 ease-out flex items-center">
                                                 <div className="w-20 pl-2">
                                                     <MusicSlider
                                                         value={volume}

@@ -49,7 +49,7 @@ fn playback_cache_hash(source_hash: &str, macos: bool) -> String {
     }
     use sha2::{Digest, Sha256};
     let digest = Sha256::digest(format!("{source_hash}:macos-mp4-v2").as_bytes());
-    format!("{digest:x}")[..32].to_string()
+    crate::modules::library::covers::encode_hex(&digest[..16])
 }
 
 #[cfg(test)]

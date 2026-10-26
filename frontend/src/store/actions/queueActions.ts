@@ -40,6 +40,20 @@ export function toggleShuffleListFn(state: QueueStateSlice, enable: boolean): Pa
     return { playlist: originalPlaylist, currentSongIndex: newIndex };
 }
 
+export function getPreviousIndexFn(state: Pick<QueueStateSlice, 'playlist' | 'currentSongIndex'>, repeatMode: 'off' | 'all' | 'one'): number {
+    const { playlist, currentSongIndex } = state;
+    if (currentSongIndex < 0 || currentSongIndex >= playlist.length) return -1;
+    if (currentSongIndex > 0) return currentSongIndex - 1;
+    return repeatMode === 'all' ? playlist.length - 1 : 0;
+}
+
+export function getManualNextIndexFn(state: Pick<QueueStateSlice, 'playlist' | 'currentSongIndex'>, repeatMode: 'off' | 'all' | 'one'): number {
+    const { playlist, currentSongIndex } = state;
+    if (currentSongIndex < 0 || currentSongIndex >= playlist.length) return -1;
+    if (currentSongIndex + 1 < playlist.length) return currentSongIndex + 1;
+    return repeatMode === 'all' ? 0 : currentSongIndex;
+}
+
 export function getNextIndexFn(state: Pick<QueueStateSlice, 'playlist' | 'currentSongIndex'>, repeatMode: 'off' | 'all' | 'one'): number {
     const { playlist, currentSongIndex } = state;
     const length = playlist.length;

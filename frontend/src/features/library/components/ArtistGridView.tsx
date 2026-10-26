@@ -1,6 +1,9 @@
-import { useState, useEffect, useMemo } from 'react';
+import SharedCover from '@/components/common/SharedCover';
+import { getCoverTransitionSource } from '@/utils/viewTransition';
+import type { CoverTransitionSource } from '@/utils/viewTransition';
+import MoreIcon from '@/components/common/MoreIcon';
+import { useState, useEffect } from 'react';
 import { MdCheckBox, MdCheckBoxOutlineBlank } from 'react-icons/md';
-import { Virtuoso } from 'react-virtuoso';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CoverImage from '@/components/common/CoverImage';
@@ -9,12 +12,9 @@ import type { SongMetadata } from '@/types';
 import ConfirmDialog from '@/components/common/ConfirmDialog';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getGridColumnCount } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 import CustomTooltip from '@/components/common/CustomTooltip';
-import { useScrollViewport } from '@/hooks/useScrollViewport';
-import { useViewportOverscan } from '@/hooks/useViewportOverscan';
+import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 // 定义艺人数据结构
 export interface ArtistData {
@@ -27,25 +27,15 @@ export interface ArtistData {
 }
 
 interface ArtistGridViewProps {
+    coverScope?: string;
     artists: ArtistData[];
     onPlayArtist: (artist: ArtistData) => void;
     onShuffleArtist?: (artist: ArtistData) => void;
-    onOpenArtist: (artist: ArtistData) => void;
+    onOpenArtist: (artist: ArtistData, source?: CoverTransitionSource) => void;
     onDeleteArtist?: (artist: ArtistData) => void;
 }
 
-export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist }: ArtistGridViewProps) {
-    const mainContentWidth = useMainContentWidth();
-    const scrollParent = useScrollViewport(true);
-    const overscan = useViewportOverscan(scrollParent);
-    const columnCount = getGridColumnCount(mainContentWidth, 'cover');
-    const artistRows = useMemo(() => {
-        const rows: ArtistData[][] = [];
-        for (let index = 0; index < artists.length; index += columnCount) {
-            rows.push(artists.slice(index, index + columnCount));
-        }
-        return rows;
-    }, [artists, columnCount]);
+export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist, onOpenArtist, onDeleteArtist, coverScope = 'library-artists' }: ArtistGridViewProps) {
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [artistToDelete, setArtistToDelete] = useState<ArtistData | null>(null);
 
@@ -92,13 +82,13 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
         setArtistToDelete(null);
     };
 
-    const handleItemClick = (artist: ArtistData, e: React.MouseEvent) => {
+    const handleItemClick = (artist: ArtistData, e: React.MouseEvent<HTMLDivElement>) => {
         if (isSelectionMode) {
             e.stopPropagation();
             toggleSelection(getMusicItemId(artist), 'artist', artist);
             return;
         }
-        onOpenArtist(artist);
+        onOpenArtist(artist, getCoverTransitionSource(e.currentTarget));
     };
 
     const renderArtistCard = (artist: ArtistData) => {
@@ -108,16 +98,16 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
         return (
             <div
                 key={id}
-                className="group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-neutral-100 dark:hover:bg-white/5 transition-colors cursor-pointer min-w-0"
+                className={`group relative flex flex-col items-center gap-3 p-3 rounded-2xl hover:bg-on-surface/5 transition-colors cursor-pointer min-w-0 ${isSelected ? 'base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80' : 'base-theme:hover:bg-surface-variant/30'}`}
                 onClick={(e) => handleItemClick(artist, e)}
                 onContextMenu={(e) => handleContextMenu(e, artist)}
             >
-                <div className="relative w-full aspect-square max-w-40 shrink-0">
+                <SharedCover data-transition-cover={`${coverScope}-${id}`} layoutId={`${coverScope}-${id}`} className="relative w-full aspect-square max-w-40 shrink-0 rounded-full">
                     <div className="w-full h-full rounded-full shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative z-10 border border-black/5 dark:border-white/5">
                         <CoverImage
                             song={artist.songs[0]}
                             src={artist.cover}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                            className="w-full h-full object-cover"
                             iconClassName="text-6xl"
                         />
 
@@ -133,7 +123,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                 className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-sm border border-white/20 flex items-center justify-center hover:bg-white/30 transition-colors shadow-sm"
                             >
                                 {isSelected
-                                    ? <MdCheckBox className="text-primary text-xl" />
+                                    ? <MdCheckBox className="selection-accent text-primary text-xl" />
                                     : <MdCheckBoxOutlineBlank className="text-white text-xl" />
                                 }
                             </div>
@@ -164,10 +154,12 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                                     ? toggleSelection(id, 'artist', artist)
                                     : toggleSelectionMode({ id, type: 'artist', data: artist })
                                 }
-                            />
+                            >
+                                <MoreIcon />
+                            </SmartMusicContextMenu>
                         </div>
                     )}
-                </div>
+                </SharedCover>
 
                 <div className="text-center w-full">
                     <CustomTooltip text={artist.name} onlyWhenOverflow className="inline-block w-fit max-w-full min-w-0 align-top">
@@ -195,27 +187,12 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
                 type="danger"
             />
 
-            {scrollParent ? (
-                <Virtuoso
-                    useWindowScroll={false}
-                    customScrollParent={scrollParent}
-                    data={artistRows}
-                    computeItemKey={(_index, row) => row.map(artist => getMusicItemId(artist)).join('|')}
-                    overscan={overscan}
-                    components={{
-                        Header: () => <div className="h-4" />,
-                        Footer: () => <div className="h-20" />,
-                    }}
-                    itemContent={(_index, row) => (
-                        <div className="grid content-grid-cover gap-4 pb-4">
-                            {row.map(renderArtistCard)}
-                        </div>
-                    )}
-                    className="w-full"
-                />
-            ) : (
-                <div className="opacity-0" />
-            )}
+            <VirtualizedGrid
+                data={artists}
+                itemKey={(_index, artist) => getMusicItemId(artist)}
+                listClassName="grid content-grid-cover gap-4 pt-4 pb-24"
+                itemContent={(_index, artist) => renderArtistCard(artist)}
+            />
             {/* Cursor Context Menu */}
             {contextMenu && (
                 <SmartCursorContextMenu

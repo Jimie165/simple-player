@@ -1,26 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { getCurrentWindow } from '@tauri-apps/api/window';
+import { useEffect, useState } from 'react';
 import { systemService } from '@/services/systemService';
+import { usePlayerFullscreen } from '@/features/player/hooks/usePlayerFullscreen';
 
-export function useVideoControls() {
-    const [isFullscreen, setIsFullscreen] = useState(false);
+export function useVideoControls(isOpen: boolean) {
+    const { isFullscreen, toggleFullscreen: toggleAppFullscreen, exitFullscreen } = usePlayerFullscreen(isOpen);
     const [isMaximized, setIsMaximized] = useState(false);
     const [isCompact, setIsCompact] = useState(false);
     const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
-
-    useEffect(() => {
-        const syncFullscreen = async () => {
-            const win = getCurrentWindow();
-            setIsFullscreen(await win.isFullscreen());
-        };
-
-        syncFullscreen();
-        const unlisten = systemService.onResize(syncFullscreen);
-
-        return () => {
-            unlisten.then(f => f && f());
-        };
-    }, []);
 
     useEffect(() => {
         const checkMaximized = async () => setIsMaximized(await systemService.isMaximized());
@@ -48,23 +34,6 @@ export function useVideoControls() {
         };
     }, []);
 
-    const toggleAppFullscreen = useCallback(async () => {
-        const win = getCurrentWindow();
-        const isFull = await win.isFullscreen();
-
-        if (!isFull) {
-            if (!systemService.isMacOS && await win.isMaximized()) {
-                await win.unmaximize();
-                setIsMaximized(false);
-            }
-            await win.setFullscreen(true);
-            setIsFullscreen(true);
-        } else {
-            await win.setFullscreen(false);
-            setIsFullscreen(false);
-        }
-    }, []);
-
     return {
         isFullscreen,
         isMaximized,
@@ -72,5 +41,6 @@ export function useVideoControls() {
         isPlaylistOpen,
         setIsPlaylistOpen,
         toggleAppFullscreen,
+        exitFullscreen,
     };
 }

@@ -61,6 +61,7 @@ const SongListItemMenu = memo(({
             groups={menuItems}
             onOpen={onMenuOpen}
             variant="clean"
+            buttonClassName="w-8 h-8 [&_svg]:size-4 text-on-surface-variant! hover:text-primary! hover:opacity-100!"
         />
     );
 });
@@ -68,9 +69,12 @@ const SongListItemMenu = memo(({
 export const SongListItem = memo(({
     song,
     index,
+    isLast = false,
     style: gridStyle,
     isSelectionMode,
     selected,
+    previousSelected = false,
+    nextSelected = false,
     onPlay,
     handleItemClick,
     handleContextMenu,
@@ -90,9 +94,12 @@ export const SongListItem = memo(({
 }: {
     song: SongMetadata;
     index: number;
+    isLast?: boolean;
     style: React.CSSProperties;
     isSelectionMode?: boolean;
     selected?: boolean;
+    previousSelected?: boolean;
+    nextSelected?: boolean;
     onPlay?: (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => void;
     handleItemClick?: (e: React.MouseEvent, song: SongMetadata) => void;
     handleContextMenu?: (e: React.MouseEvent, song: SongMetadata, index: number) => void;
@@ -117,14 +124,17 @@ export const SongListItem = memo(({
         <div
             style={gridStyle}
             className={clsx(
-                "group grid gap-4 px-4 py-2 items-center rounded-lg transition-colors relative touch-pan-y",
+                "group isolate grid h-13.5 gap-4 px-4 items-center relative touch-pan-y before:absolute before:inset-y-0 before:left-12 before:right-2 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
+                isLast ? "after:left-14" : "after:left-28",
                 isOverlay
-                    ? "bg-surface-container-high elevation-3 border border-outline-variant/10 cursor-grabbing shadow-2xl scale-[1.02]"
+                    ? "rounded-xl bg-(--content-glass-background) backdrop-blur-lg backdrop-saturate-220 border border-(--content-glass-edge) cursor-grabbing shadow-2xl scale-[1.02] after:opacity-0"
                     : selected
-                        ? "bg-primary/10 hover:bg-primary/15"
+                        ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
                         : isDragging
-                            ? "bg-surface-container-high elevation-2 opacity-50"
-                            : "hover:bg-surface-container-highest active:bg-surface-container-high hover:elevation-1",
+                            ? "bg-(--content-glass-background) backdrop-blur-lg opacity-50"
+                            : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
+                (!selected || !previousSelected) && "before:rounded-t-xl",
+                (!selected || !nextSelected) && "before:rounded-b-xl",
                 "cursor-default text-[14px]",
                 isDragging && !isOverlay ? "opacity-30" : ""
             )}
@@ -146,13 +156,9 @@ export const SongListItem = memo(({
             onContextMenu={(e) => handleContextMenu && handleContextMenu(e, song, index)}
         >
             {isOverlay && dragCount && dragCount > 1 && (
-                <div className="absolute -top-2 -right-2 bg-primary text-on-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md z-50">
+                <div className="absolute -top-2 -right-2 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shadow-md z-50">
                     {dragCount}
                 </div>
-            )}
-
-            {selected && (
-                <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-lg" />
             )}
 
             <div className="flex justify-center items-center">
@@ -169,8 +175,8 @@ export const SongListItem = memo(({
                         className={clsx(
                             "flex items-center justify-center w-6 h-6 rounded-full transition-all active:scale-95",
                             isFav
-                                ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 opacity-100"
-                                : "text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-white/5 opacity-0 group-hover:opacity-100"
+                                ? "text-red-500 hover:bg-red-500/10 opacity-100"
+                                : "text-on-surface-variant hover:text-red-500 hover:bg-on-surface/8 opacity-0 group-hover:opacity-100"
                         )}
                     >
                         {isFav ? <MdFavorite className="text-base" /> : <MdFavoriteBorder className="text-base" />}
@@ -179,7 +185,7 @@ export const SongListItem = memo(({
             </div>
 
             <div className="flex items-center gap-3 overflow-hidden">
-                <div className="w-10 h-10 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
+                <div className="w-11 h-11 rounded-sm shrink-0 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shadow-sm border border-neutral-200/10 relative group/cover cursor-pointer">
                     <SongCoverOverlay
                         song={song}
                         className="w-full h-full"
@@ -187,16 +193,13 @@ export const SongListItem = memo(({
                         restartOnPlay
                     />
                 </div>
-                <span className={clsx(
-                    "font-medium truncate pr-4",
-                    selected ? "text-primary dark:text-primary-light" : "text-neutral-900 dark:text-neutral-100"
-                )}>
+                <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}
                 </span>
             </div>
 
             {!hideArtist && (
-                <div className="text-neutral-500 dark:text-neutral-400 truncate font-medium">
+                <div className={clsx("truncate font-medium transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                     <span
                         className={clsx(
                             "transition-colors",
@@ -219,7 +222,7 @@ export const SongListItem = memo(({
             )}
 
             {!hideAlbum && (
-                <div className="text-neutral-500 dark:text-neutral-400 truncate">
+                <div className={clsx("truncate transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                     <span
                         className={clsx(
                             "transition-colors",
@@ -241,15 +244,12 @@ export const SongListItem = memo(({
                 </div>
             )}
 
-            <div className="text-neutral-500 dark:text-neutral-400 text-right pr-2 text-[13px] font-variant-numeric">
+            <div className={clsx("text-right pr-2 text-[13px] font-variant-numeric transition-colors group-hover:text-on-surface", selected ? "text-on-surface" : "text-on-surface-variant")}>
                 {formatDuration(song.duration)}
             </div>
 
             <div
-                className={clsx(
-                    "flex justify-end transition-opacity",
-                    isSelectionMode || selected ? "opacity-100" : "opacity-0 group-hover:opacity-100 any-pointer-coarse:opacity-100"
-                )}
+                className="flex justify-end"
                 onDoubleClick={(e) => e.stopPropagation()}
                 onClick={(e) => e.stopPropagation()}
             >

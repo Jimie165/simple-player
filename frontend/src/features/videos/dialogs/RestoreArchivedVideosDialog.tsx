@@ -26,6 +26,7 @@ export default function RestoreArchivedVideosDialog({
 
     useEffect(() => {
         if (!isOpen) return;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- 弹窗打开或候选视频变化时重置默认全选状态
         setSelectedIds(new Set(videos.map((video) => video.id)));
     }, [isOpen, videos]);
 
@@ -122,7 +123,7 @@ export default function RestoreArchivedVideosDialog({
                                                         onChange={() => toggleVideo(video.id)}
                                                         className="h-4 w-4 shrink-0 accent-primary"
                                                     />
-                                                    <div className="relative h-10 w-[4.5rem] shrink-0 overflow-hidden rounded-lg bg-surface-container-highest">
+                                                    <div className="relative h-10 w-18 shrink-0 overflow-hidden rounded-lg bg-surface-container-highest">
                                                         <CoverImage
                                                             src={video.thumbnail_path}
                                                             className="absolute inset-0 h-full w-full object-cover"
@@ -156,7 +157,7 @@ export default function RestoreArchivedVideosDialog({
                                         type="button"
                                         onClick={handleRestore}
                                         disabled={selectedIds.size === 0 || restoring}
-                                        className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+                                        className="rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                                     >
                                         {restoring ? '正在恢复...' : `恢复选中 (${selectedIds.size})`}
                                     </button>

@@ -228,14 +228,14 @@ export default function EditableContextMenu() {
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-9999 w-40 rounded-xl border border-neutral-200/30 bg-white/90 p-1 text-sm text-neutral-900 shadow-2xl backdrop-blur-3xl dark:border-white/10 dark:bg-neutral-900/90 dark:text-white"
+            className="fixed z-9999 w-40 rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1 text-sm text-on-surface shadow-2xl backdrop-blur-[16px] backdrop-saturate-[220%]"
             style={position}
             role="menu"
             onContextMenu={(event) => event.preventDefault()}
         >
             {items.map(({ label, icon: Icon, command, disabled }, index) => (
                 <div key={command}>
-                    {index === 2 && <div className="my-1 h-px bg-neutral-200 dark:bg-white/10" />}
+                    {index === 2 && <div className="my-1 h-px bg-on-surface/10" />}
                     <button
                         type="button"
                         role="menuitem"
@@ -256,7 +256,7 @@ export default function EditableContextMenu() {
                             runEditCommand(command, menu.element);
                             closeMenu();
                         }}
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/10"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors enabled:hover:bg-on-surface/8 base-theme:enabled:hover:bg-surface-variant/40 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                         <Icon className="text-lg opacity-70" />
                         {label}

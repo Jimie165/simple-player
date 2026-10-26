@@ -1,7 +1,7 @@
 import { Fragment } from 'react';
 import type React from 'react';
 import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { MdClose } from 'react-icons/md';
 
 export interface MetadataEditTab<T extends string> {
@@ -12,6 +12,7 @@ export interface MetadataEditTab<T extends string> {
 interface MetadataEditDialogShellProps<T extends string> {
     isOpen: boolean;
     saving: boolean;
+    cancelFirst?: boolean;
     onClose: () => void;
     onSubmit: (event: React.FormEvent) => void;
     title: string;
@@ -25,11 +26,13 @@ interface MetadataEditDialogShellProps<T extends string> {
     message?: string;
     footerStart?: React.ReactNode;
     children: React.ReactNode;
+    replacementView?: React.ReactNode;
 }
 
 export default function MetadataEditDialogShell<T extends string>({
     isOpen,
     saving,
+    cancelFirst = false,
     onClose,
     onSubmit,
     title,
@@ -43,7 +46,31 @@ export default function MetadataEditDialogShell<T extends string>({
     message,
     footerStart,
     children,
+    replacementView,
 }: MetadataEditDialogShellProps<T>) {
+    const reducedMotion = useReducedMotion();
+    const button = 'rounded-lg border border-neutral-200 px-4 py-2 text-sm dark:border-white/15 disabled:opacity-40';
+    const confirmButton = (
+        <button
+            key="confirm"
+            type="submit"
+            disabled={saving}
+            className={`${button} bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary`}
+        >
+            {saving ? '保存中...' : '确定'}
+        </button>
+    );
+    const cancelButton = (
+        <button
+            key="cancel"
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            className={button}
+        >
+            取消
+        </button>
+    );
     return (
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-9999" onClose={saving ? () => undefined : onClose}>
@@ -54,7 +81,8 @@ export default function MetadataEditDialogShell<T extends string>({
                 <div className="fixed inset-0 overflow-y-auto p-2 sm:p-4">
                     <div className="flex min-h-full items-center justify-center text-center">
                         <TransitionChild
-                            as={Fragment}
+                            as="div"
+                            className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transition-[opacity,transform,scale] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))]"
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
                             enterTo="opacity-100 scale-100"
@@ -62,8 +90,8 @@ export default function MetadataEditDialogShell<T extends string>({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transform overflow-hidden rounded-xl bg-[#fbfbfb] text-left align-middle shadow-2xl transition-all dark:bg-[#202020] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
-                                <form onSubmit={onSubmit} className="flex h-full min-h-0 flex-col">
+                            <DialogPanel className="relative h-full w-full overflow-hidden rounded-xl bg-surface text-left align-middle shadow-2xl sm:rounded-md">
+                                <motion.form onSubmit={onSubmit} inert={Boolean(replacementView)} animate={{ x: replacementView && !reducedMotion ? -32 : 0, opacity: replacementView ? 0 : 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">{title}</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">
                                         <button
@@ -116,24 +144,17 @@ export default function MetadataEditDialogShell<T extends string>({
                                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-6 pb-4 pt-3">
                                         <div>{footerStart}</div>
                                         <div className="flex gap-2">
-                                            <button
-                                                type="submit"
-                                                disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] bg-primary px-7 text-[15px] font-medium text-on-primary shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
-                                            >
-                                                {saving ? '保存中...' : '确定'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={onClose}
-                                                disabled={saving}
-                                                className="h-10 min-w-30 rounded-[7px] border border-neutral-300 bg-white px-7 text-[15px] font-medium text-neutral-800 transition-colors hover:bg-neutral-50 disabled:opacity-50 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-100 dark:hover:bg-neutral-800"
-                                            >
-                                                取消
-                                            </button>
+                                            {cancelFirst ? [cancelButton, confirmButton] : [confirmButton, cancelButton]}
                                         </div>
                                     </div>
-                                </form>
+                                </motion.form>
+                                <AnimatePresence>
+                                    {replacementView && (
+                                        <motion.div key="replacement" initial={{ x: reducedMotion ? 0 : 48, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: reducedMotion ? 0 : 48, opacity: 0 }} transition={{ duration: reducedMotion ? 0 : 0.22, ease: 'easeOut' }} className="absolute inset-0 z-20" inert={!replacementView}>
+                                            {replacementView}
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
                             </DialogPanel>
                         </TransitionChild>
                     </div>

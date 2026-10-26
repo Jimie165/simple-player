@@ -50,7 +50,6 @@ export default function NowPlayingControlsSection({
             className="flex flex-col gap-2 shrink-0 transition-[width] duration-0 ease-linear"
             style={{ width: '100%' }}
         >
-            {/* 文字采用普通合成，避免加亮混合抬高字缘亮度、损失笔画细节。 */}
             <div className="flex items-center justify-between px-0.5 mt-2">
                 <div className="flex flex-col min-w-0 pr-4 w-[75%]">
                     <OverflowMarquee
@@ -65,7 +64,7 @@ export default function NowPlayingControlsSection({
                     <OverflowMarquee
                         resetToken={`meta-${marqueeResetToken}-${metadata?.path || metadata?.artist || 'empty'}`}
                         behavior="auto-then-hover"
-                        className="mt-1 text-[clamp(0.75rem,2vmin,1.25rem)] font-medium leading-tight text-white/60"
+                        className="mt-1 text-[clamp(0.75rem,2vmin,1.25rem)] font-medium leading-tight text-white opacity-45 mix-blend-plus-lighter"
                         contentClassName="flex w-max items-center gap-1 whitespace-nowrap"
                     >
                         <span
@@ -76,7 +75,7 @@ export default function NowPlayingControlsSection({
                             className={clsx(
                                 'transition-colors',
                                 canNavigate
-                                    ? 'hover:underline hover:text-white/80 cursor-pointer'
+                                    ? 'hover:underline hover:opacity-75 active:opacity-50 cursor-pointer'
                                     : 'cursor-default'
                             )}
                             role={canNavigate ? 'button' : undefined}
@@ -94,7 +93,7 @@ export default function NowPlayingControlsSection({
                                     className={clsx(
                                         'transition-colors',
                                         canNavigate
-                                            ? 'hover:underline hover:text-white/80 cursor-pointer'
+                                            ? 'hover:underline hover:opacity-75 active:opacity-50 cursor-pointer'
                                             : 'cursor-default'
                                     )}
                                     role={canNavigate ? 'button' : undefined}
@@ -174,7 +173,7 @@ export default function NowPlayingControlsSection({
                 </button>
             </div>
 
-            <div className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
+            <div data-player-volume className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
                 {(() => {
                     if (localVolume === 0) return <IoVolumeOff className="text-white/40 text-xs" />;
                     if (localVolume <= 33) return <IoVolumeLow className="text-white/40 text-xs" />;

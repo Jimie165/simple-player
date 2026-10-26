@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Menu, MenuButton, MenuItems, MenuItem, Portal } from '@headlessui/react';
+import { Menu, MenuButton, MenuItems, Portal } from '@headlessui/react';
 import { MdMoreHoriz } from 'react-icons/md';
+import { MenuSurface, MenuEntries } from '@/components/common/MenuSurface';
+import MoreIcon from '@/components/common/MoreIcon';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import type { MenuItemData } from '@/hooks/menu/useSongOperations';
+import { useMenuDismiss, useMenuScrollLock } from '@/hooks/menu/useMenuDismiss';
 import {
     MdPlayArrow,
     MdShuffle,
@@ -185,33 +188,15 @@ function MenuContent({
                     />
                 )}
                 <MenuItems
+                    as={MenuSurface}
                     ref={menuRef}
                     data-menu-portal="true"
                     transition
-                    className="fixed w-56 rounded-xl border border-neutral-200/30 bg-white/50 dark:bg-neutral-900/50 backdrop-blur-3xl backdrop-saturate-150 p-1 text-sm text-neutral-900 shadow-2xl ring-1 ring-black/5 focus:outline-none dark:border-white/10 dark:text-white transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0 z-9999 pointer-events-auto"
+                    className="transition duration-200 ease-out data-closed:scale-95 data-closed:opacity-0!"
                     style={positionedStyle}
                     onPointerDown={(e) => e.stopPropagation()}
                 >
-                    {resolvedGroups.map((group, groupIndex) => (
-                        <React.Fragment key={groupIndex}>
-                            {groupIndex > 0 && <div className="my-1 h-0.5 bg-neutral-200/50 dark:bg-white/20" />}
-                            {group.map((item) => (
-                                <MenuItem key={item.id}>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); item.onClick(); }}
-                                        className={`group flex w-full items-center gap-3 rounded-lg py-2 px-3 data-focus:bg-neutral-100 dark:data-focus:bg-white/10 ${item.variant === 'danger' ? 'text-red-600 dark:text-red-400 data-focus:bg-red-50 dark:data-focus:bg-red-900/20' : ''
-                                            }`}
-                                    >
-                                        <div className="flex flex-1 items-center gap-3">
-                                            {item.icon && <item.icon className="text-lg opacity-70" />}
-                                            {item.label}
-                                        </div>
-                                        {item.suffix}
-                                    </button>
-                                </MenuItem>
-                            ))}
-                        </React.Fragment>
-                    ))}
+                    <MenuEntries groups={resolvedGroups} onClose={close} headless />
                 </MenuItems>
             </>
         </Portal>
@@ -220,14 +205,18 @@ function MenuContent({
 
 function MenuLifecycleEffects({
     open,
+    close,
     buttonRef,
     menuRef,
 }: {
     open: boolean;
+    close: () => void;
     buttonRef: React.RefObject<HTMLButtonElement | null>;
     menuRef: React.RefObject<HTMLDivElement | null>;
 }) {
     const wasOpenRef = useRef(false);
+    useMenuDismiss(open, menuRef, close, buttonRef);
+    useMenuScrollLock(open, menuRef);
 
     useEffect(() => {
         if (!open) {
@@ -243,52 +232,6 @@ function MenuLifecycleEffects({
         wasOpenRef.current = true;
         return;
     }, [open, buttonRef]);
-
-    useEffect(() => {
-        if (!open) return;
-
-        const shouldAllowEvent = (target: EventTarget | null) => {
-            const node = target instanceof Node ? target : null;
-            return !!node && !!menuRef.current?.contains(node);
-        };
-
-        const blockScrollGesture = (event: WheelEvent | TouchEvent) => {
-            if (shouldAllowEvent(event.target)) return;
-            event.preventDefault();
-            event.stopPropagation();
-        };
-
-        const blockScrollKeys = (event: KeyboardEvent) => {
-            if (shouldAllowEvent(event.target)) return;
-            const blockedKeys = new Set([
-                'ArrowUp',
-                'ArrowDown',
-                'PageUp',
-                'PageDown',
-                'Home',
-                'End',
-                ' ',
-                'Spacebar',
-            ]);
-
-            if (!blockedKeys.has(event.key)) return;
-            event.preventDefault();
-            event.stopPropagation();
-        };
-
-        const nonPassiveCapture = { capture: true, passive: false } as const;
-        const captureOnly = { capture: true } as const;
-
-        window.addEventListener('wheel', blockScrollGesture, nonPassiveCapture);
-        window.addEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
-        window.addEventListener('keydown', blockScrollKeys, captureOnly);
-
-        return () => {
-            window.removeEventListener('wheel', blockScrollGesture, nonPassiveCapture);
-            window.removeEventListener('touchmove', blockScrollGesture, nonPassiveCapture);
-            window.removeEventListener('keydown', blockScrollKeys, captureOnly);
-        };
-    }, [open, menuRef]);
 
     return null;
 }
@@ -315,7 +258,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
         if (!buttonEl || !menuEl) return;
 
         const buttonRect = buttonEl.getBoundingClientRect();
-        const menuRect = menuEl.getBoundingClientRect();
+        const menuRect = { width: menuEl.offsetWidth, height: menuEl.offsetHeight };
         const padding = 8;
         const gap = 6;
 
@@ -365,7 +308,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 // Use a custom event so Headless UI's own outside-click listeners don't
                                 // see a synthetic pointerdown and immediately close this menu again.
                                 if (!suppressCloseEvent) {
-                                    window.dispatchEvent(new CustomEvent('app:close-cursor-menus'));
+                                    window.dispatchEvent(new CustomEvent('app:close-cursor-menus', { detail: buttonRef.current }));
                                 }
 
                                 // Notify parent component that menu is opening
@@ -378,7 +321,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                                 e.stopPropagation();
                             }}
                         >
-                            {props.children || <MdMoreHoriz className={variant === 'cover' ? 'cover-card-menu-icon' : undefined} />}
+                            {props.children || (variant === 'cover' ? <MdMoreHoriz className="cover-card-menu-icon" /> : <MoreIcon />)}
                         </MenuButton>
                     );
 
@@ -386,6 +329,7 @@ export default function MusicContextMenu(props: MusicContextMenuProps) {
                         <>
                             <MenuLifecycleEffects
                                 open={open}
+                                close={close}
                                 buttonRef={buttonRef}
                                 menuRef={menuRef}
                             />
