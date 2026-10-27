@@ -65,6 +65,7 @@ export function useKaraokeAnimation({
     preciseMsRef, isActive, visualFocused, isSeekExiting, isPlaying,
     playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
 }: KaraokeAnimationOptions) {
+    const wordFill = wordFloat && lyricFillMode === 'line';
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const dimWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const frameRegistry = useLyricsFrameTaskRegistry();
@@ -128,7 +129,7 @@ export function useKaraokeAnimation({
 
     const wordMotionWindows = useMemo(
         () => wordGroups.map((group, wordIndex) => {
-            const window = getWordMotionWindow(group, wordIndex === wordGroups.length - 1, wordFloat);
+            const window = getWordMotionWindow(group, wordIndex === wordGroups.length - 1, wordFloat, wordFill);
             if (wordFloat) {
                 const startMs = group[0].item.time_ms;
                 const endMs = Math.max(...group.map(({ item }) => item.nextStart));
@@ -138,7 +139,7 @@ export function useKaraokeAnimation({
             }
             return window;
         }),
-        [wordGroups, wordFloat]
+        [wordGroups, wordFloat, wordFill]
     );
 
     // All values that only depend on the parsed lyric item are prepared once
@@ -150,12 +151,12 @@ export function useKaraokeAnimation({
             const isLastWord = wordIndex === wordGroups.length - 1;
             group?.forEach(({ item, flatIndex }) => {
                 runtimes[flatIndex] = prepareKaraokeCharRuntime(
-                    item, isLastWord, wordFloat, group[0].item,
+                    item, isLastWord, wordFloat, group[0].item, wordFill,
                 );
             });
         });
         return runtimes;
-    }, [wordGroups, wordFloat]);
+    }, [wordGroups, wordFloat, wordFill]);
 
     const wordRuntimes = useMemo(() => wordGroups.map((group, wordIndex) => {
         const first = group[0].item;
@@ -252,7 +253,7 @@ export function useKaraokeAnimation({
         }
 
         const lineFill = lyricFillMode === 'line' || wordFloat
-            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFloat && lyricFillMode === 'line')
+            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFill)
             : null;
 
         const runtimeState = runtime;
@@ -470,6 +471,7 @@ export function useKaraokeAnimation({
         charRuntimes,
         lyricFillMode,
         wordFloat,
+        wordFill,
         wordRuntimes,
         wordCharacterLift,
     ]);

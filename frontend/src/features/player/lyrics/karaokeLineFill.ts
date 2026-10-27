@@ -111,7 +111,6 @@ export function createLineFill(
         }
     }
     let chainIndex = -1;
-    let previousPlan: WordFillPlan | null = null;
     const timeline: FillTimelineSegment[] = [];
     plans.forEach(plan => {
         if (!plan) return;
@@ -122,11 +121,7 @@ export function createLineFill(
         segments.forEach(({ flatIndex }, index) => {
             const runtime = charRuntimes[flatIndex];
             if (!runtime) return;
-            const startPx = index === 0
-                ? previousPlan
-                    ? previousPlan.endPx + (previousPlan.bridgeToNext ? 0 : previousPlan.featherPx)
-                    : plan.startPx - plan.featherPx
-                : runtime.fillLeftPx;
+            const startPx = runtime.fillLeftPx;
             const endPx = (wordFill ? plan.endPx : runtime.fillLeftPx + runtime.fillWidthPx) +
                 (index === segments.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
             timeline.push({
@@ -136,7 +131,6 @@ export function createLineFill(
                 endPx,
             });
         });
-        previousPlan = plan;
     });
 
     let currentWordIndex = -1;
