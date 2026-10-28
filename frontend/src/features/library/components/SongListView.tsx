@@ -219,8 +219,40 @@ export default function SongListView({
     const handleSelectSong = useCallback((song: SongMetadata) => handleCheckboxClick(null, song), [handleCheckboxClick]);
 
     const listRef = useRef<HTMLDivElement>(null);
-    const scrollParent = useScrollViewport(virtualize, listRef);
+    const headerRef = useRef<HTMLDivElement>(null);
+    const headerBackdropRef = useRef<HTMLDivElement>(null);
+    const headerSentinelRef = useRef<HTMLDivElement>(null);
+    const [isHeaderPinned, setIsHeaderPinned] = useState(false);
+    const scrollParent = useScrollViewport(true, listRef);
     const overscan = useViewportOverscan(scrollParent);
+
+    useEffect(() => {
+        const header = headerRef.current;
+        const backdrop = headerBackdropRef.current;
+        const sentinel = headerSentinelRef.current;
+        if (!header || !backdrop || !sentinel || !scrollParent) return;
+        const updateBackdropBounds = () => {
+            const rootRect = scrollParent.getBoundingClientRect();
+            const headerRect = header.getBoundingClientRect();
+            backdrop.style.left = `${rootRect.left + scrollParent.clientLeft - headerRect.left}px`;
+            backdrop.style.width = `${scrollParent.clientWidth}px`;
+        };
+        updateBackdropBounds();
+        const resizeObserver = new ResizeObserver(updateBackdropBounds);
+        resizeObserver.observe(scrollParent);
+        resizeObserver.observe(header);
+        const top = parseFloat(window.getComputedStyle(header).top) || 0;
+        const observer = new IntersectionObserver(([entry]) => {
+            const rootRect = scrollParent.getBoundingClientRect();
+            if (rootRect.width <= 0 || rootRect.height <= 0 || entry.boundingClientRect.height <= 0) return;
+            setIsHeaderPinned(!entry.isIntersecting && entry.boundingClientRect.bottom <= (entry.rootBounds?.top ?? rootRect.top + top));
+        }, { root: scrollParent, rootMargin: `${-top}px 0px 0px 0px`, threshold: 0 });
+        observer.observe(sentinel);
+        return () => {
+            observer.disconnect();
+            resizeObserver.disconnect();
+        };
+    }, [scrollParent, headerTopClass]);
 
     // Render Row Function
     const itemContent = (index: number, song: SongMetadata) => {
@@ -263,17 +295,20 @@ export default function SongListView({
 
     return (
         <div ref={listRef} className="w-full relative select-none">
+            <div ref={headerSentinelRef} aria-hidden="true" className="pointer-events-none h-px -mb-px w-full" />
             {/* Header (Sticky) via CSS outside Virtuoso */}
             <div
+                ref={headerRef}
                 style={gridStyle}
                 className={clsx(
-                    "sticky z-45 grid pt-2 pb-3 backdrop-blur-xl after:absolute after:bottom-0 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none",
+                    "sticky z-45 grid pt-2 pb-3 after:absolute after:bottom-0 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none",
                     isLibraryContext ? "after:left-11" : "after:left-14",
                     headerTopClass,
                     gridGapClass,
                     headerPaddingClass,
                     "text-[13px] text-on-surface-variant font-medium"
                 )}>
+                <div ref={headerBackdropRef} aria-hidden="true" className={clsx("pointer-events-none absolute inset-y-0 -z-10 backdrop-blur-xl transition-opacity duration-150 motion-reduce:transition-none", isHeaderPinned ? "opacity-100" : "opacity-0")} />
                 <div></div>
                 {renderHeaderCell('标题', 'title', 'pl-0', !disableSort)}
                 {!effectiveHideArtist && renderHeaderCell('艺人', 'artist', undefined, !disableSort)}
