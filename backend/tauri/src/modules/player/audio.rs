@@ -10,7 +10,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter};
 #[cfg(target_os = "windows")]
 use windows::Win32::Foundation::HWND;
@@ -99,10 +99,37 @@ impl<S: Source> Source for LowFrequencySource<S> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum OutputPreference {
     SystemDefault,
     Pinned(String),
+}
+
+#[derive(Default)]
+struct OutputRecovery {
+    topology: Option<(Option<String>, Vec<String>)>,
+    attempts: usize,
+    next_attempt: Option<Instant>,
+}
+
+impl OutputRecovery {
+    fn ready(&mut self, topology: (Option<String>, Vec<String>), now: Instant) -> bool {
+        if self.topology.as_ref() != Some(&topology) {
+            self.topology = Some(topology);
+            self.attempts = 0;
+            self.next_attempt = None;
+        }
+        self.attempts < 4 && self.next_attempt.is_none_or(|next| now >= next)
+    }
+
+    fn failed(&mut self, now: Instant) -> bool {
+        const DELAYS: [u64; 3] = [250, 750, 2000];
+        self.attempts += 1;
+        self.next_attempt = DELAYS
+            .get(self.attempts - 1)
+            .map(|delay| now + Duration::from_millis(*delay));
+        self.attempts == 4
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -309,6 +336,9 @@ impl AudioState {
         *active_device_name.lock().unwrap() = picked_name;
 
         let player = Player::connect_new(stream.mixer());
+        if !autoplay {
+            player.pause();
+        }
         player.set_volume(*volume.lock().unwrap());
         player.append(LowFrequencySource::new(source, low_frequency_level.clone()));
 
@@ -347,7 +377,7 @@ impl AudioState {
                     let name = Self::device_display_name(&device);
                     (
                         DeviceSinkBuilder::from_device(device)
-                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                            .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
                         name,
                         false,
                     )
@@ -359,7 +389,7 @@ impl AudioState {
                     let name = Self::default_output_name();
                     (
                         DeviceSinkBuilder::from_default_device()
-                            .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                            .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
                         name,
                         true,
                     )
@@ -369,7 +399,7 @@ impl AudioState {
                 let name = Self::default_output_name();
                 (
                     DeviceSinkBuilder::from_default_device()
-                        .map_err(|e| format!("Failed to open audio output: {}", e))?,
+                        .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
                     name,
                     false,
                 )
@@ -382,7 +412,7 @@ impl AudioState {
                 error_flag.store(true, Ordering::SeqCst);
             })
             .open_sink_or_fallback()
-            .map_err(|e| format!("Failed to open audio output: {}", e))?;
+            .map_err(|e| format!("Failed to open audio output: {e:?}"))?;
 
         Ok((sink, picked_name, fell_back_to_default))
     }
@@ -479,13 +509,14 @@ impl AudioState {
         monitor_stop: Arc<AtomicBool>,
     ) {
         thread::spawn(move || {
+            let mut retry = OutputRecovery::default();
             loop {
                 thread::sleep(Duration::from_millis(250));
                 if monitor_stop.load(Ordering::SeqCst) {
                     break;
                 }
 
-                let mut recovery: Option<(String, Option<SongMetadata>, bool, f32, u64)> = None;
+                let mut recovery: Option<(String, Option<SongMetadata>, f32, u64)> = None;
                 let (ended, position, session_id) = {
                     let player_lock = player_arc.lock().unwrap();
                     let Some(handle) = player_lock.as_ref() else {
@@ -506,7 +537,6 @@ impl AudioState {
                         recovery = Some((
                             handle.path.clone(),
                             handle.metadata.clone(),
-                            !handle.player.is_paused(),
                             position,
                             handle.session_id,
                         ));
@@ -516,8 +546,22 @@ impl AudioState {
                     }
                 };
 
-                if let Some((path, metadata, should_play, position, session_id)) = recovery {
-                    if !monitor_stop.swap(true, Ordering::SeqCst) {
+                if let Some((path, metadata, position, session_id)) = recovery {
+                    let host = cpal::default_host();
+                    let default = host
+                        .default_output_device()
+                        .as_ref()
+                        .and_then(Self::device_id);
+                    let devices = host.output_devices().map(|devices| {
+                        let mut ids: Vec<_> = devices
+                            .filter_map(|device| Self::device_id(&device))
+                            .collect();
+                        ids.sort();
+                        ids
+                    });
+                    // Enumeration failure is not evidence of a topology change.
+                    let Ok(devices) = devices else { continue };
+                    if retry.ready((default, devices), Instant::now()) {
                         match Self::recover_output_device(
                             player_arc.clone(),
                             volume_arc.clone(),
@@ -529,20 +573,29 @@ impl AudioState {
                             monitor_stop.clone(),
                             path,
                             metadata,
-                            should_play,
                             position,
                             session_id,
                         ) {
-                            Ok(()) => {}
+                            Ok(()) => {
+                                if monitor_stop.load(Ordering::SeqCst) {
+                                    break;
+                                }
+                                // A concurrent seek or preference change can discard preparation.
+                                // It still consumes the budget so slow setup cannot spin forever.
+                                retry.failed(Instant::now());
+                            }
                             Err(err) => {
                                 eprintln!("Failed to recover audio output: {err}");
-                                smtc::set_playing(false);
-                                let _ = app_handle.emit("audio:output-error", err);
+                                if retry.failed(Instant::now()) {
+                                    let _ = app_handle.emit("audio:output-error", err);
+                                }
                             }
                         }
                     }
-                    break;
+                    continue;
                 }
+
+                retry = OutputRecovery::default();
 
                 smtc::set_position(position);
 
@@ -599,43 +652,61 @@ impl AudioState {
         expected_monitor: Arc<AtomicBool>,
         path: String,
         metadata: Option<SongMetadata>,
-        autoplay: bool,
         position: f32,
         session_id: u64,
     ) -> Result<(), String> {
+        let expected_preference = preference.lock().unwrap().clone();
+        let prepared_preference = Arc::new(Mutex::new(expected_preference.clone()));
+        let prepared_name = Arc::new(Mutex::new(None));
         let new_handle = Self::build_playback_handle(
             &volume_arc,
-            &preference,
-            &active_device_name,
+            &prepared_preference,
+            &prepared_name,
             &low_frequency_level,
             path,
             metadata.clone(),
-            autoplay,
+            false,
             position,
             session_id,
         )?;
         let new_monitor_stop = new_handle.monitor_stop.clone();
 
-        let previous = {
+        let current_volume = *volume_arc.lock().unwrap();
+        let (previous, playing) = {
             let mut player_lock = player_arc.lock().unwrap();
             let Some(current) = player_lock.as_ref() else {
+                Self::dispose_playback(Some(new_handle));
                 return Ok(());
             };
 
-            if !Arc::ptr_eq(&current.monitor_stop, &expected_monitor) {
+            let mut current_preference = preference.lock().unwrap();
+            if !Arc::ptr_eq(&current.monitor_stop, &expected_monitor)
+                || *current_preference != expected_preference
+                || current.player.get_pos().as_secs_f32() < position - 0.5
+                || current.player.get_pos().as_secs_f32() > position + 2.0
+            {
+                Self::dispose_playback(Some(new_handle));
                 return Ok(());
             }
 
+            // Preparation may take time; preserve the latest pause and volume state.
+            let playing = !current.player.is_paused();
+            new_handle.player.set_volume(current_volume);
+            if playing {
+                new_handle.player.play();
+            }
+            *current_preference = prepared_preference.lock().unwrap().clone();
+            *active_device_name.lock().unwrap() = prepared_name.lock().unwrap().clone();
             let previous = player_lock.take();
             *player_lock = Some(new_handle);
-            previous
+            (previous, playing)
         };
         Self::dispose_playback(previous);
 
         if let Some(meta) = metadata.as_ref() {
             let _ = smtc::apply_metadata(meta, Some(&app_handle));
         }
-        smtc::set_playing(autoplay);
+        smtc::set_playing(playing);
         smtc::set_position(position);
         Self::emit_output_changed(&app_handle, &active_device_name);
         let state_snapshot = snapshot_from_parts(&player_arc, &volume_arc);
@@ -811,7 +882,6 @@ impl AudioState {
                 (
                     h.path.clone(),
                     h.metadata.clone(),
-                    !h.player.is_paused(),
                     h.player.get_pos().as_secs_f32(),
                     h.monitor_stop.clone(),
                     h.session_id,
@@ -819,17 +889,13 @@ impl AudioState {
             })
         };
 
-        let Some((path, metadata, autoplay, position, monitor_stop, session_id)) = snapshot else {
+        let Some((path, metadata, position, monitor_stop, session_id)) = snapshot else {
             // Nothing playing right now; preference will apply on next play_file.
             if let Some(app_handle) = self.app_handle.lock().ok().and_then(|h| h.clone()) {
                 Self::emit_output_changed(&app_handle, &self.active_device_name);
             }
             return Ok(());
         };
-
-        // A failed automatic recovery may already have stopped this monitor. Manual
-        // selection must still attempt a fresh swap instead of returning a false success.
-        monitor_stop.store(true, Ordering::SeqCst);
 
         let app_handle = self
             .app_handle
@@ -849,7 +915,6 @@ impl AudioState {
             monitor_stop,
             path,
             metadata,
-            autoplay,
             position,
             session_id,
         )
@@ -872,6 +937,48 @@ impl AudioState {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn output_recovery_stops_after_four_failures_until_devices_change() {
+        let mut recovery = OutputRecovery::default();
+        let topology = (Some("speaker".into()), vec!["speaker".into()]);
+        let start = Instant::now();
+        let mut now = start;
+        for attempt in 0..4 {
+            assert!(recovery.ready(topology.clone(), now));
+            assert_eq!(recovery.failed(now), attempt == 3);
+            assert!(!recovery.ready(topology.clone(), now));
+            now += Duration::from_secs(3);
+        }
+        assert!(!recovery.ready(topology.clone(), start + Duration::from_secs(3600)));
+        assert!(recovery.ready((None, vec![]), now));
+        assert!(recovery.ready(topology, now));
+    }
+
+    #[test]
+    fn output_recovery_waits_between_attempts_and_rearms_on_default_change() {
+        let mut recovery = OutputRecovery::default();
+        let topology = (
+            Some("speaker".into()),
+            vec!["headphone".into(), "speaker".into()],
+        );
+        let start = Instant::now();
+        assert!(recovery.ready(topology.clone(), start));
+        recovery.failed(start);
+        assert!(!recovery.ready(topology.clone(), start + Duration::from_millis(249)));
+        assert!(recovery.ready(topology.clone(), start + Duration::from_millis(250)));
+        recovery.failed(start + Duration::from_millis(250));
+        assert!(!recovery.ready(topology.clone(), start + Duration::from_millis(999)));
+        assert!(recovery.ready(topology.clone(), start + Duration::from_millis(1000)));
+        recovery.failed(start + Duration::from_millis(1000));
+        assert!(!recovery.ready(topology.clone(), start + Duration::from_millis(2999)));
+        assert!(recovery.ready(topology.clone(), start + Duration::from_millis(3000)));
+        recovery.failed(start + Duration::from_millis(3000));
+        assert!(recovery.ready(
+            (Some("headphone".into()), topology.1),
+            start + Duration::from_millis(3001)
+        ));
+    }
     use core::num::NonZero;
     use rodio::buffer::SamplesBuffer;
 
