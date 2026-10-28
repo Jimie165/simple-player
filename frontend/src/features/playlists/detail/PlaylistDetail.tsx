@@ -111,7 +111,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             // 1. Load Songs
             let list: SongMetadata[] = [];
             if (id === 'favorites') {
-                list = await libraryService.getFavorites(sortKey === 'manual' ? (sortOrder as 'asc' | 'desc') : 'asc');
+                list = await libraryService.getFavorites(sortKey === 'manual' ? (sortOrder) : 'asc');
             } else {
                 list = await libraryService.getPlaylistSongs(id);
             }
@@ -251,10 +251,10 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
 
     const handleUpdateInfo = async (name: string, description: string | undefined, coverPath: string | undefined) => {
         if (id !== 'favorites') {
-            await libraryService.updatePlaylistInfo(id as number, name, description);
+            await libraryService.updatePlaylistInfo(id, name, description);
 
             if (coverPath !== playlistInfo?.cover_path) {
-                await libraryService.updatePlaylistCover(id as number, coverPath || "");
+                await libraryService.updatePlaylistCover(id, coverPath || "");
                 updateRecentItemCover(`playlist:${id}`, coverPath || null);
             }
             triggerLibraryUpdate();
@@ -433,14 +433,14 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         {/* Actions */}
                         <div className="flex items-center gap-3 mt-4">
                             <button
-                                onClick={handlePlayAll}
+                                onClick={() => { void handlePlayAll().catch(console.error); }}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-xs hover:shadow-sm active:scale-95"
                             >
                                 <MdPlayArrow className="text-2xl" />
                                 播放
                             </button>
                             <button
-                                onClick={handleShuffle}
+                                onClick={() => { void handleShuffle().catch(console.error); }}
                                 className="flex items-center gap-2 btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                             >
                                 <MdShuffle className="text-xl" />
@@ -461,8 +461,8 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                 <div className="px-2 pb-32 relative z-10">
                     <SortableSongList
                         songs={filteredSongs}
-                        onPlay={handlePlaySong}
-                        onReorder={handleReorder}
+                        onPlay={(song, index, options) => { void handlePlaySong(song, index, options).catch(console.error); }}
+                        onReorder={(newOrder) => { void handleReorder(newOrder).catch(console.error); }}
                         disableReorder={id === 'favorites' || !!searchQuery}
                         sortKey={sortKey}
                         sortOrder={sortOrder}

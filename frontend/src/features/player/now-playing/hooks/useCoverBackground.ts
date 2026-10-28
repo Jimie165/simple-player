@@ -33,7 +33,7 @@ export function useCoverBackground(metadata: SongMetadata | null) {
             pendingImage.src = resolved;
         };
 
-        loadBg();
+        void (loadBg()).catch(console.error);
         return () => {
             cancelled = true;
             if (pendingImage) {

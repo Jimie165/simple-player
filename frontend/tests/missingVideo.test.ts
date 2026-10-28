@@ -6,7 +6,7 @@ const mocks = vi.hoisted(() => ({
     videoMetadata: null as { path: string } | null,
     currentVideoIndex: 0,
     isVideoMode: true,
-    openDeleteConfirm: vi.fn(), batchDeleteVideos: vi.fn(), setVideos: vi.fn(),
+    openDeleteConfirm: vi.fn<(items: unknown[], confirm: () => Promise<void>, ...args: unknown[]) => void>(), batchDeleteVideos: vi.fn(), setVideos: vi.fn(),
     removeFromRecent: vi.fn(), triggerLibraryUpdate: vi.fn(), setVideoQueue: vi.fn(),
     setVideoMode: vi.fn(), setVideoMetadata: vi.fn(), error: vi.fn(),
 }));

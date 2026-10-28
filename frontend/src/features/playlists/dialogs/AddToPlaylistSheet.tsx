@@ -77,7 +77,7 @@ export default function AddToPlaylistSheet() {
         if (isOpen) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- 面板打开或歌单版本变化时重置缓存并异步拉取歌单
             setPlaylistSongs({});
-            loadPlaylists();
+            void (loadPlaylists()).catch(console.error);
         }
     }, [isOpen, libraryVersion, playlistVersion, loadPlaylists]);
 
@@ -112,7 +112,7 @@ export default function AddToPlaylistSheet() {
                 }));
                 setPlaylistSongs(newMap);
             };
-            fetchAll();
+            void (fetchAll()).catch(console.error);
         }
     }, [isOpen, playlists, libraryMap]);
 
@@ -168,7 +168,7 @@ export default function AddToPlaylistSheet() {
                 const allIds = resolvedSongs.map(s => s.id).filter((id): id is number => id !== undefined);
                 if (allIds.length > 0) {
                     await libraryService.batchAddToPlaylist(playlistId, allIds);
-                    finishAdd(playlistId);
+                    void (finishAdd(playlistId)).catch(console.error);
                 } else {
                     alert("无法添加：未找到歌曲的库ID，请先导入到音乐库");
                 }
@@ -204,7 +204,7 @@ export default function AddToPlaylistSheet() {
                 await libraryService.batchAddToPlaylist(playlistId, idsToAdd);
             }
 
-            finishAdd(playlistId);
+            void (finishAdd(playlistId)).catch(console.error);
         } catch (error) {
             console.error("Failed to add songs after confirm", error);
             alert("添加失败");
@@ -309,7 +309,7 @@ export default function AddToPlaylistSheet() {
                                                 return (
                                                     <button
                                                         key={pl.id}
-                                                        onClick={() => handleAddToPlaylist(pl.id)}
+                                                        onClick={() => { void handleAddToPlaylist(pl.id).catch(console.error); }}
                                                         className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left"
                                                     >
                                                         <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
@@ -345,8 +345,8 @@ export default function AddToPlaylistSheet() {
             <DuplicateSongConfirmDialog
                 isOpen={duplicateDialogState.isOpen}
                 onClose={closeDuplicateDialog}
-                onAdd={() => confirmAddDuplicates(true)}
-                onSkip={() => confirmAddDuplicates(false)}
+                onAdd={() => { void confirmAddDuplicates(true).catch(console.error); }}
+                onSkip={() => { void confirmAddDuplicates(false).catch(console.error); }}
                 duplicateCount={duplicateDialogState.duplicates.length}
             />
             <CreatePlaylistDialog

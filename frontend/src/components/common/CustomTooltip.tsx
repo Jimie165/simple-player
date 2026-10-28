@@ -176,7 +176,7 @@ export default function CustomTooltip({
         } else if (show === false) {
             frame = requestAnimationFrame(() => {
                 setIsVisible(false);
-                leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200) as unknown as number;
+                leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200);
             });
         }
 

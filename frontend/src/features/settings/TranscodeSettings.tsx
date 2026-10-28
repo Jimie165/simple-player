@@ -97,7 +97,7 @@ export default function TranscodeSettings() {
         }
     };
 
-    const handleLimitChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLimitChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = parseInt(e.target.value);
         setLimit(val);
     };
@@ -152,7 +152,7 @@ export default function TranscodeSettings() {
         }
     };
 
-    const limitPointerDrag = useRangePointerDrag(undefined, handleLimitCommit);
+    const limitPointerDrag = useRangePointerDrag(undefined, () => { void handleLimitCommit().catch(console.error); });
 
     // 格式化硬件加速类型显示
     const getHwAccelLabel = (type: string) => {
@@ -261,7 +261,7 @@ export default function TranscodeSettings() {
                             value={limit}
                             onChange={handleLimitChange}
                             {...limitPointerDrag}
-                            onBlur={handleLimitCommit}
+                            onBlur={() => { void handleLimitCommit().catch(console.error); }}
                             aria-label="最大缓存占用"
                             className="absolute inset-0 h-full w-full cursor-pointer opacity-0 touch-none"
                         />
@@ -288,7 +288,7 @@ export default function TranscodeSettings() {
                     {info.is_custom_cache_dir && (
                         <CustomTooltip text={`恢复默认文件夹：${info.default_cache_dir}`} disabled={changingDir}>
                             <button
-                                onClick={handleResetCacheDir}
+                                onClick={() => { void handleResetCacheDir().catch(console.error); }}
                                 disabled={changingDir}
                                 aria-label="恢复默认转码 MP4 文件夹"
                                 className="settings-control flex h-7 w-7 items-center justify-center rounded-md text-on-surface-variant transition-transform active:scale-95 disabled:opacity-50"
@@ -298,7 +298,7 @@ export default function TranscodeSettings() {
                         </CustomTooltip>
                     )}
                     <button
-                        onClick={handleChooseCacheDir}
+                        onClick={() => { void handleChooseCacheDir().catch(console.error); }}
                         disabled={changingDir}
                         aria-label="选择转码 MP4 文件夹"
                         className="settings-control flex items-center gap-1 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:opacity-50"
@@ -310,7 +310,7 @@ export default function TranscodeSettings() {
 
                 <SettingsRow label="清空转码缓存" description="删除所有已转码的视频文件">
                     <button
-                        onClick={handleClearCache}
+                        onClick={() => { void handleClearCache().catch(console.error); }}
                         disabled={clearing}
                         className={clsx(
                             "settings-control flex items-center gap-1 rounded-md px-3 py-1 text-[13px] font-medium text-error transition-transform active:scale-[0.97]",

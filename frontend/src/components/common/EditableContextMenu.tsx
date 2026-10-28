@@ -85,8 +85,8 @@ function recordInputChange(element: EditableElement) {
 function setElementValue(element: EditableElement, value: string) {
     if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
         const prototype = element instanceof HTMLInputElement ? HTMLInputElement.prototype : HTMLTextAreaElement.prototype;
-        const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
-        setter?.call(element, value);
+        const descriptor = Object.getOwnPropertyDescriptor(prototype, 'value');
+        descriptor?.set?.call(element, value);
     } else {
         element.textContent = value;
     }
@@ -228,7 +228,7 @@ export default function EditableContextMenu() {
     return createPortal(
         <div
             ref={menuRef}
-            className="fixed z-9999 w-40 rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1 text-sm text-on-surface shadow-2xl backdrop-blur-[16px] backdrop-saturate-[220%]"
+            className="fixed z-9999 w-40 rounded-xl border border-(--content-glass-edge) bg-(--content-glass-background) p-1 text-sm text-on-surface shadow-2xl backdrop-blur-lg backdrop-saturate-220"
             style={position}
             role="menu"
             onContextMenu={(event) => event.preventDefault()}

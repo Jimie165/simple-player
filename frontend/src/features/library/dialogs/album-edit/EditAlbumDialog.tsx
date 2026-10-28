@@ -159,7 +159,7 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             onClose();
         } catch (error) {
             console.error('Failed to update album details', error);
-            setMessage(error instanceof Error ? error.message : String(error || '保存失败'));
+            setMessage(error instanceof Error ? error.message : (typeof error === 'string' ? error : '保存失败'));
         } finally {
             setSaving(false);
         }
@@ -182,7 +182,7 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             isOpen={isOpen}
             saving={saving}
             onClose={onClose}
-            onSubmit={handleSubmit}
+            onSubmit={(event) => { void handleSubmit(event).catch(console.error); }}
             title="编辑专辑信息"
             cover={(
                 <CoverImage

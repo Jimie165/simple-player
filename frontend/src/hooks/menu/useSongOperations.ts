@@ -177,13 +177,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         for (const s of songs) {
             const currentFav = isFavorite(s);
             if (currentFav !== targetIsFavorite) {
-                await toggleFavorite(s as SongMetadata);
+                await toggleFavorite(s);
             }
         }
     }, [items, isFavorite, toggleFavorite]);
 
     // 5. 删除或从音乐库删除
-    const handleDeleteFromLibrary = useCallback(async () => {
+    const handleDeleteFromLibrary = useCallback(() => {
         handleDeleteFromLibraryAction({
             items,
             count,
@@ -198,7 +198,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     }, [items, count, context, clearSelection, openDeleteConfirm, removeFromRecent, triggerLibraryUpdate, triggerPlaylistUpdate, onDeleted]);
 
     // 5. 删除或从播放列表移除
-    const handleDeleteOrRemove = useCallback(async () => {
+    const handleDeleteOrRemove = useCallback(() => {
         handleDeleteOrRemoveAction({
             items,
             count,
@@ -210,7 +210,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             triggerLibraryUpdate,
             triggerPlaylistUpdate,
             removeFromRecent,
-            handleDeleteFromLibrary,
+            handleDeleteFromLibrary: handleDeleteFromLibrary,
         });
     }, [items, count, context, playlistId, onDelete, clearSelection, openDeleteConfirm, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, handleDeleteFromLibrary]);
 
@@ -294,19 +294,19 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             onShowProperties,
             canAddToPlaylist,
             isAllFavorited,
-            handlePlay,
-            handleShufflePlay,
-            handleAddToQueue,
-            handleAddToPlaylist,
-            handleFavorite,
-            handleProperties,
-            handleShowAlbum,
+            handlePlay: () => { void handlePlay().catch(console.error); },
+            handleShufflePlay: () => { void handleShufflePlay().catch(console.error); },
+            handleAddToQueue: () => { void handleAddToQueue().catch(console.error); },
+            handleAddToPlaylist: () => { void handleAddToPlaylist().catch(console.error); },
+            handleFavorite: () => { void handleFavorite().catch(console.error); },
+            handleProperties: () => { void handleProperties().catch(console.error); },
+            handleShowAlbum: () => { void handleShowAlbum().catch(console.error); },
             handleShowArtist,
-            handleDeleteOrRemove,
-            handleDeleteFromLibrary,
+            handleDeleteOrRemove: handleDeleteOrRemove,
+            handleDeleteFromLibrary: handleDeleteFromLibrary,
         });
 
-        return filterMenuGroupsByContext(groups as MenuItemData[][], context, items);
+        return filterMenuGroupsByContext(groups, context, items);
     }, [
         handlePlay, handleShufflePlay, handleAddToQueue, handleAddToPlaylist, handleFavorite,
         handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, handleEdit, onSelect, onEdit,

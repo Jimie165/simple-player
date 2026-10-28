@@ -97,9 +97,9 @@ export function PlaylistCardMenu({
     const { menuItems } = useSongOperations({
         items: [pl],
         context: 'playlist_list',
-        onPlay: () => handlePlayPlaylist(pl),
-        onShuffle: () => handlePlayPlaylist(pl, true),
-        onAddToQueue: () => handleAddToQueue(pl),
+        onPlay: () => { void handlePlayPlaylist(pl).catch(console.error); },
+        onShuffle: () => { void handlePlayPlaylist(pl, true).catch(console.error); },
+        onAddToQueue: () => { void handleAddToQueue(pl).catch(console.error); },
         onEdit: () => setEditPlaylist(pl),
         onSelect: () => {
             if (!isSelectionMode) {

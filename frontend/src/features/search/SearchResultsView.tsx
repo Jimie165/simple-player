@@ -78,7 +78,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         };
 
         const timer = setTimeout(() => {
-            performSearch();
+            void (performSearch()).catch(console.error);
         }, 300);
 
         return () => {
@@ -236,7 +236,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
                                         // Reuse logic or import util? Just basic play for now
-                                        playSong({ song: artist.songs[0], index: 0, playlist: artist.songs });
+                                        void (playSong({ song: artist.songs[0], index: 0, playlist: artist.songs })).catch(console.error);
                                     }
                                 }}
                                 onOpenArtist={(artist) => push({ type: 'artist_detail', data: artist })}
@@ -259,7 +259,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 hideYear={true}
                                 onPlayAlbum={(album) => {
                                     if (album.songs.length > 0) {
-                                        playSong({ song: album.songs[0], index: 0, playlist: album.songs });
+                                        void (playSong({ song: album.songs[0], index: 0, playlist: album.songs })).catch(console.error);
                                     }
                                 }}
                                 onOpenAlbum={(album) => push({ type: 'album_detail', data: album })}
@@ -279,7 +279,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                             </h2>
                             <SongListView
                                 songs={matchingSongs}
-                                onPlay={handlePlay}
+                                onPlay={(song, index, options) => { void handlePlay(song, index, options).catch(console.error); }}
                             />
                         </section>
                     )}
@@ -301,7 +301,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 itemContent={(_index, video) => (
                                     <div
                                         key={video.id}
-                                        onClick={() => handlePlayVideo(video)}
+                                        onClick={() => { void handlePlayVideo(video).catch(console.error); }}
                                         className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:hover:bg-surface-variant/30"
                                     >
                                         <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">

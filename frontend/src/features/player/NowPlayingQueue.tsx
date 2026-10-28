@@ -216,7 +216,7 @@ export default function NowPlayingQueue({
     }, []);
 
     const handlePlay = useCallback((globalIndex: number) => {
-        playQueueItem({ song: playlist[globalIndex], index: globalIndex, restartIfCurrent: true });
+        void (playQueueItem({ song: playlist[globalIndex], index: globalIndex, restartIfCurrent: true })).catch(console.error);
     }, [playQueueItem, playlist]);
 
     const handleRemove = useCallback((globalIndex: number) => {

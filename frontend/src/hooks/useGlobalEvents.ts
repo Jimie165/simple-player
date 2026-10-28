@@ -26,8 +26,8 @@ export function useGlobalEvents() {
                 unlistenLibrary = await listen('library_scan_complete', () => {
                     if (disposed) return;
                     console.log('Global Event: library_scan_complete');
-                    refreshFavorites();
-                    refreshRecentHistory();
+                    void (refreshFavorites()).catch(console.error);
+                    void (refreshRecentHistory()).catch(console.error);
                     triggerLibraryUpdate(); // Triggers re-render in components subscribing to version
                 });
                 // Release handles returned after the effect has already been cleaned up.
@@ -36,7 +36,7 @@ export function useGlobalEvents() {
                 unlistenVideo = await listen('video_scan_complete', () => {
                     if (disposed) return;
                     console.log('Global Event: video_scan_complete');
-                    refreshRecentHistory();
+                    void (refreshRecentHistory()).catch(console.error);
                     // Video library might have its own state or components handle it locally, 
                     // but refreshing recent history is global.
                 });
@@ -46,7 +46,7 @@ export function useGlobalEvents() {
             }
         };
 
-        setupListeners();
+        void (setupListeners()).catch(console.error);
 
         return () => {
             disposed = true;

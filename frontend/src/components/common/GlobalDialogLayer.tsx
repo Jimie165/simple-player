@@ -27,7 +27,7 @@ export default function GlobalDialogLayer() {
             <ConfirmDialog
                 isOpen={deleteConfirm.isOpen}
                 onClose={closeDeleteConfirm}
-                onConfirm={deleteConfirm.onConfirm}
+                onConfirm={() => { void Promise.resolve(deleteConfirm.onConfirm()).catch(console.error); }}
                 title={deleteConfirm.title}
                 description={deleteConfirm.description}
                 confirmText={deleteConfirm.confirmText}

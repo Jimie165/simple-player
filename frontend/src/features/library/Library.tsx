@@ -246,7 +246,7 @@ export default function Library() {
             hideHeader={false}
             actions={
                 <div className="flex items-center gap-2">
-                    <LibraryHeaderButton onClick={handleAddFolder} />
+                    <LibraryHeaderButton onClick={() => { void handleAddFolder().catch(console.error); }} />
                 </div>
             }
         >
@@ -286,7 +286,7 @@ export default function Library() {
                         />
                     )}
                     onShufflePlay={(songsToPlay) => {
-                        shufflePlay({
+                        void (shufflePlay({
                             songs: songsToPlay,
                             options: {
                                 addToRecent: true,
@@ -297,7 +297,7 @@ export default function Library() {
                                 name: '音乐库',
                                 id: 'library'
                             }
-                        });
+                        })).catch(console.error);
                     }}
                 />
 
@@ -312,7 +312,7 @@ export default function Library() {
                             >
                                 <SongListView
                                     songs={librarySongs}
-                                    onPlay={(song, index, options, songs) => handlePlaySong(song, index, songs, true, options)}
+                                    onPlay={(song, index, options, songs) => { void handlePlaySong(song, index, songs, true, options).catch(console.error); }}
                                     sortControl={{ value: songSorting, onChange: handleSongSortingChange }}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
@@ -343,12 +343,12 @@ export default function Library() {
                                             isLibraryItem: true
                                         });
                                         if (album.songs.length > 0) {
-                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: album.name, id: album.name });
+                                            void (handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: album.name, id: album.name })).catch(console.error);
                                         }
                                     }}
                                     onShuffleAlbum={(album) => {
                                         if (album.songs.length > 0) {
-                                            shufflePlay({ songs: album.songs, context: { type: 'album_detail', name: album.name, id: album.name } });
+                                            void (shufflePlay({ songs: album.songs, context: { type: 'album_detail', name: album.name, id: album.name } })).catch(console.error);
                                         }
                                     }}
                                     onOpenAlbum={handleOpenAlbum}
@@ -368,12 +368,12 @@ export default function Library() {
                                         if (artist.songs.length > 0) {
                                             // Sort by album year desc
                                             const sorted = [...artist.songs].sort((a, b) => (b.year || 0) - (a.year || 0));
-                                            handlePlaySong(sorted[0], 0, sorted, true, { restartIfCurrent: true, disableShuffle: true }, { type: 'artist_detail', name: artist.name, id: artist.name });
+                                            void (handlePlaySong(sorted[0], 0, sorted, true, { restartIfCurrent: true, disableShuffle: true }, { type: 'artist_detail', name: artist.name, id: artist.name })).catch(console.error);
                                         }
                                     }}
                                     onShuffleArtist={(artist) => {
                                         if (artist.songs.length > 0) {
-                                            shufflePlay({ songs: artist.songs, context: { type: 'artist_detail', name: artist.name, id: artist.name } });
+                                            void (shufflePlay({ songs: artist.songs, context: { type: 'artist_detail', name: artist.name, id: artist.name } })).catch(console.error);
                                         }
                                     }}
                                     onOpenArtist={handleOpenArtist}

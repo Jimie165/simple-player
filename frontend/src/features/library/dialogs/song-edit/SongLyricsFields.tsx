@@ -144,7 +144,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={handleSelectLyrics}
+                        onClick={() => { void handleSelectLyrics().catch(console.error); }}
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
                     >
                         <MdAttachFile className="h-5 w-5 shrink-0" />

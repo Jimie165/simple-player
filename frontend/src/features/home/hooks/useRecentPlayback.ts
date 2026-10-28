@@ -280,7 +280,7 @@ export function useRecentPlayback() {
                 console.error("Failed to play recent video", e);
             }
         } else {
-            playSingleFile(item.path, item.isLibraryItem, item);
+            void (playSingleFile(item.path, item.isLibraryItem, item)).catch(console.error);
         }
     };
 
@@ -317,7 +317,7 @@ export function useRecentPlayback() {
             ]
         });
         const filePath = getSelectedPath(selected);
-        if (filePath) playSingleFile(filePath);
+        if (filePath) void (playSingleFile(filePath)).catch(console.error);
     };
 
     return {

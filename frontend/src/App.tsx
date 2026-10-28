@@ -55,13 +55,13 @@ function App() {
   useEffect(() => initTheme(), [initTheme]);
 
   useEffect(() => {
-    useLibraryStore.getState().refreshFavorites();
-    useLibraryStore.getState().refreshRecentHistory();
+    void (useLibraryStore.getState().refreshFavorites()).catch(console.error);
+    void (useLibraryStore.getState().refreshRecentHistory()).catch(console.error);
   }, []);
 
   // Sync persisted audio output preference to backend on launch and listen for backend-driven changes.
   useEffect(() => {
-    useAudioOutputStore.getState().syncToBackend();
+    void (useAudioOutputStore.getState().syncToBackend()).catch(console.error);
     const unlisten = listen<string | null>('audio:output-changed', (e) => {
       audioService.getAudioOutput()
         .then((state) => {

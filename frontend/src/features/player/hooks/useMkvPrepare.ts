@@ -92,7 +92,7 @@ export function useMkvPrepare({
             }
         };
 
-        run();
+        void (run()).catch(console.error);
 
         return () => {
             cancelled = true;

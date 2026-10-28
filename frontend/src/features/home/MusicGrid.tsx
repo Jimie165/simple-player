@@ -88,7 +88,7 @@ export default function MusicGrid() {
     return (
         <PageContainer
             title="主页"
-            actions={<OpenFileMenu onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} />}
+            actions={<OpenFileMenu onOpenFile={() => { void handleOpenFile().catch(console.error); }} onOpenFolder={() => { void handleOpenFolder().catch(console.error); }} />}
         >
             <section>
                 {pendingFolderPlay && (
@@ -102,22 +102,22 @@ export default function MusicGrid() {
                             </p>
                             <div className="mt-4 flex gap-3">
                                 <button
-                                    onClick={async () => {
+                                    onClick={() => {
                                         const { folderPath, folderName, videoSongs } = pendingFolderPlay;
                                         setPendingFolderPlay(null);
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
-                                        await playVideoList(videoSongs, recentItem);
+                                        void playVideoList(videoSongs, recentItem).catch(console.error);
                                     }}
                                     className="flex-1 rounded-xl bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-colors"
                                 >
                                     播放视频
                                 </button>
                                 <button
-                                    onClick={async () => {
+                                    onClick={() => {
                                         const { folderPath, folderName, audioSongs } = pendingFolderPlay;
                                         setPendingFolderPlay(null);
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, audioSongs, "首歌曲");
-                                        await playAudioList(audioSongs, recentItem);
+                                        void playAudioList(audioSongs, recentItem).catch(console.error);
                                     }}
                                     className="flex-1 rounded-xl bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-800 dark:text-neutral-100 px-4 py-2 text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                                 >
@@ -153,7 +153,7 @@ export default function MusicGrid() {
                                 <div
                                     key={item.id}
                                     className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:hover:bg-surface-variant/30")}
-                                    onClick={(e) => handleItemClick(item, e)}
+                                    onClick={(e) => { void handleItemClick(item, e).catch(console.error); }}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
@@ -208,14 +208,14 @@ export default function MusicGrid() {
 
                                         {!isSelectionMode && (
                                             <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <CardPlayButton variant="cover" onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
+                                                <CardPlayButton variant="cover" onClick={() => { void handleItemClick(item).catch(console.error); }} className="bottom-3 left-3" />
                                                 <SmartMusicContextMenu
                                                     className="absolute bottom-3 right-3"
                                                     variant="cover"
                                                     tooltipText="更多"
                                                     items={item}
                                                     context="recent"
-                                                    onPlay={() => handleItemClick(item)}
+                                                    onPlay={() => { void handleItemClick(item).catch(console.error); }}
                                                     isSelected={isSelected}
                                                     onSelect={() => isSelectionMode
                                                         ? toggleSelection(item.id, item.type, item)

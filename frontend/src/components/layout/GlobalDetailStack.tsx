@@ -169,10 +169,10 @@ function GlobalDetailStack() {
                                                 <AlbumOverlay
                                                     data={activeView.data as AlbumData}
                                                     transitionSource={activeView.transitionSource}
-                                                    onPlaySong={handlePlaySong}
-                                                    onShuffle={shufflePlay}
+                                                    onPlaySong={(song, index, scopeSongs, addToHistory, options, context) => { void handlePlaySong(song, index, scopeSongs, addToHistory, options, context).catch(console.error); }}
+                                                    onShuffle={(params) => { void shufflePlay(params).catch(console.error); }}
                                                     addToRecent={addToRecent}
-                                                    onOpenArtistByName={handleOpenArtistByName}
+                                                    onOpenArtistByName={(artistName) => { void handleOpenArtistByName(artistName).catch(console.error); }}
                                                 />
                                             );
                                         case 'artist_detail':
@@ -181,11 +181,11 @@ function GlobalDetailStack() {
                                                     initialTab={activeView.tab}
                                                     data={activeView.data as ArtistData}
                                                     transitionSource={activeView.transitionSource}
-                                                    onPlaySong={handlePlaySong}
-                                                    onShuffle={shufflePlay}
+                                                    onPlaySong={(song, index, scopeSongs, addToHistory, options, context) => { void handlePlaySong(song, index, scopeSongs, addToHistory, options, context).catch(console.error); }}
+                                                    onShuffle={(params) => { void shufflePlay(params).catch(console.error); }}
                                                     addToRecent={addToRecent}
                                                     push={push}
-                                                    onOpenArtistByName={handleOpenArtistByName}
+                                                    onOpenArtistByName={(artistName) => { void handleOpenArtistByName(artistName).catch(console.error); }}
                                                 />
                                             );
                                         default:
@@ -267,7 +267,7 @@ function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuff
                 }
             }
         };
-        fetchAlbumSongs();
+        void (fetchAlbumSongs()).catch(console.error);
     }, [albumInitialData, libraryVersion]);
 
     return (
@@ -342,7 +342,7 @@ function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlay
                 console.error("Failed to fetch artist songs", e);
             }
         };
-        fetchArtistSongs();
+        void (fetchArtistSongs()).catch(console.error);
     }, [artistInitialData, libraryVersion]);
 
     // Correct usage of useMemo: It is now at the top level of this component

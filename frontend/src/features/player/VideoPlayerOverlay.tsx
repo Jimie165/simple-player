@@ -104,7 +104,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
         showControls,
         clearHideTimer,
         setIsControlsVisible,
-        toggleAppFullscreen,
+        toggleAppFullscreen: () => { void toggleAppFullscreen().catch(console.error); },
     });
 
     useEffect(() => {
@@ -227,7 +227,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         {/* Left: Back + Title */}
                         <div className="flex items-center gap-4 z-30 mr-4 min-w-0 flex-1">
                             <button
-                                onClick={handleClose}
+                                onClick={() => { void handleClose().catch(console.error); }}
                                 aria-label="返回"
                                 className="p-2 rounded-full hover:bg-white/10 text-white transition-colors"
                             >
@@ -244,19 +244,19 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                         {!isFullscreen && (
                             <div className="flex items-start gap-1 z-30 shrink-0 -mt-1 -mr-2">
                                 <button
-                                    onClick={systemService.minimize}
+                                    onClick={() => { void systemService.minimize().catch(console.error); }}
                                     className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                                 >
                                     <VscChromeMinimize className="text-xl" />
                                 </button>
                                 <button
-                                    onClick={systemService.toggleMaximize}
+                                    onClick={() => { void systemService.toggleMaximize().catch(console.error); }}
                                     className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-full transition-colors"
                                 >
                                     {isMaximized ? <VscChromeRestore className="text-xl" /> : <VscChromeMaximize className="text-xl" />}
                                 </button>
                                 <button
-                                    onClick={systemService.close}
+                                    onClick={() => { void systemService.close().catch(console.error); }}
                                     className="p-2 text-white/80 hover:text-white hover:bg-red-500 rounded-full transition-colors"
                                 >
                                     <VscChromeClose className="text-xl" />
@@ -318,7 +318,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
 
                                         {/* Play/Pause */}
                                         <button
-                                            onClick={handleTogglePlay}
+                                            onClick={() => { void handleTogglePlay().catch(console.error); }}
                                             className="p-2 text-white/90 hover:text-white transition-colors"
                                         >
                                             {isPlaying ? <MdPause className="text-3xl" /> : <MdPlayArrow className="text-3xl" />}
@@ -380,7 +380,7 @@ export default function VideoPlayerOverlay({ isOpen, onClose }: { isOpen: boolea
                                                 <MdPlaylistPlay className="text-2xl" />
                                             </button>
                                         </CustomTooltip>
-                                        <button onClick={toggleAppFullscreen} className="p-2 text-white/90 hover:text-white transition-colors">
+                                        <button onClick={() => { void toggleAppFullscreen().catch(console.error); }} className="p-2 text-white/90 hover:text-white transition-colors">
                                             {isFullscreen ? <MdFullscreenExit className="text-2xl" /> : <MdFullscreen className="text-2xl" />}
                                         </button>
                                     </div>

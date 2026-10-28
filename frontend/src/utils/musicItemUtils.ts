@@ -16,7 +16,7 @@ function asFlexibleMusicItem(item: unknown): FlexibleMusicItem | null {
 }
 
 function asString(value: unknown): string {
-    return typeof value === 'string' ? value : '';
+    return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -41,7 +41,7 @@ export function getMusicItemId(rawItem: unknown): string {
     // 1. If it's a RecentItem or SelectionItem with an explicit type
     const type = item.type;
     if (typeof type === 'string' && ['album', 'artist', 'playlist', 'folder'].includes(type) && item.id !== undefined) {
-        return String(item.id);
+        return asString(item.id);
     }
 
     // 2. String ID with prefix (standardized)
@@ -55,7 +55,7 @@ export function getMusicItemId(rawItem: unknown): string {
 
     // 3. Playlist object detection
     if (item.song_count !== undefined && item.updated_at !== undefined) {
-        return `playlist:${item.id}`;
+        return `playlist:${asString(item.id)}`;
     }
 
     // 4. Album/Artist object detection (from Grid views)
@@ -65,7 +65,7 @@ export function getMusicItemId(rawItem: unknown): string {
             return getAlbumMusicItemId(asString(item.name), asString(item.artist));
         }
         // ArtistData
-        return `artist:${item.name}`;
+        return `artist:${asString(item.name)}`;
     }
 
     // 5. Video detection (usually has path and thumbnail_path but missing artist/album)
@@ -75,7 +75,7 @@ export function getMusicItemId(rawItem: unknown): string {
     if (typeof item.path === 'string') return item.path;
 
     // 7. Last resort
-    if (item.id !== undefined) return String(item.id);
+    if (item.id !== undefined) return asString(item.id);
     return '';
 }
 
@@ -125,7 +125,7 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
 
         try {
             if (type === 'playlist') {
-                const idStr = String(item.id);
+                const idStr = asString(item.id);
                 // 处理 "playlist:123" 或 "123"
                 const cleanId = idStr.replace('playlist:', '');
 
@@ -209,7 +209,7 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
                 }
             }
         } catch (error) {
-            console.error(`Failed to resolve songs for item ${item.title || item.id}`, error);
+            console.error(`Failed to resolve songs for item ${asString(item.title) || asString(item.id)}`, error);
         }
     }
 

@@ -115,10 +115,13 @@ const safeStorage = createJSONStorage(() => ({
             // Attempt to shrink payload on quota error
             if (error instanceof DOMException && error.name === 'QuotaExceededError') {
                 try {
-                    const parsed = JSON.parse(value);
-                    if (parsed?.state?.recentHistory?.length) {
+                    const parsed: unknown = JSON.parse(value);
+                    if (parsed && typeof parsed === 'object' && 'state' in parsed && parsed.state && typeof parsed.state === 'object' && 'recentHistory' in parsed.state && Array.isArray(parsed.state.recentHistory)) {
                         parsed.state.recentHistory = parsed.state.recentHistory
-                            .map((item: RecentItem) => sanitizeRecentItem(item))
+                            .map((item: unknown) => {
+                                if (item && typeof item === 'object') return { ...item, cover: null };
+                                return item;
+                            })
                             .slice(0, 20);
                     }
                     localStorage.setItem(name, JSON.stringify(parsed));
@@ -222,7 +225,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                                 title: found.title || item.title,
                                 description: found.duration ? formatTime(found.duration) : item.description,
                                 cover_path: found.thumbnail_path || item.cover_path,
-                            } as RecentItem;
+                            };
                         }
                     }
 
@@ -238,7 +241,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                                 cover_path: found.cover_path || item.cover_path,
                                 description: found.artist || item.description,
                                 isLibraryItem: true
-                            } as RecentItem;
+                            };
                         }
                     }
                 }

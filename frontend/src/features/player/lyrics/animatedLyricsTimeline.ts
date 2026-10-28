@@ -53,8 +53,8 @@ export function createAnimatedLyricsTimeline(
         if (previous && sameSet(previous.karaokeActiveIndices, karaokeActiveIndices)) {
             karaokeActiveIndices = previous.karaokeActiveIndices;
         }
-        const key = `${state.focusIndex}|${[...activeIndices].sort((a, b) => a - b)}|` +
-            `${[...karaokeActiveIndices].sort((a, b) => a - b)}|${getAnimatedLyricsRenderKey(interludeBoundaries, timeMs)}`;
+        const key = `${state.focusIndex}|${[...activeIndices].sort((a, b) => a - b).join(',')}|` +
+            `${[...karaokeActiveIndices].sort((a, b) => a - b).join(',')}|${getAnimatedLyricsRenderKey(interludeBoundaries, timeMs)}`;
         const snapshot = { key, focusIndex: state.focusIndex, activeIndices, karaokeActiveIndices };
         snapshots.set(interval, snapshot);
         if (snapshots.size > 2) {

@@ -61,7 +61,7 @@ export default function SongCoverOverlay({
     return (
         <div
             className={clsx("relative shrink-0 overflow-hidden group/overlay cursor-pointer", className)}
-            onClick={handleContainerClick}
+            onClick={(event) => { void handleContainerClick(event).catch(console.error); }}
             onDoubleClick={(e) => e.stopPropagation()}
         >
             <CoverImage

@@ -11,7 +11,7 @@ function getRecord(item: MusicItem): Record<string, unknown> {
 interface DeleteFromLibraryParams {
     items: MusicItem[];
     count: number;
-    context: 'video' | string;
+    context: string;
     clearSelection: () => void;
     openDeleteConfirm: (
         items: MusicItem[],
@@ -57,11 +57,11 @@ export function handleDeleteFromLibraryAction({
 
                 if (ids.length > 0) {
                     await libraryService.batchDeleteVideos(ids);
-                    useVideoStore.getState().fetchVideos();
+                    void (useVideoStore.getState().fetchVideos()).catch(console.error);
                 }
             } else {
                 const songsToDelete = await resolveSongsFromItems(items);
-                const ids = songsToDelete.map(song => song.id).filter(id => typeof id === 'number') as number[];
+                const ids = songsToDelete.map(song => song.id).filter(id => typeof id === 'number');
                 const store = useLibraryStore.getState();
                 if (ids.length > 0) {
                     store.markSongsAsOptimisticallyDeleted(ids);

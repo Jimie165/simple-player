@@ -74,7 +74,7 @@ export function NowPlayingNarrowHeader({
                 <button
                     onClick={() => {
                         if (metadata && typeof metadata.id === 'number') {
-                            toggleFavorite(metadata);
+                            void (toggleFavorite(metadata)).catch(console.error);
                         }
                     }}
                     aria-label={metadata?.is_favorite ? '取消收藏' : '收藏'}

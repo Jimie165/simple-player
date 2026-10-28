@@ -217,7 +217,7 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             isOpen={isOpen}
             saving={saving}
             onClose={searchOpen ? () => setSearchOpen(false) : onClose}
-            onSubmit={handleSubmit}
+            onSubmit={(event) => { void handleSubmit(event).catch(console.error); }}
             title="编辑歌曲信息"
             cover={(
                 <CoverImage

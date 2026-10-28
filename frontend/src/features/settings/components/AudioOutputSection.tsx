@@ -69,7 +69,7 @@ export default function AudioOutputSection() {
                 <SettingsPopup
                     label="输出设备"
                     value={selectedAudioOutput}
-                    onChange={handleAudioOutputChange}
+                    onChange={(deviceId) => { void handleAudioOutputChange(deviceId).catch(console.error); }}
                     buttonLabel={selectedAudioOutputLabel}
                     options={[
                         {

@@ -56,7 +56,7 @@ export default function GeneralSettingsSection() {
         <SettingsGroup title="资料库">
             <SettingsRow label="刷新音乐库" description="重新扫描音乐文件夹并更新元数据">
                 <button
-                    onClick={handleRefreshMusicLibrary}
+                    onClick={() => { void handleRefreshMusicLibrary().catch(console.error); }}
                     disabled={isRefreshingMusic}
                     className="settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
                 >
@@ -66,7 +66,7 @@ export default function GeneralSettingsSection() {
             </SettingsRow>
             <SettingsRow label="刷新视频库" description="重新扫描视频文件夹并更新缩略图">
                 <button
-                    onClick={handleRefreshVideoLibrary}
+                    onClick={() => { void handleRefreshVideoLibrary().catch(console.error); }}
                     disabled={isRefreshingVideo}
                     className="settings-control flex items-center gap-1.5 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
                 >

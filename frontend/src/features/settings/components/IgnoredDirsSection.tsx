@@ -103,7 +103,7 @@ export default function IgnoredDirsSection() {
         }
 
         setInput(scope, '');
-        persistIgnoredDirs(next);
+        void (persistIgnoredDirs(next)).catch(console.error);
     };
 
     const removeIgnoredDir = (scope: IgnoreScope, name: string) => {
@@ -111,7 +111,7 @@ export default function IgnoredDirsSection() {
             ...ignoredDirs,
             [scope]: ignoredDirs[scope].filter((d) => d !== name),
         };
-        persistIgnoredDirs(next);
+        void (persistIgnoredDirs(next)).catch(console.error);
     };
 
     const renderScope = (scope: IgnoreScope) => {

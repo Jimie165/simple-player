@@ -35,7 +35,7 @@ export default function MusicFoldersSection() {
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reloadFolders 在异步 IPC 返回后更新状态，非同步调用
-        reloadFolders();
+        void (reloadFolders()).catch(console.error);
     }, [reloadFolders, libraryVersion]);
 
     const handleAddFolder = async () => {
@@ -116,7 +116,7 @@ export default function MusicFoldersSection() {
                             </CustomTooltip>
                             <CustomTooltip text="移除此文件夹">
                                 <button
-                                    onClick={() => handleRemoveFolder(folder)}
+                                    onClick={() => { void handleRemoveFolder(folder).catch(console.error); }}
                                     aria-label="移除此文件夹"
                                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant opacity-60 transition-all hover:bg-error/10 hover:text-error hover:opacity-100 active:scale-95 group-hover:opacity-100"
                                 >
@@ -148,7 +148,7 @@ export default function MusicFoldersSection() {
                         <span />
                     )}
                     <button
-                        onClick={handleAddFolder}
+                        onClick={() => { void handleAddFolder().catch(console.error); }}
                         disabled={isAddingFolder}
                         className="settings-control flex items-center gap-1 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
                     >

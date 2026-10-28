@@ -76,7 +76,7 @@ export default function CreatePlaylistDialog({
                             leaveTo="opacity-0 scale-95"
                         >
                             <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
-                                <form onSubmit={handleSubmit} className="flex h-full min-h-0 flex-col">
+                                <form onSubmit={(event) => { void handleSubmit(event).catch(console.error); }} className="flex h-full min-h-0 flex-col">
                                     <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-5 flex flex-col items-center">
                                         <DialogTitle
                                             as="h3"
@@ -87,7 +87,7 @@ export default function CreatePlaylistDialog({
 
                                         <div className="flex flex-col items-center gap-2 mb-6 cursor-pointer">
                                             <div
-                                                onClick={handleSelectCover}
+                                                onClick={() => { void handleSelectCover().catch(console.error); }}
                                                 className="group relative w-36 h-36 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex flex-col items-center justify-center transition-colors overflow-hidden ring-1 ring-black/5 dark:ring-white/10 shadow-sm"
                                             >
                                                 {coverPath ? (

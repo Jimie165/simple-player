@@ -154,7 +154,7 @@ export default function RestoreExcludedSongsDialog({
                                     </button>
                                     <button
                                         type="button"
-                                        onClick={handleRestore}
+                                        onClick={() => { void handleRestore().catch(console.error); }}
                                         disabled={selectedIds.size === 0 || restoring}
                                         className="rounded-full bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container px-4 py-2 text-sm font-medium text-on-primary hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
                                     >

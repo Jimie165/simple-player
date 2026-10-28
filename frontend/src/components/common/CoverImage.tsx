@@ -85,7 +85,7 @@ export default function CoverImage({
             }
         };
 
-        loadCover();
+        void (loadCover()).catch(console.error);
 
         return () => {
             isMounted = false;

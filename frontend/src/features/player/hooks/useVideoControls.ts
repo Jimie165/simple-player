@@ -10,10 +10,10 @@ export function useVideoControls(isOpen: boolean) {
 
     useEffect(() => {
         const checkMaximized = async () => setIsMaximized(await systemService.isMaximized());
-        checkMaximized();
-        const unlisten = systemService.onResize(checkMaximized);
+        void (checkMaximized()).catch(console.error);
+        const unlisten = systemService.onResize(() => { void checkMaximized().catch(console.error); });
         return () => {
-            unlisten.then(f => f && f());
+            void (unlisten.then(f => f && f())).catch(console.error);
         };
     }, []);
 
@@ -30,7 +30,7 @@ export function useVideoControls(isOpen: boolean) {
 
         return () => {
             window.removeEventListener('resize', updateCompact);
-            unlisten.then(f => f && f());
+            void (unlisten.then(f => f && f())).catch(console.error);
         };
     }, []);
 

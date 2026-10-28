@@ -25,7 +25,7 @@ vi.mock('react', async importOriginal => ({
     useRef: (current: unknown) => clock.slot(() => ({ current })),
     useState: (initial: unknown) => {
         const state = clock.slot(() => ({ value: initial })) as { value: unknown };
-        return [state.value, (next: unknown) => { state.value = typeof next === 'function' ? next(state.value) : next; }];
+        return [state.value, (next: unknown) => { state.value = typeof next === 'function' ? (next as (value: unknown) => unknown)(state.value) : next; }];
     },
     useCallback: (callback: unknown, deps: readonly unknown[]) => {
         const slot = clock.slot(() => ({ callback, deps })) as { callback: unknown; deps: readonly unknown[] };

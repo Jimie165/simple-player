@@ -42,7 +42,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
                     }
                 }
             };
-            loadSongs();
+            void (loadSongs()).catch(console.error);
         }
     }, [item, isPlaylist, getPlaylistSettings, playlistVersion]);
 
@@ -52,7 +52,7 @@ export default function RecentItemCard({ item, onClick, onDelete, onShowProperti
             const url = await resolveMediaPath(item.cover_path);
             if (isMounted) setCoverUrl(url);
         };
-        loadCover();
+        void (loadCover()).catch(console.error);
         return () => {
             isMounted = false;
         };

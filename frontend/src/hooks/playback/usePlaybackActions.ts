@@ -147,7 +147,7 @@ export function usePlaybackActions() {
             resetPlaybackClock(song.path);
             setMediaKind('audio');
             setPlaybackSnapshot(snapshot);
-            requestLyricsForPath(song.path);
+            void (requestLyricsForPath(song.path)).catch(console.error);
         } catch (error) {
             if (!handleMissingSong(error, song)) throw error;
         }
@@ -182,7 +182,7 @@ export function usePlaybackActions() {
             setMetadata(song);
             setMediaKind('audio');
             setPlaybackSnapshot({ ...snapshot, status: autoPlay ? 'playing' : 'paused' });
-            requestLyricsForPath(song.path);
+            void (requestLyricsForPath(song.path)).catch(console.error);
         } catch (error) {
             if (handleMissingSong(error, song)) return;
             console.error('Queue play failed', error);
@@ -234,7 +234,7 @@ export function usePlaybackActions() {
             setMetadata(song);
             setMediaKind('audio');
             setPlaybackSnapshot(snapshot);
-            requestLyricsForPath(song.path);
+            void (requestLyricsForPath(song.path)).catch(console.error);
 
             if (playlist && playlist.length > 0) {
                 if (options?.disableShuffle) {
@@ -384,7 +384,7 @@ export function usePlaybackActions() {
                 const snapshot = await audioService.load(metadata.path, metadata);
                 setMediaKind('audio');
                 setPlaybackSnapshot(snapshot);
-                requestLyricsForPath(metadata.path);
+                void (requestLyricsForPath(metadata.path)).catch(console.error);
             } catch (error) {
                 if (handleMissingSong(error, metadata)) return usePlayerStore.getState().currentTime;
                 throw error;

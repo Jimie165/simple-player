@@ -40,8 +40,8 @@ export const VideoLibrary: React.FC = () => {
     const activeTab = effectiveTab === 'folders' ? 'folders' : 'all';
 
     useEffect(() => {
-        fetchVideos();
-        fetchVideoFolders();
+        void (fetchVideos()).catch(console.error);
+        void (fetchVideoFolders()).catch(console.error);
     }, [fetchVideos, fetchVideoFolders]);
 
     useEffect(() => {
@@ -52,8 +52,8 @@ export const VideoLibrary: React.FC = () => {
             try {
                 const unlistenFn = await listen('video_scan_complete', () => {
                     if (isMounted) {
-                        fetchVideos();
-                        fetchVideoFolders();
+                        void (fetchVideos()).catch(console.error);
+                        void (fetchVideoFolders()).catch(console.error);
                     }
                 });
                 if (isMounted) {
@@ -66,7 +66,7 @@ export const VideoLibrary: React.FC = () => {
             }
         };
 
-        setupListeners();
+        void (setupListeners()).catch(console.error);
 
         return () => {
             isMounted = false;
@@ -275,7 +275,7 @@ export const VideoLibrary: React.FC = () => {
                             { value: 'name', label: '名称' },
                         ]}
                     />
-                    <LibraryHeaderButton onClick={handleAddFolder} />
+                    <LibraryHeaderButton onClick={() => { void handleAddFolder().catch(console.error); }} />
                 </div>
             }
         >

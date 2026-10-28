@@ -45,7 +45,7 @@ export default function PlaylistCoverCollage({ songs, className, iconClassName, 
             }));
             if (isMounted) setCoverUrls(urls);
         };
-        loadCovers();
+        void (loadCovers()).catch(console.error);
 
         return () => {
             isMounted = false;

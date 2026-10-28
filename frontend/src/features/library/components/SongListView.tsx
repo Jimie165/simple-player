@@ -283,7 +283,7 @@ export default function SongListView({
                 onDelete={onDelete}
                 onPlay={handlePlay}
                 formatDuration={formatDuration}
-                toggleFavorite={toggleFavorite}
+                toggleFavorite={(song) => { void toggleFavorite(song).catch(console.error); }}
                 onOpenArtist={onOpenArtist}
                 onOpenAlbum={onOpenAlbum}
                 onContextMenu={handleContextMenu}

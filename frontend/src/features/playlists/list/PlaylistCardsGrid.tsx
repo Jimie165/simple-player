@@ -195,7 +195,7 @@ export default function PlaylistCardsGrid({
                                     <CardPlayButton variant="cover"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePlayPlaylist(playlist);
+                                            void (handlePlayPlaylist(playlist)).catch(console.error);
                                         }}
                                     />
                                     <PlaylistCardMenu

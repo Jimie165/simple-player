@@ -124,9 +124,10 @@ function getOverlayKey(view: ViewState): string {
     const data = view.data && typeof view.data === 'object'
         ? view.data as Record<string, unknown>
         : undefined;
-    const idPart = data?.id ?? data?.name ?? '';
+    const rawId = data?.id ?? data?.name;
+    const idPart = typeof rawId === 'string' || typeof rawId === 'number' ? rawId : '';
     const artistPart = view.type === 'album_detail' && idPart === 'Unknown Album'
-        ? `:${String(data?.artist ?? 'Unknown Artist')}`
+        ? `:${typeof data?.artist === 'string' ? data.artist : 'Unknown Artist'}`
         : '';
     return `${view.type}:${String(idPart)}${artistPart}`;
 }

@@ -133,10 +133,10 @@ export default function NowPlayingView({
 
     useEffect(() => {
         if (metadata?.path && metadata.path !== lyricsPath) {
-            requestLyricsForPath(metadata.path);
+            void (requestLyricsForPath(metadata.path)).catch(console.error);
         }
         if (!metadata?.path && lyricsPath !== null) {
-            requestLyricsForPath(undefined);
+            void (requestLyricsForPath(undefined)).catch(console.error);
         }
     }, [metadata?.path, lyricsPath, requestLyricsForPath]);
 
@@ -236,7 +236,7 @@ export default function NowPlayingView({
             <NowPlayingTopBar
                 isFullscreen={isFullscreen}
                 onClose={onClose}
-                toggleFullscreen={toggleFullscreen}
+                toggleFullscreen={() => { void toggleFullscreen().catch(console.error); }}
             />
 
             <div className="relative flex-1 min-h-0 w-full overflow-hidden">

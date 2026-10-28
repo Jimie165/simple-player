@@ -321,7 +321,7 @@ export default function SortableSongList({
                 formatDuration={formatDuration}
                 onSelect={(s: SongMetadata) => handleCheckboxClick(null, s, index)}
                 onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
-                toggleFavorite={toggleFavorite}
+                toggleFavorite={(song) => { void toggleFavorite(song).catch(console.error); }}
                 isFav={isFav}
                 toggleSelection={toggleSelection}
                 onMenuOpen={() => {

@@ -68,7 +68,7 @@ export function useOnlineLyricsDetails() {
                             resolve(value);
                         } catch (error) {
                             if (mounted.current) setDetails(current => new Map(current).set(key, null));
-                            reject(error);
+                            reject(error instanceof Error ? error : new Error(typeof error === 'string' ? error : '歌词加载失败'));
                         } finally {
                             pending.current.delete(key);
                             active.current--;

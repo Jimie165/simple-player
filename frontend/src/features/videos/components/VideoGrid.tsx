@@ -130,7 +130,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                                 video={video}
                                 isSelected={selectedIds.has(id)}
                                 isSelectionMode={isSelectionMode}
-                                onPlay={handlePlayVideo}
+                                onPlay={(video) => { void handlePlayVideo(video).catch(console.error); }}
                                 onToggleSelection={handleToggleSelection}
                                 onContextMenu={handleContextMenu}
                                 onShowProperties={handleShowProperties}
@@ -145,7 +145,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                         item={contextMenu.video}
                         context="video"
                         onClose={() => setContextMenu(null)}
-                        onPlay={() => handlePlayVideo(contextMenu.video)}
+                        onPlay={() => { void handlePlayVideo(contextMenu.video).catch(console.error); }}
                         onShowProperties={() => handleShowProperties(contextMenu.video)}
                     />
                 )}
@@ -166,7 +166,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                         video={video}
                         isSelected={selectedIds.has(id)}
                         isSelectionMode={isSelectionMode}
-                        onPlay={handlePlayVideo}
+                        onPlay={(video) => { void handlePlayVideo(video).catch(console.error); }}
                         onToggleSelection={handleToggleSelection}
                         onContextMenu={handleContextMenu}
                         onShowProperties={handleShowProperties}
@@ -181,7 +181,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                     item={contextMenu.video}
                     context="video"
                     onClose={() => setContextMenu(null)}
-                    onPlay={() => handlePlayVideo(contextMenu.video)}
+                    onPlay={() => { void handlePlayVideo(contextMenu.video).catch(console.error); }}
                     onShowProperties={() => handleShowProperties(contextMenu.video)}
                 />
             )}

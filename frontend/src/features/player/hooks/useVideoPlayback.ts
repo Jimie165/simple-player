@@ -174,7 +174,7 @@ export function useVideoPlayback({
                 case 'Space':
                     e.preventDefault();
                     if (videoRef.current.paused) {
-                        videoRef.current.play();
+                        void (videoRef.current.play()).catch(console.error);
                         showControls();
                     } else {
                         videoRef.current.pause();
@@ -286,7 +286,7 @@ export function useVideoPlayback({
 
     const handleSmartClick = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
-        handleTogglePlay();
+        void (handleTogglePlay()).catch(console.error);
 
         const now = Date.now();
         if (now - lastClickTimeRef.current < 250) {

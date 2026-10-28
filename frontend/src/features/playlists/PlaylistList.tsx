@@ -384,8 +384,8 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
                 toggleSelection={toggleSelection}
                 toggleSelectionMode={toggleSelectionMode}
                 onOpenPlaylist={openPlaylistDetail}
-                handlePlayFavorites={handlePlayFavorites}
-                handleAddFavoritesToQueue={handleAddFavoritesToQueue}
+                handlePlayFavorites={(shuffle) => { void handlePlayFavorites(shuffle).catch(console.error); }}
+                handleAddFavoritesToQueue={() => { void handleAddFavoritesToQueue().catch(console.error); }}
                 handlePlayPlaylist={handlePlayPlaylist}
                 handleAddToQueue={handleAddToQueue}
                 setEditPlaylist={(pl) => setEditPlaylist(pl)}
@@ -403,7 +403,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
                     context="playlist_list"
                     onClose={() => setContextMenu(null)}
                     onEdit={() => setEditPlaylist(contextMenu.playlist)}
-                    onShuffle={() => handlePlayPlaylist(contextMenu.playlist, true)}
+                    onShuffle={() => { void handlePlayPlaylist(contextMenu.playlist, true).catch(console.error); }}
                 />
             )}
 
@@ -420,7 +420,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
                     } as unknown as Playlist}
                     context="playlist_list"
                     onClose={() => setFavoritesContextMenu(null)}
-                    onShuffle={() => handlePlayFavorites(true)}
+                    onShuffle={() => { void handlePlayFavorites(true).catch(console.error); }}
                 />
             )}
 

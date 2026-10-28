@@ -79,7 +79,7 @@ export default function ArtworkEditor({
             )}
             <button
                 type="button"
-                onClick={handleSelect}
+                onClick={() => { void handleSelect().catch(console.error); }}
                 className={`inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-primary transition-colors hover:bg-primary/10 ${actionsContainer !== undefined ? 'order-first' : ''}`}
             >
                 <MdAdd className="text-[24px]" />
