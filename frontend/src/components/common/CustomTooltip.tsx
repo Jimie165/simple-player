@@ -125,7 +125,7 @@ export default function CustomTooltip({
             clearTimeout(leaveTimeoutRef.current);
             leaveTimeoutRef.current = null;
         }
-        hoverTimeoutRef.current = setTimeout(() => {
+        hoverTimeoutRef.current = window.setTimeout(() => {
             if (onlyWhenOverflow && !isContentOverflowing()) return;
             updatePosition();
             setIsRendered(true);
@@ -176,7 +176,7 @@ export default function CustomTooltip({
         } else if (show === false) {
             frame = requestAnimationFrame(() => {
                 setIsVisible(false);
-                leaveTimeoutRef.current = setTimeout(() => setIsRendered(false), 200);
+                leaveTimeoutRef.current = window.setTimeout(() => setIsRendered(false), 200);
             });
         }
 

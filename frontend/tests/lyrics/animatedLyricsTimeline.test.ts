@@ -12,7 +12,7 @@ const line = (id: string, start: number, end: number, extra: Partial<LyricsLine>
 describe('semantic animated lyrics timeline', () => {
     it.each([false, true])('preserves current focus, harmonies and tails in either seek direction (TTML=%s)', isTtml => {
         const lines = [
-            line('主行', 1200, 3200, { words: [{ text: '雨 Rain', start_time_ms: 1200, end_time_ms: 3000 }], visual_end_ms: 2600 }),
+            line('主行', 1200, 3200, { words: [{ text: '雨 Rain', start_time_ms: 1200, end_time_ms: 3000 }] }),
             line('和声1', 1900, 4000, { role: 'background', parent_id: '主行' }),
             line('和声2', 2300, 4100, { role: 'background', parent_id: '主行' }),
             line('next', 3600, 5500), line('interlude', 14000, 16500),
