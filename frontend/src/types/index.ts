@@ -158,6 +158,7 @@ export type MediaKind = 'audio' | 'video' | null;
 export type PlaybackStatus = 'idle' | 'playing' | 'paused' | 'ended';
 
 export interface PlaybackSnapshot {
+    output_unavailable?: boolean;
     session_id: number;
     status: PlaybackStatus;
     path: string | null;

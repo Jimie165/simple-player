@@ -15,6 +15,7 @@ interface PlayerState {
     playbackPath: string | null;
     playbackRevision: number;
     playbackSessionId: number;
+    pendingQueuePlayback: { song: SongMetadata; index: number; sessionId: number } | null;
     mediaKind: MediaKind;
 
     isShuffling: boolean;      // 随机状态
@@ -81,6 +82,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     playbackPath: null,
     playbackRevision: 0,
     playbackSessionId: 0,
+    pendingQueuePlayback: null,
     mediaKind: null,
     isShuffling: false,
     repeatMode: 'off',
@@ -114,8 +116,8 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         }
 
         return {
-            isPlaying: snapshot.status === 'playing',
-            isAudioLoaded: snapshot.status !== 'idle',
+            isPlaying: snapshot.status === 'playing' && !snapshot.output_unavailable,
+            isAudioLoaded: snapshot.status !== 'idle' && !snapshot.output_unavailable,
             currentTime: Number.isFinite(snapshot.position) ? Math.max(0, snapshot.position) : 0,
             isSeeking: state.isSeeking,
             playbackPath: snapshot.path,

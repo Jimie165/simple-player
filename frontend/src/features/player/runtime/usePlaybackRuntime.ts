@@ -6,6 +6,8 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PlaybackSnapshot } from '@/types';
 import { useAutoOnlineLyrics } from '@/features/player/runtime/useAutoOnlineLyrics';
+import { handleAudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
+import type { AudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
 
 /**
  * Keeps media-side effects alive independently of the bottom player UI.
@@ -101,6 +103,7 @@ function usePlaybackRuntime() {
             ) return;
             void callbacksRef.current.handlePlaybackEnded();
         });
+        void register<AudioOutputError>('audio:output-error', handleAudioOutputError);
         void register<PlaybackSnapshot>('audio:state-changed', (snapshot) => {
             const state = usePlayerStore.getState();
             if (

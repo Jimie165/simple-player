@@ -5,6 +5,7 @@ import { getManualNextIndexFn, getPreviousIndexFn } from '@/store/actions/queueA
 import { audioService } from '@/services/audioService';
 import { handleMissingSong } from '@/hooks/playback/handleMissingSong';
 import type { RecentItem, SongMetadata } from '@/types';
+import toast from 'react-hot-toast';
 
 export interface PlayOptions {
     restartIfCurrent?: boolean;
@@ -79,7 +80,6 @@ export function usePlaybackActions() {
     const setMetadata = usePlayerStore(state => state.setMetadata);
     const setShuffleState = usePlayerStore(state => state.setShuffleState);
     const setRepeatState = usePlayerStore(state => state.setRepeatState);
-    const restartSong = usePlayerStore(state => state.restartSong);
     const togglePlayerShuffle = usePlayerStore(state => state.toggleShuffle);
     const setPlaybackTime = usePlayerStore(state => state.setPlaybackTime);
     const setPlaybackSnapshot = usePlayerStore(state => state.setPlaybackSnapshot);
@@ -88,7 +88,64 @@ export function usePlaybackActions() {
     const resetPlaybackClock = usePlayerStore(state => state.resetPlaybackClock);
     const requestLyricsForPath = usePlayerStore(state => state.requestLyricsForPath);
 
+    const applyQueueItemPlayback = useCallback(async (
+        song: SongMetadata,
+        index: number,
+        transitionId: number,
+        autoPlay = true,
+        retainOnFailure = false
+    ) => {
+        if (!song.path) return;
+
+        const previousSessionId = usePlayerStore.getState().playbackSessionId;
+        try {
+            const snapshot = autoPlay
+                ? await audioService.play(song.path, song)
+                : await audioService.load(song.path, song);
+            if (!isActiveTransition(transitionId)) return;
+
+            usePlayerStore.setState({ pendingQueuePlayback: null });
+            resetPlaybackClock(song.path);
+            setCurrentSongIndex(index);
+            setMetadata(song);
+            setMediaKind('audio');
+            setPlaybackSnapshot({ ...snapshot, status: autoPlay ? 'playing' : 'paused' });
+            void (requestLyricsForPath(song.path)).catch(console.error);
+        } catch (error) {
+            if (usePlayerStore.getState().playbackSessionId !== previousSessionId) return;
+            if (handleMissingSong(error, song)) return;
+            if (retainOnFailure) {
+                usePlayerStore.setState({ pendingQueuePlayback: { song, index, sessionId: previousSessionId } });
+            }
+            console.error('Queue play failed', error);
+            toast.error('歌曲播放失败，请重试');
+        }
+    }, [
+        requestLyricsForPath,
+        resetPlaybackClock,
+        setCurrentSongIndex,
+        setMediaKind,
+        setMetadata,
+        setPlaybackSnapshot,
+    ]);
+
+    const retryPendingPlayback = useCallback(async () => {
+        const state = usePlayerStore.getState();
+        const pending = state.pendingQueuePlayback;
+        if (!pending) return false;
+        const song = useLibraryStore.getState().playlist[pending.index];
+        if (state.mediaKind !== 'audio' || state.playbackSessionId !== pending.sessionId || song?.path !== pending.song.path) {
+            usePlayerStore.setState({ pendingQueuePlayback: null });
+            return false;
+        }
+        await runPlaybackTransition(async (transitionId) => {
+            await applyQueueItemPlayback(song, pending.index, transitionId, true, true);
+        });
+        return true;
+    }, [applyQueueItemPlayback]);
+
     const togglePlayback = useCallback(async () => {
+        if (await retryPendingPlayback()) return;
         const state = usePlayerStore.getState();
         const metadata = state.metadata;
         if (!metadata?.path || state.mediaKind === 'video') return;
@@ -107,16 +164,9 @@ export function usePlaybackActions() {
         } catch (error) {
             if (handleMissingSong(error, metadata)) return;
             console.error('Toggle play failed', error);
-            setPlaybackSnapshot({
-                session_id: state.playbackSessionId,
-                status: 'paused',
-                path: metadata.path ?? null,
-                position: state.currentTime,
-                duration: metadata.duration,
-                volume: state.volume / 100,
-            });
+            toast.error('歌曲播放失败，请重试');
         }
-    }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot]);
+    }, [requestLyricsForPath, retryPendingPlayback, setMediaKind, setPlaybackSnapshot]);
 
     const pausePlayback = useCallback(async () => {
         const snapshot = await audioService.pause();
@@ -124,6 +174,7 @@ export function usePlaybackActions() {
     }, [setPlaybackSnapshot]);
 
     const resumePlayback = useCallback(async () => {
+        if (await retryPendingPlayback()) return;
         const state = usePlayerStore.getState();
         if (!state.metadata?.path || state.mediaKind === 'video') return;
 
@@ -137,9 +188,10 @@ export function usePlaybackActions() {
         } catch (error) {
             if (!handleMissingSong(error, state.metadata)) throw error;
         }
-    }, [requestLyricsForPath, setMediaKind, setPlaybackSnapshot]);
+    }, [requestLyricsForPath, retryPendingPlayback, setMediaKind, setPlaybackSnapshot]);
 
     const restartCurrent = useCallback(async (song: SongMetadata) => {
+        usePlayerStore.setState({ pendingQueuePlayback: null });
         if (!song.path) return;
         try {
             const snapshot = await audioService.play(song.path, song);
@@ -153,51 +205,6 @@ export function usePlaybackActions() {
         }
     }, [requestLyricsForPath, resetPlaybackClock, setMediaKind, setMetadata, setPlaybackSnapshot]);
 
-    const applyQueueItemPlayback = useCallback(async (
-        song: SongMetadata,
-        index: number,
-        transitionId: number,
-        restartIfCurrent = false,
-        autoPlay = true
-    ) => {
-        const { currentSongIndex } = useLibraryStore.getState();
-
-        if (index === currentSongIndex && !restartIfCurrent) {
-            await togglePlayback();
-            return;
-        }
-
-        restartSong();
-
-        if (!song.path) return;
-
-        try {
-            const snapshot = autoPlay
-                ? await audioService.play(song.path, song)
-                : await audioService.load(song.path, song);
-            if (!isActiveTransition(transitionId)) return;
-
-            resetPlaybackClock(song.path);
-            setCurrentSongIndex(index);
-            setMetadata(song);
-            setMediaKind('audio');
-            setPlaybackSnapshot({ ...snapshot, status: autoPlay ? 'playing' : 'paused' });
-            void (requestLyricsForPath(song.path)).catch(console.error);
-        } catch (error) {
-            if (handleMissingSong(error, song)) return;
-            console.error('Queue play failed', error);
-        }
-    }, [
-        requestLyricsForPath,
-        resetPlaybackClock,
-        restartSong,
-        setCurrentSongIndex,
-        setMediaKind,
-        setMetadata,
-        setPlaybackSnapshot,
-        togglePlayback,
-    ]);
-
     const toggleShuffle = useCallback(() => {
         const { isShuffling } = usePlayerStore.getState();
         const newShuffleState = !isShuffling;
@@ -210,6 +217,7 @@ export function usePlaybackActions() {
     }, [togglePlayerShuffle, toggleShuffleList]);
 
     const playSongInternal = useCallback(async ({ song, index, playlist, options, context }: PlaySongParams, transitionId: number) => {
+        usePlayerStore.setState({ pendingQueuePlayback: null });
         if (!song.path) return;
 
         const { metadata, isShuffling } = usePlayerStore.getState();
@@ -220,6 +228,7 @@ export function usePlaybackActions() {
             return;
         }
 
+        const previousSessionId = usePlayerStore.getState().playbackSessionId;
         try {
             if (isCurrent && options?.restartIfCurrent) {
                 const actualTime = await audioService.seek(0);
@@ -267,16 +276,10 @@ export function usePlaybackActions() {
                 if (recentItem) addToRecent(recentItem);
             }
         } catch (error) {
+            if (usePlayerStore.getState().playbackSessionId !== previousSessionId) return;
             if (handleMissingSong(error, song)) return;
             console.error('Play failed', error);
-            setPlaybackSnapshot({
-                session_id: usePlayerStore.getState().playbackSessionId,
-                status: 'paused',
-                path: song.path,
-                position: usePlayerStore.getState().currentTime,
-                duration: song.duration,
-                volume: usePlayerStore.getState().volume / 100,
-            });
+            toast.error('歌曲播放失败，请重试');
         }
     }, [
         addToRecent,
@@ -371,9 +374,14 @@ export function usePlaybackActions() {
 
     const playQueueItem = useCallback(async ({ song, index, restartIfCurrent = false }: PlayQueueParams) => {
         await runPlaybackTransition(async (transitionId) => {
-            await applyQueueItemPlayback(song, index, transitionId, restartIfCurrent);
+            usePlayerStore.setState({ pendingQueuePlayback: null });
+            if (index === useLibraryStore.getState().currentSongIndex && !restartIfCurrent) {
+                await togglePlayback();
+                return;
+            }
+            await applyQueueItemPlayback(song, index, transitionId);
         });
-    }, [applyQueueItemPlayback]);
+    }, [applyQueueItemPlayback, togglePlayback]);
 
     // --- New Actions for Controls ---
     const seek = useCallback(async (time: number) => {
@@ -408,6 +416,7 @@ export function usePlaybackActions() {
     }, []);
 
     const playNext = useCallback(async () => {
+        usePlayerStore.setState({ pendingQueuePlayback: null });
         await runPlaybackTransition(async (transitionId) => {
             const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
@@ -417,12 +426,13 @@ export function usePlaybackActions() {
             if (nextIdx < 0) return;
             const song = playlist[nextIdx];
             if (song?.path) {
-                await applyQueueItemPlayback(song, nextIdx, transitionId, true);
+                await applyQueueItemPlayback(song, nextIdx, transitionId);
             }
         });
     }, [applyQueueItemPlayback]);
 
     const playPrev = useCallback(async (currentTime: number = 0) => {
+        usePlayerStore.setState({ pendingQueuePlayback: null });
         await runPlaybackTransition(async (transitionId) => {
             const { playlist, currentSongIndex } = useLibraryStore.getState();
             if (playlist.length === 0) return;
@@ -445,7 +455,7 @@ export function usePlaybackActions() {
             }
             const song = playlist[prevIdx];
             if (song?.path) {
-                await applyQueueItemPlayback(song, prevIdx, transitionId, true);
+                await applyQueueItemPlayback(song, prevIdx, transitionId);
             }
         });
     }, [applyQueueItemPlayback, seek]);
@@ -460,7 +470,7 @@ export function usePlaybackActions() {
                 const { repeatMode, metadata } = usePlayerStore.getState();
                 if (playlist.length === 0 || currentSongIndex < 0 || currentSongIndex >= playlist.length) {
                     if (metadata?.path) {
-                        await applyQueueItemPlayback(metadata, currentSongIndex, transitionId, true, false);
+                        await applyQueueItemPlayback(metadata, currentSongIndex, transitionId, false);
                     }
                     return;
                 }
@@ -468,7 +478,7 @@ export function usePlaybackActions() {
                 if (repeatMode === 'one') {
                     const song = playlist[currentSongIndex];
                     if (song?.path) {
-                        await applyQueueItemPlayback(song, currentSongIndex, transitionId, true);
+                        await applyQueueItemPlayback(song, currentSongIndex, transitionId, true, true);
                     }
                     return;
                 }
@@ -477,14 +487,14 @@ export function usePlaybackActions() {
                 if (nextIdx === -1) {
                     const song = playlist[currentSongIndex];
                     if (song?.path) {
-                        await applyQueueItemPlayback(song, currentSongIndex, transitionId, true, false);
+                        await applyQueueItemPlayback(song, currentSongIndex, transitionId, false);
                     }
                     return;
                 }
 
                 const song = playlist[nextIdx];
                 if (song?.path) {
-                    await applyQueueItemPlayback(song, nextIdx, transitionId, true);
+                    await applyQueueItemPlayback(song, nextIdx, transitionId, true, true);
                 }
             } finally {
                 // Failed loads and invalid queues must leave both the UI and SMTC stopped.
@@ -504,6 +514,9 @@ export function usePlaybackActions() {
                                 volume: state.volume / 100,
                             });
                         }
+                    }
+                    if (usePlayerStore.getState().playbackSessionId === endedSessionId) {
+                        usePlayerStore.setState({ isAudioLoaded: false });
                     }
                 }
             }

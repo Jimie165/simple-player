@@ -35,6 +35,7 @@ pub struct PlaybackSnapshot {
     pub position: f32,
     pub duration: Option<f32>,
     pub volume: f32,
+    pub output_unavailable: bool,
 }
 
 struct LowFrequencySource<S> {
@@ -146,8 +147,16 @@ pub struct AudioOutputState {
     pub active_device: Option<String>,
 }
 
+#[derive(Clone, Serialize)]
+struct AudioOutputError {
+    session_id: u64,
+    message: String,
+    unavailable: bool,
+}
+
 struct PlaybackHandle {
     _stream: MixerDeviceSink,
+    output_device_id: Option<String>,
     player: Player,
     monitor_stop: Arc<AtomicBool>,
     stream_error: Arc<AtomicBool>,
@@ -170,6 +179,7 @@ fn snapshot_from_parts(
             position: 0.0,
             duration: None,
             volume,
+            output_unavailable: false,
         };
     };
 
@@ -189,6 +199,7 @@ fn snapshot_from_parts(
         position,
         duration: handle.metadata.as_ref().map(|meta| meta.duration as f32),
         volume,
+        output_unavailable: handle.stream_error.load(Ordering::SeqCst),
     }
 }
 
@@ -321,7 +332,7 @@ impl AudioState {
 
         let stream_error = Arc::new(AtomicBool::new(false));
         let pref_snapshot = preference.lock().unwrap().clone();
-        let (mut stream, picked_name, fell_back_to_default) =
+        let (mut stream, picked_name, fell_back_to_default, output_device_id) =
             Self::open_output_sink(pref_snapshot.clone(), stream_error.clone())?;
         if fell_back_to_default {
             let mut current = preference.lock().unwrap();
@@ -357,6 +368,7 @@ impl AudioState {
 
         Ok(PlaybackHandle {
             _stream: stream,
+            output_device_id,
             player,
             monitor_stop: Arc::new(AtomicBool::new(false)),
             stream_error,
@@ -369,42 +381,19 @@ impl AudioState {
     fn open_output_sink(
         preference: OutputPreference,
         stream_error: Arc<AtomicBool>,
-    ) -> Result<(MixerDeviceSink, Option<String>, bool), String> {
+    ) -> Result<(MixerDeviceSink, Option<String>, bool, Option<String>), String> {
         let error_flag = stream_error;
-        let (builder, picked_name, fell_back_to_default) = match preference {
+        let (device, fell_back_to_default) = match preference {
             OutputPreference::Pinned(target_id) => match Self::find_output_device(&target_id) {
-                Some(device) => {
-                    let name = Self::device_display_name(&device);
-                    (
-                        DeviceSinkBuilder::from_device(device)
-                            .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
-                        name,
-                        false,
-                    )
-                }
-                None => {
-                    eprintln!(
-                        "audio: pinned endpoint '{target_id}' is unavailable; using system default"
-                    );
-                    let name = Self::default_output_name();
-                    (
-                        DeviceSinkBuilder::from_default_device()
-                            .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
-                        name,
-                        true,
-                    )
-                }
+                Some(device) => (device, false),
+                None => (Self::system_output_device()?, true),
             },
-            OutputPreference::SystemDefault => {
-                let name = Self::default_output_name();
-                (
-                    DeviceSinkBuilder::from_default_device()
-                        .map_err(|e| format!("Failed to open audio output: {e:?}"))?,
-                    name,
-                    false,
-                )
-            }
+            OutputPreference::SystemDefault => (Self::system_output_device()?, false),
         };
+        let picked_name = Self::device_display_name(&device);
+        let output_device_id = Self::device_id(&device);
+        let builder = DeviceSinkBuilder::from_device(device)
+            .map_err(|e| format!("Failed to open audio output: {e:?}"))?;
 
         let sink = builder
             .with_error_callback(move |err| {
@@ -414,7 +403,23 @@ impl AudioState {
             .open_sink_or_fallback()
             .map_err(|e| format!("Failed to open audio output: {e:?}"))?;
 
-        Ok((sink, picked_name, fell_back_to_default))
+        Ok((sink, picked_name, fell_back_to_default, output_device_id))
+    }
+
+    fn system_output_device() -> Result<cpal::Device, String> {
+        let device = cpal::default_host()
+            .default_output_device()
+            .ok_or_else(|| "No default audio output device available".to_string())?;
+        #[cfg(target_os = "windows")]
+        {
+            // Open the concrete endpoint to avoid async virtual-device activation's COM conflict.
+            let id = Self::device_id(&device)
+                .ok_or_else(|| "Failed to resolve default audio output endpoint".to_string())?;
+            Self::find_output_device(&id)
+                .ok_or_else(|| "Default audio output endpoint is unavailable".to_string())
+        }
+        #[cfg(not(target_os = "windows"))]
+        Ok(device)
     }
 
     fn device_id(device: &cpal::Device) -> Option<String> {
@@ -459,12 +464,6 @@ impl AudioState {
                     .unwrap_or(false);
             matches_old_name.then(|| Self::device_id(&device)).flatten()
         })
-    }
-
-    fn default_output_name() -> Option<String> {
-        cpal::default_host()
-            .default_output_device()
-            .and_then(|device| Self::device_display_name(&device))
     }
 
     fn emit_output_changed(
@@ -531,19 +530,18 @@ impl AudioState {
                     let stream_failed = handle.stream_error.load(Ordering::SeqCst);
                     let follow_drift = !stream_failed
                         && matches!(*preference.lock().unwrap(), OutputPreference::SystemDefault)
-                        && Self::system_default_drifted(&active_device_name);
+                        && Self::system_default_drifted(handle.output_device_id.as_deref());
 
-                    if stream_failed || follow_drift {
+                    let ended = handle.player.empty();
+                    if !ended && (stream_failed || follow_drift) {
                         recovery = Some((
                             handle.path.clone(),
                             handle.metadata.clone(),
                             position,
                             handle.session_id,
                         ));
-                        (false, position, handle.session_id)
-                    } else {
-                        (handle.player.empty(), position, handle.session_id)
                     }
+                    (ended, position, handle.session_id)
                 };
 
                 if let Some((path, metadata, position, session_id)) = recovery {
@@ -587,7 +585,25 @@ impl AudioState {
                             Err(err) => {
                                 eprintln!("Failed to recover audio output: {err}");
                                 if retry.failed(Instant::now()) {
-                                    let _ = app_handle.emit("audio:output-error", err);
+                                    let player = player_arc.lock().unwrap();
+                                    let Some(current) = player.as_ref().filter(|current| {
+                                        Arc::ptr_eq(&current.monitor_stop, &monitor_stop)
+                                    }) else {
+                                        break;
+                                    };
+                                    let unavailable = current.stream_error.load(Ordering::SeqCst);
+                                    if unavailable {
+                                        current.player.pause();
+                                        smtc::set_playing(false);
+                                    }
+                                    let _ = app_handle.emit(
+                                        "audio:output-error",
+                                        AudioOutputError {
+                                            session_id,
+                                            message: err,
+                                            unavailable,
+                                        },
+                                    );
                                 }
                             }
                         }
@@ -631,12 +647,12 @@ impl AudioState {
         });
     }
 
-    fn system_default_drifted(active_device_name: &Arc<Mutex<Option<String>>>) -> bool {
-        let Some(default_name) = Self::default_output_name() else {
-            return false;
-        };
-        let active = active_device_name.lock().ok().and_then(|g| g.clone());
-        active.as_deref() != Some(default_name.as_str())
+    fn system_default_drifted(active_id: Option<&str>) -> bool {
+        let default_id = cpal::default_host()
+            .default_output_device()
+            .as_ref()
+            .and_then(Self::device_id);
+        default_id.is_some_and(|id| active_id != Some(id.as_str()))
     }
 
     // Recovery must transfer both shared playback state and the current track snapshot.
