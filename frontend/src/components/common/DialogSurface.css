@@ -1,0 +1,13 @@
+.app-dialog-panel {
+    --dialog-divider-color: color-mix(in srgb, var(--color-on-surface) 8%, transparent);
+    --dialog-outline-color: color-mix(in srgb, var(--color-on-surface) 14%, transparent);
+    background: var(--content-glass-background);
+    border: 1px solid var(--dialog-divider-color);
+    backdrop-filter: blur(24px) saturate(150%);
+    transition-property: opacity, transform, scale;
+    box-shadow: 0 12px 40px rgb(0 0 0 / 18%), 0 2px 8px rgb(0 0 0 / 10%);
+}
+.app-dialog-backdrop {
+    background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+    backdrop-filter: blur(2px);
+}

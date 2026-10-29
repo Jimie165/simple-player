@@ -1,5 +1,6 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment, useState, useEffect, useCallback } from 'react';
-import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogTitle } from '@headlessui/react';
 import { MdPlaylistAdd } from 'react-icons/md';
 import { MdAdd } from 'react-icons/md';
 
@@ -279,7 +280,7 @@ export default function AddToPlaylistSheet() {
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <DialogPanel className="w-[min(28rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-md sm:max-h-[calc(100vh-2rem)]">
+                                <DialogPanel className="w-[min(28rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-(--dialog-outline-color) sm:w-full sm:max-w-md sm:max-h-[calc(100vh-2rem)]">
                                     <DialogTitle
                                         as="h3"
                                         className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2"

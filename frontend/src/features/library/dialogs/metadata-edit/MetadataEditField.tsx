@@ -31,7 +31,7 @@ export function MetadataEditField({
     compact = false,
 }: MetadataEditFieldProps) {
     return (
-        <label className={compact ? 'block' : 'block border-b border-neutral-200/80 py-3 dark:border-white/10'}>
+        <label className={compact ? 'block' : 'block border-b border-(--dialog-divider-color) py-3'}>
             <span className="mb-1 block text-[13px] text-neutral-500 dark:text-neutral-400">{label}</span>
             <div className="relative">
                 <input
@@ -53,7 +53,7 @@ export function MetadataEditField({
                             type="button"
                             aria-label={`恢复${label}`}
                             onClick={onRestore}
-                            className="grid h-8 w-10 place-items-center rounded-md border border-neutral-300 bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:border-white/10 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary base-theme:bg-surface base-theme:text-primary base-theme:hover:bg-primary-container"
+                            className="grid h-8 w-10 place-items-center rounded-md border border-(--dialog-outline-color) bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary base-theme:bg-surface base-theme:text-primary base-theme:hover:bg-primary-container"
                         >
                             <MdUndo className="text-xl" />
                         </button>
@@ -67,7 +67,7 @@ export function MetadataEditField({
 
 export function MetadataEditFieldPair({ children }: { children: React.ReactNode }) {
     return (
-        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 border-b border-neutral-200/80 py-3 dark:border-white/10">
+        <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-3 border-b border-(--dialog-divider-color) py-3">
             {children}
         </div>
     );

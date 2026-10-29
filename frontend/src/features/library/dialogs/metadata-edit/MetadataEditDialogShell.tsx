@@ -1,6 +1,7 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment } from 'react';
 import type React from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
+import { Dialog, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { MdClose } from 'react-icons/md';
 
@@ -49,7 +50,7 @@ export default function MetadataEditDialogShell<T extends string>({
     replacementView,
 }: MetadataEditDialogShellProps<T>) {
     const reducedMotion = useReducedMotion();
-    const button = 'rounded-lg border border-neutral-200 px-4 py-2 text-sm dark:border-white/15 disabled:opacity-40';
+    const button = 'rounded-lg border border-(--dialog-outline-color) px-4 py-2 text-sm disabled:opacity-40';
     const confirmButton = (
         <button
             key="confirm"
@@ -81,8 +82,7 @@ export default function MetadataEditDialogShell<T extends string>({
                 <div className="fixed inset-0 overflow-y-auto p-2 sm:p-4">
                     <div className="flex min-h-full items-center justify-center text-center">
                         <TransitionChild
-                            as="div"
-                            className="h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] transition-[opacity,transform,scale] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))]"
+                            as={Fragment}
                             enter="ease-out duration-300"
                             enterFrom="opacity-0 scale-95"
                             enterTo="opacity-100 scale-100"
@@ -90,7 +90,7 @@ export default function MetadataEditDialogShell<T extends string>({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="relative h-full w-full overflow-hidden rounded-xl bg-surface text-left align-middle shadow-2xl sm:rounded-md">
+                            <DialogPanel className="relative h-[min(820px,calc(100vh-1rem))] w-[min(640px,calc(100vw-1rem))] overflow-hidden rounded-xl bg-surface text-left align-middle shadow-2xl transition-[opacity,transform,scale] sm:h-[min(820px,calc(100vh-2rem))] sm:w-[min(640px,calc(100vw-2rem))] sm:rounded-md">
                                 <motion.form onSubmit={onSubmit} inert={Boolean(replacementView)} animate={{ x: replacementView && !reducedMotion ? -32 : 0, opacity: replacementView ? 0 : 1 }} transition={{ duration: reducedMotion ? 0 : 0.22 }} className="flex h-full min-h-0 flex-col">
                                     <DialogTitle className="sr-only">{title}</DialogTitle>
                                     <div className="relative shrink-0 px-6 pt-7">

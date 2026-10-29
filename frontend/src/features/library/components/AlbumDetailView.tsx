@@ -55,7 +55,7 @@ export default function AlbumDetailView({
             <DetailScrollHeader />
 
             {/* Header Area using Material 3 Styling */}
-            <div className="flex flex-col md:flex-row gap-8 mb-8 px-6 pt-6 relative z-10">
+            <div className="flex flex-col items-center text-center md:flex-row md:items-stretch md:text-left gap-8 mb-8 px-6 pt-6 relative z-10">
                 {/* Cover: Elevation, Large Radius */}
                 <SharedCover source={transitionSource} className="w-67.5 h-67.5 rounded-xl shadow-xl shadow-black/10 bg-neutral-200 dark:bg-neutral-800 overflow-hidden shrink-0 relative z-10">
                     <CoverImage
@@ -67,7 +67,7 @@ export default function AlbumDetailView({
                 </SharedCover>
 
                 {/* Details */}
-                <div className="flex flex-col justify-center gap-2 min-w-0 flex-1 pb-2">
+                <div className="flex w-full flex-col justify-center gap-2 min-w-0 flex-1 pb-2 md:w-auto">
                     <h1 className="text-2xl md:text-[28px] font-bold text-on-surface wrap-break-words leading-snug tracking-tight mt-2">
                         {album.name}
                     </h1>
@@ -75,7 +75,7 @@ export default function AlbumDetailView({
                         {album.artist}
                     </h2>
 
-                    <div className="text-sm text-on-surface-variant mt-2 font-medium flex flex-wrap items-center gap-2">
+                    <div className="text-sm text-on-surface-variant mt-2 font-medium flex flex-wrap items-center justify-center md:justify-start gap-2">
                         <span className="bg-on-surface/8 text-on-surface-variant px-2 py-0.5 rounded-md text-xs">Album</span>
                         <span>•</span>
                         <span>{album.songs[0]?.year || 'Unknown Year'}</span>
@@ -88,7 +88,7 @@ export default function AlbumDetailView({
                     </div>
 
                     {/* Actions Row */}
-                    <div className="flex flex-wrap items-center gap-3 mt-6">
+                    <div className="flex flex-wrap items-center justify-center md:justify-start gap-3 mt-6 [&>.ml-auto]:ml-0 md:[&>.ml-auto]:ml-auto">
                         <button
                             onClick={onPlayAll}
                             className="flex items-center gap-2 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container hover:bg-primary/90 base-theme:dark:hover:bg-on-primary text-on-primary px-6 py-2.5 rounded-full font-medium transition-all shadow-xs hover:shadow-sm active:scale-95"

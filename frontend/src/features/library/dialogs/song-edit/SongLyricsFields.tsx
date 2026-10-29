@@ -101,7 +101,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
 
     return (
         <div className="relative flex h-full min-h-0 flex-col">
-            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/3 base-theme:bg-surface">
+            <div className="relative min-h-0 flex-1 border border-outline-variant/40 bg-on-surface/3">
                 <textarea
                     aria-label="歌词内容"
                     aria-busy={searching}

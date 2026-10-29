@@ -1,5 +1,6 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment, useEffect, useState } from 'react';
-import { Dialog, DialogBackdrop, DialogPanel, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
+import { Dialog, DialogTitle, Transition, TransitionChild } from '@headlessui/react';
 import { MdRestore } from 'react-icons/md';
 
 import CoverImage from '@/components/common/CoverImage';

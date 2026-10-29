@@ -1,5 +1,6 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment, useState } from 'react';
-import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogTitle } from '@headlessui/react';
 import { MdAdd, MdImage, MdDelete } from 'react-icons/md';
 import { open } from '@tauri-apps/plugin-dialog';
 import { convertFileSrc } from '@tauri-apps/api/core';
@@ -75,7 +76,7 @@ export default function CreatePlaylistDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(22.5rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface text-left align-middle shadow-xl transition-all border border-(--dialog-outline-color) flex flex-col sm:w-full sm:max-w-90 sm:max-h-[calc(100vh-2rem)]">
                                 <form onSubmit={(event) => { void handleSubmit(event).catch(console.error); }} className="flex h-full min-h-0 flex-col">
                                     <div className="min-h-0 flex-1 overflow-y-auto p-6 pb-5 flex flex-col items-center">
                                         <DialogTitle
@@ -125,7 +126,7 @@ export default function CreatePlaylistDialog({
                                                     value={name}
                                                     onChange={(e) => setName(e.target.value)}
                                                     placeholder="播放列表标题"
-                                                    className="w-full px-3 py-2.5 pr-10 rounded-lg bg-transparent border border-neutral-300 dark:border-neutral-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-neutral-900 dark:text-white placeholder:text-neutral-400"
+                                                    className="w-full px-3 py-2.5 pr-10 rounded-lg bg-transparent border border-(--dialog-outline-color) focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-neutral-900 dark:text-white placeholder:text-neutral-400"
                                                     autoFocus
                                                     required
                                                 />
@@ -146,7 +147,7 @@ export default function CreatePlaylistDialog({
                                                     onChange={(e) => setDescription(e.target.value)}
                                                     placeholder="描述 (可选)"
                                                     rows={3}
-                                                    className="w-full px-3 py-2.5 pr-10 rounded-lg bg-transparent border border-neutral-300 dark:border-neutral-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-neutral-900 dark:text-white placeholder:text-neutral-400 resize-none"
+                                                    className="w-full px-3 py-2.5 pr-10 rounded-lg bg-transparent border border-(--dialog-outline-color) focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-neutral-900 dark:text-white placeholder:text-neutral-400 resize-none"
                                                 />
                                                 {description && (
                                                     <button
@@ -161,7 +162,7 @@ export default function CreatePlaylistDialog({
                                         </div>
                                     </div>
 
-                                    <div className="shrink-0 px-6 py-4 bg-surface-container-low border-t border-neutral-200 dark:border-neutral-700 flex gap-3">
+                                    <div className="shrink-0 px-6 py-4 bg-surface-container-low border-t border-(--dialog-divider-color) flex gap-3">
                                         <button
                                             type="submit"
                                             disabled={!name.trim() || loading}

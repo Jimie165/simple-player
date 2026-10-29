@@ -1,5 +1,6 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment } from 'react';
-import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
+import { Dialog, Transition, TransitionChild, DialogTitle } from '@headlessui/react';
 import { MdLibraryAdd } from 'react-icons/md';
 
 interface DuplicateSongConfirmDialogProps {
@@ -36,7 +37,7 @@ export default function DuplicateSongConfirmDialog({
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
                         >
-                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
+                            <DialogPanel className="w-[min(24rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-y-auto rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-(--dialog-outline-color) sm:w-full sm:max-w-sm sm:max-h-[calc(100vh-2rem)]">
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="w-10 h-10 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center shrink-0">
                                         <MdLibraryAdd className="text-xl text-primary" />

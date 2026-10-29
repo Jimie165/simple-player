@@ -1,5 +1,6 @@
+import { DialogPanel, DialogBackdrop } from '@/components/common/DialogSurface';
 import { useState, useEffect } from 'react';
-import { Dialog, DialogPanel, DialogTitle, DialogBackdrop } from '@headlessui/react';
+import { Dialog, DialogTitle } from '@headlessui/react';
 import { MdClose } from 'react-icons/md';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { fileService } from '@/services/fileService';
@@ -11,9 +12,11 @@ interface InfoDialogProps {
     isOpen: boolean;
     onClose: () => void;
     song?: SongMetadata | null; // 可选：传入特定歌曲，否则显示当前播放
+    title?: string;
+    description?: string;
 }
 
-export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
+export default function InfoDialog({ isOpen, onClose, song, title = '属性', description }: InfoDialogProps) {
     const storeMetadata = usePlayerStore((state) => state.metadata);
     // 优先显示传入的 song，如果没有则显示正在播放的
     const initialMetadata = song || storeMetadata;
@@ -22,7 +25,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
 
     // 当弹窗打开且有路径时，获取详细信息（大小、码率等）
     useEffect(() => {
-        if (isOpen && initialMetadata?.path) {
+        if (isOpen && description === undefined && initialMetadata?.path) {
             fileService.getMetadata(initialMetadata.path)
                 .then(meta => {
                     // 合并信息：数据库里的 id/added_at 等可能在 get_metadata 里没有，
@@ -40,7 +43,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                     setFullMetadata(initialMetadata);
                 });
         }
-    }, [isOpen, initialMetadata]);
+    }, [isOpen, initialMetadata, description]);
 
     // 显示的数据源：如果有 fullMetadata（加载完成），用它；否则用 initialMetadata
     const displayMeta = fullMetadata?.path === initialMetadata?.path ? fullMetadata : initialMetadata;
@@ -81,21 +84,22 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
             <div className="fixed inset-0 flex w-screen items-center justify-center p-3 sm:p-4">
                 <DialogPanel
                     transition
-                    className="w-[min(42rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-4 sm:w-full sm:max-w-2xl sm:max-h-[calc(100vh-2rem)] sm:p-6 lg:p-8 text-left align-middle shadow-xl border border-neutral-200 dark:border-neutral-700 transition-all duration-300 ease-out data-closed:scale-95 data-closed:opacity-0 flex flex-col"
+                    className="w-[min(42rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-4 sm:w-full sm:max-w-2xl sm:max-h-[calc(100vh-2rem)] sm:p-6 lg:p-8 text-left align-middle shadow-xl border border-(--dialog-outline-color) transition-all duration-300 ease-out data-closed:scale-95 data-closed:opacity-0 flex flex-col"
                 >
                     <div className="flex justify-between items-start mb-4 sm:mb-6 gap-4 shrink-0">
                         <DialogTitle as="h3" className="text-xl font-bold leading-6 text-neutral-900 dark:text-white whitespace-nowrap">
-                            属性
+                            {title}
                         </DialogTitle>
-                        <button onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-700">
+                        <button type="button" aria-label="关闭" onClick={onClose} className="text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 transition-colors p-1 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-700">
                             <MdClose className="text-2xl" />
                         </button>
                     </div>
 
+                    {description !== undefined ? <p className="overflow-y-auto whitespace-pre-line text-sm leading-7 text-on-surface-variant">{description}</p> : <>
                     <div className="space-y-5 sm:space-y-6 overflow-y-auto pr-1 sm:pr-2 min-h-0 overscroll-contain">
                         {/* 上半部分：封面 + 核心信息 */}
                         <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden shadow-md shrink-0 border border-neutral-200/30">
+                            <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg bg-neutral-100 dark:bg-neutral-800 overflow-hidden shadow-md shrink-0 border border-(--dialog-outline-color)">
                                 <CoverImage song={displayMeta} className="w-full h-full" iconClassName="text-5xl" />
                             </div>
 
@@ -170,15 +174,7 @@ export default function InfoDialog({ isOpen, onClose, song }: InfoDialogProps) {
                         </div>
                     </div>
 
-                    <div className="mt-5 sm:mt-8 flex justify-end shrink-0">
-                        <button
-                            type="button"
-                            className="w-full inline-flex justify-center rounded-xl px-4 py-2 text-sm font-medium bg-primary/10 text-primary hover:bg-primary/20 dark:bg-primary/20 dark:text-primary dark:hover:bg-primary/30 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                            onClick={onClose}
-                        >
-                            关闭
-                        </button>
-                    </div>
+                    </>}
                 </DialogPanel>
             </div>
         </Dialog>
