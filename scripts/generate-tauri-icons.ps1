@@ -94,8 +94,11 @@ try {
 
     Save-Png $image $bounds 32 (Join-Path $outputPath '32x32.png') $PaddingRatio
     Save-Png $image $bounds 128 (Join-Path $outputPath '128x128.png') $PaddingRatio
+    Save-Png $image $bounds 256 (Join-Path $outputPath '128x128@2x.png') $PaddingRatio
+    Save-Png $image $bounds 512 (Join-Path $outputPath 'icon.png') $PaddingRatio
 
-    $icoSizes = @(16, 24, 32, 48, 64, 128, 256)
+    # Keep 32px first for window icon consumers that select the first entry.
+    $icoSizes = @(32, 16, 24, 48, 64, 96, 128, 256)
     $icoPath = Join-Path $outputPath 'icon.ico'
     $icoStream = [System.IO.File]::Open($icoPath, [System.IO.FileMode]::Create)
     $icoWriter = New-Object System.IO.BinaryWriter $icoStream
@@ -150,7 +153,8 @@ try {
         @{ Type = 'icp6'; Size = 64 },
         @{ Type = 'ic07'; Size = 128 },
         @{ Type = 'ic08'; Size = 256 },
-        @{ Type = 'ic09'; Size = 512 }
+        @{ Type = 'ic09'; Size = 512 },
+        @{ Type = 'ic10'; Size = 1024 }
     )
     $icnsPayloads = @()
     foreach ($entry in $icnsEntries) {

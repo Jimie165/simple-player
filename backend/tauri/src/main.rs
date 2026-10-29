@@ -67,6 +67,7 @@ fn main() {
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
                 modules::window_fullscreen::initialize(&window)?;
+                modules::window_icon::initialize(&window)?;
             }
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
