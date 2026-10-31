@@ -134,9 +134,11 @@ export function createLineFill(
     });
 
     let currentWordIndex = -1;
+    let currentTimeMs = -Infinity;
     let currentHeadPx = timeline[0]?.startPx ?? 0;
     return {
         update(timeMs: number) {
+            currentTimeMs = timeMs;
             currentWordIndex = -1;
             plans.forEach((plan, wordIndex) => {
                 if (plan && timeMs >= plan.startMs) currentWordIndex = wordIndex;
@@ -165,6 +167,10 @@ export function createLineFill(
         getFillStop(wordIndex: number, runtime: LineFillCharRuntime): number | null {
             const plan = plans[wordIndex];
             if (!plan) return null;
+            // Keep the entire feather outside words that have not started, even within a shared chain.
+            if (currentTimeMs <= plan.startMs) {
+                return -(runtime.fillFeatherPx + 1) / runtime.fillMaskWidthPx * 100;
+            }
             const currentPlan = plans[currentWordIndex];
             const headPx = currentPlan && plan.chainIndex === currentPlan.chainIndex
                 ? currentHeadPx
