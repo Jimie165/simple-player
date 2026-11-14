@@ -57,7 +57,7 @@ export default function PlaylistCardsGrid({
         <VirtualizedGrid
             data={filteredPlaylists}
             itemKey={(_index, playlist) => getMusicItemId(playlist)}
-            listClassName="grid content-grid-cover gap-6 pb-8"
+            listClassName="grid content-grid-cover gap-6"
             listStyle={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
             itemContent={(_index, pl) => {
                 if (pl.id === 'favorites' || pl.id === 'playlist:favorites') {

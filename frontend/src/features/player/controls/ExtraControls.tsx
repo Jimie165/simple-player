@@ -63,8 +63,8 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
         return () => document.removeEventListener("pointerdown", handleClickOutside);
     }, []);
 
-    const utilityButtonClass = "grid h-8 w-8 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";
-    const volumeIconClass = clsx("text-xl", showVolumePopup && "text-primary");
+    const utilityButtonClass = "grid h-7 w-7 place-items-center rounded-full text-neutral-600 transition-colors hover:bg-black/5 hover:text-neutral-900 dark:text-white/64 dark:hover:bg-white/10 dark:hover:text-white/90";
+    const volumeIconClass = clsx("text-[18px]", showVolumePopup && "text-primary");
     const queueButton = (
         <CustomTooltip text="播放队列">
             <button
@@ -78,7 +78,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
                 aria-controls="content-play-queue"
                 className={clsx(utilityButtonClass, isQueueOpen && "bg-primary/10 text-primary dark:bg-primary/15 dark:text-primary")}
             >
-                <MdQueueMusic className={clsx("text-xl", isQueueOpen && "text-primary")} />
+                <MdQueueMusic className={clsx("text-[18px]", isQueueOpen && "text-primary")} />
             </button>
         </CustomTooltip>
     );
@@ -116,7 +116,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
                     }}
                     className={clsx(utilityButtonClass, "text-neutral-500 dark:text-white/58")}
                 >
-                    <MdInfoOutline className="text-xl" />
+                    <MdInfoOutline className="text-[18px]" />
                 </button>
             </CustomTooltip>
         </>
@@ -146,7 +146,7 @@ export default function ExtraControls({ onInfoClick, mode, isQueueOpen, canShowQ
             </div>
 
             {showCompactMenu && (
-                <div className="absolute right-0 bottom-11 z-30 flex items-center gap-1 rounded-full border border-black/8 bg-white/78 px-2 py-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-[20px] backdrop-saturate-180 dark:border-white/[0.14] dark:bg-[#24262c]/78 dark:shadow-[0_16px_34px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] dark:ring-1 dark:ring-white/4">
+                <div className="absolute right-0 bottom-10 z-30 flex items-center gap-1 rounded-full border border-black/8 bg-white/78 px-2 py-1.5 shadow-[0_10px_24px_rgba(15,23,42,0.14)] backdrop-blur-[20px] backdrop-saturate-180 dark:border-white/[0.14] dark:bg-[#24262c]/78 dark:shadow-[0_16px_34px_rgba(0,0,0,0.38),0_0_0_1px_rgba(255,255,255,0.03)] dark:ring-1 dark:ring-white/4">
                     {controls}
                 </div>
             )}

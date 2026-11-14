@@ -458,7 +458,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-500"></div>
                 </div>
             ) : (
-                <div className="px-2 pb-32 relative z-10">
+                <div className="px-2 relative z-10">
                     <SortableSongList
                         songs={filteredSongs}
                         onPlay={(song, index, options) => { void handlePlaySong(song, index, options).catch(console.error); }}

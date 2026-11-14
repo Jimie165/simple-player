@@ -120,7 +120,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                 <VirtualizedGrid
                     data={videos}
                     itemKey={(_index, video) => getMusicItemId(video)}
-                    listClassName="grid content-grid-video gap-4 p-4 pb-20"
+                    listClassName="grid content-grid-video gap-4 px-4 pt-4"
                     listStyle={getSparseGridStyle(mainContentWidth, videos.length, 16, 'video')}
                     overscan={200}
                     itemContent={(_, video) => {

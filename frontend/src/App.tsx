@@ -215,7 +215,7 @@ function App() {
               <ScrollArea className="h-full" topOffset={48} navigationScrollKey={scrollKey}>
                 <div className="relative">
                   <DetailScrollHeader className="-mb-10" />
-                  <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                  <div className="pt-12 min-h-full transition-colors duration-300">
                     {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
                   </div>
                 </div>

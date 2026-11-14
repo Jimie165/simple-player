@@ -43,7 +43,7 @@ export default function RetainedMediaPage({ active, children, scrollKey, onExitC
                 <ScrollArea className="h-full" topOffset={48} navigationScrollKey={retainedScrollKey} navigationActive={active}>
                     <div className="relative">
                         <DetailScrollHeader className="-mb-10" />
-                        <div className="pt-12 min-h-full pb-24 transition-colors duration-300">{children}</div>
+                        <div className="pt-12 min-h-full transition-colors duration-300">{children}</div>
                     </div>
                 </ScrollArea>
             </Activity>

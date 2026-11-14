@@ -37,8 +37,8 @@ export function PlaybackControlButtons({
 }: PlaybackControlButtonsProps) {
     return (
         <div className={clsx(
-            "relative z-10 row-start-1 flex min-w-0 items-center gap-1.5",
-            isMini ? "col-start-2 justify-end gap-2" : "col-start-1 justify-center"
+            "relative z-10 row-start-1 flex min-w-0 items-center gap-1",
+            isMini ? "col-start-2 justify-end" : "col-start-1 justify-center"
         )}>
             <div className={clsx(isMini && "hidden")}>
                 <CustomTooltip text={"随机播放"}>
@@ -58,7 +58,7 @@ export function PlaybackControlButtons({
 
             <CustomTooltip text="上一首">
                 <button onClick={handlePrev} className={clsx(
-                    "grid h-7 w-7 place-items-center rounded-full text-[23px] text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
+                    "grid h-7 w-7 place-items-center rounded-full text-[21px] text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
                     isMini && "hidden"
                 )}>
                     <MdSkipPrevious />
@@ -71,7 +71,7 @@ export function PlaybackControlButtons({
                     disabled={!metadata}
                     className={clsx(
                         "grid place-items-center rounded-full transition-all active:scale-95",
-                        isMini ? "h-11 w-11 text-[44px]" : "h-8 w-8 text-[32px]",
+                        isMini ? "h-9 w-9 text-[36px]" : "h-8 w-8 text-[30px]",
                         metadata
                             ? "cursor-pointer text-primary drop-shadow-[0_1px_2px_rgba(0,0,0,0.08)] hover:text-primary/90 hover:scale-[1.04]"
                             : "cursor-not-allowed text-neutral-300 dark:text-neutral-600"
@@ -84,7 +84,7 @@ export function PlaybackControlButtons({
             <CustomTooltip text="下一首">
                 <button onClick={handleNext} className={clsx(
                     "grid place-items-center rounded-full text-neutral-900 transition-all hover:bg-black/5 active:scale-90 dark:text-white/88 dark:hover:bg-white/10",
-                    isMini ? "h-10 w-10 text-[34px]" : "h-7 w-7 text-[23px]"
+                    isMini ? "h-8 w-8 text-[28px]" : "h-7 w-7 text-[21px]"
                 )}>
                     <MdSkipNext />
                 </button>

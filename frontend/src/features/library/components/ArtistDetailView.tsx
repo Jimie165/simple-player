@@ -322,7 +322,7 @@ export default function ArtistDetailView({
             </div>
 
             {/* Content Area */}
-            <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2 pb-20">
+            <div className="grid flex-1 min-h-[clamp(28rem,60vh,52rem)] px-2">
                 <AnimatePresence mode="wait" initial={false}>
                     {activeTab === 'albums' ? (
                         <motion.div
@@ -353,7 +353,6 @@ export default function ArtistDetailView({
                                     computeItemKey={(_index, album) => `${album.name}::${album.artist}`}
                                     itemContent={(index, album) => <ArtistAlbumSection album={album} index={index} render={renderAlbum} />}
                                 />}
-                                <div className="h-20 w-full" />
                             </div>
                         </motion.div>
                     )}

@@ -190,7 +190,7 @@ export default function ArtistGridView({ artists, onPlayArtist, onShuffleArtist,
             <VirtualizedGrid
                 data={artists}
                 itemKey={(_index, artist) => getMusicItemId(artist)}
-                listClassName="grid content-grid-cover gap-4 pt-4 pb-24"
+                listClassName="grid content-grid-cover gap-4 pt-4"
                 itemContent={(_index, artist) => renderArtistCard(artist)}
             />
             {/* Cursor Context Menu */}

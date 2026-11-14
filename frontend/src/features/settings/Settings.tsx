@@ -33,7 +33,7 @@ export default function Settings() {
 
     return (
         <PageContainer title="设置">
-            <div className="w-full pb-20">
+            <div className="w-full">
                 {/* 图标分类栏 */}
                 <div className="mb-8 flex justify-center">
                     <div role="tablist" aria-label="设置分类" className="settings-glass inline-flex gap-1 rounded-2xl p-1">

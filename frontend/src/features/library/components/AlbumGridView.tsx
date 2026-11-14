@@ -115,7 +115,7 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             <VirtualizedGrid
                 data={albums}
                 itemKey={(_index, album) => getAlbumId(album)}
-                listClassName="grid content-grid-cover gap-6 pt-2 pb-20"
+                listClassName="grid content-grid-cover gap-6 pt-2"
                 listStyle={getSparseGridStyle(mainContentWidth, albums.length, 24, 'cover')}
                 itemContent={(_index, album) => {
                     const id = getAlbumId(album);

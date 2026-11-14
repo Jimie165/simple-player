@@ -316,7 +316,7 @@ export default function Library() {
                                     sortControl={{ value: songSorting, onChange: handleSongSortingChange }}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
-                                    footerSpacerClassName="h-6"
+                                    footerSpacerClassName="h-0"
                                 />
                             </motion.div>
                         )}

@@ -220,7 +220,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                     <p className="text-lg font-medium">{error}</p>
                 </div>
             ) : hasAnyResults ? (
-                <div className="pb-8 flex flex-col gap-8">
+                <div className="flex flex-col gap-8">
                     {/* Artists Section */}
                     {matchingArtists.length > 0 && (
                         <section>

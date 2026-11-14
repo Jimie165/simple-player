@@ -254,26 +254,27 @@ body {
     pointer-events: none;
   }
 
+  .content-player-shell {
+    /* Snappy in, slow critically damped out. */
+    --spring-info-in: linear(0, 0.042, 0.141, 0.266, 0.395, 0.518, 0.626, 0.719, 0.794, 0.854, 0.9, 0.935, 0.96, 0.978, 0.99, 0.998, 1.002, 1.005, 1.006, 1.006, 1.006, 1.005, 1.004, 1.004, 1);
+    --spring-info-out: linear(0, 0.065, 0.197, 0.34, 0.472, 0.584, 0.676, 0.749, 0.806, 0.851, 0.886, 0.912, 0.933, 0.949, 0.961, 0.97, 0.977, 0.982, 0.987, 0.99, 0.992, 0.994, 0.995, 0.997, 1);
+  }
+
+  /* Kept here rather than as utilities so the hover state below can swap in the snappy curve. */
+  .player-song-info {
+    transition-property: opacity, filter, transform;
+    transition-duration: 450ms;
+    transition-timing-function: var(--spring-info-out);
+  }
+
   .content-player-shell:has(.player-progress:hover, .player-progress[data-dragging]) .player-song-info {
     opacity: 0.5;
+    filter: blur(4px);
+    transform: translateY(-3px) scale(0.965);
     pointer-events: none;
-  }
-
-  .player-progress::before {
-    content: '';
-    position: absolute;
-    inset-inline: -8px;
-    bottom: 0;
-    height: 72px;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0;
-    backdrop-filter: blur(4px);
-    transition: opacity 200ms ease;
-  }
-
-  .player-progress:is(:hover, [data-dragging])::before {
-    opacity: 1;
+    transition-duration: 150ms;
+    transition-timing-function: var(--spring-info-in);
+    transition-delay: 30ms;
   }
 
   .player-progress[data-dragging] span {
@@ -595,6 +596,11 @@ body {
 
   .main-content-query {
     container: main-content / inline-size;
+  }
+
+  .main-content-query [data-scroll-viewport] > .relative {
+    /* Floating player: 16px bottom inset + 56px height + 24px content gap. */
+    padding-bottom: 96px;
   }
 
   .content-grid-cover,

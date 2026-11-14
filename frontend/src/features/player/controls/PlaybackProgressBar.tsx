@@ -36,7 +36,7 @@ export function PlaybackProgressBar({
     const loading = usePlaybackLoadingVisible();
     return (
         <div className={clsx(
-            "player-progress relative z-20 col-start-2 col-end-3 row-start-1 mb-1 flex self-end text-[10px] font-medium text-neutral-500 dark:text-white/50",
+            "player-progress relative z-20 col-start-2 col-end-3 row-start-1 -mb-1 flex self-end text-[10px] font-medium text-neutral-500 dark:text-white/50",
             isMini && "hidden"
         )} data-dragging={isDragging || undefined}>
             <div className="playback-progress-interactive group relative flex h-5 flex-1 items-center">

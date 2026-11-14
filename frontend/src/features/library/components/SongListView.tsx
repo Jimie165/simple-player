@@ -211,7 +211,7 @@ export default function SongListView({
         let cols = "24px minmax(0,4fr)";
         if (!effectiveHideArtist) cols += " minmax(0,3fr)";
         if (!effectiveHideAlbum) cols += " minmax(0,3fr)";
-        cols += " 100px 40px";
+        cols += " 48px 40px";
         return cols;
     };
     const gridTemplateColumns = getGridCols();
