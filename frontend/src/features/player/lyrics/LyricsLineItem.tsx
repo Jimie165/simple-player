@@ -188,7 +188,7 @@ function LyricsLineItem({
         >
             <span
                 className={clsx(
-                    'block font-bold leading-[1.38] tracking-wide relative',
+                    'block font-bold leading-[1.38] relative',
                     mainTextClass,
                     shouldRenderKaraoke
                         ? (isBackground
@@ -243,7 +243,7 @@ function LyricsLineItem({
                             : undefined,
                     }}
                     className={clsx(
-                        'block font-medium leading-[1.34] tracking-wide mt-1 text-white/30',
+                        'block font-medium leading-[1.34] mt-1 text-white/30',
                         translationTextClass,
                         // 译文不单独高亮；和声仍需随主文字出现和退出，避免残留。
                         isBackground && (isActive ? bgTextActive : bgTextInactive)
