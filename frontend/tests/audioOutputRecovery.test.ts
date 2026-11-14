@@ -348,6 +348,75 @@ describe('audio output failure and queue recovery', () => {
         expect(usePlayerStore.getState().audioLoadingCount).toBe(0);
     });
 
+    it('handles duplicate end notifications only once, including after a failed continuation', async () => {
+        const load = vi.spyOn(audioService, 'load').mockRejectedValue(new Error('output unavailable'));
+        const playback = actions();
+        await Promise.all([playback.handlePlaybackEnded(41), playback.handlePlaybackEnded(41)]);
+        await playback.handlePlaybackEnded(41);
+        expect(load).toHaveBeenCalledOnce();
+        expect(usePlayerStore.getState().handledEndedSessionId).toBe(41);
+        expect(usePlayerStore.getState().pendingQueuePlayback?.song.path).toBe(songs[1].path);
+    });
+
+    it('rechecks an end ignored during a transition without skipping a song', async () => {
+        const prepared = deferred<PlaybackSnapshot>();
+        const load = vi.spyOn(audioService, 'load').mockReturnValueOnce(prepared.promise)
+            .mockResolvedValue({ ...snapshot, session_id: 43, path: songs[0].path ?? null, position: 0 });
+        usePlayerStore.setState({ repeatMode: 'all' });
+        const playback = actions();
+        const switching = playback.playNext();
+        await playback.handlePlaybackEnded(42);
+        expect(usePlayerStore.getState().handledEndedSessionId).toBeNull();
+        let ignoredEnd: Promise<void> | undefined;
+        const unsubscribe = usePlayerStore.subscribe((state, previous) => {
+            if (state.playbackSessionId === 42 && previous.playbackSessionId !== 42) {
+                ignoredEnd = playback.handlePlaybackEnded(42);
+            }
+        });
+        prepared.resolve({ ...snapshot, session_id: 42, path: songs[1].path ?? null, position: 0 });
+        await switching;
+        unsubscribe();
+        await ignoredEnd;
+        expect(usePlayerStore.getState().handledEndedSessionId).toBeNull();
+        await playback.handlePlaybackEnded(41);
+        expect(load).toHaveBeenCalledOnce();
+        vi.mocked(audioService.resume).mockResolvedValue({
+            ...snapshot, session_id: 43, path: songs[0].path ?? null, status: 'playing', position: 0,
+        });
+        await playback.handlePlaybackEnded(42);
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(useLibraryStore.getState().currentSongIndex).toBe(0);
+        expect(usePlayerStore.getState().playbackSessionId).toBe(43);
+    });
+
+    it.each(['off', 'one'] as const)('handles the queue end only once with repeat=%s', async repeatMode => {
+        usePlayerStore.setState({ repeatMode, metadata: songs[1], playbackPath: songs[1].path });
+        useLibraryStore.setState({ currentSongIndex: 1 });
+        const load = vi.spyOn(audioService, 'load').mockResolvedValue({
+            ...snapshot, session_id: 42, path: songs[1].path ?? null, position: 0,
+        });
+        const playback = actions();
+        await playback.handlePlaybackEnded(41);
+        await playback.handlePlaybackEnded(41);
+        expect(load).toHaveBeenCalledOnce();
+        expect(useLibraryStore.getState().currentSongIndex).toBe(1);
+        expect(usePlayerStore.getState().isPlaying).toBe(repeatMode === 'one');
+    });
+
+    it('defers an end while seeking and accepts it once seeking completes', async () => {
+        const load = vi.spyOn(audioService, 'load').mockResolvedValue({
+            ...snapshot, session_id: 42, path: songs[1].path ?? null, position: 0,
+        });
+        const playback = actions();
+        usePlayerStore.setState({ isSeeking: true });
+        await playback.handlePlaybackEnded(41);
+        expect(load).not.toHaveBeenCalled();
+        expect(usePlayerStore.getState().handledEndedSessionId).toBeNull();
+        usePlayerStore.setState({ isSeeking: false });
+        await playback.handlePlaybackEnded(41);
+        expect(load).toHaveBeenCalledOnce();
+    });
+
     it('retries the pending next track after automatic continuation fails', async () => {
         vi.spyOn(audioService, 'pause').mockResolvedValue(snapshot);
         const play = vi.spyOn(audioService, 'load').mockRejectedValueOnce(new Error('output unavailable'))

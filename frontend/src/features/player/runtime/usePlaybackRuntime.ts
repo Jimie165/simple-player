@@ -35,6 +35,7 @@ function usePlaybackRuntime() {
         seek,
     } = usePlaybackActions();
 
+    const snapshotEpochRef = useRef(0);
     const currentTimeRef = useRef(currentTime);
     const isSeekingRef = useRef(isSeeking);
     const callbacksRef = useRef({
@@ -49,6 +50,13 @@ function usePlaybackRuntime() {
         position: currentTime,
         updatedAt: 0,
     });
+
+    // A reply requested before a seek or track replacement cannot describe the current source.
+    useEffect(() => usePlayerStore.subscribe((state, previous) => {
+        if (state.isSeeking !== previous.isSeeking || state.audioSeekInFlight !== previous.audioSeekInFlight
+            || state.audioLoadingCount !== previous.audioLoadingCount || state.playbackSessionId !== previous.playbackSessionId
+            || state.metadata?.path !== previous.metadata?.path) snapshotEpochRef.current++;
+    }), []);
 
     useEffect(() => {
         currentTimeRef.current = currentTime;
@@ -103,14 +111,18 @@ function usePlaybackRuntime() {
                 currentSessionId !== 0 &&
                 endedSessionId !== currentSessionId
             ) return;
-            void callbacksRef.current.handlePlaybackEnded();
+            void callbacksRef.current.handlePlaybackEnded(endedSessionId);
         });
         void register<AudioOutputError>('audio:output-error', handleAudioOutputError);
         void register<PlaybackSnapshot>('audio:state-changed', (snapshot) => {
             const state = usePlayerStore.getState();
+            if (snapshot.status === 'ended') {
+                if (snapshot.path === state.metadata?.path && snapshot.path === state.playbackPath && !snapshot.output_unavailable) {
+                    void callbacksRef.current.handlePlaybackEnded(snapshot.session_id);
+                }
+                return;
+            }
             if (
-                // End-of-track is resolved by audio:ended, including automatic continuation.
-                snapshot.status === 'ended' ||
                 state.mediaKind === 'video' ||
                 (snapshot.session_id !== 0 &&
                     state.playbackSessionId !== 0 &&
@@ -165,14 +177,22 @@ function usePlaybackRuntime() {
     }, [metadata?.path, resetPlaybackClock, restartTrigger]);
 
     useEffect(() => {
-        if (!isPlaying || mediaKind !== 'audio') return;
+        if (mediaKind !== 'audio') return;
 
         let disposed = false;
         const poll = async () => {
             if (disposed || isSeekingRef.current || usePlayerStore.getState().audioLoadingCount > 0) return;
+            const epoch = snapshotEpochRef.current;
             try {
                 const snapshot = await audioService.getPlaybackSnapshot();
-                if (!disposed && !isSeekingRef.current && snapshot.status !== 'ended') {
+                if (!disposed && !isSeekingRef.current && epoch === snapshotEpochRef.current) {
+                    if (snapshot.status === 'ended') {
+                        const state = usePlayerStore.getState();
+                        if (snapshot.path === state.metadata?.path && snapshot.path === state.playbackPath && !snapshot.output_unavailable) {
+                            await callbacksRef.current.handlePlaybackEnded(snapshot.session_id);
+                        }
+                        return;
+                    }
                     setPlaybackSnapshot(snapshot);
                     const current = usePlayerStore.getState();
                     if (current.playbackSessionId !== snapshot.session_id || current.playbackPath !== snapshot.path) return;
@@ -188,7 +208,7 @@ function usePlaybackRuntime() {
 
         void poll();
         const interval = window.setInterval(() => void poll(), 1000);
-        const clock = window.setInterval(() => {
+        const clock = isPlaying ? window.setInterval(() => {
             const state = usePlayerStore.getState();
             if (disposed || state.mediaKind !== 'audio' || !state.isPlaying || !state.isAudioLoaded || state.audioLoadingCount > 0 || state.isSeeking) return;
 
@@ -198,11 +218,11 @@ function usePlaybackRuntime() {
                 ? Math.min(positionAnchorRef.current.position + elapsed, duration)
                 : positionAnchorRef.current.position + elapsed;
             setPlaybackTime(nextPosition);
-        }, 100);
+        }, 100) : null;
         return () => {
             disposed = true;
             window.clearInterval(interval);
-            window.clearInterval(clock);
+            if (clock !== null) window.clearInterval(clock);
         };
     }, [isPlaying, mediaKind, setPlaybackSnapshot, setPlaybackTime]);
 

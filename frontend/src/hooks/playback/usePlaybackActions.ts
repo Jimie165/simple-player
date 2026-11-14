@@ -528,11 +528,15 @@ export function usePlaybackActions() {
         }, true);
     }, [applyQueueItemPlayback, seek]);
 
-    const handlePlaybackEnded = useCallback(async () => {
-        if (playbackTransitionRunning) return;
+    const handlePlaybackEnded = useCallback(async (endedSessionId = usePlayerStore.getState().playbackSessionId) => {
+        const state = usePlayerStore.getState();
+        if (playbackTransitionRunning || state.audioLoadingCount > 0 || state.isSeeking || state.audioSeekInFlight
+            || state.mediaKind !== 'audio' || !state.isAudioLoaded || state.audioRetryPosition !== null
+            || endedSessionId <= 0 || endedSessionId !== state.playbackSessionId
+            || endedSessionId === state.handledEndedSessionId) return;
 
         await runPlaybackTransition(async (transitionId) => {
-            const endedSessionId = usePlayerStore.getState().playbackSessionId;
+            usePlayerStore.setState({ handledEndedSessionId: endedSessionId });
             try {
                 const { playlist, currentSongIndex, getNextIndex } = useLibraryStore.getState();
                 const { repeatMode, metadata } = usePlayerStore.getState();

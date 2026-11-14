@@ -19,6 +19,7 @@ interface PlayerState {
     playbackPath: string | null;
     playbackRevision: number;
     playbackSessionId: number;
+    handledEndedSessionId: number | null;
     pendingQueuePlayback: { song: SongMetadata; index: number; sessionId: number } | null;
     mediaKind: MediaKind;
 
@@ -90,6 +91,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     playbackPath: null,
     playbackRevision: 0,
     playbackSessionId: 0,
+    handledEndedSessionId: null,
     pendingQueuePlayback: null,
     mediaKind: null,
     isShuffling: false,
