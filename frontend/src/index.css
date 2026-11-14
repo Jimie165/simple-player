@@ -866,6 +866,21 @@ body {
     rgba(0, 0, 0, var(--kw-tail, 1)) calc(0.3em + (100% - 0.6em) * var(--kf, -100) / 100 + 0.16em));
 }
 
+/* Larger mask is scoped to line fill combined with word-group motion. */
+.karaoke-text-word-float.karaoke-text-line-word-mask .karaoke-word-motion {
+  padding: 0.5em;
+  margin: -0.5em;
+  --kw-head: calc(0.5em + (100% - 1em) * var(--kf, -100) / 100);
+  mask-image: linear-gradient(to right,
+    black calc(var(--kw-head) - 0.25em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.926)) calc(var(--kw-head) - 0.1667em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.741)) calc(var(--kw-head) - 0.0833em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.5)) var(--kw-head),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.259)) calc(var(--kw-head) + 0.0833em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.074)) calc(var(--kw-head) + 0.1667em),
+    rgba(0, 0, 0, var(--kw-tail, 1)) calc(var(--kw-head) + 0.25em));
+}
+
 .karaoke-text-word-float .karaoke-char::before {
   -webkit-mask-image: none;
   mask-image: none;

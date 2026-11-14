@@ -18,6 +18,7 @@ type WordFillPlan = {
     startPx: number;
     endPx: number;
     featherPx: number;
+    maskPaddingPx: number;
     bridgeFromPrevious: boolean;
     bridgeToNext: boolean;
     chainIndex: number;
@@ -93,7 +94,9 @@ export function createLineFill(
                 Math.min(sourceDurationMs, parsedDurationMs) * compressedSpanMs / parsedDurationMs),
             startPx: firstRuntime.fillLeftPx,
             endPx: lastRuntime.fillLeftPx + lastRuntime.fillWidthPx,
-            featherPx: firstRuntime.fillFeatherPx,
+            // Match the 0.5em-wide word mask and its 0.5em padding in index.css.
+            featherPx: wordFill ? fontSize * 0.25 : firstRuntime.fillFeatherPx,
+            maskPaddingPx: wordFill ? fontSize * 0.5 : 0,
             bridgeFromPrevious: false,
             bridgeToNext: false,
             chainIndex: -1,
@@ -153,11 +156,19 @@ export function createLineFill(
         },
         getWordFillStop(wordIndex: number): number | null {
             const group = wordGroups[wordIndex];
-            if (!group?.length) return null;
+            const plan = plans[wordIndex];
+            if (!group?.length || !plan) return null;
             const first = charRuntimes[group[0].flatIndex];
             const last = charRuntimes[group[group.length - 1].flatIndex];
             if (!first || !last) return null;
             const width = last.fillLeftPx + last.fillWidthPx - first.fillLeftPx;
+            if (wordFill) {
+                const reach = plan.featherPx + plan.maskPaddingPx + 1;
+                if (currentTimeMs <= plan.startMs) return -reach / Math.max(1, width) * 100;
+                if (!plan.bridgeToNext && currentTimeMs >= plan.startMs + plan.durationMs) {
+                    return (width + reach) / Math.max(1, width) * 100;
+                }
+            }
             return this.getFillStop(wordIndex, {
                 ...first,
                 fillPaddingPx: 0,
