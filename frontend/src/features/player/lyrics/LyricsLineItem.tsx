@@ -256,11 +256,12 @@ function LyricsLineItem({
     );
 
     // 背景和声行：独立层承载从小变大过渡（配合文字淡入淡出），
-    // 对齐间奏 origin-left，不与 animator 的 scale 层（data-animated-lyrics-scale）冲突
+    // 原点随对唱的对齐方向，不与 animator 的 scale 层（data-animated-lyrics-scale）冲突
     const renderedContent = isBackground ? (
         <div
             className={clsx(
-                'lyrics-bg-scale-layer origin-left',
+                'lyrics-bg-scale-layer',
+                isDuetRow ? 'origin-right' : 'origin-left',
                 isActive ? bgScaleActive : bgScaleInactive
             )}
             style={{ willChange: 'transform' }}

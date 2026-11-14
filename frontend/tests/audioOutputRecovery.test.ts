@@ -361,4 +361,18 @@ describe('audio output failure and queue recovery', () => {
         expect(useLibraryStore.getState().currentSongIndex).toBe(1);
         expect(usePlayerStore.getState().pendingQueuePlayback).toBeNull();
     });
+    it('replaces a source playlist without inheriting its prior source or manual queue flags', async () => {
+        useLibraryStore.setState({ queueContext: { type: 'album_detail', name: 'Old album' } });
+        const queuedSong = { ...songs[1], is_queue_item: true };
+        const load = vi.spyOn(audioService, 'load').mockResolvedValue({
+            ...snapshot, session_id: 42, path: queuedSong.path ?? null, position: 0,
+        });
+        await actions().playList({ songs: [queuedSong] });
+        expect(useLibraryStore.getState().queueContext).toBeNull();
+        expect(useLibraryStore.getState().playlist[0].is_queue_item).toBeUndefined();
+        expect(load).toHaveBeenCalledWith(queuedSong.path, songs[1]);
+        expect(usePlayerStore.getState().metadata?.is_queue_item).toBeUndefined();
+        expect(queuedSong.is_queue_item).toBe(true);
+    });
+
 });

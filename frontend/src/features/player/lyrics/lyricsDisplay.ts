@@ -732,7 +732,10 @@ export function buildDisplayItems(
         }
 
         if (isTimelineLine) {
-            pendingEndMs = typeof line.end_time_ms === 'number' ? line.end_time_ms : null;
+            // Overlapping voices must not shorten a preceding line's sung interval.
+            pendingEndMs = typeof line.end_time_ms === 'number'
+                ? Math.max(pendingEndMs ?? line.end_time_ms, line.end_time_ms)
+                : null;
             if (typeof line.start_time_ms === 'number') lastLyricLineIndex = index;
         }
     }

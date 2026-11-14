@@ -6,6 +6,13 @@ export interface QueueStateSlice {
     currentSongIndex: number;
 }
 
+export function withoutQueueMetadata(song: SongMetadata): SongMetadata {
+    if (!('is_queue_item' in song)) return song;
+    const metadata = { ...song };
+    delete metadata.is_queue_item;
+    return metadata;
+}
+
 export function toggleShuffleListFn(state: QueueStateSlice, enable: boolean): Partial<QueueStateSlice> | null {
     const { originalPlaylist, playlist, currentSongIndex } = state;
     const currentSong = playlist[currentSongIndex];

@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { MdMusicNote } from 'react-icons/md';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { getMusicItemId } from '@/utils/musicItemUtils';
+import { getMusicItemId, loadPlaylistSongsInSavedOrder } from '@/utils/musicItemUtils';
 
 import PageContainer from '@/components/layout/PageContainer';
 import { libraryService } from '@/services/libraryService';
@@ -184,7 +184,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     // 完整歌曲只在播放或加入队列时按需查询，不再为卡片常驻缓存。
     const loadPlaylistSongs = useCallback(async (playlistId: number) => {
         try {
-            return await libraryService.getPlaylistSongs(playlistId);
+            return await loadPlaylistSongsInSavedOrder(playlistId);
         } catch (error) {
             console.warn(`Failed to load playlist songs for ${playlistId}`, error);
             return [];
@@ -263,7 +263,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     // 播放喜爱歌曲
     const handlePlayFavorites = async (shuffle = false) => {
         try {
-            const songs = await libraryService.getFavorites();
+            const songs = await loadPlaylistSongsInSavedOrder('favorites');
             if (songs.length === 0) return;
             const recentItem = {
                 id: `playlist:favorites`,
@@ -309,7 +309,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     // 添加喜爱歌曲到播放队列
     const handleAddFavoritesToQueue = async () => {
         try {
-            const songs = await libraryService.getFavorites();
+            const songs = await loadPlaylistSongsInSavedOrder('favorites');
             addMultipleToNext(songs, true);
         } catch (error) {
             console.error('Failed to add favorites to queue:', error);

@@ -383,7 +383,7 @@ export default function SortableSongList({
                 </SortableContext>
 
                 {typeof document !== 'undefined' && createPortal(
-                    <DragOverlay adjustScale={true}>
+                    <DragOverlay adjustScale={true} className="pointer-events-none">
                         {activeId ? (() => {
                             const activeSong = songs.find((s, i) => getSongId(s, i) === activeId);
                             if (!activeSong) return null;

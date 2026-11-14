@@ -87,6 +87,10 @@ export function getAnimatedLyricsSpringParams({
     for (let index = activeDisplayIndex - 1; index >= 0; index--) {
         const item = displayItems[index];
         if (item.type === 'interlude') break;
+        if (!hasPreviousMain && item.line.role === 'main' && item.line.words.length === 0
+            && (item.line.end_time_ms === null || item.line.end_time_inferred)) {
+            return { stiffness: 100, damping: 18, mass: 1 };
+        }
         const endMs = getLineKaraokeEndMs(item.line, nextMainStartMs);
         if (endMs !== null) previousGroupEndMs = Math.max(previousGroupEndMs ?? endMs, endMs);
         if (item.line.role === 'main') {

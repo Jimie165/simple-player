@@ -185,9 +185,9 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     };
 
     const handlePlayAll = async () => {
-        if (songs.length > 0) {
+        if (filteredSongs.length > 0) {
             await playList({
-                songs,
+                songs: filteredSongs,
                 startIndex: 0,
                 options: {
                     restartIfCurrent: true,
@@ -207,9 +207,9 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     };
 
     const handleShuffle = async () => {
-        if (songs.length > 0) {
+        if (filteredSongs.length > 0) {
             await shufflePlay({
-                songs,
+                songs: filteredSongs,
                 options: {
                     buildRecentItem: buildRecentForSong
                 },

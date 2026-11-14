@@ -344,6 +344,7 @@ export default function NowPlayingQueue({
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
             modifiers={[restrictToVerticalAxis, restrictToQueueViewport]}
+            autoScroll={{ canScroll: element => element === scrollParent }}
         >
             <SortableContext
                 items={allSortableItems}

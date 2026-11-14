@@ -67,6 +67,8 @@ export interface LyricsLine {
     role: LyricsLineRole;
     start_time_ms: number | null;
     end_time_ms: number | null;
+    /** 行尾由下一时间标记推导，并非实际演唱结束时间。 */
+    end_time_inferred?: boolean;
     text: string;
     words: LyricsWord[];
     translation?: string | null;

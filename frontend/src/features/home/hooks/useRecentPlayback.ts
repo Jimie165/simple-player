@@ -9,7 +9,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { sortSongs } from '@/utils/songSort';
+import { loadPlaylistSongsInSavedOrder } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import { getSelectedPath } from '@/utils/dialogSelection';
 import { songMatchesAlbum } from '@/features/library/utils/grouping';
@@ -250,14 +250,11 @@ export function useRecentPlayback() {
                 let songs: SongMetadata[] = [];
 
                 if (plIdStr === 'favorites') {
-                    songs = await libraryService.getFavorites();
+                    songs = await loadPlaylistSongsInSavedOrder('favorites');
                 } else {
                     const plId = parseInt(plIdStr);
                     if (!isNaN(plId)) {
-                        const rawSongs = await libraryService.getPlaylistSongs(plId);
-                        const { getPlaylistSettings } = useLibraryStore.getState();
-                        const settings = getPlaylistSettings(plIdStr);
-                        songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
+                        songs = await loadPlaylistSongsInSavedOrder(plId);
                     }
                 }
                 await playListHelper(songs);

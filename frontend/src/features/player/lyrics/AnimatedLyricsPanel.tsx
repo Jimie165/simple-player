@@ -115,7 +115,7 @@ function AnimatedLyricsPanel({
     const { renderCurrentMs, preciseMsRef, syncRevision } = usePrecisePlaybackTime(
         currentTime,
         timeline.getRenderKey,
-        isPlaying,
+        true,
         frameScheduler,
     );
     const { focusIndex: activeDisplayIndex, activeIndices, karaokeActiveIndices } = useMemo(
@@ -279,6 +279,14 @@ function AnimatedLyricsPanel({
         const frame = requestAnimationFrame(() => setPausedScroll(false));
         return () => cancelAnimationFrame(frame);
     }, [isPlaying]);
+
+    useEffect(() => usePlayerStore.subscribe((state, previous) => {
+        if (!state.isSeeking || previous.isSeeking) return;
+        pausedScrollRef.current = false;
+        manualScrollActiveRef.current = false;
+        setPausedScroll(false);
+        setIsUserScrolling(false);
+    }), []);
 
     const animatorTargetScrollY = shouldAutoFollow ? activeTargetScrollY : targetScrollY;
 

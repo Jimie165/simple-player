@@ -211,6 +211,18 @@ export default function LyricsPanel({
         if (isPlaying) pausedScrollRef.current = false;
     }, [isPlaying]);
 
+    useEffect(() => usePlayerStore.subscribe((state, previous) => {
+        if (!state.isSeeking || previous.isSeeking) return;
+        if (userScrollTimeoutRef.current) {
+            clearTimeout(userScrollTimeoutRef.current);
+            userScrollTimeoutRef.current = null;
+        }
+        pausedScrollRef.current = false;
+        userScrollingRef.current = false;
+        setIsUserScrolling(false);
+        lastAutoScrollIndexRef.current = null;
+    }), []);
+
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
         if (status === 'error') return '歌词读取失败';
@@ -416,7 +428,6 @@ export default function LyricsPanel({
 
     useEffect(() => {
         if (!isOpen || !hasTimestamps || lines.length === 0) return;
-        if (!isPlaying) return;
         if (activeDisplayIndex < 0) {
             autoScroll.cancel();
             lastAutoScrollIndexRef.current = null;

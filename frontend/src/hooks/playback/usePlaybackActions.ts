@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
-import { getManualNextIndexFn, getPreviousIndexFn } from '@/store/actions/queueActions';
+import { getManualNextIndexFn, getPreviousIndexFn, withoutQueueMetadata } from '@/store/actions/queueActions';
 import { audioService } from '@/services/audioService';
 import type { RecentItem, SongMetadata } from '@/types';
 import toast from 'react-hot-toast';
@@ -88,7 +88,6 @@ export function usePlaybackActions() {
     const setCurrentSongIndex = useLibraryStore(state => state.setCurrentSongIndex);
     const toggleShuffleList = useLibraryStore(state => state.toggleShuffleList);
     const addToRecent = useLibraryStore(state => state.addToRecent);
-    const setQueueContext = useLibraryStore(state => state.setQueueContext);
     const setShuffleState = usePlayerStore(state => state.setShuffleState);
     const setRepeatState = usePlayerStore(state => state.setRepeatState);
     const togglePlayerShuffle = usePlayerStore(state => state.toggleShuffle);
@@ -297,17 +296,11 @@ export function usePlaybackActions() {
             if (playlist && playlist.length > 0) {
                 if (options?.disableShuffle) {
                     setShuffleState(false);
-                    setPlaylist(playlist);
-                    if (context) {
-                        setQueueContext(context);
-                    }
+                    setPlaylist(playlist, context ?? null);
                     setCurrentSongIndex(index);
                     toggleShuffleList(false);
                 } else {
-                    setPlaylist(playlist);
-                    if (context) {
-                        setQueueContext(context);
-                    }
+                    setPlaylist(playlist, context ?? null);
                     if (isShuffling) {
                         setCurrentSongIndex(index);
                         toggleShuffleList(true);
@@ -343,7 +336,6 @@ export function usePlaybackActions() {
         setPlaybackSnapshot,
         setPlaybackTime,
         setPlaylist,
-        setQueueContext,
         setShuffleState,
         togglePlayback,
         toggleShuffleList,
@@ -351,7 +343,7 @@ export function usePlaybackActions() {
 
     const playSong = useCallback(async (params: PlaySongParams) => {
         await runPlaybackTransition(async (transitionId) => {
-            await playSongInternal(params, transitionId);
+            await playSongInternal({ ...params, song: withoutQueueMetadata(params.song) }, transitionId);
         }, !isSameSong(usePlayerStore.getState().metadata, params.song));
     }, [playSongInternal]);
 
@@ -366,10 +358,7 @@ export function usePlaybackActions() {
             setRepeatState('off');
         }
 
-        setPlaylist(songs);
-        if (context) {
-            setQueueContext(context);
-        }
+        setPlaylist(songs, context ?? null);
         setCurrentSongIndex(randomIndex);
         toggleShuffleList(true);
         setShuffleState(true);
@@ -390,7 +379,6 @@ export function usePlaybackActions() {
         playSong,
         setCurrentSongIndex,
         setPlaylist,
-        setQueueContext,
         setRepeatState,
         setShuffleState,
         toggleShuffleList,

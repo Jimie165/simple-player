@@ -12,6 +12,7 @@ import {
     removeSongFromPlaylistFn,
     reorderPlaylistFn,
     toggleShuffleListFn,
+    withoutQueueMetadata,
 } from '@/store/actions/queueActions';
 import { isFavoriteFn, refreshFavoritesFn, toggleFavoriteFn } from '@/store/actions/favoriteActions';
 
@@ -43,7 +44,7 @@ interface LibraryState {
     addToRecent: (item: RecentItem) => void;
     removeFromRecent: (id: string) => void;
     updateRecentItemCover: (id: string, newCoverPath: string | null) => void;
-    setPlaylist: (songs: SongMetadata[]) => void;
+    setPlaylist: (songs: SongMetadata[], context: { type: string, name: string, id?: string } | null) => void;
     updateSongInQueues: (song: SongMetadata) => void;
     setCurrentSongIndex: (index: number) => void;
 
@@ -94,7 +95,6 @@ interface LibraryState {
 
     // Queue Context
     queueContext: { type: string, name: string, id?: string } | null;
-    setQueueContext: (context: { type: string, name: string, id?: string } | null) => void;
 }
 
 import { libraryService } from '@/services/libraryService';
@@ -145,7 +145,6 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     queueContext: null,
     lastAddedToPlaylists: {},
 
-    setQueueContext: (context) => set({ queueContext: context }),
 
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
@@ -301,10 +300,10 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         )
     })),
 
-    setPlaylist: (songs) => set({
-        playlist: songs,
-        originalPlaylist: songs
-    }),
+    setPlaylist: (songs, context) => {
+        const playlist = songs.map(withoutQueueMetadata);
+        set({ playlist, originalPlaylist: playlist, queueContext: context });
+    },
 
     updateSongInQueues: (song) => set((state) => {
         const matches = (candidate: SongMetadata) => (

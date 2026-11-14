@@ -1,11 +1,23 @@
 import type { SongMetadata, RecentItem, Playlist } from '@/types';
 import { libraryService } from '@/services/libraryService';
 import { fileService } from '@/services/fileService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { sortSongs } from '@/utils/songSort';
 
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { VideoMetadata } from '@/types';
 import { songMatchesAlbum } from '@/features/library/utils/grouping';
+
+export async function loadPlaylistSongsInSavedOrder(id: number | 'favorites'): Promise<SongMetadata[]> {
+    const settings = useLibraryStore.getState().getPlaylistSettings(String(id));
+    if (id === 'favorites') {
+        const songs = await libraryService.getFavorites(settings.sortKey === 'manual' ? settings.sortOrder : 'asc');
+        return settings.sortKey === 'manual' ? songs : sortSongs(songs, settings.sortKey, settings.sortOrder);
+    }
+    const songs = await libraryService.getPlaylistSongs(id);
+    return sortSongs(songs, settings.sortKey, settings.sortOrder);
+}
 
 export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | AlbumData | VideoMetadata;
 type FlexibleMusicItem = MusicItem & Record<string, unknown>;
@@ -130,12 +142,12 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
                 const cleanId = idStr.replace('playlist:', '');
 
                 if (cleanId === 'favorites') {
-                    const favs = await libraryService.getFavorites();
+                    const favs = await loadPlaylistSongsInSavedOrder('favorites');
                     songs.push(...favs);
                 } else {
                     const plId = parseInt(cleanId);
                     if (!isNaN(plId)) {
-                        const plSongs = await libraryService.getPlaylistSongs(plId);
+                        const plSongs = await loadPlaylistSongsInSavedOrder(plId);
                         songs.push(...plSongs);
                     }
                 }
