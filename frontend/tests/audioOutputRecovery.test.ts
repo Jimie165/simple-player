@@ -417,6 +417,40 @@ describe('audio output failure and queue recovery', () => {
         expect(load).toHaveBeenCalledOnce();
     });
 
+    it.each(['togglePlayback', 'resumePlayback'] as const)('recovers an end discovered by %s after polling was paused', async action => {
+        usePlayerStore.setState({ isPlaying: false });
+        vi.mocked(audioService.resume).mockResolvedValueOnce({ ...snapshot, status: 'ended', position: 100 });
+        const load = vi.spyOn(audioService, 'load').mockResolvedValue({
+            ...snapshot, session_id: 42, path: songs[1].path ?? null, position: 0,
+        });
+        await actions()[action]();
+        expect(load).toHaveBeenCalledOnce();
+        expect(load).toHaveBeenCalledWith(songs[1].path, songs[1]);
+        expect(usePlayerStore.getState().handledEndedSessionId).toBe(41);
+        expect(usePlayerStore.getState().isPlaying).toBe(true);
+        expect(useLibraryStore.getState().currentSongIndex).toBe(1);
+    });
+
+    it.each(['togglePlayback', 'resumePlayback'] as const)('accepts %s during the failed continuation cleanup without swallowing the click', async action => {
+        const stopping = deferred<PlaybackSnapshot>();
+        vi.mocked(audioService.pause).mockResolvedValueOnce(snapshot).mockReturnValueOnce(stopping.promise);
+        const load = vi.spyOn(audioService, 'load').mockRejectedValueOnce(new Error('output unavailable'))
+            .mockResolvedValue({ ...snapshot, session_id: 42, path: songs[1].path ?? null, position: 0 });
+        const playback = actions();
+        const ending = playback.handlePlaybackEnded(41);
+        await vi.waitFor(() => expect(usePlayerStore.getState().pendingQueuePlayback).not.toBeNull());
+        expect(usePlayerStore.getState().audioLoadingCount).toBe(0);
+        await playback[action]();
+        expect(load).toHaveBeenCalledTimes(2);
+        expect(usePlayerStore.getState().pendingQueuePlayback).toBeNull();
+        expect(usePlayerStore.getState().playbackSessionId).toBe(42);
+        expect(usePlayerStore.getState().isPlaying).toBe(true);
+        stopping.resolve(snapshot);
+        await ending;
+        expect(usePlayerStore.getState().playbackSessionId).toBe(42);
+        expect(usePlayerStore.getState().isPlaying).toBe(true);
+    });
+
     it('retries the pending next track after automatic continuation fails', async () => {
         vi.spyOn(audioService, 'pause').mockResolvedValue(snapshot);
         const play = vi.spyOn(audioService, 'load').mockRejectedValueOnce(new Error('output unavailable'))

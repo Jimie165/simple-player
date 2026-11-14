@@ -8,6 +8,7 @@ import type { PlaybackSnapshot } from '@/types';
 import { useAutoOnlineLyrics } from '@/features/player/runtime/useAutoOnlineLyrics';
 import { handleAudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
 import type { AudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
+import { selectPlaybackAdvancing } from '@/features/player/runtime/selectPlaybackAdvancing';
 
 /**
  * Keeps media-side effects alive independently of the bottom player UI.
@@ -16,6 +17,7 @@ import type { AudioOutputError } from '@/features/player/runtime/handleAudioOutp
  */
 function usePlaybackRuntime() {
     const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isPlaybackAdvancing = usePlayerStore(selectPlaybackAdvancing);
     const mediaKind = usePlayerStore(state => state.mediaKind);
     const isSeeking = usePlayerStore(state => state.isSeeking);
     const currentTime = usePlayerStore(state => state.currentTime);
@@ -53,7 +55,8 @@ function usePlaybackRuntime() {
 
     // A reply requested before a seek or track replacement cannot describe the current source.
     useEffect(() => usePlayerStore.subscribe((state, previous) => {
-        if (state.isSeeking !== previous.isSeeking || state.audioSeekInFlight !== previous.audioSeekInFlight
+        if (state.isPlaying !== previous.isPlaying || state.isAudioLoaded !== previous.isAudioLoaded
+            || state.isSeeking !== previous.isSeeking || state.audioSeekInFlight !== previous.audioSeekInFlight
             || state.audioLoadingCount !== previous.audioLoadingCount || state.playbackSessionId !== previous.playbackSessionId
             || state.metadata?.path !== previous.metadata?.path) snapshotEpochRef.current++;
     }), []);
@@ -177,15 +180,18 @@ function usePlaybackRuntime() {
     }, [metadata?.path, resetPlaybackClock, restartTrigger]);
 
     useEffect(() => {
-        if (mediaKind !== 'audio') return;
+        if (!isPlaybackAdvancing || mediaKind !== 'audio') return;
 
         let disposed = false;
         const poll = async () => {
-            if (disposed || isSeekingRef.current || usePlayerStore.getState().audioLoadingCount > 0) return;
+            const state = usePlayerStore.getState();
+            if (disposed || isSeekingRef.current || !selectPlaybackAdvancing(state)
+                || state.handledEndedSessionId === state.playbackSessionId) return;
             const epoch = snapshotEpochRef.current;
             try {
                 const snapshot = await audioService.getPlaybackSnapshot();
-                if (!disposed && !isSeekingRef.current && epoch === snapshotEpochRef.current) {
+                if (!disposed && !isSeekingRef.current && epoch === snapshotEpochRef.current
+                    && selectPlaybackAdvancing(usePlayerStore.getState())) {
                     if (snapshot.status === 'ended') {
                         const state = usePlayerStore.getState();
                         if (snapshot.path === state.metadata?.path && snapshot.path === state.playbackPath && !snapshot.output_unavailable) {
@@ -224,7 +230,7 @@ function usePlaybackRuntime() {
             window.clearInterval(interval);
             if (clock !== null) window.clearInterval(clock);
         };
-    }, [isPlaying, mediaKind, setPlaybackSnapshot, setPlaybackTime]);
+    }, [isPlaying, isPlaybackAdvancing, mediaKind, setPlaybackSnapshot, setPlaybackTime]);
 
 }
 

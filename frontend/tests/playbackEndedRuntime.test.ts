@@ -42,6 +42,13 @@ const mount = () => {
     });
 };
 
+const unmount = async () => {
+    runtime.cleanup.forEach(cleanup => cleanup());
+    runtime.cleanup.length = 0;
+    runtime.effects.length = 0;
+    await Promise.resolve();
+};
+
 describe('playback end notification recovery', () => {
     beforeEach(() => {
         vi.useFakeTimers();
@@ -52,10 +59,7 @@ describe('playback end notification recovery', () => {
         vi.spyOn(audioService, 'getPlaybackSnapshot').mockResolvedValue(snapshot);
     });
     afterEach(async () => {
-        runtime.cleanup.forEach(cleanup => cleanup());
-        await Promise.resolve();
-        runtime.cleanup.length = 0;
-        runtime.effects.length = 0;
+        await unmount();
         runtime.events.clear();
         vi.clearAllMocks();
         vi.restoreAllMocks();
@@ -76,8 +80,52 @@ describe('playback end notification recovery', () => {
         await vi.advanceTimersByTimeAsync(0);
         expect(runtime.ended).not.toHaveBeenCalled();
         usePlayerStore.setState({ audioLoadingCount: 0 });
-        await vi.advanceTimersByTimeAsync(1000);
+        await unmount();
+        mount();
+        await vi.advanceTimersByTimeAsync(0);
         expect(runtime.ended).toHaveBeenCalledWith(41);
+    });
+
+    it('does not poll while paused and checks for a missed end after resuming', async () => {
+        usePlayerStore.setState({ isPlaying: false });
+        mount();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(audioService.getPlaybackSnapshot).not.toHaveBeenCalled();
+        usePlayerStore.setState({ isPlaying: true });
+        await unmount();
+        mount();
+        await vi.advanceTimersByTimeAsync(0);
+        expect(runtime.ended).toHaveBeenCalledWith(41);
+    });
+
+    it('stops querying immediately when continuation fails, before effects are cleaned up', async () => {
+        runtime.ended.mockImplementation(() => {
+            usePlayerStore.setState({ isPlaying: false, isAudioLoaded: false, handledEndedSessionId: 41 });
+            return Promise.resolve();
+        });
+        mount();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(audioService.getPlaybackSnapshot).toHaveBeenCalledOnce();
+        expect(runtime.ended).toHaveBeenCalledOnce();
+    });
+
+    it('stops querying a session whose end has already been claimed by a transition', async () => {
+        usePlayerStore.setState({ handledEndedSessionId: 41 });
+        mount();
+        await vi.advanceTimersByTimeAsync(3000);
+        expect(audioService.getPlaybackSnapshot).not.toHaveBeenCalled();
+        expect(runtime.ended).not.toHaveBeenCalled();
+    });
+
+    it('does not accept a snapshot arriving after the user pauses', async () => {
+        let finish: (value: PlaybackSnapshot) => void = () => {};
+        vi.mocked(audioService.getPlaybackSnapshot).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+        mount();
+        usePlayerStore.setState({ isPlaying: false });
+        finish(snapshot);
+        await vi.advanceTimersByTimeAsync(2000);
+        expect(runtime.ended).not.toHaveBeenCalled();
+        expect(audioService.getPlaybackSnapshot).toHaveBeenCalledOnce();
     });
 
     it('uses a state notification as another recovery path', () => {
