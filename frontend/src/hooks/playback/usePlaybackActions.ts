@@ -324,20 +324,6 @@ export function usePlaybackActions() {
         }
     }, [handlePlaybackEnded, loadAudio, retryPendingPlayback, setMediaKind, setPlaybackSnapshot]);
 
-    const restartCurrent = useCallback(async (song: SongMetadata) => {
-        const path = song.path;
-        if (!path) return;
-        await runPlaybackTransition(async (transitionId) => {
-            usePlayerStore.setState({ pendingQueuePlayback: null });
-            try {
-                const snapshot = await loadAudio(path, song);
-                if (isActiveTransition(transitionId)) setPlaybackSnapshot(snapshot, song);
-            } catch (error) {
-                if (isActiveTransition(transitionId)) reportPlaybackFailure(error, song);
-            }
-        });
-    }, [loadAudio, setPlaybackSnapshot]);
-
     const toggleShuffle = useCallback(() => {
         const { isShuffling } = usePlayerStore.getState();
         const newShuffleState = !isShuffling;
@@ -616,7 +602,6 @@ export function usePlaybackActions() {
         setVolume,
         pausePlayback,
         resumePlayback,
-        restartCurrent,
         togglePlayback,
         toggleShuffle
     };

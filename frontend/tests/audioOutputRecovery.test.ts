@@ -48,6 +48,34 @@ describe('audio output failure and queue recovery', () => {
 
     afterEach(() => { vi.restoreAllMocks(); });
 
+    it('pauses and resumes the current song without loading or seeking back to the start', async () => {
+        const load = vi.spyOn(audioService, 'load');
+        const seek = vi.spyOn(audioService, 'seek');
+        vi.mocked(audioService.resume).mockResolvedValue({ ...snapshot, status: 'playing' });
+        const playback = actions();
+        await playback.togglePlayback();
+        expect(audioService.pause).toHaveBeenCalledOnce();
+        expect(usePlayerStore.getState().isPlaying).toBe(false);
+        expect(usePlayerStore.getState().currentTime).toBe(35);
+        await playback.togglePlayback();
+        expect(audioService.resume).toHaveBeenCalledOnce();
+        expect(usePlayerStore.getState().isPlaying).toBe(true);
+        expect(usePlayerStore.getState().currentTime).toBe(35);
+        expect(load).not.toHaveBeenCalled();
+        expect(seek).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])('restarts a selected current song from zero instead of toggling (playing=%s)', async isPlaying => {
+        usePlayerStore.setState({ isPlaying });
+        const seek = vi.spyOn(audioService, 'seek').mockResolvedValue(0);
+        const load = vi.spyOn(audioService, 'load').mockResolvedValue({ ...snapshot, session_id: 42, position: 0 });
+        await actions().playSong({ song: songs[0], index: 0, options: { restartIfCurrent: true } });
+        expect(seek).toHaveBeenCalledExactlyOnceWith(0);
+        expect(load).toHaveBeenCalledExactlyOnceWith(songs[0].path, songs[0]);
+        expect(usePlayerStore.getState().currentTime).toBe(0);
+        expect(usePlayerStore.getState().isPlaying).toBe(true);
+    });
+
     it('ignores output errors for obsolete sessions and video playback', () => {
         handleAudioOutputError({ session_id: 40, message: 'device error', unavailable: true });
         expect(usePlayerStore.getState().isPlaying).toBe(true);
@@ -175,8 +203,8 @@ describe('audio output failure and queue recovery', () => {
         const load = vi.spyOn(audioService, 'load').mockReturnValue(prepared.promise);
         const seek = vi.spyOn(audioService, 'seek').mockResolvedValue(12);
         const playback = actions();
-        const firstLoad = playback.restartCurrent(songs[0]);
-        await playback.restartCurrent(songs[0]);
+        const firstLoad = playback.playQueueItem({ song: songs[0], index: 0, restartIfCurrent: true });
+        await playback.playQueueItem({ song: songs[0], index: 0, restartIfCurrent: true });
         await playback.seek(12);
         expect(load).toHaveBeenCalledOnce();
         expect(seek).not.toHaveBeenCalled();
@@ -215,7 +243,7 @@ describe('audio output failure and queue recovery', () => {
         const nativeSeek = vi.spyOn(audioService, 'seek').mockReturnValueOnce(firstSeek.promise).mockResolvedValue(80);
         vi.spyOn(audioService, 'resume').mockResolvedValue({ ...snapshot, session_id: 42, status: 'playing', position: 80 });
         const playback = actions();
-        const loading = playback.restartCurrent(songs[0]);
+        const loading = playback.playQueueItem({ song: songs[0], index: 0, restartIfCurrent: true });
         await playback.seek(30);
         prepared.resolve({ ...snapshot, session_id: 42, position: 0 });
         await Promise.resolve();
@@ -277,7 +305,7 @@ describe('audio output failure and queue recovery', () => {
             .mockRejectedValueOnce(scenario === 'missing file' ? 'AUDIO_FILE_NOT_FOUND' : new Error('source unavailable'))
             .mockResolvedValue({ ...snapshot, session_id: 42, status: 'paused' });
         const playback = actions();
-        if (scenario === 'restart') await playback.restartCurrent(songs[0]);
+        if (scenario === 'restart') await playback.playQueueItem({ song: songs[0], index: 0, restartIfCurrent: true });
         else await playback.resumePlayback();
         expect(usePlayerStore.getState().isPlaying).toBe(false);
         expect(usePlayerStore.getState().isAudioLoaded).toBe(false);

@@ -236,7 +236,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
                                         // Reuse logic or import util? Just basic play for now
-                                        void (playSong({ song: artist.songs[0], index: 0, playlist: artist.songs })).catch(console.error);
+                                        void (playSong({ song: artist.songs[0], index: 0, playlist: artist.songs, options: { restartIfCurrent: true } })).catch(console.error);
                                     }
                                 }}
                                 onOpenArtist={(artist) => push({ type: 'artist_detail', data: artist })}
@@ -259,7 +259,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 hideYear={true}
                                 onPlayAlbum={(album) => {
                                     if (album.songs.length > 0) {
-                                        void (playSong({ song: album.songs[0], index: 0, playlist: album.songs })).catch(console.error);
+                                        void (playSong({ song: album.songs[0], index: 0, playlist: album.songs, options: { restartIfCurrent: true } })).catch(console.error);
                                     }
                                 }}
                                 onOpenAlbum={(album) => push({ type: 'album_detail', data: album })}

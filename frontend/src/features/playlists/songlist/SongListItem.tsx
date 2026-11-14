@@ -8,8 +8,6 @@ import SongCoverOverlay from '@/components/common/SongCoverOverlay';
 import MusicContextMenu from '@/components/common/MusicContextMenu';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
-import { usePlayerStore } from '@/store/usePlayerStore';
-import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { useNavigationStore } from '@/store/useNavigationStore';
 
 const getSongId = (song: SongMetadata, index: number) => {
@@ -118,7 +116,6 @@ export const SongListItem = memo(({
     isFav?: boolean;
 }) => {
     const { push } = useNavigationStore();
-    const { togglePlayback } = usePlaybackActions();
 
     return (
         <div
@@ -140,18 +137,7 @@ export const SongListItem = memo(({
             )}
             onClick={(e) => handleItemClick && handleItemClick(e, song)}
             onDoubleClick={() => {
-                if (!isSelectionMode && onPlay) {
-                    const { metadata } = usePlayerStore.getState();
-                    const isCurrent = metadata && (
-                        (song.id !== undefined && song.id === metadata.id) ||
-                        (song.path === metadata.path)
-                    );
-                    if (isCurrent) {
-                        void togglePlayback();
-                    } else {
-                        onPlay(song, index);
-                    }
-                }
+                if (!isSelectionMode && onPlay) onPlay(song, index, { restartIfCurrent: true });
             }}
             onContextMenu={(e) => handleContextMenu && handleContextMenu(e, song, index)}
         >
@@ -190,7 +176,6 @@ export const SongListItem = memo(({
                         song={song}
                         className="w-full h-full"
                         onPlay={() => !isDragging && onPlay && onPlay(song, index, { restartIfCurrent: true })}
-                        restartOnPlay
                     />
                 </div>
                 <span className="font-medium truncate pr-4 text-on-surface">

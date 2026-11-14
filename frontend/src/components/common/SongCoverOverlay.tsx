@@ -13,7 +13,6 @@ interface SongCoverOverlayProps {
     onPlay: () => void; // Action to play this song (if not current)
     iconClassName?: string; // Fallback icon color
     isActive?: boolean; // Manual override for current playing status (useful for duplicates in queue)
-    restartOnPlay?: boolean; // If true, clicking current song restarts instead of toggling pause
 }
 
 export default function SongCoverOverlay({
@@ -22,12 +21,11 @@ export default function SongCoverOverlay({
     coverClassName,
     onPlay,
     iconClassName,
-    isActive,
-    restartOnPlay = false
+    isActive
 }: SongCoverOverlayProps) {
     const metadata = usePlayerStore(state => state.metadata);
     const isPlaying = usePlayerStore(state => state.isPlaying);
-    const { restartCurrent, togglePlayback } = usePlaybackActions();
+    const { togglePlayback } = usePlaybackActions();
 
     // Determine if this is the currently active song
     // Prioritize manual isActive prop, then ID match, fallback to path match
@@ -41,17 +39,7 @@ export default function SongCoverOverlay({
     const handleContainerClick = async (e: React.MouseEvent) => {
         e.stopPropagation();
         if (isCurrent) {
-            if (restartOnPlay && song.path) {
-                try {
-                    await restartCurrent(song);
-                } catch (error) {
-                    console.error('Restart play failed', error);
-                }
-            } else {
-                // If it's already the current song, just toggle play/pause
-                // This prevents the "restart from beginning" issue caused by parent's onPlay handling
-                void togglePlayback();
-            }
+            await togglePlayback();
         } else {
             // New song, call parent handler
             onPlay();

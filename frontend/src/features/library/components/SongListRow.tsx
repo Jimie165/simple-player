@@ -8,8 +8,6 @@ import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { getMusicItemId } from '@/utils/musicItemUtils';
-import { usePlayerStore } from '@/store/usePlayerStore';
-import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 function SongListRowImpl({
     index,
@@ -65,24 +63,12 @@ function SongListRowImpl({
     onSelect: (song: SongMetadata) => void;
 }) {
     const id = getMusicItemId(song);
-    const { togglePlayback } = usePlaybackActions();
 
     return (
         <div
             key={id || index}
             onDoubleClick={() => {
-                if (!isSelectionMode) {
-                    const { metadata } = usePlayerStore.getState();
-                    const isCurrent = metadata && (
-                        (song.id !== undefined && song.id === metadata.id) ||
-                        (song.path === metadata.path)
-                    );
-                    if (isCurrent) {
-                        void togglePlayback();
-                    } else {
-                        onPlay(song, index);
-                    }
-                }
+                if (!isSelectionMode) onPlay(song, index, { restartIfCurrent: true });
             }}
             onClick={(e) => onRowClick(e, song)}
             onContextMenu={(e) => onContextMenu(e, song, index)}
@@ -134,7 +120,6 @@ function SongListRowImpl({
                             song={song}
                             className="w-full h-full"
                             onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
-                            restartOnPlay
                         />
                     </div>
                 )}
