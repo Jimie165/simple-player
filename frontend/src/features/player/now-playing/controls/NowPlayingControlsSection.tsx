@@ -51,7 +51,7 @@ export default function NowPlayingControlsSection({
             style={{ width: '100%' }}
         >
             <div className="flex items-center justify-between px-0.5 mt-2">
-                <div className="flex flex-col min-w-0 pr-4 w-[75%]">
+                <div className="flex flex-col min-w-0 flex-1 pr-[clamp(0.125rem,0.3vmin,0.25rem)]">
                     <OverflowMarquee
                         resetToken={`title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
                         behavior="auto-then-hover"

@@ -15,7 +15,7 @@ export function NowPlayingNarrowHeader({
     const { canNavigate, handleOpenArtist, handleOpenAlbum } = useNowPlayingNavigation({ metadata, onClose, push });
 
     return (
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-[clamp(0.125rem,0.3vmin,0.25rem)] min-w-0">
             <div className="flex flex-col min-w-0 flex-1">
                 <OverflowMarquee
                     resetToken={`narrow-title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
