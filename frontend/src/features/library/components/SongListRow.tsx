@@ -124,7 +124,12 @@ function SongListRowImpl({
                     </div>
                 )}
                 {hideCover && (
-                    <span className="w-5 shrink-0 text-center text-on-surface-variant tabular-nums">{index + 1}</span>
+                    <SongCoverOverlay
+                        song={song}
+                        className="w-7 h-7"
+                        trackNumber={song.track_number || index + 1}
+                        onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
+                    />
                 )}
                 <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}

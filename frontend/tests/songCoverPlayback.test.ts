@@ -1,4 +1,5 @@
 import { isValidElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import SongCoverOverlay from '@/components/common/SongCoverOverlay';
 import { SongListRow } from '@/features/library/components/SongListRow';
@@ -73,6 +74,39 @@ describe('song cover play and pause', () => {
         const { onPlay } = await clickCover(song, false);
         expect(onPlay).toHaveBeenCalledOnce();
         expect(player.togglePlayback).not.toHaveBeenCalled();
+    });
+
+    it.each([true, false])('shows the current track indicator in number mode (playing=%s)', playing => {
+        player.isPlaying = playing;
+        const markup = renderToStaticMarkup(SongCoverOverlay({ song, trackNumber: 3, onPlay: vi.fn() }));
+        expect(markup).toContain('bg-on-surface');
+        expect(markup).toContain(`${playing ? '暂停' : '播放'} Song`);
+        expect(markup).toContain('opacity-0');
+        expect(markup).toContain(playing ? 'equalizer-jump' : 'scale-y-[0.33]');
+    });
+
+    it('shows the track number without an equalizer for another song', () => {
+        const markup = renderToStaticMarkup(SongCoverOverlay({
+            song: { ...song, path: 'D:/Music/another.flac' }, trackNumber: 7, onPlay: vi.fn(),
+        }));
+        expect(markup).toContain('>7</span>');
+        expect(markup).not.toContain('bg-on-surface');
+    });
+
+    it.each(['Enter', ' '])('toggles the current numbered track with %s', async key => {
+        const onPlay = vi.fn();
+        const stopPropagation = vi.fn();
+        const preventDefault = vi.fn();
+        const view = SongCoverOverlay({ song, trackNumber: 1, onPlay });
+        if (!isValidElement<{ onKeyDown: (event: { key: string; stopPropagation: () => void; preventDefault: () => void }) => void }>(view)) {
+            throw new Error('Song control was not rendered');
+        }
+        view.props.onKeyDown({ key, stopPropagation, preventDefault });
+        await Promise.resolve();
+        expect(player.togglePlayback).toHaveBeenCalledOnce();
+        expect(onPlay).not.toHaveBeenCalled();
+        expect(stopPropagation).toHaveBeenCalledOnce();
+        expect(preventDefault).toHaveBeenCalledOnce();
     });
 
     it.each(['library', 'playlist'] as const)('double-clicking the current %s row requests a restart, playing or paused', kind => {
