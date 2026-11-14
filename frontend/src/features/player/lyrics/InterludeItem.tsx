@@ -5,6 +5,7 @@ import {
     interludeNextLineFocusLeadMs,
 } from '@/features/player/lyrics/constants';
 import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
+import { useThemeStore } from '@/store/useThemeStore';
 
 const dotIndexes = [0, 1, 2];
 
@@ -18,9 +19,13 @@ const EXIT_PHASE_MAX = 0.08;
 const EXIT_SCALE_MAX = BREATH_SCALE_CENTER + BREATH_SCALE_AMPLITUDE;
 const FORCED_EXIT_DURATION_MS = 250;
 const ENTER_FADE_MS = 180;
-const DOT_ENTER_FADE_MS = 750;
+const DOT_ENTER_FADE_MS = 550;
 const DOT_ENTER_STAGGER_MS = 80;
 const ENTER_TOTAL_MS = DOT_ENTER_FADE_MS + DOT_ENTER_STAGGER_MS * 2;
+const WHITENING_START_DELAY_MS = 670;
+const WHITENING_END_LEAD_MS = 150;
+const DOT_RESTING_OPACITY = 0.15;
+const DOT_RESTING_OPACITY_BLENDED = 0.1;
 
 const clamp = (value: number, min: number, max: number) =>
     Math.min(Math.max(value, min), max);
@@ -66,6 +71,7 @@ export default function InterludeItem({
     endMs,
 }: InterludeItemProps) {
     const frameRegistry = useLyricsFrameTaskRegistry();
+    const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const dotsContainerRef = useRef<HTMLSpanElement | null>(null);
     const dotRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const entryRef = useRef<{
@@ -165,11 +171,11 @@ export default function InterludeItem({
 
             return BREATH_SCALE_CENTER + BREATH_SCALE_AMPLITUDE * signedProgress;
         };
-        const dotsVisibleStartDurationMs = interludeGapOpenDurationMs;
-        const dotsWhiteningDurationMs = Math.max(
-            1,
-            exitStartDurationMs - dotsVisibleStartDurationMs
-        );
+        const whiteningStartDurationMs = interludeGapOpenDurationMs + WHITENING_START_DELAY_MS;
+        const whiteningWindowMs = Math.max(
+            1, exitStartDurationMs - WHITENING_END_LEAD_MS - whiteningStartDurationMs
+        ) / dotIndexes.length;
+        const restingOpacity = lyricLineBlendEnabled ? DOT_RESTING_OPACITY_BLENDED : DOT_RESTING_OPACITY;
         const exitMotionDurationMs = Math.max(
             1,
             exitPeakDurationMs - exitStartDurationMs
@@ -216,15 +222,11 @@ export default function InterludeItem({
                 const dot = dotRefs.current[dotIndex];
                 if (!dot) return;
 
-                const whiteningProgress = clamp01(
-                    (currentDurationMs - dotsVisibleStartDurationMs) /
-                    dotsWhiteningDurationMs
-                );
                 const dotWhiteningProgress = clamp01(
-                    whiteningProgress * dotIndexes.length - dotIndex
+                    (currentDurationMs - whiteningStartDurationMs - dotIndex * whiteningWindowMs) /
+                    whiteningWindowMs
                 );
-                const dotOpacity =
-                    0.25 + dotWhiteningProgress * 0.75;
+                const dotOpacity = restingOpacity + dotWhiteningProgress * (1 - restingOpacity);
                 const entryProgress = clamp01(
                     (entryElapsedMs - dotIndex * DOT_ENTER_STAGGER_MS) / DOT_ENTER_FADE_MS
                 );
@@ -255,6 +257,7 @@ export default function InterludeItem({
         startMs,
         frameRegistry,
         isPlaying,
+        lyricLineBlendEnabled,
     ]);
 
     const shouldKeepContainer =

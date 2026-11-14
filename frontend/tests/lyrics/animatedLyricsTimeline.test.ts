@@ -38,7 +38,7 @@ describe('semantic animated lyrics timeline', () => {
     });
 
     it('skips redundant boundaries while retaining collection identity', () => {
-        const lines = [line('a', 0, 1000), line('b', 2000, 4000)];
+        const lines = [line('a', 0, 1000), line('b', 3000, 4000)];
         const items = buildDisplayItems(lines, true, strategy);
         const timeline = createAnimatedLyricsTimeline(items, lines, strategy, false);
         const before = timeline.getSnapshot(999);

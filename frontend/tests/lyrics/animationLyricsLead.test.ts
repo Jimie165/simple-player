@@ -19,7 +19,7 @@ const line = (id: string, start: number, end: number | null, wordTimed = false):
 const stateAt = (lines: LyricsLine[], timeMs: number, isTtml = false) =>
     getActiveLyricsState(buildDisplayItems(lines, true, strategy), lines, timeMs / 1000, strategy, isTtml);
 
-describe('animation mode 600ms handoff lead', () => {
+describe('animation mode early handoff timing', () => {
     it('advances line-timed LRC at 600ms, not 800ms, and publishes the boundary', () => {
         const lines = [line('a', 0, null), line('b', 2000, null)];
         expect(stateAt(lines, 1200).focusIndex).toBe(0);
@@ -30,11 +30,11 @@ describe('animation mode 600ms handoff lead', () => {
         expect(boundaries).not.toContain(1200);
     });
 
-    it.each([false, true])('uses a 600ms lead across a non-interlude gap (TTML=%s)', isTtml => {
+    it.each([false, true])('uses a 1050ms lead across a word-timed non-interlude gap (TTML=%s)', isTtml => {
         const lines = [line('a', 0, 1000, true), line('b', 3000, 4000, true)];
-        expect(stateAt(lines, 2200, isTtml).focusIndex).toBe(0);
-        expect(stateAt(lines, 2399, isTtml).focusIndex).toBe(0);
-        expect(stateAt(lines, 2400, isTtml).focusIndex).toBe(1);
+        expect(stateAt(lines, 1900, isTtml).focusIndex).toBe(0);
+        expect(stateAt(lines, 1949, isTtml).focusIndex).toBe(0);
+        expect(stateAt(lines, 1950, isTtml).focusIndex).toBe(1);
     });
 
     it('uses 600ms for the TTML overlap-chain activation window', () => {
@@ -53,20 +53,30 @@ describe('animation mode 600ms handoff lead', () => {
         expect(stateAt(middle, 9400).focusIndex).toBe(2);
     });
 
-    it('only compresses the amount missing from the existing gap to reach 600ms', () => {
+    it('limits compression to half the sung tail when the new handoff needs a larger cut', () => {
         const lines = [line('a', 1000, 1600, true), line('b', 2000, 3000, true)];
         const chars = parseLyricsWordsToChars(lines[0].words, 1600, { enabled: true, nextLineStartMs: 2000 });
-        expect(chars.at(-1)?.nextStart).toBe(1400);
-        expect(stateAt(lines, 1399).focusIndex).toBe(0);
-        expect(stateAt(lines, 1400).focusIndex).toBe(1);
+        expect(chars.at(-1)?.nextStart).toBe(1300);
+        expect(stateAt(lines, 1299).focusIndex).toBe(0);
+        expect(stateAt(lines, 1300).focusIndex).toBe(1);
     });
 
-    it('keeps the 50% compression limit rather than forcing every handoff to 600ms', () => {
+    it('keeps the 50% compression limit rather than forcing every handoff to 1050ms', () => {
         const lines = [line('a', 1300, 2000, true), line('b', 2000, 3000, true)];
         const items = buildDisplayItems(lines, true, strategy);
         expect(items[0].type === 'line' && items[0].line.visual_end_ms).toBe(1650);
         expect(stateAt(lines, 1400).focusIndex).toBe(0);
         expect(stateAt(lines, 1650).focusIndex).toBe(1);
+    });
+
+    it.each([false, true])('caps the tail cut at 400ms and publishes the same focus boundary (TTML=%s)', isTtml => {
+        const lines = [line('a', 0, 2000, true), line('b', 2300, 4000, true)];
+        const items = buildDisplayItems(lines, true, strategy);
+        const boundaries = buildAnimatedLyricsRenderBoundaries(items, lines, strategy, isTtml);
+        expect(items[0].type === 'line' && items[0].line.visual_end_ms).toBe(1600);
+        expect(stateAt(lines, 1599, isTtml).focusIndex).toBe(0);
+        expect(stateAt(lines, 1600, isTtml).focusIndex).toBe(1);
+        expect(boundaries).toContain(1600);
     });
 
     it('does not change performance mode timing or enable tail compression there', () => {

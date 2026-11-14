@@ -44,9 +44,9 @@ describe('overlapping voices and inferred LRC ends', () => {
         };
         expect(spring()).toEqual({ stiffness: 100, damping: 18, mass: 1 });
         previous.end_time_inferred = false;
-        expect(spring().stiffness).toBe(130);
+        expect(spring().stiffness).toBe(172);
         previous.end_time_inferred = true;
         previous.words = [{ text: 'word', start_time_ms: 0, end_time_ms: 1900 }];
-        expect(spring().stiffness).toBe(130);
+        expect(spring().stiffness).toBe(172);
     });
 });
