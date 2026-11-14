@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { flushSync } from 'react-dom';
 import { motion, type PanInfo } from 'framer-motion';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { selectPlaybackAdvancing } from '@/features/player/runtime/selectPlaybackAdvancing';
 import { useThemeStore } from '@/store/useThemeStore';
 import { useAnimatedLyricsInterlude } from '@/features/player/lyrics/useAnimatedLyricsInterlude';
 import { useAnimatedLyricsLayout, useAnimatedLyricsMeasurements } from '@/features/player/lyrics/useAnimatedLyricsLayout';
@@ -60,7 +61,7 @@ function AnimatedLyricsPanel({
     const narrowMaskImage = narrowControlsVisible
         ? 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
         : narrowScrollMaskStyle.maskImage;
-    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isPlaying = usePlayerStore(selectPlaybackAdvancing);
     const lyricLineBlendEnabled = useThemeStore(state => state.lyricLineBlendEnabled);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';

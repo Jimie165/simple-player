@@ -207,7 +207,7 @@ export function NowPlayingNarrowPanelLayout({
                     <div className="flex items-center gap-2">
                         <NowPlayingLyricsToggle
                             isLyricsOpen={isLyricsOpen}
-                            hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                            hasLyrics={(lyricsStatus !== 'empty' && lyricsStatus !== 'error') || isLyricsOpen}
                             onToggle={handleToggleLyrics}
                         />
                         <NowPlayingQueueToggle
@@ -357,7 +357,7 @@ export function NowPlayingStandardLayout({
             <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)] mix-blend-plus-lighter">
                 <NowPlayingLyricsToggle
                     isLyricsOpen={isLyricsOpen}
-                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                    hasLyrics={(lyricsStatus !== 'empty' && lyricsStatus !== 'error') || isLyricsOpen}
                     onToggle={handleToggleLyrics}
                 />
                 <NowPlayingQueueToggle

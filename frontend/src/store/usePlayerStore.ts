@@ -10,6 +10,10 @@ interface PlayerState {
     volume: number;
     metadata: SongMetadata | null;
     isAudioLoaded: boolean;
+    audioLoadingCount: number;
+    audioRetryPosition: number | null;
+    pendingAudioSeek: number | null;
+    audioSeekInFlight: boolean;
     currentTime: number;
     isSeeking: boolean;
     playbackPath: string | null;
@@ -25,7 +29,7 @@ interface PlayerState {
     setVolume: (volume: number) => void;
     setMetadata: (metadata: SongMetadata | null) => void;
     setPlaybackTime: (time: number) => void;
-    setPlaybackSnapshot: (snapshot: PlaybackSnapshot) => void;
+    setPlaybackSnapshot: (snapshot: PlaybackSnapshot, metadata?: SongMetadata) => void;
     setMediaKind: (kind: MediaKind) => void;
     setSeeking: (seeking: boolean) => void;
     resetPlaybackClock: (path?: string | null) => void;
@@ -77,6 +81,10 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
     volume: 70,
     metadata: null,
     isAudioLoaded: false,
+    audioLoadingCount: 0,
+    audioRetryPosition: null,
+    pendingAudioSeek: null,
+    audioSeekInFlight: false,
     currentTime: 0,
     isSeeking: false,
     playbackPath: null,
@@ -101,10 +109,13 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
 
     // --- Setter 实现 ---
     setMetadata: (metadata) => set({ metadata }),
-    setPlaybackTime: (time) => set({
+    setPlaybackTime: (time) => set(state => state.audioLoadingCount > 0 && !state.isSeeking ? state : ({
         currentTime: Number.isFinite(time) ? Math.max(0, time) : 0,
-    }),
-    setPlaybackSnapshot: (snapshot) => set((state) => {
+    })),
+    setPlaybackSnapshot: (snapshot, metadata) => set((state) => {
+        // The previous native session can still report positions while its replacement loads.
+        if (state.audioLoadingCount > 0) return state;
+        if (state.audioRetryPosition !== null && snapshot.session_id === state.playbackSessionId) return state;
         // A stopped monitor can finish after a new track has already replaced it.
         // Never let that stale session move the visible player backwards.
         if (
@@ -114,12 +125,17 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
         ) {
             return state;
         }
+        // Track metadata and its first clock sample must become visible together.
+        if (metadata ? snapshot.path !== metadata.path : state.metadata?.path && snapshot.path && snapshot.path !== state.metadata.path) {
+            return state;
+        }
 
         return {
+            ...(metadata ? { metadata } : {}),
             isPlaying: snapshot.status === 'playing' && !snapshot.output_unavailable,
             isAudioLoaded: snapshot.status !== 'idle' && !snapshot.output_unavailable,
-            currentTime: Number.isFinite(snapshot.position) ? Math.max(0, snapshot.position) : 0,
-            isSeeking: state.isSeeking,
+            currentTime: state.audioSeekInFlight ? state.currentTime : Number.isFinite(snapshot.position) ? Math.max(0, snapshot.position) : 0,
+            isSeeking: metadata ? false : state.isSeeking,
             playbackPath: snapshot.path,
             mediaKind: snapshot.status === 'idle' ? null : 'audio',
             volume: snapshot.volume * 100,
@@ -127,6 +143,7 @@ export const usePlayerStore = create<PlayerState>()(persist((set, get) => ({
                 ? state.playbackRevision + 1
                 : state.playbackRevision,
             playbackSessionId: snapshot.session_id,
+            audioRetryPosition: null,
         };
     }),
     setMediaKind: (mediaKind) => set({ mediaKind }),

@@ -1,6 +1,7 @@
 import MusicSlider from '@/components/common/MusicSlider';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SongMetadata } from '@/types';
+import { usePlaybackLoadingVisible } from '@/features/player/controls/usePlaybackLoadingVisible';
 import { formatTime } from '@/utils/time';
 
 interface NowPlayingProgressProps {
@@ -20,6 +21,7 @@ export default function NowPlayingProgress({
     variant,
 }: NowPlayingProgressProps) {
     const currentTime = usePlayerStore(state => state.currentTime);
+    const loading = usePlaybackLoadingVisible();
     const isNarrow = variant === 'narrow';
 
     return (
@@ -29,6 +31,8 @@ export default function NowPlayingProgress({
                 min={0}
                 max={metadata?.duration || 0}
                 disabled={!metadata}
+                dimWhenDisabled={false}
+                loading={loading}
                 onChange={onChange}
                 onMouseDown={onMouseDown}
                 onMouseUp={onMouseUp}

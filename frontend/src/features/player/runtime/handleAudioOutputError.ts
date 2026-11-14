@@ -9,7 +9,7 @@ export interface AudioOutputError {
 
 export function handleAudioOutputError(error: AudioOutputError) {
     const state = usePlayerStore.getState();
-    if (state.mediaKind !== 'audio' || state.playbackSessionId !== error.session_id) return;
+    if (state.audioLoadingCount > 0 || state.mediaKind !== 'audio' || state.playbackSessionId !== error.session_id) return;
     if (error.unavailable) {
         usePlayerStore.setState({ isPlaying: false, isAudioLoaded: false });
     }

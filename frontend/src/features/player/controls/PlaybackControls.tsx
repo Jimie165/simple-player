@@ -102,8 +102,7 @@ export default function PlaybackControls({ mode, isSuspended }: PlaybackControls
     const handleSeekEnd = async (e: React.MouseEvent<HTMLInputElement>) => {
         const newTime = Number((e.currentTarget).value);
         setIsDragging(false);
-        const actualTime = await seek(newTime);
-        setPlaybackTime(actualTime);
+        await seek(newTime);
     };
     return (
         <>

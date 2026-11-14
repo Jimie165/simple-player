@@ -95,7 +95,9 @@ function usePlaybackRuntime() {
             if (Number.isFinite(time)) void callbacksRef.current.seek(time);
         });
         void register<number>('audio:ended', (endedSessionId) => {
-            const currentSessionId = usePlayerStore.getState().playbackSessionId;
+            const state = usePlayerStore.getState();
+            if (state.audioLoadingCount > 0 || state.audioRetryPosition !== null) return;
+            const currentSessionId = state.playbackSessionId;
             if (
                 Number.isFinite(endedSessionId) &&
                 currentSessionId !== 0 &&
@@ -114,11 +116,13 @@ function usePlaybackRuntime() {
                     state.playbackSessionId !== 0 &&
                     snapshot.session_id < state.playbackSessionId)
             ) return;
+            state.setPlaybackSnapshot(snapshot);
+            const current = usePlayerStore.getState();
+            if (current.playbackSessionId !== snapshot.session_id || current.playbackPath !== snapshot.path) return;
             positionAnchorRef.current = {
                 position: snapshot.position,
                 updatedAt: performance.now(),
             };
-            state.setPlaybackSnapshot(snapshot);
         });
 
         return () => {
@@ -165,15 +169,17 @@ function usePlaybackRuntime() {
 
         let disposed = false;
         const poll = async () => {
-            if (disposed || isSeekingRef.current) return;
+            if (disposed || isSeekingRef.current || usePlayerStore.getState().audioLoadingCount > 0) return;
             try {
                 const snapshot = await audioService.getPlaybackSnapshot();
                 if (!disposed && !isSeekingRef.current && snapshot.status !== 'ended') {
+                    setPlaybackSnapshot(snapshot);
+                    const current = usePlayerStore.getState();
+                    if (current.playbackSessionId !== snapshot.session_id || current.playbackPath !== snapshot.path) return;
                     positionAnchorRef.current = {
                         position: snapshot.position,
                         updatedAt: performance.now(),
                     };
-                    setPlaybackSnapshot(snapshot);
                 }
             } catch (error) {
                 if (!disposed) console.warn('Failed to sync playback snapshot', error);
@@ -184,7 +190,7 @@ function usePlaybackRuntime() {
         const interval = window.setInterval(() => void poll(), 1000);
         const clock = window.setInterval(() => {
             const state = usePlayerStore.getState();
-            if (disposed || state.mediaKind !== 'audio' || !state.isPlaying || state.isSeeking) return;
+            if (disposed || state.mediaKind !== 'audio' || !state.isPlaying || !state.isAudioLoaded || state.audioLoadingCount > 0 || state.isSeeking) return;
 
             const elapsed = (performance.now() - positionAnchorRef.current.updatedAt) / 1000;
             const duration = state.metadata?.duration;

@@ -923,3 +923,93 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .menu-surface { animation: none; }
 }
+
+@keyframes playback-loading-segment {
+  0% { left: 0.00%; width: 0.00%; }
+  2.5% { left: 0.00%; width: 1.46%; }
+  5% { left: 0.00%; width: 5.29%; }
+  7.5% { left: 0.00%; width: 10.02%; }
+  10% { left: 0.00%; width: 15.09%; }
+  12.5% { left: 1.24%; width: 19.37%; }
+  15% { left: 3.94%; width: 22.52%; }
+  17.5% { left: 6.64%; width: 25.79%; }
+  20% { left: 9.35%; width: 29.39%; }
+  22.5% { left: 12.16%; width: 32.88%; }
+  25% { left: 14.86%; width: 36.60%; }
+  27.5% { left: 17.57%; width: 40.32%; }
+  30% { left: 20.27%; width: 44.14%; }
+  32.5% { left: 23.31%; width: 47.41%; }
+  35% { left: 26.58%; width: 50.45%; }
+  37.5% { left: 29.84%; width: 53.49%; }
+  40% { left: 33.33%; width: 56.64%; }
+  42.5% { left: 36.94%; width: 59.57%; }
+  45% { left: 40.77%; width: 59.23%; }
+  47.5% { left: 45.27%; width: 54.73%; }
+  50% { left: 50.68%; width: 49.32%; }
+  52.5% { left: 56.08%; width: 43.92%; }
+  55% { left: 61.60%; width: 38.40%; }
+  57.5% { left: 69.14%; width: 30.86%; }
+  60% { left: 76.91%; width: 23.09%; }
+  62.5% { left: 84.12%; width: 15.88%; }
+  65% { left: 90.54%; width: 9.46%; }
+  67.5% { left: 96.62%; width: 3.38%; }
+  70% { left: 100.00%; width: 0.00%; }
+  100% { left: 100%; width: 0.00%; }
+}
+
+@keyframes playback-loading-segment-next {
+  0% { left: 0.00%; width: 0.00%; }
+  55% { left: 0.00%; width: 0.00%; }
+  57.5% { left: 0.00%; width: 7.66%; }
+  60% { left: 0.00%; width: 19.93%; }
+  62.5% { left: 0.00%; width: 32.09%; }
+  65% { left: 0.00%; width: 44.37%; }
+  67.5% { left: 0.00%; width: 55.97%; }
+  70% { left: 1.13%; width: 64.98%; }
+  72.5% { left: 13.85%; width: 60.36%; }
+  75% { left: 27.25%; width: 52.93%; }
+  77.5% { left: 40.65%; width: 45.05%; }
+  80% { left: 52.25%; width: 38.29%; }
+  82.5% { left: 63.18%; width: 32.43%; }
+  85% { left: 72.41%; width: 27.25%; }
+  87.5% { left: 80.29%; width: 19.71%; }
+  90% { left: 86.82%; width: 13.18%; }
+  92.5% { left: 92.00%; width: 8.00%; }
+  95% { left: 96.17%; width: 3.83%; }
+  97.5% { left: 99.32%; width: 0.68%; }
+  100% { left: 100.00%; width: 0.00%; }
+}
+
+.playback-progress-loading-fill {
+  opacity: 0;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading {
+  display: none;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading-fill {
+  opacity: 1;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading-segment {
+  animation-play-state: paused;
+}
+
+.playback-progress-loading-segment {
+  animation: playback-loading-segment 2s linear infinite;
+}
+
+.playback-progress-loading-segment-next {
+  animation-name: playback-loading-segment-next;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-surface { animation: none; }
+  .playback-progress-loading-segment {
+    animation: none;
+    left: 30%;
+    width: 40%;
+  }
+  .playback-progress-loading-segment-next { display: none; }
+}

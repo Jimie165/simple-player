@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
 const clock = vi.hoisted(() => ({
-    state: { isPlaying: true, playbackRevision: 0, playbackSessionId: 1 },
+    state: { isPlaying: true, isAudioLoaded: true, audioLoadingCount: 0, metadata: { path: 'D:/music/track.flac' }, playbackRevision: 0, playbackSessionId: 1 },
     cursor: 0,
     slots: [] as unknown[],
     effects: [] as Array<() => void>,
@@ -39,15 +39,16 @@ vi.mock('react', async importOriginal => ({
     },
 }));
 
+import { usePlaybackLoadingVisible } from '@/features/player/controls/usePlaybackLoadingVisible';
 import { usePrecisePlaybackTime } from '@/features/player/lyrics/usePrecisePlaybackTime';
 
 describe('lyric clock calibration lifetime', () => {
     afterEach(() => {
         for (const slot of clock.slots) (slot as { cleanup?: () => void }).cleanup?.();
         clock.cursor = 0; clock.slots.length = 0; clock.effects.length = 0;
-        clock.state = { isPlaying: true, playbackRevision: 0, playbackSessionId: 1 };
+        clock.state = { isPlaying: true, isAudioLoaded: true, audioLoadingCount: 0, metadata: { path: 'D:/music/track.flac' }, playbackRevision: 0, playbackSessionId: 1 };
         clock.getTime.mockReset();
-        vi.unstubAllGlobals(); vi.restoreAllMocks();
+        vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();
     });
 
     const setup = () => {
@@ -77,8 +78,35 @@ describe('lyric clock calibration lifetime', () => {
         now = 1600;
         tick?.(now, 1600);
         expect(clock.getTime).toHaveBeenCalledTimes(1);
-        return { result, render, resolve: async (value: number) => { resolveTime(value); await Promise.resolve(); } };
+        return { result, render, advance: (delta: number) => { now += delta; tick?.(now, delta); }, resolve: async (value: number) => { resolveTime(value); await Promise.resolve(); } };
     };
+
+    it('shows slow loading after a delay and resets when selecting another local track or pausing', () => {
+        vi.useFakeTimers();
+        clock.state = { ...clock.state, audioLoadingCount: 1, isAudioLoaded: false };
+        const render = function LoadingHarness() {
+            clock.cursor = 0; clock.effects.length = 0;
+            const visible = usePlaybackLoadingVisible();
+            clock.effects.forEach(run => run());
+            return visible;
+        };
+        expect(render()).toBe(false);
+        vi.advanceTimersByTime(499);
+        expect(render()).toBe(false);
+        vi.advanceTimersByTime(1);
+        expect(render()).toBe(true);
+        clock.state = { ...clock.state, metadata: { path: 'D:/music/local.flac' } };
+        expect(render()).toBe(false);
+        vi.advanceTimersByTime(1000);
+        expect(render()).toBe(true);
+        clock.state = { ...clock.state, metadata: { path: 'D:/music/track.flac' } };
+        expect(render()).toBe(false);
+        vi.advanceTimersByTime(500);
+        expect(render()).toBe(true);
+        clock.state = { ...clock.state, isPlaying: false };
+        expect(render()).toBe(false);
+        expect(clock.state.audioLoadingCount).toBe(1);
+    });
 
     it('still accepts a current-session correction with unchanged thresholds', async () => {
         const { result, resolve } = setup();
@@ -86,13 +114,31 @@ describe('lyric clock calibration lifetime', () => {
         expect(result.preciseMsRef.current).toBe(4000);
     });
 
-    it.each(['pause', 'session', 'revision'] as const)('ignores a response invalidated by %s', async reason => {
+    it.each(['pause', 'session', 'revision', 'loading'] as const)('ignores a response invalidated by %s', async reason => {
         const { result, resolve } = setup();
+        if (reason === 'loading') clock.state = { ...clock.state, audioLoadingCount: 1 };
         if (reason === 'pause') clock.state = { ...clock.state, isPlaying: false };
         if (reason === 'session') clock.state = { ...clock.state, playbackSessionId: 2 };
         if (reason === 'revision') clock.state = { ...clock.state, playbackRevision: 1 };
         await resolve(4);
         expect(result.preciseMsRef.current).toBe(1600);
+    });
+
+    it.each(['preparation', 'unloaded'] as const)('freezes during %s, ignores old calibration, and resumes without a time jump', async phase => {
+        const { result, render, advance, resolve } = setup();
+        clock.state = { ...clock.state, audioLoadingCount: phase === 'preparation' ? 1 : 0, isAudioLoaded: false };
+        advance(3000);
+        expect(result.preciseMsRef.current).toBe(1600);
+        await resolve(4);
+        expect(result.preciseMsRef.current).toBe(1600);
+        render(0);
+        advance(3000);
+        expect(result.preciseMsRef.current).toBe(0);
+        expect(clock.state.isPlaying).toBe(true);
+        clock.state = { ...clock.state, audioLoadingCount: 0, isAudioLoaded: true };
+        render(0);
+        advance(250);
+        expect(result.preciseMsRef.current).toBe(250);
     });
 
     it('does not undo a newer hard synchronization', async () => {

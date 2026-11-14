@@ -157,7 +157,7 @@ struct AudioOutputError {
 struct PlaybackHandle {
     _stream: MixerDeviceSink,
     output_device_id: Option<String>,
-    player: Player,
+    player: Arc<Player>,
     monitor_stop: Arc<AtomicBool>,
     stream_error: Arc<AtomicBool>,
     path: String,
@@ -206,6 +206,7 @@ fn snapshot_from_parts(
 pub struct AudioState {
     player: Arc<Mutex<Option<PlaybackHandle>>>,
     next_session_id: AtomicU64,
+    load_request: AtomicU64,
     volume: Arc<Mutex<f32>>,
     output_preference: Arc<Mutex<OutputPreference>>,
     active_device_name: Arc<Mutex<Option<String>>>,
@@ -224,6 +225,7 @@ impl AudioState {
         Self {
             player: Arc::new(Mutex::new(None)),
             next_session_id: AtomicU64::new(1),
+            load_request: AtomicU64::new(0),
             volume: Arc::new(Mutex::new(1.0)),
             output_preference: Arc::new(Mutex::new(OutputPreference::SystemDefault)),
             active_device_name: Arc::new(Mutex::new(None)),
@@ -255,6 +257,17 @@ impl AudioState {
         metadata: Option<SongMetadata>,
         autoplay: bool,
     ) -> Result<PlaybackSnapshot, String> {
+        self.open_file_request(path, metadata, autoplay, None)
+    }
+
+    fn open_file_request(
+        &self,
+        path: String,
+        metadata: Option<SongMetadata>,
+        autoplay: bool,
+        request_id: Option<u64>,
+    ) -> Result<PlaybackSnapshot, String> {
+        self.check_load_request(request_id)?;
         let session_id = self.next_session_id.fetch_add(1, Ordering::Relaxed);
         let handle = Self::build_playback_handle(
             &self.volume,
@@ -270,6 +283,10 @@ impl AudioState {
         let monitor_stop = handle.monitor_stop.clone();
         let previous = {
             let mut player_lock = self.player.lock().unwrap();
+            if let Err(error) = self.check_load_request(request_id) {
+                Self::dispose_playback(Some(handle));
+                return Err(error);
+            }
             let previous = player_lock.take();
             *player_lock = Some(handle);
             previous
@@ -346,7 +363,7 @@ impl AudioState {
         stream.log_on_drop(false);
         *active_device_name.lock().unwrap() = picked_name;
 
-        let player = Player::connect_new(stream.mixer());
+        let player = Arc::new(Player::connect_new(stream.mixer()));
         if !autoplay {
             player.pause();
         }
@@ -755,12 +772,25 @@ impl AudioState {
         self.open_file(path, metadata, true)
     }
 
+    pub fn begin_load_request(&self) -> u64 {
+        let _player = self.player.lock().unwrap();
+        self.load_request.fetch_add(1, Ordering::SeqCst) + 1
+    }
+
+    fn check_load_request(&self, request_id: Option<u64>) -> Result<(), String> {
+        if request_id.is_some_and(|id| id != self.load_request.load(Ordering::SeqCst)) {
+            return Err("音频加载请求已被替代".into());
+        }
+        Ok(())
+    }
+
     pub fn load_file(
         &self,
         path: String,
         metadata: Option<SongMetadata>,
+        request_id: Option<u64>,
     ) -> Result<PlaybackSnapshot, String> {
-        self.open_file(path, metadata, false)
+        self.open_file_request(path, metadata, false, request_id)
     }
 
     pub fn pause(&self) -> Result<PlaybackSnapshot, String> {
@@ -803,13 +833,26 @@ impl AudioState {
     }
 
     pub fn seek(&self, seconds: f32) -> Result<PlaybackSnapshot, String> {
-        if let Some(handle) = self.player.lock().unwrap().as_ref() {
+        let player = self
+            .player
+            .lock()
+            .unwrap()
+            .as_ref()
+            .map(|handle| (handle.session_id, handle.player.clone()));
+        if let Some((session_id, player)) = player {
             let position = Duration::from_secs_f32(seconds.max(0.0));
-            handle
+            let result = player.try_seek(position);
+            if !self
                 .player
-                .try_seek(position)
-                .map_err(|e| format!("Failed to seek audio: {}", e))?;
-            let actual = handle.player.get_pos().as_secs_f32();
+                .lock()
+                .unwrap()
+                .as_ref()
+                .is_some_and(|handle| handle.session_id == session_id)
+            {
+                return Ok(self.snapshot());
+            }
+            result.map_err(|e| format!("Failed to seek audio: {e}"))?;
+            let actual = player.get_pos().as_secs_f32();
             smtc::set_position(actual);
         }
         let snapshot = self.snapshot();
@@ -955,6 +998,23 @@ mod tests {
     use super::*;
 
     #[test]
+    fn superseded_load_is_rejected_before_opening_the_source() {
+        let state = AudioState::new();
+        let old = state.begin_load_request();
+        let current = state.begin_load_request();
+        assert!(state.check_load_request(Some(old)).is_err());
+        assert!(state.check_load_request(Some(current)).is_ok());
+        assert_eq!(
+            state
+                .load_file("missing.flac".into(), None, Some(old))
+                .err()
+                .as_deref(),
+            Some("音频加载请求已被替代")
+        );
+        assert!(state.get_snapshot().path.is_none());
+    }
+
+    #[test]
     fn output_recovery_stops_after_four_failures_until_devices_change() {
         let mut recovery = OutputRecovery::default();
         let topology = (Some("speaker".into()), vec!["speaker".into()]);
@@ -1012,7 +1072,7 @@ mod tests {
             Some("AUDIO_FILE_NOT_FOUND")
         );
         assert_eq!(
-            state.load_file(path, None).err().as_deref(),
+            state.load_file(path, None, None).err().as_deref(),
             Some("AUDIO_FILE_NOT_FOUND")
         );
         assert!(matches!(state.get_snapshot().status, PlaybackStatus::Idle));
