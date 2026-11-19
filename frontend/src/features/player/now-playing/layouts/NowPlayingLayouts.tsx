@@ -363,7 +363,15 @@ export function NowPlayingStandardLayout({
                 onSeek={seek}
             />
 
-            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)] mix-blend-plus-lighter">
+            <div
+                className={clsx(
+                    'absolute z-30 flex items-center mix-blend-plus-lighter',
+                    mainContentWidth < 560
+                        ? 'right-[clamp(1rem,5vw,2rem)] gap-2'
+                        : 'bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] gap-[clamp(0.5rem,1.2vw,0.85rem)]'
+                )}
+                style={mainContentWidth < 560 ? { bottom: 'calc(clamp(1rem, 5vw, 2rem) - 12px)' } : undefined}
+            >
                 <NowPlayingLyricsToggle
                     isLyricsOpen={isLyricsOpen}
                     hasLyrics={(lyricsStatus !== 'empty' && lyricsStatus !== 'error') || isLyricsOpen}
