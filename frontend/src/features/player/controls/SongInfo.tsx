@@ -10,7 +10,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
-    isFullScreen: boolean;
+    isFullScreen?: boolean;
     onToggleFullScreen: () => void;
     /** The progress bar is hidden, so nothing sits below the text. */
     isMini?: boolean;
@@ -18,7 +18,7 @@ interface SongInfoProps {
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 
-export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen, isMini = false }: SongInfoProps) {
+export default function SongInfo({ metadata, onToggleFullScreen, isMini = false }: SongInfoProps) {
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const setMediaKind = usePlayerStore(s => s.setMediaKind);
     const { pausePlayback } = usePlaybackActions();
@@ -46,12 +46,8 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen, i
                             onToggleFullScreen();
                         }
                     }}
-                    className={clsx(
-                        "group/cover relative shrink-0 flex items-center justify-center overflow-hidden bg-neutral-200 shadow-sm ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] dark:bg-neutral-800 dark:ring-white/10",
-                        isFullScreen
-                            ? "w-0 h-[34px] opacity-0 -translate-y-12 scale-150 mr-0"
-                            : "size-[34px] opacity-100 translate-y-0 scale-100 mr-2 rounded-[6px] hover:scale-105 focus-visible:scale-105"
-                    )}>
+                    className="group/cover relative mr-2 flex size-8.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-neutral-200 shadow-sm ring-1 ring-black/5 transition-transform duration-150 hover:scale-105 focus-visible:scale-105 dark:bg-neutral-800 dark:ring-white/10"
+                >
                     <CoverImage
                         thumbnail={128}
                         song={metadata}
@@ -74,7 +70,7 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen, i
                         {metadata?.is_favorite && <MdFavorite className="text-red-500 text-xs shrink-0" />}
                     </div>
                     <OverflowMarquee
-                        className="w-full text-[12px] leading-[15px] font-medium text-neutral-600 dark:text-white/56"
+                        className="w-full text-[12px] leading-3.75 font-medium text-neutral-600 dark:text-white/56"
                         contentClassName="flex w-max items-center whitespace-nowrap"
                         resetToken={`meta-${metadata?.path || metadata?.artist || 'empty'}-${metadata?.album || ''}`}
                     >

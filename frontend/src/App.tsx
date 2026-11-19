@@ -126,6 +126,7 @@ function App() {
     close: closeFullScreenPlayer,
     toggle: toggleFullScreenPlayer,
     handleOpened: handleFullScreenPlayerOpened,
+    handleClosed: handleFullScreenPlayerClosed,
   } = useImmersivePlayerTransition();
 
   useQueuePersistence(); // Activate queue persistence
@@ -334,6 +335,7 @@ function App() {
         isOpen={isFullScreen}
         onClose={() => void closeFullScreenPlayer()}
         onOpened={handleFullScreenPlayerOpened}
+        onClosed={handleFullScreenPlayerClosed}
         mainContentWidth={mainContentWidth}
       />
       <Toaster

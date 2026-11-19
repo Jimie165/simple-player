@@ -23,11 +23,13 @@ import { useLowFrequencyLevel } from '@/features/player/now-playing/hooks/useLow
 export default function NowPlayingView({
     onClose,
     onOpened,
+    onClosed,
     isOpen,
     mainContentWidth,
 }: {
     onClose: () => void;
     onOpened: () => void;
+    onClosed?: () => void;
     isOpen: boolean;
     mainContentWidth: number;
 }) {
@@ -208,17 +210,17 @@ export default function NowPlayingView({
 
     return (
         <motion.div
-            initial={{ opacity: 0, y: '100%' }}
+            initial={{ y: '100%' }}
             animate={{
-                opacity: isOpen ? 1 : 0,
                 y: isOpen ? 0 : '100%',
                 pointerEvents: isOpen ? 'auto' : 'none'
             }}
-            transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
+            transition={{ duration: 0.29, ease: [0.42, 0, 0.58, 1] }}
             onAnimationComplete={() => {
                 if (isOpen) onOpened();
+                else onClosed?.();
             }}
-            style={{ willChange: isOpen ? 'transform, opacity' : 'auto', backfaceVisibility: 'hidden' }}
+            style={{ willChange: isOpen ? 'transform' : 'auto', backfaceVisibility: 'hidden' }}
             className="absolute inset-0 z-200 flex flex-col overflow-hidden bg-neutral-900"
             onPointerDown={handleNarrowPointerMove}
             data-now-playing-root
