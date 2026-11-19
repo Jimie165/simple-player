@@ -49,7 +49,7 @@ function KaraokeTextBase({
     const dimMaskAlpha = lyricLineBlendEnabled
         ? (glowDisabled ? 0.16 : 0.3) / fillLayerAlpha
         : 0;
-    const { contentRef, wordRefs, dimWordRefs, charRefCallbacks, dimCharRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift } = useKaraokeAnimation({
+    const { contentRef, wordRefs, dimWordRefs, charRefCallbacks, dimCharRefCallbacks, wordLayoutGroups, charRuntimes, wordCharacterLift } = useKaraokeAnimation({
         words, lineEndMs, nextLineStartMs, enableTightHandoffTailCompression,
         preciseMsRef, isActive, visualFocused, isSeekExiting, isPlaying,
         playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
@@ -62,10 +62,10 @@ function KaraokeTextBase({
         return (
             <span
                 key={`${lyricFloatMode}-${group[0].flatIndex}`}
-                ref={wordFloat ? (element) => {
+                ref={(element) => {
                     (dim ? dimWordRefs : wordRefs).current[group[0].flatIndex] = element;
-                } : undefined}
-                className={wordFloat ? 'karaoke-word-motion' : undefined}
+                }}
+                className="karaoke-word-motion"
                 style={{
                     display: 'inline-block',
                     whiteSpace: 'nowrap',
@@ -79,15 +79,7 @@ function KaraokeTextBase({
                 {group.map(({ item: charItem, flatIndex }) => {
                     const runtime = charRuntimes[flatIndex];
                     if (!runtime) return null;
-                    const { isLongTone, longToneAmount, glowToneAmount, fillEdgeWidth } = runtime;
-                    const fillEdgeAlpha = fillAlpha >= 1
-                        ? 0.72 + longToneAmount * 0.2
-                        : fillAlpha;
-                    const fillEdgeMaskAlpha = lyricLineBlendEnabled
-                        ? Math.min(fillEdgeAlpha, fillLayerAlpha) / fillLayerAlpha
-                        : fillAlpha > baseAlpha
-                            ? (fillEdgeAlpha - baseAlpha) / (fillLayerAlpha * (1 - baseAlpha))
-                            : 1;
+                    const { isLongTone, glowToneAmount } = runtime;
 
                     return (
                         <span
@@ -96,12 +88,10 @@ function KaraokeTextBase({
                             className={[
                                 'karaoke-char',
                                 isLongTone ? 'karaoke-char-long-tone' : '',
-                                wordFloat && wordCharacterLift[charItem.wordIndex] ? 'karaoke-char-word-lift' : '',
+                                wordCharacterLift[charItem.wordIndex] ? 'karaoke-char-word-lift' : '',
                             ].filter(Boolean).join(' ')}
                             data-c={charItem.char}
                             style={{
-                                '--kfe': fillEdgeWidth,
-                                '--kfem': fillEdgeMaskAlpha,
                                 '--kgb': `${Math.min(0.3, glowToneAmount * 0.3)}em`,
                             } as React.CSSProperties}
                         >
@@ -115,9 +105,8 @@ function KaraokeTextBase({
 
     return (
         <span ref={contentRef} className={[
-            lyricFillMode === 'character' ? 'karaoke-text-character' : '',
-            wordFloat ? 'karaoke-text-word-float' : '',
-            wordFloat && lyricFillMode === 'line' ? 'karaoke-text-line-word-mask' : '',
+            'karaoke-text-word-float',
+            lyricFillMode === 'line' ? 'karaoke-text-line-word-mask' : '',
             lyricLineBlendEnabled ? 'karaoke-text-background-blend' : '',
         ].filter(Boolean).join(' ')} style={{ display: 'block', position: 'relative', isolation: 'isolate' }}>
             {[false, true].map(dim => <span
@@ -131,20 +120,19 @@ function KaraokeTextBase({
                     opacity: dim ? (visualFocused ? 0 : 1) : (visualFocused ? 1 : 0),
                     '--kb': dim ? restingAlpha : baseAlpha,
                     '--kfa': fillLayerAlpha,
-                    '--kfd': dimMaskAlpha,
                     '--kw-tail': (baseAlpha + (1 - baseAlpha) * fillLayerAlpha * dimMaskAlpha) /
                         (baseAlpha + (1 - baseAlpha) * fillLayerAlpha),
                     '--kf': lyricLineBlendEnabled ? -100 : undefined,
                 } as React.CSSProperties}
             >
-                {wordFloat ? wordLayoutGroups.map(groups => (
+                {wordLayoutGroups.map(groups => (
                     <span
                         key={groups[0][0].flatIndex}
                         style={{ display: 'inline-block', whiteSpace: 'nowrap', verticalAlign: 'bottom' }}
                     >
                         {groups.map(group => renderGroup(group, dim))}
                     </span>
-                )) : layoutGroups.map(group => renderGroup(group, dim))}
+                ))}
             </span>)}
         </span>
     );

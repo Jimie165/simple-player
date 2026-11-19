@@ -696,41 +696,6 @@ body {
   padding: inherit;
   pointer-events: none;
   color: rgba(255, 255, 255, var(--kfa, 1));
-  -webkit-mask-image: linear-gradient(
-    to right,
-    black 0%,
-    black calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    black 0%,
-    black calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) 100%
-  );
-}
-
-.karaoke-text-character .karaoke-char::before {
-  -webkit-mask-image: linear-gradient(
-    to right,
-    black 0%,
-    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfd, 0)) 100%
-  );
-  mask-image: linear-gradient(
-    to right,
-    black 0%,
-    black max(0%, calc(var(--kf, 100) * 1% - var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfem, 0.60)) calc(var(--kf, 100) * 1%),
-    rgba(0, 0, 0, var(--kfd, 0)) min(125%, calc(var(--kf, 100) * 1% + var(--kfe, 13) * 1%)),
-    rgba(0, 0, 0, var(--kfd, 0)) 100%
-  );
 }
 
 .karaoke-text-background-blend .karaoke-char {
@@ -886,11 +851,6 @@ body {
     rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.259)) calc(var(--kw-head) + 0.0833em),
     rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.074)) calc(var(--kw-head) + 0.1667em),
     rgba(0, 0, 0, var(--kw-tail, 1)) calc(var(--kw-head) + 0.25em));
-}
-
-.karaoke-text-word-float .karaoke-char::before {
-  -webkit-mask-image: none;
-  mask-image: none;
 }
 
 /* Fixed mask contrast lets brightness fades run on opacity alone.

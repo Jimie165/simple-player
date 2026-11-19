@@ -177,7 +177,7 @@ export default function AppearanceSection() {
                         label="歌词上浮方式"
                         value={lyricFloatMode}
                         onChange={setLyricFloatMode}
-                        options={[{ value: 'character', label: '逐字符上浮' }, { value: 'word', label: '逐词组上浮' }]}
+                        options={[{ value: 'word', label: '逐词组上浮' }, { value: 'character', label: '逐字符上浮' }]}
                     />
                 </SettingsRow>
                 <SettingsRow label="逐字歌词刷白方式">

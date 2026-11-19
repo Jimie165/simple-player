@@ -6,13 +6,12 @@ import { parseLyricsWordsToChars } from '@/features/player/lyrics/lyricCharSplit
 import type { FlatCharItem } from '@/features/player/lyrics/lyricCharSplitting';
 import { useLyricsFrameTaskRegistry } from '@/features/player/lyrics/lyricsFrameScheduler';
 import { getLyricsDebugSink } from '@/features/player/lyrics/lyricsDebug';
-import { applyCharacterFillStyles, getCharacterFillStop } from '@/features/player/lyrics/karaokeCharacterFill';
 import { createLineFill } from '@/features/player/lyrics/karaokeLineFill';
 import { groupKaraokeWords, groupKaraokeLayout, groupKaraokeWordLayout } from '@/features/player/lyrics/karaokeLayout';
 import type { IndexedCharItem } from '@/features/player/lyrics/karaokeLayout';
 import {
-    karaokeExitDurationMs, regularLiftMinDurationMs, syllableLiftEm,
-    restingCharTransform, clamp01, WORD_PHASE_FUTURE, WORD_PHASE_MOTION, WORD_PHASE_SETTLED,
+    karaokeExitDurationMs, regularLiftMinDurationMs, getLiftOffsetEm,
+    restingCharTransform, WORD_PHASE_FUTURE, WORD_PHASE_MOTION, WORD_PHASE_SETTLED,
     getWordMotionOrders, prepareKaraokeCharRuntime, getKaraokeCharStyle, getWordMotionWindow,
 } from '@/features/player/lyrics/karaokeMotion';
 import type { KaraokeCharStyle, KaraokeCharRuntime, WordMotionWindow } from '@/features/player/lyrics/karaokeMotion';
@@ -65,7 +64,7 @@ export function useKaraokeAnimation({
     preciseMsRef, isActive, visualFocused, isSeekExiting, isPlaying,
     playbackSyncKey, glowDisabled, wordFloat, lyricFillMode,
 }: KaraokeAnimationOptions) {
-    const wordFill = wordFloat && lyricFillMode === 'line';
+    const wordFill = lyricFillMode === 'line';
     const wordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const dimWordRefs = useRef<Array<HTMLSpanElement | null>>([]);
     const frameRegistry = useLyricsFrameTaskRegistry();
@@ -117,26 +116,19 @@ export function useKaraokeAnimation({
     ), [flatChars]);
 
     const wordGroups = useMemo(() => groupKaraokeWords(flatChars), [flatChars]);
-    const layoutGroups = useMemo(
-        () => wordFloat ? wordGroups : groupKaraokeLayout(flatChars),
-        [flatChars, wordFloat, wordGroups]
-    );
-
     const wordLayoutGroups = useMemo(
-        () => wordFloat ? groupKaraokeWordLayout(wordGroups, groupKaraokeLayout(flatChars)) : [],
-        [flatChars, wordFloat, wordGroups]
+        () => groupKaraokeWordLayout(wordGroups, groupKaraokeLayout(flatChars)),
+        [flatChars, wordGroups]
     );
 
     const wordMotionWindows = useMemo(
         () => wordGroups.map((group, wordIndex) => {
             const window = getWordMotionWindow(group, wordIndex === wordGroups.length - 1, wordFloat, wordFill);
-            if (wordFloat) {
-                const startMs = group[0].item.time_ms;
-                const endMs = Math.max(...group.map(({ item }) => item.nextStart));
-                // Keep ticking until the group lift reaches its final height.
-                window.endMs = Math.max(window.endMs,
-                    startMs + Math.max(regularLiftMinDurationMs, endMs - startMs));
-            }
+            const startMs = group[0].item.time_ms;
+            const endMs = Math.max(...group.map(({ item }) => item.nextStart));
+            // Keep ticking until the group lift and its mask reach their final state.
+            window.endMs = Math.max(window.endMs,
+                startMs + Math.max(regularLiftMinDurationMs, endMs - startMs));
             return window;
         }),
         [wordGroups, wordFloat, wordFill]
@@ -151,12 +143,12 @@ export function useKaraokeAnimation({
             const isLastWord = wordIndex === wordGroups.length - 1;
             group?.forEach(({ item, flatIndex }) => {
                 runtimes[flatIndex] = prepareKaraokeCharRuntime(
-                    item, isLastWord, wordFloat, group[0].item, wordFill,
+                    item, isLastWord, group[0].item, wordFill,
                 );
             });
         });
         return runtimes;
-    }, [wordGroups, wordFloat, wordFill]);
+    }, [wordGroups, wordFill]);
 
     const wordRuntimes = useMemo(() => wordGroups.map((group, wordIndex) => {
         const first = group[0].item;
@@ -172,9 +164,14 @@ export function useKaraokeAnimation({
     }), [wordGroups]);
 
     // 句尾压缩可能改变部分字符的长音判定，但同组必须共用上浮归属。
-    const wordCharacterLift = useMemo(() => wordRuntimes.map((runtime, wordIndex) => (
+    const wordWaveLift = useMemo(() => wordRuntimes.map((runtime, wordIndex) => (
         runtime.isLongTone && wordGroups[wordIndex][0].item.activeCharCountInWord > 1
     )), [wordRuntimes, wordGroups]);
+    // 逐字符模式只把上浮单位从词组换成字符，其余与逐词组共用同一路径。
+    const wordCharacterLift = useMemo(
+        () => wordWaveLift.map(waveLift => waveLift || !wordFloat),
+        [wordFloat, wordWaveLift]
+    );
 
     useLayoutEffect(() => {
         const charElements = charRefs.current;
@@ -248,13 +245,7 @@ export function useKaraokeAnimation({
             runtime.needsVisualSync = true;
         }
 
-        if (!wordFloat && lyricFillMode === 'character') {
-            applyCharacterFillStyles(charElements, charRuntimes);
-        }
-
-        const lineFill = lyricFillMode === 'line' || wordFloat
-            ? createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFill)
-            : null;
+        const lineFill = createLineFill(wordGroups, charElements, charRuntimes, words, lineEndMs, wordFill);
 
         const runtimeState = runtime;
         let debugWrites: { transform: number; fill: number; glow: number } | null = null;
@@ -265,7 +256,7 @@ export function useKaraokeAnimation({
             // 退出过渡期间，不再覆写 transform 和发光，交由 CSS transition 处理；
             // 但保留 --kf 进度写入，确保未完成的刷白继续进行直到真正卸载。
             const transforms = motionOnly ? runtime.previousWordTransforms : runtime.previousTransforms;
-            if (isFocusedRef.current && (!wordFloat || motionOnly || charRuntimes[flatIndex]?.isLongTone
+            if (isFocusedRef.current && (motionOnly || charRuntimes[flatIndex]?.isLongTone
                 || wordCharacterLift[flatChars[flatIndex].wordIndex])) {
                 if (runtime.forceVisualWrite || style.transform !== transforms[flatIndex]) {
                     el.style.transform = style.transform;
@@ -282,7 +273,7 @@ export function useKaraokeAnimation({
                 }
             }
 
-            if ((!wordFloat || motionOnly) && style.fillStop !== runtime.previousFillStops[flatIndex]) {
+            if (motionOnly && style.fillStop !== runtime.previousFillStops[flatIndex]) {
                 el.style.setProperty('--kf', String(style.fillStop));
                 runtime.previousFillStops[flatIndex] = style.fillStop;
                 if (debugWrites) debugWrites.fill++;
@@ -295,7 +286,7 @@ export function useKaraokeAnimation({
             const changedWords = runtimeState.changedWordIndices;
             changedWords.length = 0;
             let evaluatedWordCount = 0;
-            lineFill?.update(timeMs);
+            lineFill.update(timeMs);
 
             const markChanged = (wordIndex: number) => {
                 if (runtimeState.wordPhaseChanges[wordIndex] !== 0) return;
@@ -312,32 +303,28 @@ export function useKaraokeAnimation({
             const applyWord = (wordIndex: number) => {
                 evaluatedWordCount++;
                 const group = wordGroups[wordIndex];
-                if (wordFloat && group?.length) {
+                if (group?.length) {
                     const word = wordRuntimes[wordIndex].item;
-                    const progress = clamp01((timeMs - word.time_ms) / Math.max(regularLiftMinDurationMs, word.durationMs));
                     const style = runtimeState.scratchStyle;
-                    // Long-tone glyphs own the staggered lift; ordinary words
-                    // still move together in this shared container.
+                    // Character mode and long-tone glyphs own the lift; ordinary
+                    // word groups still move together in this shared container.
                     style.transform = wordCharacterLift[wordIndex]
                         ? restingCharTransform
-                        : `translateY(${(-Math.sin(progress * Math.PI / 2) * syllableLiftEm).toFixed(6)}em)`;
-                    style.fillStop = lineFill?.getWordFillStop(wordIndex) ?? -100;
+                        : `translateY(${getLiftOffsetEm(timeMs - word.time_ms, word.durationMs, true).toFixed(6)}em)`;
+                    style.fillStop = lineFill.getWordFillStop(wordIndex) ?? -100;
                     updateCharStyles(group[0].flatIndex, style, true);
                 }
                 group?.forEach(({ flatIndex }) => {
                     const charRuntime = charRuntimes[flatIndex];
-                    if (!charRuntime || (wordFloat && !charRuntime.isLongTone && !wordCharacterLift[wordIndex])) return;
-                    const fillStop = wordFloat ? 0 : (lineFill?.getFillStop(wordIndex, charRuntime)
-                        ?? getCharacterFillStop(charRuntime.item, charRuntime.fillEdgeWidth, timeMs));
+                    if (!charRuntime || (!charRuntime.isLongTone && !wordCharacterLift[wordIndex])) return;
                     const style = getKaraokeCharStyle(
                         charRuntime,
                         timeMs,
-                        fillStop,
+                        0,
                         glowDisabledRef.current,
                         runtimeState.scratchStyle,
-                        wordFloat,
+                        !wordFloat && !wordWaveLift[wordIndex],
                     );
-                    style.fillStop = fillStop;
                     updateCharStyles(flatIndex, style);
                 });
             };
@@ -474,6 +461,7 @@ export function useKaraokeAnimation({
         wordFill,
         wordRuntimes,
         wordCharacterLift,
+        wordWaveLift,
     ]);
 
     // Focus and play/pause changes should only change ownership of the stable
@@ -501,18 +489,14 @@ export function useKaraokeAnimation({
     }, [wordFloat, wordRuntimes, charRuntimes, flatChars, frameRegistry, isActive, isPlaying, isSeekExiting, lyricFillMode, preciseMsRef, wordGroups, wordMotionWindows]);
 
     useLayoutEffect(() => {
-        const motionElements = wordFloat
-            ? [...wordRefs.current, ...charRefs.current.filter((_element, index) => {
-                const charRuntime = charRuntimes[index];
-                return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
-            })]
-            : charRefs.current;
-        const dimMotionElements = wordFloat
-            ? [...dimWordRefs.current, ...dimCharRefs.current.filter((_element, index) => {
-                const charRuntime = charRuntimes[index];
-                return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
-            })]
-            : dimCharRefs.current;
+        const motionElements = [...wordRefs.current, ...charRefs.current.filter((_element, index) => {
+            const charRuntime = charRuntimes[index];
+            return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
+        })];
+        const dimMotionElements = [...dimWordRefs.current, ...dimCharRefs.current.filter((_element, index) => {
+            const charRuntime = charRuntimes[index];
+            return charRuntime && (charRuntime.isLongTone || wordCharacterLift[charRuntime.item.wordIndex]);
+        })];
         const allMotionElements = [...motionElements, ...dimMotionElements];
         const wasFocused = wasFocusedRef.current;
         wasFocusedRef.current = visualFocused;
@@ -571,7 +555,7 @@ export function useKaraokeAnimation({
         return () => {
             window.clearTimeout(releaseTimer);
         };
-    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length, wordFloat, charRuntimes, wordCharacterLift]);
+    }, [flatChars, visualFocused, preciseMsRef, wordGroups.length, charRuntimes, wordCharacterLift]);
 
     // These events invalidate playback state, not the DOM runtime. In
     // particular a paused seek has no content frame to refresh the fill.
@@ -581,5 +565,5 @@ export function useKaraokeAnimation({
         runtime.syncNow?.();
     }, [glowDisabled, isActive, isPlaying, isSeekExiting, playbackSyncKey, preciseMsRef]);
 
-    return { contentRef, wordRefs, dimWordRefs, charRefCallbacks, dimCharRefCallbacks, layoutGroups, wordLayoutGroups, charRuntimes, wordCharacterLift };
+    return { contentRef, wordRefs, dimWordRefs, charRefCallbacks, dimCharRefCallbacks, wordLayoutGroups, charRuntimes, wordCharacterLift };
 }
