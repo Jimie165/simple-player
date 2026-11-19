@@ -4,7 +4,15 @@ import type { SongMetadata } from '@/types';
 import { useSongOperations } from '@/hooks/menu/useSongOperations';
 import MusicContextMenu from '@/components/common/MusicContextMenu';
 
-export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata; onClose: () => void }) {
+export function PlayerMenuButton({
+    metadata,
+    onClose,
+    sizeClassName = 'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)]',
+}: {
+    metadata: SongMetadata;
+    onClose: () => void;
+    sizeClassName?: string;
+}) {
     const ops = useSongOperations({
         items: [metadata],
         context: 'other',
@@ -22,7 +30,7 @@ export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata
         <MusicContextMenu
             groups={filteredGroups}
             variant="clean"
-            buttonClassName="group/player-menu w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center hover:opacity-100!"
+            buttonClassName={`group/player-menu ${sizeClassName} shrink-0 rounded-full flex items-center justify-center hover:opacity-100!`}
         >
             <svg viewBox="0 0 36 36" className="block h-full w-full shrink-0 overflow-visible text-white" fill="currentColor" aria-hidden="true">
                 <circle cx="18" cy="18" r="18" className="opacity-10 group-hover/player-menu:opacity-20" />
@@ -36,7 +44,15 @@ export function PlayerMenuButton({ metadata, onClose }: { metadata: SongMetadata
     );
 }
 
-export function PlayerMenuWrapper({ metadata, onClose }: { metadata: SongMetadata | null; onClose: () => void }) {
+export function PlayerMenuWrapper({
+    metadata,
+    onClose,
+    sizeClassName,
+}: {
+    metadata: SongMetadata | null;
+    onClose: () => void;
+    sizeClassName?: string;
+}) {
     if (!metadata) return null;
-    return <PlayerMenuButton metadata={metadata} onClose={onClose} />;
+    return <PlayerMenuButton metadata={metadata} onClose={onClose} sizeClassName={sizeClassName} />;
 }

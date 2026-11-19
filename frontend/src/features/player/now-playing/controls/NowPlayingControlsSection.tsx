@@ -1,13 +1,8 @@
+import VolumeIcon from '@/components/common/VolumeIcon';
 import NowPlayingStarIcon from '@/features/player/now-playing/controls/NowPlayingStarIcon';
 import clsx from 'clsx';
 import NowPlayingTransportIcon from '@/features/player/now-playing/controls/NowPlayingTransportIcon';
 import NowPlayingToggleIcon from '@/features/player/now-playing/controls/NowPlayingToggleIcon';
-import {
-    IoVolumeOff,
-    IoVolumeLow,
-    IoVolumeMedium,
-    IoVolumeHigh,
-} from 'react-icons/io5';
 import MusicSlider from '@/components/common/MusicSlider';
 import { PlayerMenuWrapper } from '@/features/player/now-playing/controls/PlayerMenuButton';
 import OverflowMarquee from '@/components/common/OverflowMarquee';
@@ -55,7 +50,7 @@ export default function NowPlayingControlsSection({
                     <OverflowMarquee
                         resetToken={`title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
                         behavior="auto-then-hover"
-                        className="text-[clamp(0.875rem,2.8vmin,1.75rem)] font-bold text-white leading-tight"
+                        className="text-(length:--np-title-size) font-bold text-white leading-tight"
                     >
                         <h1 className="whitespace-nowrap">
                             {metadata?.title || '未播放音乐'}
@@ -64,7 +59,7 @@ export default function NowPlayingControlsSection({
                     <OverflowMarquee
                         resetToken={`meta-${marqueeResetToken}-${metadata?.path || metadata?.artist || 'empty'}`}
                         behavior="auto-then-hover"
-                        className="mt-1 text-[clamp(0.75rem,2vmin,1.25rem)] font-medium leading-tight text-white opacity-45 mix-blend-plus-lighter"
+                        className="mt-1 text-(length:--np-meta-size) font-medium leading-tight text-white opacity-45 mix-blend-plus-lighter"
                         contentClassName="flex w-max items-center gap-1 whitespace-nowrap"
                     >
                         <span
@@ -115,7 +110,7 @@ export default function NowPlayingControlsSection({
                         aria-pressed={Boolean(metadata?.is_favorite)}
                         disabled={!metadata || typeof metadata.id !== 'number'}
                         className={clsx(
-                            'w-[clamp(1.5rem,3.8vmin,2.25rem)] h-[clamp(1.5rem,3.8vmin,2.25rem)] shrink-0 rounded-full flex items-center justify-center text-white',
+                            'size-[max(1.5rem,calc(var(--np-control-base)*0.075))] shrink-0 rounded-full flex items-center justify-center text-white',
                             metadata && typeof metadata.id === 'number'
                                 ? 'group/favorite cursor-pointer'
                                 : 'opacity-30 cursor-default'
@@ -124,7 +119,11 @@ export default function NowPlayingControlsSection({
                         <NowPlayingStarIcon selected={Boolean(metadata?.is_favorite)} />
                     </button>
 
-                    <PlayerMenuWrapper metadata={metadata} onClose={onClose} />
+                    <PlayerMenuWrapper
+                        metadata={metadata}
+                        onClose={onClose}
+                        sizeClassName="size-[max(1.5rem,calc(var(--np-control-base)*0.075))]"
+                    />
                 </div>
             </div>
 
@@ -142,44 +141,43 @@ export default function NowPlayingControlsSection({
                 <button
                     onClick={toggleShuffle}
                     className={clsx(
-                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-opacity text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
+                        'size-[calc(var(--np-control-base)*0.12)] shrink-0 flex items-center justify-center rounded-lg transition-opacity text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
                     <NowPlayingToggleIcon selected={isShuffling} icon="shuffle" />
                 </button>
 
-                <button onClick={playPrev} className="w-[13.5%] shrink-0 aspect-square max-w-12 flex items-center justify-center text-white hover:scale-105 transition-all">
+                <button onClick={playPrev} className="size-[calc(var(--np-control-base)*0.135)] shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
                     <NowPlayingTransportIcon icon="previous" className="w-[70%] h-[70%]" />
                 </button>
 
                 <button
                     onClick={togglePlay}
-                    className="shrink-0 w-[18%] max-w-16 aspect-square rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
+                    className="shrink-0 size-[calc(var(--np-control-base)*0.18)] rounded-full bg-transparent text-white flex items-center justify-center hover:scale-105 active:scale-95 transition-all overflow-hidden"
                 >
                     <NowPlayingTransportIcon icon={isPlaying ? 'pause' : 'play'} className={clsx('w-[75%] h-[75%]', !isPlaying && 'ml-[4%]')} />
                 </button>
 
-                <button onClick={playNext} className="w-[13.5%] shrink-0 aspect-square max-w-12 flex items-center justify-center text-white hover:scale-105 transition-all">
+                <button onClick={playNext} className="size-[calc(var(--np-control-base)*0.135)] shrink-0 flex items-center justify-center text-white hover:scale-105 transition-all">
                     <NowPlayingTransportIcon icon="next" className="w-[70%] h-[70%]" />
                 </button>
 
                 <button
                     onClick={toggleRepeat}
                     className={clsx(
-                        'w-[11.25%] shrink-0 aspect-square max-w-10 flex items-center justify-center rounded-lg transition-opacity relative text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
+                        'size-[calc(var(--np-control-base)*0.12)] shrink-0 flex items-center justify-center rounded-lg transition-opacity relative text-white mix-blend-plus-lighter group/toggle [&:hover>svg[data-selected=false]]:opacity-60'
                     )}
                 >
                     <NowPlayingToggleIcon selected={repeatMode !== 'off'} icon="repeat" repeatOne={repeatMode === 'one'} />
                 </button>
             </div>
 
+            {/* 音量图标与播放控制区共用 --np-control-base 缩放基准。 */}
             <div data-player-volume className="flex items-center gap-3 mt-6 px-1 mix-blend-plus-lighter">
-                {(() => {
-                    if (localVolume === 0) return <IoVolumeOff className="text-white/40 text-xs" />;
-                    if (localVolume <= 33) return <IoVolumeLow className="text-white/40 text-xs" />;
-                    if (localVolume <= 66) return <IoVolumeMedium className="text-white/40 text-xs" />;
-                    return <IoVolumeHigh className="text-white/40 text-xs" />;
-                })()}
+                <VolumeIcon
+                    volume={localVolume}
+                    className="text-white/40 text-[max(0.875rem,calc(var(--np-control-base)*0.05))]"
+                />
                 <MusicSlider
                     value={localVolume}
                     min={0}
@@ -192,7 +190,7 @@ export default function NowPlayingControlsSection({
                     activeHeightClass="group-active:h-[clamp(6px,1.5vmin,12px)]"
                     className="flex-1"
                 />
-                <IoVolumeHigh className="text-white/40 text-xs" />
+                <VolumeIcon className="text-white/40 text-[max(0.875rem,calc(var(--np-control-base)*0.05))]" />
             </div>
         </div>
     );

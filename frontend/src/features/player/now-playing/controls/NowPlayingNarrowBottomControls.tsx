@@ -1,12 +1,7 @@
 import clsx from 'clsx';
 import NowPlayingTransportIcon from '@/features/player/now-playing/controls/NowPlayingTransportIcon';
 import NowPlayingToggleIcon from '@/features/player/now-playing/controls/NowPlayingToggleIcon';
-import {
-    IoVolumeHigh,
-    IoVolumeLow,
-    IoVolumeMedium,
-    IoVolumeOff,
-} from 'react-icons/io5';
+import VolumeIcon from '@/components/common/VolumeIcon';
 import MusicSlider from '@/components/common/MusicSlider';
 import type { NowPlayingControlsSectionProps } from '@/features/player/now-playing/controls/NowPlayingControlTypes';
 import NowPlayingProgress from '@/features/player/now-playing/controls/NowPlayingProgress';
@@ -94,12 +89,7 @@ export function NowPlayingNarrowBottomControls({
             </div>
 
             <div className="relative z-30 flex items-center gap-4 px-1 mt-1 mix-blend-plus-lighter">
-                {(() => {
-                    if (localVolume === 0) return <IoVolumeOff className="text-white/50 text-sm" />;
-                    if (localVolume <= 33) return <IoVolumeLow className="text-white/50 text-sm" />;
-                    if (localVolume <= 66) return <IoVolumeMedium className="text-white/50 text-sm" />;
-                    return <IoVolumeHigh className="text-white/50 text-sm" />;
-                })()}
+                <VolumeIcon volume={localVolume} className="text-white/50 text-sm" />
                 <MusicSlider
                     value={localVolume}
                     min={0}
@@ -112,7 +102,7 @@ export function NowPlayingNarrowBottomControls({
                     activeHeightClass="group-active:h-[10px]"
                     className="flex-1"
                 />
-                <IoVolumeHigh className="text-white/50 text-sm" />
+                <VolumeIcon className="text-white/50 text-sm" />
             </div>
         </div>
     );
