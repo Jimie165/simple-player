@@ -35,14 +35,14 @@ jobs:
       SIDECAR_ARCH: ${{ matrix.arch == 'aarch64' && 'arm64' || 'x86_64' }}
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: pnpm/action-setup@v6.1.0
+      - uses: pnpm/action-setup@v6.1.1
         with:
-          version: '12.15.0'
+          version: '12.22.0'
       - uses: actions/setup-node@v7.1.0
         with:
-          node-version: '26.13.0'
+          node-version: '26.13.1'
           cache: pnpm
-      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2.9.3
