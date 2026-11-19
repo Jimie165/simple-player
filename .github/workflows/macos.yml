@@ -131,7 +131,6 @@ jobs:
           name: Simple-Player-macos-${{ matrix.arch }}
           path: Simple-Player-macos-${{ matrix.arch }}.zip
           if-no-files-found: error
-          retention-days: 14
           compression-level: 0
       - uses: actions/upload-artifact@v7.0.2
         if: github.event_name == 'workflow_dispatch'
@@ -139,5 +138,4 @@ jobs:
           name: Simple-Player-macos-${{ matrix.arch }}-DMG
           path: backend/target/release/bundle/dmg/*.dmg
           if-no-files-found: error
-          retention-days: 14
           compression-level: 0
