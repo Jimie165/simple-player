@@ -41,8 +41,8 @@ export default function NowPlayingProgress({
                 activeHeightClass={isNarrow ? 'group-active:h-[10px]' : 'group-active:h-[clamp(8px,2vmin,16px)]'}
             />
             <div className={isNarrow
-                ? 'flex justify-between text-[length:max(1.2vh,0.8rem)] font-medium text-white/50 select-none'
-                : 'flex justify-between text-[length:max(1.2vh,0.8rem)] font-medium text-white/40 select-none'}
+                ? 'flex justify-between text-[max(1.2vh,0.8rem)] font-medium text-white/50 select-none'
+                : 'flex justify-between text-[max(1.2vh,0.8rem)] font-medium text-white/40 select-none'}
             >
                 <span>{formatTime(currentTime)}</span>
                 <span>-{formatTime(Math.max(0, Math.floor(metadata?.duration || 0) - Math.floor(currentTime)))}</span>

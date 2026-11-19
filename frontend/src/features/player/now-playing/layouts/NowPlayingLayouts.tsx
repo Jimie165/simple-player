@@ -282,7 +282,7 @@ export function NowPlayingStandardLayout({
         >
             <div
                 style={{
-                    '--np-control-base': mainContentWidth < 560 ? NARROW_STANDARD_CONTROL_BASE : CONTROL_BASE,
+                    '--np-control-base': mainContentWidth < 560 || !(isQueueOpen || isLyricsOpen) ? NARROW_STANDARD_CONTROL_BASE : CONTROL_BASE,
                     '--np-title-size': mainContentWidth < 560 ? 'clamp(0.8rem, 3.4vw, 1rem)' : 'clamp(0.8125rem, 2.4vmin, 1.5rem)',
                     '--np-meta-size': mainContentWidth < 560 ? 'clamp(0.72rem, 3vw, 0.875rem)' : 'clamp(0.75rem, 2.1vmin, 1.3125rem)',
                 } as CSSProperties}
