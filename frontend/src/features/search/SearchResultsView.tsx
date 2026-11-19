@@ -16,8 +16,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { buildAlbums } from '@/features/library/utils/grouping';
 
@@ -28,7 +27,6 @@ interface SearchResultsViewProps {
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videoResults.length, 'video'));
     const [completedQuery, setCompletedQuery] = useState<string | null>(null);
     // 防抖等待也属于加载阶段，只有当前关键词的请求结束后才展示结果或空态。
     const loading = Boolean(query.trim()) && completedQuery !== query;
@@ -296,7 +294,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 data={videoResults}
                                 itemKey={(_index, video) => video.id}
                                 listClassName="grid content-grid-video gap-4"
-                                listStyle={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
+                                listStyle={getSparseGridStyle(videoResults.length, 'video')}
                                 itemContent={(_index, video) => (
                                     <div
                                         key={video.id}

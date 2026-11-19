@@ -18,8 +18,7 @@ import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 /**
@@ -46,7 +45,6 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
 export default function MusicGrid() {
     // Store Actions
     const { recentHistory } = useLibraryStore();
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(recentHistory.length, 'cover'));
     // 虚拟网格会在尺寸变化时重复渲染卡片，封面数据需保持引用稳定。
     const recentCoverSongs = useMemo(() => new Map<string, SongMetadata>(recentHistory.map((item) => [item.id, {
         title: item.title,
@@ -145,7 +143,7 @@ export default function MusicGrid() {
                         data={recentHistory}
                         itemKey={(_index, item) => item.id}
                         listClassName="grid content-grid-cover gap-6"
-                        listStyle={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
+                        listStyle={getSparseGridStyle(recentHistory.length, 'cover')}
                         itemContent={(_index, item) => {
                             const isSelected = selectedIds.has(item.id);
                             const description = `${item.description}${!isVideoFile(item.path) && item.album ? ` — ${item.album}` : ''}`;

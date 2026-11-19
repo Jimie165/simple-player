@@ -1,79 +1,22 @@
-import type { CSSProperties } from 'react';
-
 type GridKind = 'cover' | 'video';
 
-const NO_GRID_BREAKPOINTS: readonly number[] = [];
-
-type GridConfig = {
-    breakpoints: readonly number[];
-    columns: number[];
-    fallbackLockedWidth: number;
+/** 列数需与 index.css 中 `.content-grid-*` 的容器查询断点保持一致；lockedWidth 是条目不足一行时的固定卡片宽度。 */
+const GRID_CONFIGS: Record<GridKind, { columns: number[]; lockedWidth: number }> = {
+    cover: { columns: [2, 3, 4, 5, 6, 7], lockedWidth: 208 },
+    video: { columns: [2, 3, 4, 5], lockedWidth: 215 },
 };
 
-const GRID_CONFIGS: Record<GridKind, GridConfig> = {
-    cover: {
-        breakpoints: [520, 700, 920, 1140, 1360],
-        columns: [2, 3, 4, 5, 6, 7],
-        fallbackLockedWidth: 208,
-    },
-    video: {
-        breakpoints: [520, 700, 920],
-        columns: [2, 3, 4, 5],
-        fallbackLockedWidth: 215,
-    },
-};
+/**
+ * 条目不足一行时，卡片在所有断点下保持同一宽度，而不是被拉伸到整行，也不随断点变宽变窄。
+ * 结果是每一档断点的列模板变量，由 CSS 容器查询选择，宽度变化时不经过 JS，也就不会与换列错帧。
+ */
+export function getSparseGridStyle(itemCount: number, kind: GridKind): Record<string, string> | undefined {
+    const { columns, lockedWidth } = GRID_CONFIGS[kind];
+    if (itemCount <= 0 || itemCount >= columns[columns.length - 1]) return undefined;
 
-/** 满行网格由 CSS 容器查询换列，只有稀疏网格需要 JS 跟踪断点。 */
-export function getSparseGridBreakpoints(itemCount: number, kind: GridKind): readonly number[] {
-    const { breakpoints, columns } = GRID_CONFIGS[kind];
-    return itemCount >= columns[columns.length - 1] ? NO_GRID_BREAKPOINTS : breakpoints;
-}
-
-export function getGridColumnCount(width: number, kind: GridKind) {
-    const { breakpoints, columns } = GRID_CONFIGS[kind];
-    let index = 0;
-
-    while (index < breakpoints.length && width >= breakpoints[index]) {
-        index += 1;
-    }
-
-    return columns[index];
-}
-
-function getLockedItemWidth(width: number, gapPx: number, kind: GridKind) {
-    const { breakpoints, columns, fallbackLockedWidth } = GRID_CONFIGS[kind];
-    let index = 0;
-
-    while (index < breakpoints.length && width >= breakpoints[index]) {
-        index += 1;
-    }
-
-    const currentColumns = columns[index];
-    const nextBreakpoint = breakpoints[index];
-
-    if (!nextBreakpoint) {
-        return fallbackLockedWidth;
-    }
-
-    return Math.max(
-        0,
-        Math.floor((nextBreakpoint - gapPx * (currentColumns - 1)) / currentColumns)
-    );
-}
-
-export function getSparseGridStyle(
-    width: number,
-    itemCount: number,
-    gapPx: number,
-    kind: GridKind
-): CSSProperties | undefined {
-    if (width <= 0 || itemCount <= 0) return undefined;
-
-    const activeColumns = getGridColumnCount(width, kind);
-    if (itemCount >= activeColumns) return undefined;
-
-    const lockedItemWidth = getLockedItemWidth(width, gapPx, kind);
-    return {
-        gridTemplateColumns: `repeat(${itemCount}, minmax(0, ${lockedItemWidth}px))`,
-    };
+    const style: Record<string, string> = {};
+    columns.forEach((count, level) => {
+        if (itemCount < count) style[`--grid-columns-${level}`] = `repeat(${itemCount}, minmax(0, ${lockedWidth}px))`;
+    });
+    return style;
 }

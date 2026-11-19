@@ -603,41 +603,42 @@ body {
     padding-bottom: 96px;
   }
 
+  /* --grid-columns-N 由条目不足一行的列表提供（见 utils/gridLayout.ts），否则使用等分列。 */
   .content-grid-cover,
   .content-grid-video {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: var(--grid-columns-0, repeat(2, minmax(0, 1fr)));
   }
 
   @container main-content (min-width: 520px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-1, repeat(3, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 700px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-2, repeat(4, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 920px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-3, repeat(5, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 1140px) {
     .content-grid-cover {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-4, repeat(6, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 1360px) {
     .content-grid-cover {
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-5, repeat(7, minmax(0, 1fr)));
     }
   }
 

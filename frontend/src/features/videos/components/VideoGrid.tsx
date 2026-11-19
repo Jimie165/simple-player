@@ -10,12 +10,10 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { VideoCard } from '@/features/videos/components/VideoCard';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videos.length, 'video'));
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const { pausePlayback } = usePlaybackActions();
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
@@ -121,7 +119,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                     data={videos}
                     itemKey={(_index, video) => getMusicItemId(video)}
                     listClassName="grid content-grid-video gap-4 pt-4"
-                    listStyle={getSparseGridStyle(mainContentWidth, videos.length, 16, 'video')}
+                    listStyle={getSparseGridStyle(videos.length, 'video')}
                     overscan={200}
                     itemContent={(_, video) => {
                         const id = getMusicItemId(video);
@@ -156,7 +154,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
     return (
         <div
             className="grid content-grid-video gap-4"
-            style={getSparseGridStyle(mainContentWidth, videos.length, 16, 'video')}
+            style={getSparseGridStyle(videos.length, 'video')}
         >
             {videos.map((video) => {
                 const id = getMusicItemId(video);
