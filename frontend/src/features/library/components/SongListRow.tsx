@@ -1,4 +1,5 @@
 import React from 'react';
+import { SONG_LIST_DIVIDER_RIGHT, SONG_LIST_GRID_GAP, SONG_LIST_HOVER_BACKGROUND, SONG_LIST_ROW_PADDING, songListDividerLeft } from '@/features/playlists/songlist/songListLayout';
 import { MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -14,8 +15,6 @@ function SongListRowImpl({
     isLast,
     song,
     gridStyle,
-    gridGapClass,
-    rowPaddingClass,
     isSelectionMode,
     selected,
     previousSelected = false,
@@ -40,8 +39,6 @@ function SongListRowImpl({
     isLast: boolean;
     song: SongMetadata;
     gridStyle: React.CSSProperties;
-    gridGapClass: string;
-    rowPaddingClass: string;
     isSelectionMode: boolean;
     selected: boolean;
     previousSelected?: boolean;
@@ -74,14 +71,13 @@ function SongListRowImpl({
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
+                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
                 "h-13.5",
-                context === 'library' ? "before:left-9 before:right-0" : "before:left-12 before:right-2",
-                isLast ? (context === 'library' ? "after:left-11" : "after:left-14") : hideCover
-                    ? (context === 'library' ? "after:left-19" : "after:left-22")
-                    : (context === 'library' ? "after:left-25" : "after:left-28"),
-                gridGapClass,
-                rowPaddingClass,
+                SONG_LIST_HOVER_BACKGROUND,
+                SONG_LIST_DIVIDER_RIGHT,
+                songListDividerLeft(isLast, hideCover),
+                SONG_LIST_GRID_GAP,
+                SONG_LIST_ROW_PADDING,
                 selected
                     ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
                     : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",

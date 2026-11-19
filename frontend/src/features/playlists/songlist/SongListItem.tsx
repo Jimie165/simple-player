@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { SONG_LIST_DIVIDER_RIGHT, SONG_LIST_GRID_GAP, SONG_LIST_HOVER_BACKGROUND, SONG_LIST_ROW_PADDING, songListDividerLeft } from '@/features/playlists/songlist/songListLayout';
 import { MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -121,8 +122,12 @@ export const SongListItem = memo(({
         <div
             style={gridStyle}
             className={clsx(
-                "group isolate grid h-13.5 gap-4 px-4 items-center relative touch-pan-y before:absolute before:inset-y-0 before:left-12 before:right-2 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
-                isLast ? "after:left-14" : "after:left-28",
+                "group isolate grid h-13.5 items-center relative touch-pan-y before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
+                SONG_LIST_GRID_GAP,
+                SONG_LIST_ROW_PADDING,
+                SONG_LIST_HOVER_BACKGROUND,
+                SONG_LIST_DIVIDER_RIGHT,
+                songListDividerLeft(isLast, false),
                 isOverlay
                     ? "rounded-xl bg-(--content-glass-background) backdrop-blur-lg backdrop-saturate-220 border border-(--content-glass-edge) cursor-grabbing shadow-2xl scale-[1.02] after:opacity-0"
                     : selected

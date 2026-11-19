@@ -354,7 +354,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     />
                 </div>
 
-                <div className="relative z-10 p-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
+                <div className="relative z-10 pl-12 pr-8 py-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
                         <SharedCover source={transitionSource} className={clsx(
@@ -434,7 +434,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-500"></div>
                 </div>
             ) : (
-                <div className="px-2 relative z-10">
+                <div className="relative z-10">
                     <SortableSongList
                         songs={filteredSongs}
                         onPlay={(song, index, options) => { void handlePlaySong(song, index, options).catch(console.error); }}

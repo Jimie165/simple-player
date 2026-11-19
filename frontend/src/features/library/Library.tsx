@@ -304,7 +304,7 @@ export default function Library() {
                             <motion.div
                                 key="songs"
                                 {...pageMotion}
-                                className="h-full"
+                                className="h-full -mx-8"
                             >
                                 <SongListView
                                     songs={librarySongs}

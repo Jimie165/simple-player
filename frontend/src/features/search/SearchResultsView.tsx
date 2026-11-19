@@ -274,10 +274,12 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     {matchingSongs.length}
                                 </span>
                             </h2>
-                            <SongListView
-                                songs={matchingSongs}
-                                onPlay={(song, index, options) => { void handlePlay(song, index, options).catch(console.error); }}
-                            />
+                            <div className="-mx-8">
+                                <SongListView
+                                    songs={matchingSongs}
+                                    onPlay={(song, index, options) => { void handlePlay(song, index, options).catch(console.error); }}
+                                />
+                            </div>
                         </section>
                     )}
 

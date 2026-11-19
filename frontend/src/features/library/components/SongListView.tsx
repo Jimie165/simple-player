@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { SONG_LIST_DIVIDER_RIGHT, SONG_LIST_GRID_GAP, SONG_LIST_ROW_PADDING, getGridTemplateColumns } from '@/features/playlists/songlist/songListLayout';
 import { MdAccessTime, MdArrowDropUp, MdArrowDropDown } from 'react-icons/md';
 import clsx from 'clsx';
 import { Virtuoso } from 'react-virtuoso';
@@ -74,10 +75,6 @@ export default function SongListView({
     footerSpacerClassName = "h-12",
     sortControl,
 }: SongListViewProps) {
-    const isLibraryContext = context === 'library';
-    const gridGapClass = isLibraryContext ? "gap-3" : "gap-4";
-    const headerPaddingClass = isLibraryContext ? "px-2" : "px-4";
-    const rowPaddingClass = isLibraryContext ? "px-2" : "px-4";
     const headerTopClass = "top-10";
 
     // Header Blur / Context specific class - kept from original if any logic existed, seemingly generic sticky
@@ -207,14 +204,7 @@ export default function SongListView({
         }
     }, [isSelectionMode, toggleSelection, toggleSelectionMode]);
 
-    const getGridCols = () => {
-        let cols = "24px minmax(0,4fr)";
-        if (!effectiveHideArtist) cols += " minmax(0,3fr)";
-        if (!effectiveHideAlbum) cols += " minmax(0,3fr)";
-        cols += " 48px 40px";
-        return cols;
-    };
-    const gridTemplateColumns = getGridCols();
+    const gridTemplateColumns = getGridTemplateColumns(effectiveHideAlbum, effectiveHideArtist);
     const gridStyle = useMemo(() => ({ gridTemplateColumns }), [gridTemplateColumns]);
     const handleSelectSong = useCallback((song: SongMetadata) => handleCheckboxClick(null, song), [handleCheckboxClick]);
 
@@ -268,8 +258,6 @@ export default function SongListView({
                 isLast={index === sortedSongs.length - 1}
                 song={song}
                 gridStyle={gridStyle}
-                gridGapClass={gridGapClass}
-                rowPaddingClass={rowPaddingClass}
                 isSelectionMode={isSelectionMode}
                 selected={selected}
                 previousSelected={index > 0 && isSelected(getMusicItemId(sortedSongs[index - 1]))}
@@ -301,11 +289,12 @@ export default function SongListView({
                 ref={headerRef}
                 style={gridStyle}
                 className={clsx(
-                    "sticky z-45 grid pt-2 pb-3 after:absolute after:bottom-0 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none",
-                    isLibraryContext ? "after:left-11" : "after:left-14",
+                    "sticky z-45 grid pt-2 pb-3 after:absolute after:bottom-0 after:border-b after:border-on-surface/10 after:pointer-events-none",
+                    "after:left-12",
                     headerTopClass,
-                    gridGapClass,
-                    headerPaddingClass,
+                    SONG_LIST_GRID_GAP,
+                    SONG_LIST_ROW_PADDING,
+                    SONG_LIST_DIVIDER_RIGHT,
                     "text-[13px] text-on-surface-variant font-medium"
                 )}>
                 <div ref={headerBackdropRef} aria-hidden="true" className={clsx("pointer-events-none absolute inset-y-0 -z-10 backdrop-blur-xl transition-opacity duration-150 motion-reduce:transition-none", isHeaderPinned ? "opacity-100" : "opacity-0")} />

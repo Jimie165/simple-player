@@ -151,7 +151,7 @@ export default function ArtistDetailView({
             className={index === sortedAlbums.length - 1 ? "" : "pb-12"}
         >
             <div
-                className="flex flex-col md:flex-row gap-6 md:gap-8"
+                className="flex flex-col md:flex-row gap-6 md:gap-0"
             >
                 <div className="w-67.5 shrink-0 flex flex-col gap-3 mx-auto md:mx-0">
                     <div
