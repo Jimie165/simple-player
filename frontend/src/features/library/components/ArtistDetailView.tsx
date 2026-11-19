@@ -153,7 +153,7 @@ export default function ArtistDetailView({
             <div
                 className="flex flex-col md:flex-row gap-6 md:gap-8"
             >
-                <div className="w-67.5 shrink-0 flex flex-col gap-3">
+                <div className="w-67.5 shrink-0 flex flex-col gap-3 mx-auto md:mx-0">
                     <div
                         className="aspect-square w-full rounded-xl shadow-lg bg-neutral-200 dark:bg-neutral-800 overflow-hidden cursor-pointer group relative"
                         onClick={() => onPlayAlbum(album)}
@@ -190,7 +190,7 @@ export default function ArtistDetailView({
                         <div className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
                             {album.artist}
                         </div>
-                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex gap-2">
+                        <div className="text-xs text-neutral-400 dark:text-neutral-500 mt-0.5 flex justify-center md:justify-start gap-2">
                             <span>{album.songs[0]?.year || "Unknown Year"}</span>
                             {album.songs[0]?.genre && (
                                 <>
@@ -290,7 +290,7 @@ export default function ArtistDetailView({
             </div>
 
             {/* Tabs Navigation */}
-            <div className="flex items-center gap-8 px-4 mb-4">
+            <div className="flex items-center justify-center md:justify-start gap-8 px-4 mb-4">
                 <button
                     onClick={() => handleTabChange('albums')}
                     className={clsx(
