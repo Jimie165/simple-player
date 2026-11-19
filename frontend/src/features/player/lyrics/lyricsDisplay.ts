@@ -76,6 +76,15 @@ const getFirstMainLineDisplayIndex = (displayItems: DisplayItem[]) => {
     return index >= 0 ? index : 0;
 };
 
+/** 歌曲尚未到首行起始时间（且无间奏）：焦点停在首行，但首行未到激活时间，保持失活。 */
+const getPreFirstLineState = (displayItems: DisplayItem[], currentMs: number): ActiveLyricsState => {
+    const focusIndex = getFirstMainLineDisplayIndex(displayItems);
+    const first = displayItems[focusIndex];
+    const startMs = first?.type === 'line' ? first.line.start_time_ms : null;
+    const isPending = typeof startMs === 'number' && startMs > 0 && currentMs < startMs;
+    return { focusIndex, activeIndices: new Set(isPending ? [] : [focusIndex]) };
+};
+
 interface TtmlLineWindows {
     lineIndices: number[];
     windowStartMs: number[];
@@ -345,8 +354,8 @@ function getTtmlActiveState(
     if (activeIndices.size === 0) {
         const fallbackIndex = getFirstMainLineDisplayIndex(displayItems);
         if (lastStartedLineIndex < 0) {
-            // 歌曲尚未开始：回退第一主行
-            return { focusIndex: fallbackIndex, activeIndices: new Set([fallbackIndex]) };
+            // 歌曲尚未开始：焦点回退第一主行
+            return getPreFirstLineState(displayItems, currentMs);
         }
         // 所有行已播放完：聚焦并保持最后已开始行激活（与 LRC 行为一致），
         // 而不是跳回开头第一句
@@ -456,8 +465,7 @@ function getLrcActiveState(
         };
     }
 
-    const fallbackIndex = getFirstMainLineDisplayIndex(displayItems);
-    return { focusIndex: fallbackIndex, activeIndices: new Set([fallbackIndex]) };
+    return getPreFirstLineState(displayItems, currentMs);
 }
 
 // ===== 统一入口 =====
