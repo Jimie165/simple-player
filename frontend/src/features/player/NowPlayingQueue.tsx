@@ -162,30 +162,70 @@ export default function NowPlayingQueue({
     const queueSortableItems = useMemo(() => queueList.map(getQueueItemId), [queueList]);
     const nextFromSortableItems = useMemo(() => nextFromList.map(getQueueItemId), [nextFromList]);
     const allQueueEntries = useMemo(() => [...queueList, ...nextFromList], [queueList, nextFromList]);
+    const hasContextSection = nextFromList.length > 0 || queueList.length === 0;
+    // 分区标题固定在列表上方：首个分区的标题不进入列表，滚过后续分区的标题后切换为它。
+    const sections = useMemo(() => {
+        const list: Array<'current' | 'user' | 'context'> = [];
+        if (isContent && currentSong) list.push('current');
+        if (queueList.length > 0) list.push('user');
+        if (hasContextSection) list.push('context');
+        return list;
+    }, [isContent, currentSong, queueList.length, hasContextSection]);
     const virtualItems = useMemo(() => {
         const items: Array<
             | { kind: 'user-header' }
-            | { kind: 'context-header' }
+            | { kind: 'context-header'; source: typeof queueContext }
             | { kind: 'empty' }
             | { kind: 'entry'; entry: QueueEntry }
             | { kind: 'current'; entry: QueueEntry }
         > = [];
 
-        if (isContent && currentSong) {
+        if (sections.includes('current') && currentSong) {
             items.push({ kind: 'current', entry: { song: currentSong, originalIndex: currentSongIndex } });
         }
-        if (queueList.length > 0) {
-            items.push({ kind: 'user-header' });
+        if (sections.includes('user')) {
+            if (sections[0] !== 'user') items.push({ kind: 'user-header' });
             queueList.forEach((entry) => items.push({ kind: 'entry', entry }));
         }
-        items.push({ kind: 'context-header' });
-        if (nextFromList.length > 0) {
-            nextFromList.forEach((entry) => items.push({ kind: 'entry', entry }));
-        } else {
-            items.push({ kind: 'empty' });
+        if (sections.includes('context')) {
+            if (sections[0] !== 'context') items.push({ kind: 'context-header', source: queueContext });
+            if (nextFromList.length > 0) {
+                nextFromList.forEach((entry) => items.push({ kind: 'entry', entry }));
+            } else if (queueList.length === 0) {
+                items.push({ kind: 'empty' });
+            }
         }
         return items;
-    }, [queueList, nextFromList, isContent, currentSong, currentSongIndex]);
+    }, [sections, queueList, nextFromList, currentSong, currentSongIndex, queueContext]);
+
+    // 已完全滚出视口顶部的列表内分区标题数量，对应当前固定显示的分区。
+    const [passedHeaders, setPassedHeaders] = useState(0);
+    const headerIndices = useMemo(
+        () => virtualItems.flatMap((item, index) => (
+            item.kind === 'user-header' || item.kind === 'context-header' ? [index] : []
+        )),
+        [virtualItems]
+    );
+    const updatePinnedHeader = useCallback(() => {
+        const viewport = scrollContainerRef.current;
+        if (!viewport) return;
+        const top = viewport.getBoundingClientRect().top;
+        const firstVisible = Array.from(viewport.querySelectorAll<HTMLElement>('[data-index]')).find(
+            (element) => element.getBoundingClientRect().bottom > top
+        );
+        // 快速拖动滚动条时，虚拟列表要到下一次渲染才补上视口顶部的行：此时 DOM 中没有跨过顶边的行，
+        // 找到的要么不存在、要么是下方的旧行，据此判断会让标题来回跳，所以保留上一次的结果。
+        if (!firstVisible || firstVisible.getBoundingClientRect().top > top) return;
+        const firstIndex = Number(firstVisible.dataset.index);
+        setPassedHeaders(headerIndices.filter((index) => index < firstIndex).length);
+    }, [headerIndices]);
+    useLayoutEffect(updatePinnedHeader, [updatePinnedHeader]);
+    useEffect(() => {
+        if (!scrollParent) return;
+        scrollParent.addEventListener('scroll', updatePinnedHeader, { passive: true });
+        return () => scrollParent.removeEventListener('scroll', updatePinnedHeader);
+    }, [scrollParent, updatePinnedHeader]);
+    const pinnedSection = sections[Math.min(passedHeaders, sections.length - 1)];
 
     const allSortableItems = useMemo(
         () => [...queueSortableItems, ...nextFromSortableItems],
@@ -248,11 +288,45 @@ export default function NowPlayingQueue({
         };
     };
 
+    const renderUserHeader = useCallback(() => (
+        <div className="h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] flex items-center justify-between">
+            <span className={clsx('font-bold', isContent ? 'text-sm text-on-surface' : 'text-[clamp(0.75rem,1.5vw,0.875rem)] text-white')}>队列中的下一首歌</span>
+            <button
+                onClick={clearUserQueue}
+                className={clsx('font-bold transition-colors', isContent ? 'text-xs text-on-surface-variant hover:text-primary' : 'text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/60 hover:text-white')}
+            >
+                清空队列
+            </button>
+        </div>
+    ), [clearUserQueue, isContent]);
+
+    const renderContextHeader = useCallback((source: typeof queueContext) => (
+        <div className={clsx('flex items-center gap-1 font-bold', isContent ? 'h-12 px-2 text-sm text-on-surface' : 'h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] text-[clamp(0.75rem,1.5vw,0.875rem)] text-white')}>
+            {source?.type === 'home' ? (
+                <span>下一首</span>
+            ) : (
+                <>
+                    <span className="shrink-0 whitespace-nowrap">下一首歌来自:</span>
+                    <QueueSourceLabel
+                        label={source?.name || '播放列表'}
+                        blend={!isContent}
+                        onClick={() => navigateFromQueueContext(source, onNavigate)}
+                        className={clsx(
+                            'min-w-0 truncate',
+                            isContent ? 'text-on-surface' : 'text-white opacity-45 mix-blend-plus-lighter transition-opacity',
+                            source && 'cursor-pointer hover:underline',
+                            source && (isContent ? 'hover:text-primary' : 'hover:opacity-35 active:opacity-25')
+                        )}
+                    />
+                </>
+            )}
+        </div>
+    ), [isContent, onNavigate]);
+
     const renderVirtualItem = useCallback((_: number, item: (typeof virtualItems)[number]) => {
         if (item.kind === 'current') {
             return (
                 <section className="pb-4">
-                    <h3 className="px-2 pt-3 pb-2 text-sm font-bold text-on-surface">当前播放</h3>
                     <div className="group flex items-center gap-3 rounded-md p-2 hover:bg-on-surface/5">
                         <SongCoverOverlay
                             song={item.entry.song}
@@ -278,42 +352,11 @@ export default function NowPlayingQueue({
         }
 
         if (item.kind === 'user-header') {
-            return (
-                <div className="h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] flex items-center justify-between">
-                    <span className={clsx('font-bold', isContent ? 'text-sm text-on-surface' : 'text-[clamp(0.75rem,1.5vw,0.875rem)] text-white')}>队列中的下一首歌</span>
-                    <button
-                        onClick={clearUserQueue}
-                        className={clsx('font-bold transition-colors', isContent ? 'text-xs text-on-surface-variant hover:text-primary' : 'text-[clamp(0.625rem,1.2vw,0.75rem)] text-white/60 hover:text-white')}
-                    >
-                        清空队列
-                    </button>
-                </div>
-            );
+            return renderUserHeader();
         }
 
         if (item.kind === 'context-header') {
-            return (
-                <div className={clsx('flex items-center gap-1 font-bold', isContent ? 'h-12 px-2 text-sm text-on-surface' : 'h-10 px-[clamp(0.5rem,1.5vw,0.75rem)] text-[clamp(0.75rem,1.5vw,0.875rem)] text-white')}>
-                    {queueContext?.type === 'home' ? (
-                        <span>下一首</span>
-                    ) : (
-                        <>
-                            <span className="shrink-0 whitespace-nowrap">下一首歌来自:</span>
-                            <QueueSourceLabel
-                                label={queueContext?.name || '播放列表'}
-                                blend={!isContent}
-                                onClick={() => navigateFromQueueContext(queueContext, onNavigate)}
-                                className={clsx(
-                                    'min-w-0 flex-1 truncate',
-                                    isContent ? 'text-on-surface' : 'text-white opacity-45 mix-blend-plus-lighter transition-opacity',
-                                    queueContext && 'cursor-pointer hover:underline',
-                                    queueContext && (isContent ? 'hover:text-primary' : 'hover:opacity-35 active:opacity-25')
-                                )}
-                            />
-                        </>
-                    )}
-                </div>
-            );
+            return renderContextHeader(item.source);
         }
 
         if (item.kind === 'empty') {
@@ -330,7 +373,7 @@ export default function NowPlayingQueue({
                 appearance={isContent ? 'content' : 'immersive'}
             />
         );
-    }, [clearUserQueue, handlePlay, handleRemove, onNavigate, queueContext, isContent]);
+    }, [handlePlay, handleRemove, onNavigate, isContent, renderUserHeader, renderContextHeader]);
 
     const activeDragEntry = useMemo(() => {
         if (!activeDragId) return null;
@@ -408,10 +451,21 @@ song={activeDragEntry.song} className="w-full h-full object-cover" />
 
         </DndContext>
     );
+    const pinnedHeaderSlot = pinnedSection && (
+        <div className="shrink-0" data-queue-blend-frame={isContent ? undefined : ''}>
+            {pinnedSection === 'current' ? (
+                <h3 className="h-10 px-2 flex items-center text-sm font-bold text-on-surface">当前播放</h3>
+            ) : pinnedSection === 'user' ? (
+                renderUserHeader()
+            ) : (
+                renderContextHeader(queueContext)
+            )}
+        </div>
+    );
     return (
         <div className={clsx('h-full min-h-0 flex flex-col bg-transparent relative overflow-hidden', isContent && 'px-3')}>
             {/* Fixed Top Header Area */}
-            <div className={clsx('w-full z-50 shrink-0 flex items-center justify-between', isContent ? 'h-14 px-2' : 'h-[clamp(2.5rem,4.5vw,3.5rem)] px-[clamp(0.5rem,1.5vw,0.75rem)]')}>
+            <div className={clsx('w-full z-50 shrink-0 flex items-center justify-between', isContent ? 'h-14 px-2' : 'h-[clamp(1.75rem,3vw,2rem)] px-[clamp(0.5rem,1.5vw,0.75rem)]')}>
                 <span className={clsx('font-bold', isContent ? 'border-b-2 border-primary py-2 text-base text-on-surface' : 'text-[clamp(1rem,2vw,1.125rem)] text-white')}>{isContent ? '队列' : '播放队列'}</span>
                 {isContent && (
                     <button onClick={onClose} aria-label="关闭播放队列" className="grid h-8 w-8 place-items-center rounded-full text-on-surface-variant hover:bg-on-surface/5 hover:text-on-surface transition-colors">
@@ -422,15 +476,21 @@ song={activeDragEntry.song} className="w-full h-full object-cover" />
 
             {/* Sortable List */}
             {isContent ? (
-                <ScrollArea viewportRef={scrollContainerRef} className="z-10">
-                    <div className="pb-6">{queueContent}</div>
-                </ScrollArea>
+                <>
+                    {pinnedHeaderSlot}
+                    <ScrollArea viewportRef={scrollContainerRef} className="z-10">
+                        <div className="pb-6">{queueContent}</div>
+                    </ScrollArea>
+                </>
             ) : (
-                <div className="relative flex-1 min-h-0">
-                    <div
-                        ref={scrollContainerRef}
-                        data-queue-viewport
-                        data-queue-variant={variant}
+                <>
+                    {pinnedHeaderSlot}
+                    <div className="relative flex-1 min-h-0">
+                        <div
+                            ref={scrollContainerRef}
+                            data-queue-viewport
+                            data-queue-blend-frame
+                            data-queue-variant={variant}
                         data-controls-visible={narrowControlsVisible}
                         className={clsx(
                             'h-full min-h-0 overflow-y-auto overflow-x-hidden relative z-10 block',
@@ -482,6 +542,7 @@ song={activeDragEntry.song} className="w-full h-full object-cover" />
                         }}
                     />}
                 </div>
+                </>
             )}
         </div>
     );
