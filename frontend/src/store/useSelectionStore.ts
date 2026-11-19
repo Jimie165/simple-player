@@ -93,7 +93,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
             let finalType = type;
             if (state.selectionType && areTypesCompatible(state.selectionType, type) && state.selectionType !== type) {
                 const mixableTypes = ['file', 'folder', 'album', 'recent', 'playlist', 'video'];
-                if (mixableTypes.includes(state.selectionType as string) &&
+                if (mixableTypes.includes(state.selectionType) &&
                     mixableTypes.includes(type as string)) {
                     finalType = 'recent';
                 }

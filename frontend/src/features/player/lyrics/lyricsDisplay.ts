@@ -160,6 +160,7 @@ export function getTtmlLineWindows(
     if (cached) return cached;
 
     const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
+    const handoffLeadMs = timingStrategy?.nextLineHandoffLeadMs ?? leadMs;
     const compressTail = timingStrategy?.compressTightHandoffTail ?? false;
     const backgroundEndByParentId = new Map<string, number>();
     for (const line of lines) {
@@ -243,7 +244,7 @@ export function getTtmlLineWindows(
             } else {
                 const gapMs = Math.max(0, next.start - end);
                 windowEnd = gapMs > nonInterludeNextLineFocusThresholdMs
-                    ? next.start - leadMs
+                    ? Math.max(end, next.start - handoffLeadMs)
                     : end;
             }
         }
@@ -386,6 +387,7 @@ function getLrcActiveState(
 ): ActiveLyricsState {
     const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
     const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
+    const handoffLeadMs = timingStrategy?.nextLineHandoffLeadMs ?? leadMs;
     const enableLineLyricsEarlyFocus = timingStrategy?.enableLineLyricsEarlyFocus ?? false;
     const activeLineDisplayIndex =
         findEntryAtOrBefore(timelineIndex.timedLines, currentMs)?.displayIndex ?? -1;
@@ -447,7 +449,7 @@ function getLrcActiveState(
                     const gapMs = Math.max(0, nextLineStartMs - lineEndForFocusMs);
                     const focusNextLineAtMs =
                         gapMs > nonInterludeNextLineFocusThresholdMs
-                            ? nextLineStartMs - leadMs
+                            ? nextLineStartMs - handoffLeadMs
                             : lineEndForFocusMs;
                     if (currentMs >= focusNextLineAtMs) {
                         return {
@@ -518,6 +520,7 @@ export function buildAnimatedLyricsRenderBoundaries(
     const boundaries = new Set<number>();
     const focusNextLineByVisualEnd = timingStrategy?.focusNextLineByVisualEnd ?? false;
     const leadMs = timingStrategy?.nextLineFocusLeadMs ?? nonInterludeNextLineFocusLeadMs;
+    const handoffLeadMs = timingStrategy?.nextLineHandoffLeadMs ?? leadMs;
     const enableLineLyricsEarlyFocus = timingStrategy?.enableLineLyricsEarlyFocus ?? false;
     const addBoundary = (timeMs: number | null | undefined) => {
         if (typeof timeMs === 'number' && Number.isFinite(timeMs) && timeMs >= 0) {
@@ -562,7 +565,7 @@ export function buildAnimatedLyricsRenderBoundaries(
         const gapMs = Math.max(0, nextLineStartMs - naturalLineEndMs);
         addBoundary(
             gapMs > nonInterludeNextLineFocusThresholdMs
-                ? nextLineStartMs - leadMs
+                ? Math.max(naturalLineEndMs, nextLineStartMs - handoffLeadMs)
                 : naturalLineEndMs,
         );
     });
@@ -740,7 +743,10 @@ export function buildDisplayItems(
         }
 
         if (isTimelineLine) {
-            pendingEndMs = typeof line.end_time_ms === 'number' ? line.end_time_ms : null;
+            // Overlapping voices must not shorten a preceding line's sung interval.
+            pendingEndMs = typeof line.end_time_ms === 'number'
+                ? Math.max(pendingEndMs ?? line.end_time_ms, line.end_time_ms)
+                : null;
             if (typeof line.start_time_ms === 'number') lastLyricLineIndex = index;
         }
     }

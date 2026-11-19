@@ -19,7 +19,7 @@ export function getAlbumDisplayArtist(songs: SongMetadata[]): string {
     const albumArtists = new Set(songs.map(song => song.album_artist?.trim()).filter(Boolean));
     const trackArtists = new Set(songs.map(song => song.artist?.trim()).filter(Boolean));
     if (albumArtists.size === 1) return Array.from(albumArtists)[0]!;
-    if (trackArtists.size === 1) return Array.from(trackArtists)[0]!;
+    if (trackArtists.size === 1) return Array.from(trackArtists)[0];
     return 'Various Artists';
 }
 

@@ -46,12 +46,7 @@ export function useImmersivePlaybackControls({
     };
 
     const handleSeekEnd = async () => {
-        try {
-            const actualTime = await seek(usePlayerStore.getState().currentTime);
-            setPlaybackTime(actualTime);
-        } finally {
-            usePlayerStore.getState().setSeeking(false);
-        }
+        await seek(usePlayerStore.getState().currentTime);
     };
 
     return {

@@ -87,6 +87,10 @@ export function getAnimatedLyricsSpringParams({
     for (let index = activeDisplayIndex - 1; index >= 0; index--) {
         const item = displayItems[index];
         if (item.type === 'interlude') break;
+        if (!hasPreviousMain && item.line.role === 'main' && item.line.words.length === 0
+            && (item.line.end_time_ms === null || item.line.end_time_inferred)) {
+            return { stiffness: 100, damping: 18, mass: 1 };
+        }
         const endMs = getLineKaraokeEndMs(item.line, nextMainStartMs);
         if (endMs !== null) previousGroupEndMs = Math.max(previousGroupEndMs ?? endMs, endMs);
         if (item.line.role === 'main') {
@@ -97,8 +101,8 @@ export function getAnimatedLyricsSpringParams({
     if (!hasPreviousMain || previousGroupEndMs === null) return { stiffness: 90, damping: 15, mass: 1 };
 
     const slowRatio = (clamp(currentStartMs - previousGroupEndMs, 150, 700) - 150) / 550;
-    const stiffness = 130 - 60 * slowRatio;
-    const dampingRatio = 0.92 - 0.13 * slowRatio;
+    const stiffness = 172 - 102 * slowRatio;
+    const dampingRatio = 0.9 - 0.12 * slowRatio;
     return {
         stiffness,
         damping: 2 * dampingRatio * Math.sqrt(stiffness),

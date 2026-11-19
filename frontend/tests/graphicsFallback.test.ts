@@ -22,7 +22,7 @@ describe('automatic graphics fallback', () => {
     it('keeps a graphics failure out of persisted preferences and retries next session', async () => {
         useThemeStore.getState().setGraphicsUnavailable();
         expect(useThemeStore.getState().graphicsUnavailable).toBe(true);
-        const saved = JSON.parse(localStorage.getItem('theme-storage') ?? '{}');
+        const saved = JSON.parse(localStorage.getItem('theme-storage') ?? '{}') as { state?: Record<string, unknown> };
         expect(saved.state).not.toHaveProperty('graphicsUnavailable');
         await useThemeStore.persist.rehydrate();
         expect(useThemeStore.getState().graphicsUnavailable).toBe(false);
@@ -35,7 +35,7 @@ describe('automatic graphics fallback', () => {
         expect(useThemeStore.getState()).not.toHaveProperty('reducedVisualEffects');
         expect(useThemeStore.getState().graphicsUnavailable).toBe(false);
         useThemeStore.getState().setPlayerEffectMode('animation');
-        const saved = JSON.parse(localStorage.getItem('theme-storage') ?? '{}');
+        const saved = JSON.parse(localStorage.getItem('theme-storage') ?? '{}') as { state?: Record<string, unknown> };
         expect(saved.state).not.toHaveProperty('reducedVisualEffects');
     });
 });

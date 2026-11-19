@@ -100,10 +100,9 @@ export default function PlaybackControls({ mode, isSuspended }: PlaybackControls
         setPlaybackTime(time);
     };
     const handleSeekEnd = async (e: React.MouseEvent<HTMLInputElement>) => {
-        const newTime = Number((e.currentTarget as HTMLInputElement).value);
+        const newTime = Number((e.currentTarget).value);
         setIsDragging(false);
-        const actualTime = await seek(newTime);
-        setPlaybackTime(actualTime);
+        await seek(newTime);
     };
     return (
         <>
@@ -114,8 +113,8 @@ export default function PlaybackControls({ mode, isSuspended }: PlaybackControls
                 isShuffling={isShuffling}
                 repeatMode={repeatMode}
                 togglePlay={() => void togglePlayback()}
-                handlePrev={handlePrev}
-                handleNext={handleNext}
+                handlePrev={() => { void handlePrev().catch(console.error); }}
+                handleNext={() => { void handleNext().catch(console.error); }}
                 handleBtnShuffle={handleBtnShuffle}
                 handleBtnRepeat={handleBtnRepeat}
             />
@@ -128,7 +127,7 @@ export default function PlaybackControls({ mode, isSuspended }: PlaybackControls
                 isSuspended={isSuspended}
                 handleSeekStart={handleSeekStart}
                 handleSeekChange={handleSeekChange}
-                handleSeekEnd={handleSeekEnd}
+                handleSeekEnd={(event) => { void handleSeekEnd(event).catch(console.error); }}
             />
         </>
     );

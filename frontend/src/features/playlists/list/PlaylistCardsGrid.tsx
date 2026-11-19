@@ -10,8 +10,7 @@ import CardPlayButton from '@/components/common/CardPlayButton';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { FavoritesCardMenu, PlaylistCardMenu } from '@/features/playlists/list/PlaylistCardMenus';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 type PlaylistGridItem = Playlist | (Omit<Playlist, 'id'> & { id: 'favorites' | 'playlist:favorites' });
@@ -51,14 +50,12 @@ export default function PlaylistCardsGrid({
     setFavoritesContextMenu,
     playlistCoverPaths,
 }: PlaylistCardsGridProps) {
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(filteredPlaylists.length, 'cover'));
-
     return (
         <VirtualizedGrid
             data={filteredPlaylists}
             itemKey={(_index, playlist) => getMusicItemId(playlist)}
-            listClassName="grid content-grid-cover gap-6 pb-8"
-            listStyle={getSparseGridStyle(mainContentWidth, filteredPlaylists.length, 24, 'cover')}
+            listClassName="grid content-grid-cover gap-6"
+            listStyle={getSparseGridStyle(filteredPlaylists.length, 'cover')}
             itemContent={(_index, pl) => {
                 if (pl.id === 'favorites' || pl.id === 'playlist:favorites') {
                     const favoritesSelectionId = getMusicItemId(pl);
@@ -195,7 +192,7 @@ export default function PlaylistCardsGrid({
                                     <CardPlayButton variant="cover"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePlayPlaylist(playlist);
+                                            void (handlePlayPlaylist(playlist)).catch(console.error);
                                         }}
                                     />
                                     <PlaylistCardMenu

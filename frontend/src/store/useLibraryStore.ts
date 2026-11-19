@@ -12,6 +12,7 @@ import {
     removeSongFromPlaylistFn,
     reorderPlaylistFn,
     toggleShuffleListFn,
+    withoutQueueMetadata,
 } from '@/store/actions/queueActions';
 import { isFavoriteFn, refreshFavoritesFn, toggleFavoriteFn } from '@/store/actions/favoriteActions';
 import { mediaPathKey } from '@/utils/mediaPath';
@@ -44,7 +45,7 @@ interface LibraryState {
     addToRecent: (item: RecentItem) => void;
     removeFromRecent: (id: string) => void;
     updateRecentItemCover: (id: string, newCoverPath: string | null) => void;
-    setPlaylist: (songs: SongMetadata[]) => void;
+    setPlaylist: (songs: SongMetadata[], context: { type: string, name: string, id?: string } | null) => void;
     updateSongInQueues: (song: SongMetadata) => void;
     setCurrentSongIndex: (index: number) => void;
 
@@ -95,7 +96,6 @@ interface LibraryState {
 
     // Queue Context
     queueContext: { type: string, name: string, id?: string } | null;
-    setQueueContext: (context: { type: string, name: string, id?: string } | null) => void;
 }
 
 import { libraryService } from '@/services/libraryService';
@@ -116,11 +116,20 @@ const safeStorage = createJSONStorage(() => ({
             // Attempt to shrink payload on quota error
             if (error instanceof DOMException && error.name === 'QuotaExceededError') {
                 try {
-                    const parsed = JSON.parse(value);
-                    if (parsed?.state?.recentHistory?.length) {
-                        parsed.state.recentHistory = parsed.state.recentHistory
-                            .map((item: RecentItem) => sanitizeRecentItem(item))
-                            .slice(0, 20);
+                    const parsed: unknown = JSON.parse(value);
+                    if (parsed && typeof parsed === 'object' && 'state' in parsed && parsed.state && typeof parsed.state === 'object' && 'recentHistory' in parsed.state && Array.isArray(parsed.state.recentHistory)) {
+                        const recent = parsed.state.recentHistory.slice(0, 20);
+                        // 单个保存的队列可能比其他几条记录加起来还大，逐步减半直到写入成功。
+                        for (let count = recent.length; count > 0; count = Math.floor(count / 2)) {
+                            parsed.state.recentHistory = recent.slice(0, count);
+                            try {
+                                localStorage.setItem(name, JSON.stringify(parsed));
+                                return;
+                            } catch (retryError) {
+                                if (!(retryError instanceof DOMException) || retryError.name !== 'QuotaExceededError') throw retryError;
+                            }
+                        }
+                        parsed.state.recentHistory = [];
                     }
                     localStorage.setItem(name, JSON.stringify(parsed));
                 } catch (innerError) {
@@ -143,7 +152,6 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
     queueContext: null,
     lastAddedToPlaylists: {},
 
-    setQueueContext: (context) => set({ queueContext: context }),
 
     // Cache for favorites (Set of IDs)
     favoriteSet: new Set<number>(),
@@ -186,7 +194,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             const { recentHistory } = get();
             if (recentHistory.length === 0) return;
 
-            const hasPlaylistItems = recentHistory.some((item) => item.type === 'playlist');
+            const hasPlaylistItems = recentHistory.some((item) => item.type === 'playlist' && !item.songs);
 
             // Fetch latest data safely
             const [allSongs, allVideos, playlists] = await Promise.all([
@@ -223,7 +231,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                                 title: found.title || item.title,
                                 description: found.duration ? formatTime(found.duration) : item.description,
                                 cover_path: found.thumbnail_path || item.cover_path,
-                            } as RecentItem;
+                            };
                         }
                     }
 
@@ -239,14 +247,14 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                                 cover_path: found.cover_path || item.cover_path,
                                 description: found.artist || item.description,
                                 isLibraryItem: true
-                            } as RecentItem;
+                            };
                         }
                     }
                 }
                 return item;
             }).filter((item) => {
                 if (item.type === 'playlist') {
-                    if (item.id === 'playlist:favorites') return true;
+                    if (item.songs || item.id === 'playlist:favorites') return true;
                     const rawId = item.id.replace('playlist:', '');
                     const playlistId = Number.parseInt(rawId, 10);
                     return Number.isInteger(playlistId) && playlistIds.has(playlistId);
@@ -265,14 +273,21 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                 return true;
             });
 
-            set({ recentHistory: newRecent });
+            const refreshed = new Map(newRecent.map((item) => [item.id, item]));
+            set((state) => ({
+                recentHistory: state.recentHistory.flatMap((item) => {
+                    // 保留刷新数据期间新增或重新播放的记录。
+                    if (!recentHistory.includes(item)) return [item];
+                    const updated = refreshed.get(item.id);
+                    return updated ? [updated] : [];
+                }),
+            }));
         } catch (e) {
             console.error('Failed to refresh recent history', e);
         }
     },
 
     addToRecent: (item) => set((state) => {
-        if (item.type === 'artist') return state;
         const safeItem = sanitizeRecentItem(item);
         // 使用 id 去重而不是 path；专辑按 album:name 唯一标识。
         const filtered = state.recentHistory.filter(i => {
@@ -299,10 +314,10 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
         )
     })),
 
-    setPlaylist: (songs) => set({
-        playlist: songs,
-        originalPlaylist: songs
-    }),
+    setPlaylist: (songs, context) => {
+        const playlist = songs.map(withoutQueueMetadata);
+        set({ playlist, originalPlaylist: playlist, queueContext: context });
+    },
 
     updateSongInQueues: (song) => set((state) => {
         const matches = (candidate: SongMetadata) => (

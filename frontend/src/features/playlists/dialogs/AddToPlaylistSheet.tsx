@@ -1,7 +1,8 @@
+import { DialogBackdrop, DialogPanel } from '@/components/common/DialogSurface';
 import { Fragment, useState, useEffect, useCallback } from 'react';
-import { Dialog, Transition, TransitionChild, DialogBackdrop, DialogPanel, DialogTitle } from '@headlessui/react';
-import { MdPlaylistAdd } from 'react-icons/md';
-import { MdAdd } from 'react-icons/md';
+import { Dialog, Transition, TransitionChild, DialogTitle } from '@headlessui/react';
+import { MdAdd, MdAddCircleOutline, MdPlaylistAdd } from 'react-icons/md';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useAddToPlaylistStore } from '@/store/useAddToPlaylistStore';
@@ -11,8 +12,7 @@ import type { Playlist, SongMetadata } from '@/types';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 import CoverImage from '@/components/common/CoverImage';
 import { sortSongs } from '@/utils/songSort';
-import DuplicateSongConfirmDialog from '@/features/playlists/dialogs/DuplicateSongConfirmDialog';
-import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
+import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
 import { resolveSongsWithLibraryIds, splitDuplicateSongs } from '@/features/playlists/dialogs/playlistDuplicateUtils';
 
 export default function AddToPlaylistSheet() {
@@ -77,7 +77,7 @@ export default function AddToPlaylistSheet() {
         if (isOpen) {
             // eslint-disable-next-line react-hooks/set-state-in-effect -- 面板打开或歌单版本变化时重置缓存并异步拉取歌单
             setPlaylistSongs({});
-            loadPlaylists();
+            void (loadPlaylists()).catch(console.error);
         }
     }, [isOpen, libraryVersion, playlistVersion, loadPlaylists]);
 
@@ -112,7 +112,7 @@ export default function AddToPlaylistSheet() {
                 }));
                 setPlaylistSongs(newMap);
             };
-            fetchAll();
+            void (fetchAll()).catch(console.error);
         }
     }, [isOpen, playlists, libraryMap]);
 
@@ -120,9 +120,15 @@ export default function AddToPlaylistSheet() {
         setCreateDialogOpen(true);
     };
 
-    const handleCreateConfirm = async (name: string) => {
+    const handleCreateConfirm = async (name: string, description?: string, coverPath?: string) => {
         try {
             const newPl = await libraryService.createPlaylist(name);
+            if (description) {
+                await libraryService.updatePlaylistInfo(newPl.id, name, description);
+            }
+            if (coverPath) {
+                await libraryService.updatePlaylistCover(newPl.id, coverPath);
+            }
             // Auto add to new playlist
             await handleAddToPlaylist(newPl.id);
         } catch (error) {
@@ -168,7 +174,7 @@ export default function AddToPlaylistSheet() {
                 const allIds = resolvedSongs.map(s => s.id).filter((id): id is number => id !== undefined);
                 if (allIds.length > 0) {
                     await libraryService.batchAddToPlaylist(playlistId, allIds);
-                    finishAdd(playlistId);
+                    void (finishAdd(playlistId)).catch(console.error);
                 } else {
                     alert("无法添加：未找到歌曲的库ID，请先导入到音乐库");
                 }
@@ -204,7 +210,7 @@ export default function AddToPlaylistSheet() {
                 await libraryService.batchAddToPlaylist(playlistId, idsToAdd);
             }
 
-            finishAdd(playlistId);
+            void (finishAdd(playlistId)).catch(console.error);
         } catch (error) {
             console.error("Failed to add songs after confirm", error);
             alert("添加失败");
@@ -279,10 +285,10 @@ export default function AddToPlaylistSheet() {
                                 leaveFrom="opacity-100 scale-100"
                                 leaveTo="opacity-0 scale-95"
                             >
-                                <DialogPanel className="w-[min(28rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-neutral-200 dark:border-neutral-700 sm:w-full sm:max-w-md sm:max-h-[calc(100vh-2rem)]">
+                                <DialogPanel className="w-[min(28rem,calc(100vw-1.5rem))] max-h-[calc(100vh-1.5rem)] transform overflow-hidden rounded-2xl bg-surface p-6 text-left align-middle shadow-xl transition-all border border-(--dialog-outline-color) sm:w-full sm:max-w-md sm:max-h-[calc(100vh-2rem)]">
                                     <DialogTitle
                                         as="h3"
-                                        className="text-lg font-medium leading-6 text-neutral-900 dark:text-neutral-100 mb-4 flex items-center gap-2"
+                                        className="text-lg font-medium leading-6 text-on-surface mb-4 flex items-center gap-2"
                                     >
                                         <MdPlaylistAdd className="text-xl" />
                                         添加到播放列表
@@ -291,16 +297,16 @@ export default function AddToPlaylistSheet() {
                                     <div className="mt-2 flex flex-col gap-2 max-h-[min(60vh,24rem)] overflow-y-auto">
                                         <button
                                             onClick={handleCreateNew}
-                                            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left group"
+                                            className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-on-surface/5 transition-colors text-left group"
                                         >
-                                            <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center text-neutral-500 group-hover:text-primary transition-colors">
+                                            <div className="w-12 h-12 rounded-lg bg-on-surface/8 flex items-center justify-center text-on-surface-variant group-hover:text-primary transition-colors">
                                                 <MdAdd className="text-2xl" />
                                             </div>
                                             <span className="font-medium text-primary">新建播放列表</span>
                                         </button>
 
                                         {loading ? (
-                                            <div className="text-center py-4 text-neutral-500">加载中...</div>
+                                            <div className="text-center py-4 text-on-surface-variant">加载中...</div>
                                         ) : (
                                             playlists.map(pl => {
                                                 const songs = playlistSongs[pl.id] || [];
@@ -309,10 +315,10 @@ export default function AddToPlaylistSheet() {
                                                 return (
                                                     <button
                                                         key={pl.id}
-                                                        onClick={() => handleAddToPlaylist(pl.id)}
-                                                        className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors text-left"
+                                                        onClick={() => { void handleAddToPlaylist(pl.id).catch(console.error); }}
+                                                        className="flex items-center gap-3 w-full p-2 rounded-xl hover:bg-on-surface/5 transition-colors text-left"
                                                     >
-                                                        <div className="w-12 h-12 rounded-lg bg-neutral-200 dark:bg-neutral-700 flex items-center justify-center overflow-hidden shrink-0">
+                                                        <div className="w-12 h-12 rounded-lg bg-on-surface/8 flex items-center justify-center overflow-hidden shrink-0">
                                                             {pl.cover_path ? (
                                                                 <CoverImage src={pl.cover_path} className="w-full h-full object-cover" />
                                                             ) : (
@@ -324,10 +330,10 @@ export default function AddToPlaylistSheet() {
                                                             )}
                                                         </div>
                                                         <div className="flex flex-col">
-                                                            <span className="font-medium text-neutral-900 dark:text-neutral-100 truncate">
+                                                            <span className="font-medium text-on-surface truncate">
                                                                 {pl.name}
                                                             </span>
-                                                            <span className="text-xs text-neutral-500">
+                                                            <span className="text-xs text-on-surface-variant">
                                                                 {pl.song_count || 0} 首歌曲
                                                             </span>
                                                         </div>
@@ -342,14 +348,32 @@ export default function AddToPlaylistSheet() {
                     </div>
                 </Dialog>
             </Transition>
-            <DuplicateSongConfirmDialog
+            <ConfirmDialog
                 isOpen={duplicateDialogState.isOpen}
                 onClose={closeDuplicateDialog}
-                onAdd={() => confirmAddDuplicates(true)}
-                onSkip={() => confirmAddDuplicates(false)}
-                duplicateCount={duplicateDialogState.duplicates.length}
+                type="info"
+                fullWidthActions
+                title="发现重复歌曲"
+                icon={(
+                    <div className="w-10 h-10 rounded-full bg-on-surface/8 flex items-center justify-center shrink-0">
+                        <MdAddCircleOutline className="text-xl text-primary" />
+                    </div>
+                )}
+                description={(
+                    <>
+                        <p>有一些重复项目正在添加到播放列表。你要添加这些重复项目，还是跳过？</p>
+                        <p className="text-xs text-on-surface-variant/75 mt-2">
+                            检测到 {duplicateDialogState.duplicates.length} 首重复歌曲。
+                        </p>
+                    </>
+                )}
+                cancelText="添加"
+                confirmText="跳过"
+                onCancel={() => { void confirmAddDuplicates(true).catch(console.error); }}
+                onConfirm={() => { void confirmAddDuplicates(false).catch(console.error); }}
             />
-            <CreatePlaylistDialog
+            <EditPlaylistDialog
+                mode="create"
                 isOpen={isCreateDialogOpen}
                 onClose={() => setCreateDialogOpen(false)}
                 onConfirm={handleCreateConfirm}

@@ -74,6 +74,7 @@ fn main() {
             #[cfg(target_os = "windows")]
             if let Some(window) = app.get_webview_window("main") {
                 modules::window_fullscreen::initialize(&window)?;
+                modules::window_icon::initialize(&window)?;
             }
             let db = app.state::<DbState>().0.clone();
             modules::window_state::initialize(app, db);
@@ -105,6 +106,7 @@ fn main() {
             // Player commands
             commands::player::play_audio,
             commands::player::load_audio,
+            commands::player::begin_audio_load,
             commands::player::pause_audio,
             commands::player::resume_audio,
             commands::player::set_volume,

@@ -68,7 +68,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const triggerPlaylistUpdate = useLibraryStore(state => state.triggerPlaylistUpdate);
     const removeFromRecent = useLibraryStore(state => state.removeFromRecent);
     const toggleFavorite = useLibraryStore(state => state.toggleFavorite);
-    const { pausePlayback, playList, shufflePlay } = usePlaybackActions();
+    const { pausePlayback, playSong, playList, shufflePlay } = usePlaybackActions();
     const setShuffleState = usePlayerStore(s => s.setShuffleState);
     const isShuffling = usePlayerStore(s => s.isShuffling);
     const isPlaying = usePlayerStore(s => s.isPlaying);
@@ -84,6 +84,10 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     const count = items.length;
     const isSingle = count === 1;
     const firstItem = items[0];
+    const firstType = getMusicItemType(firstItem);
+    const recentCollection = isSingle && firstItem && 'lastPlayed' in firstItem && firstItem.type !== 'file'
+        ? firstItem
+        : undefined;
 
     const isAllFavorited = useLibraryStore(state => items.length > 0 && items.every(item =>
         state.isFavorite(item as SongMetadata)
@@ -114,14 +118,20 @@ export function useSongOperations(options: UseSongOperationsOptions) {
                 await pausePlayback();
             }
             usePlayerStore.getState().setMediaKind('video');
+        } else if (isSingle && (firstType === 'file' || firstType === 'song')) {
+            await playSong({
+                song: songs[0],
+                index: 0,
+                playlist: songs,
+                options: { restartIfCurrent: true, disableShuffle: true }
+            });
         } else {
             await playList({
                 songs,
-                startIndex: 0,
-                options: { restartIfCurrent: true }
+                options: { recentItem: recentCollection && { ...recentCollection, lastPlayed: Date.now() } }
             });
         }
-    }, [items, onPlay, pausePlayback, playList, isShuffling, setShuffleState, context, isPlaying, setVideoQueue, setVideoMetadata, setVideoMode]);
+    }, [items, onPlay, pausePlayback, playSong, playList, isShuffling, setShuffleState, context, isPlaying, setVideoQueue, setVideoMetadata, setVideoMode, isSingle, firstType, recentCollection]);
 
     // 2. 随机播放
     const handleShufflePlay = useCallback(async () => {
@@ -134,9 +144,9 @@ export function useSongOperations(options: UseSongOperationsOptions) {
 
         await shufflePlay({
             songs,
-            options: { restartIfCurrent: true }
+            options: { recentItem: recentCollection && { ...recentCollection, lastPlayed: Date.now() } }
         });
-    }, [items, onShuffle, shufflePlay]);
+    }, [items, onShuffle, shufflePlay, recentCollection]);
 
     // 3. 加入队列 (播放下一首)
     const handleAddToQueue = useCallback(async () => {
@@ -177,13 +187,13 @@ export function useSongOperations(options: UseSongOperationsOptions) {
         for (const s of songs) {
             const currentFav = isFavorite(s);
             if (currentFav !== targetIsFavorite) {
-                await toggleFavorite(s as SongMetadata);
+                await toggleFavorite(s);
             }
         }
     }, [items, isFavorite, toggleFavorite]);
 
     // 5. 删除或从音乐库删除
-    const handleDeleteFromLibrary = useCallback(async () => {
+    const handleDeleteFromLibrary = useCallback(() => {
         handleDeleteFromLibraryAction({
             items,
             count,
@@ -198,7 +208,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
     }, [items, count, context, clearSelection, openDeleteConfirm, removeFromRecent, triggerLibraryUpdate, triggerPlaylistUpdate, onDeleted]);
 
     // 5. 删除或从播放列表移除
-    const handleDeleteOrRemove = useCallback(async () => {
+    const handleDeleteOrRemove = useCallback(() => {
         handleDeleteOrRemoveAction({
             items,
             count,
@@ -210,7 +220,7 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             triggerLibraryUpdate,
             triggerPlaylistUpdate,
             removeFromRecent,
-            handleDeleteFromLibrary,
+            handleDeleteFromLibrary: handleDeleteFromLibrary,
         });
     }, [items, count, context, playlistId, onDelete, clearSelection, openDeleteConfirm, triggerLibraryUpdate, triggerPlaylistUpdate, removeFromRecent, handleDeleteFromLibrary]);
 
@@ -294,19 +304,19 @@ export function useSongOperations(options: UseSongOperationsOptions) {
             onShowProperties,
             canAddToPlaylist,
             isAllFavorited,
-            handlePlay,
-            handleShufflePlay,
-            handleAddToQueue,
-            handleAddToPlaylist,
-            handleFavorite,
-            handleProperties,
-            handleShowAlbum,
+            handlePlay: () => { void handlePlay().catch(console.error); },
+            handleShufflePlay: () => { void handleShufflePlay().catch(console.error); },
+            handleAddToQueue: () => { void handleAddToQueue().catch(console.error); },
+            handleAddToPlaylist: () => { void handleAddToPlaylist().catch(console.error); },
+            handleFavorite: () => { void handleFavorite().catch(console.error); },
+            handleProperties: () => { void handleProperties().catch(console.error); },
+            handleShowAlbum: () => { void handleShowAlbum().catch(console.error); },
             handleShowArtist,
-            handleDeleteOrRemove,
-            handleDeleteFromLibrary,
+            handleDeleteOrRemove: handleDeleteOrRemove,
+            handleDeleteFromLibrary: handleDeleteFromLibrary,
         });
 
-        return filterMenuGroupsByContext(groups as MenuItemData[][], context, items);
+        return filterMenuGroupsByContext(groups, context, items);
     }, [
         handlePlay, handleShufflePlay, handleAddToQueue, handleAddToPlaylist, handleFavorite,
         handleProperties, handleShowAlbum, handleShowArtist, handleDeleteOrRemove, handleEdit, onSelect, onEdit,

@@ -1,6 +1,7 @@
 import MusicSlider from '@/components/common/MusicSlider';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SongMetadata } from '@/types';
+import { usePlaybackLoadingVisible } from '@/features/player/controls/usePlaybackLoadingVisible';
 import { formatTime } from '@/utils/time';
 
 interface NowPlayingProgressProps {
@@ -20,6 +21,7 @@ export default function NowPlayingProgress({
     variant,
 }: NowPlayingProgressProps) {
     const currentTime = usePlayerStore(state => state.currentTime);
+    const loading = usePlaybackLoadingVisible();
     const isNarrow = variant === 'narrow';
 
     return (
@@ -29,6 +31,8 @@ export default function NowPlayingProgress({
                 min={0}
                 max={metadata?.duration || 0}
                 disabled={!metadata}
+                dimWhenDisabled={false}
+                loading={loading}
                 onChange={onChange}
                 onMouseDown={onMouseDown}
                 onMouseUp={onMouseUp}
@@ -37,8 +41,8 @@ export default function NowPlayingProgress({
                 activeHeightClass={isNarrow ? 'group-active:h-[10px]' : 'group-active:h-[clamp(8px,2vmin,16px)]'}
             />
             <div className={isNarrow
-                ? 'flex justify-between text-[11px] font-medium text-white/50 select-none'
-                : 'flex justify-between text-[11px] font-medium text-white/40 select-none'}
+                ? 'flex justify-between text-[max(1.2vh,0.8rem)] font-medium text-white/50 select-none'
+                : 'flex justify-between text-[max(1.2vh,0.8rem)] font-medium text-white/40 select-none'}
             >
                 <span>{formatTime(currentTime)}</span>
                 <span>-{formatTime(Math.max(0, Math.floor(metadata?.duration || 0) - Math.floor(currentTime)))}</span>

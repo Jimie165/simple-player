@@ -9,7 +9,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { sortSongs } from '@/utils/songSort';
+import { resolveSongsFromItems } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import { getSelectedPath } from '@/utils/dialogSelection';
 import { songMatchesAlbum } from '@/features/library/utils/grouping';
@@ -244,25 +244,11 @@ export function useRecentPlayback() {
             } catch (err) {
                 console.error("Failed to play recent album", err);
             }
-        } else if (item.type === 'playlist') {
+        } else if (item.type === 'playlist' || item.type === 'artist') {
             try {
-                const plIdStr = item.id.replace('playlist:', '');
-                let songs: SongMetadata[] = [];
-
-                if (plIdStr === 'favorites') {
-                    songs = await libraryService.getFavorites();
-                } else {
-                    const plId = parseInt(plIdStr);
-                    if (!isNaN(plId)) {
-                        const rawSongs = await libraryService.getPlaylistSongs(plId);
-                        const { getPlaylistSettings } = useLibraryStore.getState();
-                        const settings = getPlaylistSettings(plIdStr);
-                        songs = sortSongs(rawSongs, settings.sortKey, settings.sortOrder);
-                    }
-                }
-                await playListHelper(songs);
+                await playListHelper(await resolveSongsFromItems([item]));
             } catch (err) {
-                console.error("Failed to play recent playlist", err);
+                console.error("Failed to play recent collection", err);
             }
         } else if (item.type === 'video') {
             try {
@@ -281,7 +267,7 @@ export function useRecentPlayback() {
                 console.error("Failed to play recent video", e);
             }
         } else {
-            playSingleFile(item.path, item.isLibraryItem, item);
+            void (playSingleFile(item.path, item.isLibraryItem, item)).catch(console.error);
         }
     };
 
@@ -318,7 +304,7 @@ export function useRecentPlayback() {
             ]
         });
         const filePath = getSelectedPath(selected);
-        if (filePath) playSingleFile(filePath);
+        if (filePath) void (playSingleFile(filePath)).catch(console.error);
     };
 
     return {

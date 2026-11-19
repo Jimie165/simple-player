@@ -50,7 +50,8 @@ export const audioService = {
     },
 
     load: async (path: string, metadata?: SongMetadata) => {
-        return invoke<PlaybackSnapshot>('load_audio', { path, metadata });
+        const requestId = await invoke<number>('begin_audio_load');
+        return invoke<PlaybackSnapshot>('load_audio', { path, metadata, requestId });
     },
 
     pause: async (): Promise<PlaybackSnapshot> => invoke('pause_audio'),

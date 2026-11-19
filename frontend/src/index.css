@@ -277,26 +277,27 @@ body {
     pointer-events: none;
   }
 
+  .content-player-shell {
+    /* Snappy in, slow critically damped out. */
+    --spring-info-in: linear(0, 0.042, 0.141, 0.266, 0.395, 0.518, 0.626, 0.719, 0.794, 0.854, 0.9, 0.935, 0.96, 0.978, 0.99, 0.998, 1.002, 1.005, 1.006, 1.006, 1.006, 1.005, 1.004, 1.004, 1);
+    --spring-info-out: linear(0, 0.065, 0.197, 0.34, 0.472, 0.584, 0.676, 0.749, 0.806, 0.851, 0.886, 0.912, 0.933, 0.949, 0.961, 0.97, 0.977, 0.982, 0.987, 0.99, 0.992, 0.994, 0.995, 0.997, 1);
+  }
+
+  /* Kept here rather than as utilities so the hover state below can swap in the snappy curve. */
+  .player-song-info {
+    transition-property: opacity, filter, transform;
+    transition-duration: 450ms;
+    transition-timing-function: var(--spring-info-out);
+  }
+
   .content-player-shell:has(.player-progress:hover, .player-progress[data-dragging]) .player-song-info {
     opacity: 0.5;
+    filter: blur(4px);
+    transform: translateY(-3px) scale(0.965);
     pointer-events: none;
-  }
-
-  .player-progress::before {
-    content: '';
-    position: absolute;
-    inset-inline: -8px;
-    bottom: 0;
-    height: 72px;
-    z-index: -1;
-    pointer-events: none;
-    opacity: 0;
-    backdrop-filter: blur(4px);
-    transition: opacity 200ms ease;
-  }
-
-  .player-progress:is(:hover, [data-dragging])::before {
-    opacity: 1;
+    transition-duration: 150ms;
+    transition-timing-function: var(--spring-info-in);
+    transition-delay: 30ms;
   }
 
   .player-progress[data-dragging] span {
@@ -620,41 +621,47 @@ body {
     container: main-content / inline-size;
   }
 
+  .main-content-query [data-scroll-viewport] > .relative {
+    /* Floating player: 16px bottom inset + 56px height + 24px content gap. */
+    padding-bottom: 96px;
+  }
+
+  /* --grid-columns-N 由条目不足一行的列表提供（见 utils/gridLayout.ts），否则使用等分列。 */
   .content-grid-cover,
   .content-grid-video {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: var(--grid-columns-0, repeat(2, minmax(0, 1fr)));
   }
 
   @container main-content (min-width: 520px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-1, repeat(3, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 700px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-2, repeat(4, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 920px) {
     .content-grid-cover,
     .content-grid-video {
-      grid-template-columns: repeat(5, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-3, repeat(5, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 1140px) {
     .content-grid-cover {
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-4, repeat(6, minmax(0, 1fr)));
     }
   }
 
   @container main-content (min-width: 1360px) {
     .content-grid-cover {
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      grid-template-columns: var(--grid-columns-5, repeat(7, minmax(0, 1fr)));
     }
   }
 
@@ -889,6 +896,21 @@ body {
     rgba(0, 0, 0, var(--kw-tail, 1)) calc(0.3em + (100% - 0.6em) * var(--kf, -100) / 100 + 0.16em));
 }
 
+/* Larger mask is scoped to line fill combined with word-group motion. */
+.karaoke-text-word-float.karaoke-text-line-word-mask .karaoke-word-motion {
+  padding: 0.5em;
+  margin: -0.5em;
+  --kw-head: calc(0.5em + (100% - 1em) * var(--kf, -100) / 100);
+  mask-image: linear-gradient(to right,
+    black calc(var(--kw-head) - 0.25em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.926)) calc(var(--kw-head) - 0.1667em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.741)) calc(var(--kw-head) - 0.0833em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.5)) var(--kw-head),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.259)) calc(var(--kw-head) + 0.0833em),
+    rgba(0, 0, 0, calc(var(--kw-tail, 1) + (1 - var(--kw-tail, 1)) * 0.074)) calc(var(--kw-head) + 0.1667em),
+    rgba(0, 0, 0, var(--kw-tail, 1)) calc(var(--kw-head) + 0.25em));
+}
+
 .karaoke-text-word-float .karaoke-char::before {
   -webkit-mask-image: none;
   mask-image: none;
@@ -945,4 +967,94 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .menu-surface { animation: none; }
+}
+
+@keyframes playback-loading-segment {
+  0% { left: 0.00%; width: 0.00%; }
+  2.5% { left: 0.00%; width: 1.46%; }
+  5% { left: 0.00%; width: 5.29%; }
+  7.5% { left: 0.00%; width: 10.02%; }
+  10% { left: 0.00%; width: 15.09%; }
+  12.5% { left: 1.24%; width: 19.37%; }
+  15% { left: 3.94%; width: 22.52%; }
+  17.5% { left: 6.64%; width: 25.79%; }
+  20% { left: 9.35%; width: 29.39%; }
+  22.5% { left: 12.16%; width: 32.88%; }
+  25% { left: 14.86%; width: 36.60%; }
+  27.5% { left: 17.57%; width: 40.32%; }
+  30% { left: 20.27%; width: 44.14%; }
+  32.5% { left: 23.31%; width: 47.41%; }
+  35% { left: 26.58%; width: 50.45%; }
+  37.5% { left: 29.84%; width: 53.49%; }
+  40% { left: 33.33%; width: 56.64%; }
+  42.5% { left: 36.94%; width: 59.57%; }
+  45% { left: 40.77%; width: 59.23%; }
+  47.5% { left: 45.27%; width: 54.73%; }
+  50% { left: 50.68%; width: 49.32%; }
+  52.5% { left: 56.08%; width: 43.92%; }
+  55% { left: 61.60%; width: 38.40%; }
+  57.5% { left: 69.14%; width: 30.86%; }
+  60% { left: 76.91%; width: 23.09%; }
+  62.5% { left: 84.12%; width: 15.88%; }
+  65% { left: 90.54%; width: 9.46%; }
+  67.5% { left: 96.62%; width: 3.38%; }
+  70% { left: 100.00%; width: 0.00%; }
+  100% { left: 100%; width: 0.00%; }
+}
+
+@keyframes playback-loading-segment-next {
+  0% { left: 0.00%; width: 0.00%; }
+  55% { left: 0.00%; width: 0.00%; }
+  57.5% { left: 0.00%; width: 7.66%; }
+  60% { left: 0.00%; width: 19.93%; }
+  62.5% { left: 0.00%; width: 32.09%; }
+  65% { left: 0.00%; width: 44.37%; }
+  67.5% { left: 0.00%; width: 55.97%; }
+  70% { left: 1.13%; width: 64.98%; }
+  72.5% { left: 13.85%; width: 60.36%; }
+  75% { left: 27.25%; width: 52.93%; }
+  77.5% { left: 40.65%; width: 45.05%; }
+  80% { left: 52.25%; width: 38.29%; }
+  82.5% { left: 63.18%; width: 32.43%; }
+  85% { left: 72.41%; width: 27.25%; }
+  87.5% { left: 80.29%; width: 19.71%; }
+  90% { left: 86.82%; width: 13.18%; }
+  92.5% { left: 92.00%; width: 8.00%; }
+  95% { left: 96.17%; width: 3.83%; }
+  97.5% { left: 99.32%; width: 0.68%; }
+  100% { left: 100.00%; width: 0.00%; }
+}
+
+.playback-progress-loading-fill {
+  opacity: 0;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading {
+  display: none;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading-fill {
+  opacity: 1;
+}
+
+.playback-progress-interactive:hover .playback-progress-loading-segment {
+  animation-play-state: paused;
+}
+
+.playback-progress-loading-segment {
+  animation: playback-loading-segment 2s linear infinite;
+}
+
+.playback-progress-loading-segment-next {
+  animation-name: playback-loading-segment-next;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-surface { animation: none; }
+  .playback-progress-loading-segment {
+    animation: none;
+    left: 30%;
+    width: 40%;
+  }
+  .playback-progress-loading-segment-next { display: none; }
 }

@@ -36,10 +36,10 @@ export default function PlaylistSearchControl({
                 onMouseLeave={() => setSuppressTooltip(false)}
                 className={clsx(
                     disabled && 'opacity-40 pointer-events-none',
-                    'flex h-10 items-center bg-on-surface/5 hover:bg-on-surface/10 focus-within:bg-on-surface/10 base-theme:bg-secondary-container/50 base-theme:hover:bg-secondary-container base-theme:focus-within:bg-secondary-container backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
+                    'flex h-10 items-center backdrop-blur-md border border-on-surface/10 transition-all duration-300 ease-[cubic-bezier(0.2,0,0,1)] overflow-hidden rounded-full',
                     isSearchOpen
-                        ? 'w-64 mr-2'
-                        : 'w-10 text-on-surface-variant hover:text-primary cursor-pointer'
+                        ? 'w-64 mr-2 bg-menu-highlight text-on-surface shadow-sm'
+                        : 'w-10 bg-on-surface/5 text-on-surface-variant hover:bg-menu-hover hover:text-on-surface cursor-pointer'
                 )}
                 onClick={() => !disabled && !isSearchOpen && setIsSearchOpen(true)}
             >
@@ -47,7 +47,7 @@ export default function PlaylistSearchControl({
                     <MdSearch
                         className={clsx(
                             'text-xl shrink-0 transition-colors transform',
-                            isSearchOpen ? 'text-on-surface-variant translate-x-0' : '-translate-x-[3px]'
+                            isSearchOpen ? 'text-on-surface-variant translate-x-0' : '-translate-x-0.75'
                         )}
                     />
                     <input

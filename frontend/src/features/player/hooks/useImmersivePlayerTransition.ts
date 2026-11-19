@@ -8,6 +8,7 @@ const waitForPaint = () => new Promise<void>((resolve) => {
 export function useImmersivePlayerTransition() {
     const [isOpen, setIsOpen] = useState(false);
     const [isBaseLayerFrozen, setIsBaseLayerFrozen] = useState(false);
+    const [isCovering, setIsCovering] = useState(false);
     const isOpenRef = useRef(false);
     const transitionSequenceRef = useRef(0);
 
@@ -15,6 +16,7 @@ export function useImmersivePlayerTransition() {
         transitionSequenceRef.current += 1;
         isOpenRef.current = true;
         setIsBaseLayerFrozen(false);
+        setIsCovering(true);
         setIsOpen(true);
     }, []);
 
@@ -46,6 +48,11 @@ export function useImmersivePlayerTransition() {
         setIsBaseLayerFrozen(true);
     }, []);
 
+    const handleClosed = useCallback(() => {
+        if (isOpenRef.current) return;
+        setIsCovering(false);
+    }, []);
+
     useEffect(() => {
         const handleOpen = () => open();
         const handleClose = () => void close();
@@ -61,9 +68,11 @@ export function useImmersivePlayerTransition() {
     return {
         isOpen,
         isBaseLayerFrozen,
+        isCovering,
         open,
         close,
         toggle,
         handleOpened,
+        handleClosed,
     };
 }

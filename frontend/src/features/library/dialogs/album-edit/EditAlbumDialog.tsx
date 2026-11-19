@@ -159,7 +159,7 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             onClose();
         } catch (error) {
             console.error('Failed to update album details', error);
-            setMessage(error instanceof Error ? error.message : String(error || '保存失败'));
+            setMessage(error instanceof Error ? error.message : (typeof error === 'string' ? error : '保存失败'));
         } finally {
             setSaving(false);
         }
@@ -182,7 +182,7 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             isOpen={isOpen}
             saving={saving}
             onClose={onClose}
-            onSubmit={handleSubmit}
+            onSubmit={(event) => { void handleSubmit(event).catch(console.error); }}
             title="编辑专辑信息"
             cover={(
                 <CoverImage
@@ -195,9 +195,9 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             )}
             header={(
                 <>
-                    <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{displayedAlbumName}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{displayedAlbumArtist}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{album.songs.length} 首歌曲</div>
+                    <div className="truncate text-[18px] leading-6 text-on-surface">{displayedAlbumName}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{displayedAlbumArtist}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{album.songs.length} 首歌曲</div>
                 </>
             )}
             tabs={tabs}

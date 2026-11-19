@@ -8,3 +8,6 @@ export const interludeNextLineFocusLeadMs = 600;
 export const interludeExitCollapseDelayMs = 250;
 export const nonInterludeNextLineFocusThresholdMs = 600;
 export const nonInterludeNextLineFocusLeadMs = 800;
+
+/** 动画模式逐字歌词换行的最早提前量。 */
+export const tightHandoffLeadMs = 1050;

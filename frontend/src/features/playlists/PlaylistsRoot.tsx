@@ -59,7 +59,7 @@ export function PlaylistDetailOverlay({ isVisible }: { isVisible: boolean }) {
                 >
                     <div data-tauri-drag-region className="absolute top-0 left-0 right-0 h-6 z-100 bg-transparent" />
                     <ScrollArea className="h-full" topOffset={48} navigationScrollKey={detail.scrollKey} navigationActive={isVisible}>
-                        <div className="min-h-full pb-24">
+                        <div className="min-h-full">
                             <PlaylistDetail
                                 id={detail.id}
                                 name={detail.name}

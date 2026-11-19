@@ -9,13 +9,14 @@ import ArtistGridView, { type ArtistData } from '@/features/library/components/A
 import AlbumGridView, { type AlbumData } from '@/features/library/components/AlbumGridView';
 import { MdSearch } from 'react-icons/md';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
+import { albumRecentItem } from '@/utils/musicItemUtils';
+import { artistRecentItem } from '@/utils/recentCollections';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { formatTime } from '@/utils/time';
 import CoverImage from '@/components/common/CoverImage';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { buildAlbums } from '@/features/library/utils/grouping';
 
@@ -26,14 +27,13 @@ interface SearchResultsViewProps {
 export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [results, setResults] = useState<SongMetadata[]>([]);
     const [videoResults, setVideoResults] = useState<VideoMetadata[]>([]);
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videoResults.length, 'video'));
     const [completedQuery, setCompletedQuery] = useState<string | null>(null);
     // 防抖等待也属于加载阶段，只有当前关键词的请求结束后才展示结果或空态。
     const loading = Boolean(query.trim()) && completedQuery !== query;
     const [error, setError] = useState<string | null>(null);
 
     // Player controls
-    const { pausePlayback, playSong } = usePlaybackActions();
+    const { pausePlayback, playSong, playList } = usePlaybackActions();
     const { push } = useNavigationStore();
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
@@ -78,7 +78,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
         };
 
         const timer = setTimeout(() => {
-            performSearch();
+            void (performSearch()).catch(console.error);
         }, 300);
 
         return () => {
@@ -190,20 +190,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             song,
             index,
             playlist: matchingSongs, // Use only matched songs playlist
-            options: {
-                ...options,
-                recentItem: {
-                    id: song.path || '',
-                    type: 'file',
-                    title: song.title,
-                    description: song.artist,
-                    cover: null,
-                    cover_path: song.cover_path || null,
-                    path: song.path || '',
-                    lastPlayed: Date.now(),
-                    artist: song.artist
-                }
-            }
+            options
         });
     };
 
@@ -220,7 +207,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                     <p className="text-lg font-medium">{error}</p>
                 </div>
             ) : hasAnyResults ? (
-                <div className="pb-8 flex flex-col gap-8">
+                <div className="flex flex-col gap-8">
                     {/* Artists Section */}
                     {matchingArtists.length > 0 && (
                         <section>
@@ -236,7 +223,11 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
                                         // Reuse logic or import util? Just basic play for now
-                                        playSong({ song: artist.songs[0], index: 0, playlist: artist.songs });
+                                        void (playList({
+                                            songs: artist.songs,
+                                            options: { recentItem: artistRecentItem(artist.name, artist.songs, artist.cover) },
+                                            context: { type: 'artist_detail', name: artist.name, id: artist.name }
+                                        })).catch(console.error);
                                     }
                                 }}
                                 onOpenArtist={(artist) => push({ type: 'artist_detail', data: artist })}
@@ -259,7 +250,11 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 hideYear={true}
                                 onPlayAlbum={(album) => {
                                     if (album.songs.length > 0) {
-                                        playSong({ song: album.songs[0], index: 0, playlist: album.songs });
+                                        void (playList({
+                                            songs: album.songs,
+                                            options: { recentItem: albumRecentItem(album.name, album.artist, album.songs, album.cover_path) },
+                                            context: { type: 'album_detail', name: album.name, id: album.name }
+                                        })).catch(console.error);
                                     }
                                 }}
                                 onOpenAlbum={(album) => push({ type: 'album_detail', data: album })}
@@ -277,10 +272,12 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                     {matchingSongs.length}
                                 </span>
                             </h2>
-                            <SongListView
-                                songs={matchingSongs}
-                                onPlay={handlePlay}
-                            />
+                            <div className="-mx-8">
+                                <SongListView
+                                    songs={matchingSongs}
+                                    onPlay={(song, index, options) => { void handlePlay(song, index, options).catch(console.error); }}
+                                />
+                            </div>
                         </section>
                     )}
 
@@ -297,11 +294,11 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 data={videoResults}
                                 itemKey={(_index, video) => video.id}
                                 listClassName="grid content-grid-video gap-4"
-                                listStyle={getSparseGridStyle(mainContentWidth, videoResults.length, 16, 'video')}
+                                listStyle={getSparseGridStyle(videoResults.length, 'video')}
                                 itemContent={(_index, video) => (
                                     <div
                                         key={video.id}
-                                        onClick={() => handlePlayVideo(video)}
+                                        onClick={() => { void handlePlayVideo(video).catch(console.error); }}
                                         className="group relative flex flex-col gap-2 p-2 rounded-xl transition-all cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 base-theme:hover:bg-surface-variant/30"
                                     >
                                         <div className="aspect-video bg-surface-container-highest rounded-lg overflow-hidden shadow-sm group-hover:shadow-md transition-all relative">

@@ -15,8 +15,7 @@ import CustomTooltip from '@/components/common/CustomTooltip';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import { getMusicItemId } from '@/utils/musicItemUtils';
 
 // 定义专辑数据结构
@@ -42,7 +41,6 @@ interface AlbumGridViewProps {
 
 export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onOpenAlbum, onOpenArtist, onDeleteAlbum, hideArtist = false, hideYear = false, coverScope = 'library-albums' }: AlbumGridViewProps) {
     // Motion retains shared-layout IDs after unmount; reuse IDs across page visits.
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(albums.length, 'cover'));
     const [confirmOpen, setConfirmOpen] = useState(false);
     const [albumToDelete, setAlbumToDelete] = useState<AlbumData | null>(null);
     const openEditAlbum = useDialogStore(state => state.openEditAlbum);
@@ -85,7 +83,6 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             onDeleteAlbum(albumToDelete);
         }
         setConfirmOpen(false);
-        setAlbumToDelete(null);
     };
 
     // Helper key for selection (Album Name + Artist as specific ID)
@@ -115,8 +112,8 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             <VirtualizedGrid
                 data={albums}
                 itemKey={(_index, album) => getAlbumId(album)}
-                listClassName="grid content-grid-cover gap-6 pt-2 pb-20"
-                listStyle={getSparseGridStyle(mainContentWidth, albums.length, 24, 'cover')}
+                listClassName="grid content-grid-cover gap-6 pt-2"
+                listStyle={getSparseGridStyle(albums.length, 'cover')}
                 itemContent={(_index, album) => {
                     const id = getAlbumId(album);
                     const isSelected = selectedIds.has(id);

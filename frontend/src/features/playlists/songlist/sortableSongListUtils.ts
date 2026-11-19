@@ -18,7 +18,7 @@ export function getGridTemplateColumns(shouldHideAlbum: boolean, shouldHideArtis
     let cols = '24px minmax(0,4fr)';
     if (!shouldHideArtist) cols += ' minmax(0,3fr)';
     if (!shouldHideAlbum) cols += ' minmax(0,3fr)';
-    cols += ' 100px 40px';
+    cols += ' 48px 40px';
     return cols;
 }
 

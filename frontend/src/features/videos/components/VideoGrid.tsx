@@ -10,12 +10,10 @@ import { getMusicItemId } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 import { VideoCard } from '@/features/videos/components/VideoCard';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boolean; virtualized?: boolean }> = ({ videos, playSingleItem, virtualized = false }) => {
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(videos.length, 'video'));
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const { pausePlayback } = usePlaybackActions();
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
@@ -120,8 +118,8 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                 <VirtualizedGrid
                     data={videos}
                     itemKey={(_index, video) => getMusicItemId(video)}
-                    listClassName="grid content-grid-video gap-4 p-4 pb-20"
-                    listStyle={getSparseGridStyle(mainContentWidth, videos.length, 16, 'video')}
+                    listClassName="grid content-grid-video gap-4 pt-4"
+                    listStyle={getSparseGridStyle(videos.length, 'video')}
                     overscan={200}
                     itemContent={(_, video) => {
                         const id = getMusicItemId(video);
@@ -130,7 +128,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                                 video={video}
                                 isSelected={selectedIds.has(id)}
                                 isSelectionMode={isSelectionMode}
-                                onPlay={handlePlayVideo}
+                                onPlay={(video) => { void handlePlayVideo(video).catch(console.error); }}
                                 onToggleSelection={handleToggleSelection}
                                 onContextMenu={handleContextMenu}
                                 onShowProperties={handleShowProperties}
@@ -145,7 +143,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                         item={contextMenu.video}
                         context="video"
                         onClose={() => setContextMenu(null)}
-                        onPlay={() => handlePlayVideo(contextMenu.video)}
+                        onPlay={() => { void handlePlayVideo(contextMenu.video).catch(console.error); }}
                         onShowProperties={() => handleShowProperties(contextMenu.video)}
                     />
                 )}
@@ -156,7 +154,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
     return (
         <div
             className="grid content-grid-video gap-4"
-            style={getSparseGridStyle(mainContentWidth, videos.length, 16, 'video')}
+            style={getSparseGridStyle(videos.length, 'video')}
         >
             {videos.map((video) => {
                 const id = getMusicItemId(video);
@@ -166,7 +164,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                         video={video}
                         isSelected={selectedIds.has(id)}
                         isSelectionMode={isSelectionMode}
-                        onPlay={handlePlayVideo}
+                        onPlay={(video) => { void handlePlayVideo(video).catch(console.error); }}
                         onToggleSelection={handleToggleSelection}
                         onContextMenu={handleContextMenu}
                         onShowProperties={handleShowProperties}
@@ -181,7 +179,7 @@ export const VideoGrid: React.FC<{ videos: VideoMetadata[]; playSingleItem?: boo
                     item={contextMenu.video}
                     context="video"
                     onClose={() => setContextMenu(null)}
-                    onPlay={() => handlePlayVideo(contextMenu.video)}
+                    onPlay={() => { void handlePlayVideo(contextMenu.video).catch(console.error); }}
                     onShowProperties={() => handleShowProperties(contextMenu.video)}
                 />
             )}

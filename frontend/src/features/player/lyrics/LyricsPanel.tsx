@@ -3,6 +3,7 @@ import LyricsScrollbar from '@/features/player/scrollbar/LyricsScrollbar';
 import clsx from 'clsx';
 import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { selectPlaybackAdvancing } from '@/features/player/runtime/selectPlaybackAdvancing';
 import {
     interludeExitCollapseDelayMs,
     interludeGapOpenDurationMs,
@@ -55,7 +56,7 @@ export default function LyricsPanel({
     const narrowMaskImage = narrowControlsVisible
         ? 'linear-gradient(to bottom, transparent 0px, black clamp(1.5rem, calc(6.5vh - 0.5rem), 3.5rem), black calc(100% - 18rem), transparent calc(100% - 14.5rem))'
         : narrowScrollMaskStyle.maskImage;
-    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isPlaying = usePlayerStore(selectPlaybackAdvancing);
     const lines = useMemo(() => lyricsDocument?.lines ?? [], [lyricsDocument]);
     const hasTimestamps = (lyricsDocument?.timing_mode ?? 'none') !== 'none';
     const isTtml = lyricsDocument?.origin === 'native-ttml';
@@ -209,6 +210,18 @@ export default function LyricsPanel({
     useEffect(() => {
         if (isPlaying) pausedScrollRef.current = false;
     }, [isPlaying]);
+
+    useEffect(() => usePlayerStore.subscribe((state, previous) => {
+        if (!state.isSeeking || previous.isSeeking) return;
+        if (userScrollTimeoutRef.current) {
+            clearTimeout(userScrollTimeoutRef.current);
+            userScrollTimeoutRef.current = null;
+        }
+        pausedScrollRef.current = false;
+        userScrollingRef.current = false;
+        setIsUserScrolling(false);
+        lastAutoScrollIndexRef.current = null;
+    }), []);
 
     const displayState = useMemo(() => {
         if (status === 'loading') return '正在加载歌词...';
@@ -415,7 +428,6 @@ export default function LyricsPanel({
 
     useEffect(() => {
         if (!isOpen || !hasTimestamps || lines.length === 0) return;
-        if (!isPlaying) return;
         if (activeDisplayIndex < 0) {
             autoScroll.cancel();
             lastAutoScrollIndexRef.current = null;

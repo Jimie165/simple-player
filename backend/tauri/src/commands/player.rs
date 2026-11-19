@@ -17,12 +17,18 @@ pub fn play_audio(
 }
 
 #[tauri::command]
+pub fn begin_audio_load(state: State<'_, AudioState>) -> u64 {
+    state.begin_load_request()
+}
+
+#[tauri::command]
 pub fn load_audio(
     state: State<'_, AudioState>,
     path: String,
     metadata: Option<SongMetadata>,
+    request_id: Option<u64>,
 ) -> Result<PlaybackSnapshot, String> {
-    state.load_file(path, metadata)
+    state.load_file(path, metadata, request_id)
 }
 
 #[tauri::command]

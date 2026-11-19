@@ -83,6 +83,7 @@ describe('seek exit versus normal compressed handoff', () => {
         expect(before.activeIndices.size).toBe(2);
         const after = getActiveLyricsState(items, duet, windows.windowEndMs[0] / 1000, animationLyricsTimingStrategy, true);
         expect(after.activeIndices.size).toBe(1);
-        expect(items[after.focusIndex].type === 'line' && items[after.focusIndex].line.id).toBe('L20a');
+        const focusedItem = items[after.focusIndex];
+        expect(focusedItem.type === 'line' && focusedItem.line.id).toBe('L20a');
     });
 });

@@ -10,13 +10,15 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface SongInfoProps {
     metadata: SongMetadata | null;
-    isFullScreen: boolean;
+    isFullScreen?: boolean;
     onToggleFullScreen: () => void;
+    /** The progress bar is hidden, so nothing sits below the text. */
+    isMini?: boolean;
 }
 
 import { usePlayerStore } from '@/store/usePlayerStore';
 
-export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }: SongInfoProps) {
+export default function SongInfo({ metadata, onToggleFullScreen, isMini = false }: SongInfoProps) {
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const setMediaKind = usePlayerStore(s => s.setMediaKind);
     const { pausePlayback } = usePlaybackActions();
@@ -24,9 +26,9 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
     const canNavigate = !!metadata && typeof metadata.id === 'number';
 
     return (
-        <div className="player-song-info flex min-w-0 justify-start transition-opacity duration-200">
+        <div className="player-song-info flex min-w-0 origin-[25%_50%] justify-start">
             <div
-                className="group relative flex h-16 w-full min-w-0 items-center rounded-md pb-2 text-left"
+                className={clsx("group relative flex h-14 w-full min-w-0 items-center rounded-md text-left", !isMini && "pb-1.5")}
             >
                 <button
                     type="button"
@@ -44,12 +46,8 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                             onToggleFullScreen();
                         }
                     }}
-                    className={clsx(
-                        "group/cover relative shrink-0 flex items-center justify-center overflow-hidden bg-neutral-200 shadow-sm ring-1 ring-black/5 transition-all duration-500 ease-[cubic-bezier(0.2,0,0,1)] dark:bg-neutral-800 dark:ring-white/10",
-                        isFullScreen
-                            ? "w-0 h-14 opacity-0 -translate-y-12 scale-150 mr-0"
-                            : "w-12 h-12 opacity-100 translate-y-0 scale-100 mr-2.5 rounded-sm hover:scale-105 focus-visible:scale-105"
-                    )}>
+                    className="group/cover relative mr-2 flex size-8.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-neutral-200 shadow-sm ring-1 ring-black/5 transition-transform duration-150 hover:scale-105 focus-visible:scale-105 dark:bg-neutral-800 dark:ring-white/10"
+                >
                     <CoverImage
                         thumbnail={128}
                         song={metadata}
@@ -57,12 +55,12 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                         iconClassName="text-2xl text-neutral-400"
                     />
                     <span className="absolute inset-0 flex items-center justify-center bg-black/30 text-white opacity-0 transition-opacity duration-150 group-hover/cover:opacity-100 group-focus-visible/cover:opacity-100">
-                        <FiMaximize2 className="rotate-90 text-xl" />
+                        <FiMaximize2 className="rotate-90 text-base" />
                     </span>
                 </button>
 
                 <div className="flex min-w-0 flex-1 flex-col justify-center pr-1">
-                    <div className="flex w-full min-w-0 items-center gap-1 text-[15px] font-semibold leading-5 text-neutral-900 transition-colors dark:text-white/92">
+                    <div className="flex w-full min-w-0 items-center gap-1 text-[13px] font-semibold leading-4 text-neutral-900 transition-colors dark:text-white/92">
                         <OverflowMarquee
                             className="shrink"
                             resetToken={`title-${metadata?.path || metadata?.title || 'empty'}`}
@@ -72,7 +70,7 @@ export default function SongInfo({ metadata, isFullScreen, onToggleFullScreen }:
                         {metadata?.is_favorite && <MdFavorite className="text-red-500 text-xs shrink-0" />}
                     </div>
                     <OverflowMarquee
-                        className="mt-0.5 w-full text-sm leading-5 text-neutral-600 dark:text-white/56"
+                        className="w-full text-[12px] leading-3.75 font-medium text-neutral-600 dark:text-white/56"
                         contentClassName="flex w-max items-center whitespace-nowrap"
                         resetToken={`meta-${metadata?.path || metadata?.artist || 'empty'}-${metadata?.album || ''}`}
                     >

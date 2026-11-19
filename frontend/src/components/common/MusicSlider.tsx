@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import { useRangePointerDrag } from '@/hooks/useRangePointerDrag';
+import PlaybackLoadingIndicator from '@/features/player/controls/PlaybackLoadingIndicator';
 
 interface MusicSliderProps {
     value: number;
@@ -7,6 +8,8 @@ interface MusicSliderProps {
     max: number;
     step?: number;
     disabled?: boolean;
+    dimWhenDisabled?: boolean;
+    loading?: boolean;
     onChange: (value: number) => void;
     onMouseDown?: () => void;
     onMouseUp?: () => void;
@@ -26,7 +29,7 @@ interface MusicSliderProps {
  * 特点：悬停时加粗，不显示滑块圆点 (Thumb)
  */
 export default function MusicSlider({
-    value, min, max, step = 1, disabled = false,
+    value, min, max, step = 1, disabled = false, dimWhenDisabled = true, loading = false,
     onChange, onMouseDown, onMouseUp,
     className,
     trackColor = "bg-white/20",
@@ -41,8 +44,9 @@ export default function MusicSlider({
 
     return (
         <div className={clsx(
-            "relative w-full group flex items-center h-4",
-            disabled ? "opacity-40 pointer-events-none cursor-not-allowed" : "",
+            "playback-progress-interactive relative w-full group flex items-center h-4",
+            disabled && !loading && "pointer-events-none cursor-not-allowed",
+            disabled && !loading && dimWhenDisabled && "opacity-40",
             className
         )}>
             {/* 轨道 & 填充容器 */}
@@ -55,13 +59,14 @@ export default function MusicSlider({
             )}>
                 {/* 填充进度 */}
                 <div
-                    className={clsx("absolute left-0 top-0 bottom-0 rounded-full", fillColor)}
+                    className={clsx("absolute left-0 top-0 bottom-0 rounded-full", fillColor, loading && 'playback-progress-loading-fill')}
                     style={{ width: `${percent}%` }}
                 />
+                {loading && <PlaybackLoadingIndicator className="text-white/80" />}
             </div>
 
             {/* 可选：显示自定义滑块 (Thumb) */}
-            {thumbClassName && (
+            {thumbClassName && !loading && (
                 <div
                     className={clsx("absolute top-1/2 -translate-y-1/2 pointer-events-none transition-[opacity,transform,color]", thumbClassName)}
                     style={{ left: `${percent}%` }}

@@ -63,7 +63,7 @@ function App() {
       }
     };
     void syncFullscreen();
-    const unlisten = systemService.onResize(syncFullscreen);
+    const unlisten = systemService.onResize(() => { void syncFullscreen(); });
     return () => {
       cancelled = true;
       void unlisten.then((cleanup) => cleanup()).catch(console.error);
@@ -90,13 +90,13 @@ function App() {
   }, []);
 
   useEffect(() => {
-    useLibraryStore.getState().refreshFavorites();
-    useLibraryStore.getState().refreshRecentHistory();
+    void (useLibraryStore.getState().refreshFavorites()).catch(console.error);
+    void (useLibraryStore.getState().refreshRecentHistory()).catch(console.error);
   }, []);
 
   // Sync persisted audio output preference to backend on launch and listen for backend-driven changes.
   useEffect(() => {
-    useAudioOutputStore.getState().syncToBackend();
+    void (useAudioOutputStore.getState().syncToBackend()).catch(console.error);
     const unlisten = listen<string | null>('audio:output-changed', (e) => {
       audioService.getAudioOutput()
         .then((state) => {
@@ -161,6 +161,7 @@ function App() {
     close: closeFullScreenPlayer,
     toggle: toggleFullScreenPlayer,
     handleOpened: handleFullScreenPlayerOpened,
+    handleClosed: handleFullScreenPlayerClosed,
   } = useImmersivePlayerTransition();
 
   useQueuePersistence(); // Activate queue persistence
@@ -250,7 +251,7 @@ function App() {
               <ScrollArea className="h-full" topOffset={48} navigationScrollKey={scrollKey}>
                 <div className="relative">
                   <DetailScrollHeader className="-mb-10" />
-                  <div className="pt-12 min-h-full pb-24 transition-colors duration-300">
+                  <div className="pt-12 min-h-full transition-colors duration-300">
                     {currentPage === 'settings' ? <Settings /> : <SearchResultsView query={searchQuery} />}
                   </div>
                 </div>
@@ -370,6 +371,7 @@ function App() {
         isOpen={isFullScreen}
         onClose={() => void closeFullScreenPlayer()}
         onOpened={handleFullScreenPlayerOpened}
+        onClosed={handleFullScreenPlayerClosed}
         mainContentWidth={mainContentWidth}
       />
       <Toaster

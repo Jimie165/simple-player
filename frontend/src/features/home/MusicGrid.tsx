@@ -12,13 +12,13 @@ import type { RecentItem, SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
+import ArtistPortrait from '@/components/common/ArtistPortrait';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { useRecentPlayback } from '@/features/home/hooks/useRecentPlayback';
-import { useMainContentWidth } from '@/hooks/useMainContentWidth';
-import { getSparseGridBreakpoints, getSparseGridStyle } from '@/utils/gridLayout';
+import { getSparseGridStyle } from '@/utils/gridLayout';
 import VirtualizedGrid from '@/components/common/VirtualizedGrid';
 
 /**
@@ -45,7 +45,6 @@ function PlaylistGridCover({ item }: { item: RecentItem }) {
 export default function MusicGrid() {
     // Store Actions
     const { recentHistory } = useLibraryStore();
-    const mainContentWidth = useMainContentWidth(getSparseGridBreakpoints(recentHistory.length, 'cover'));
     // 虚拟网格会在尺寸变化时重复渲染卡片，封面数据需保持引用稳定。
     const recentCoverSongs = useMemo(() => new Map<string, SongMetadata>(recentHistory.map((item) => [item.id, {
         title: item.title,
@@ -88,7 +87,7 @@ export default function MusicGrid() {
     return (
         <PageContainer
             title="主页"
-            actions={<OpenFileMenu onOpenFile={handleOpenFile} onOpenFolder={handleOpenFolder} />}
+            actions={<OpenFileMenu onOpenFile={() => { void handleOpenFile().catch(console.error); }} onOpenFolder={() => { void handleOpenFolder().catch(console.error); }} />}
         >
             <section>
                 {pendingFolderPlay && (
@@ -102,22 +101,22 @@ export default function MusicGrid() {
                             </p>
                             <div className="mt-4 flex gap-3">
                                 <button
-                                    onClick={async () => {
+                                    onClick={() => {
                                         const { folderPath, folderName, videoSongs } = pendingFolderPlay;
                                         setPendingFolderPlay(null);
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, videoSongs, "个视频");
-                                        await playVideoList(videoSongs, recentItem);
+                                        void playVideoList(videoSongs, recentItem).catch(console.error);
                                     }}
                                     className="flex-1 rounded-xl bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary px-4 py-2 text-sm font-medium hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-colors"
                                 >
                                     播放视频
                                 </button>
                                 <button
-                                    onClick={async () => {
+                                    onClick={() => {
                                         const { folderPath, folderName, audioSongs } = pendingFolderPlay;
                                         setPendingFolderPlay(null);
                                         const recentItem = buildFolderRecentItem(folderPath, folderName, audioSongs, "首歌曲");
-                                        await playAudioList(audioSongs, recentItem);
+                                        void playAudioList(audioSongs, recentItem).catch(console.error);
                                     }}
                                     className="flex-1 rounded-xl bg-neutral-200/80 dark:bg-neutral-800/80 text-neutral-800 dark:text-neutral-100 px-4 py-2 text-sm font-medium hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors"
                                 >
@@ -144,7 +143,7 @@ export default function MusicGrid() {
                         data={recentHistory}
                         itemKey={(_index, item) => item.id}
                         listClassName="grid content-grid-cover gap-6"
-                        listStyle={getSparseGridStyle(mainContentWidth, recentHistory.length, 24, 'cover')}
+                        listStyle={getSparseGridStyle(recentHistory.length, 'cover')}
                         itemContent={(_index, item) => {
                             const isSelected = selectedIds.has(item.id);
                             const description = `${item.description}${!isVideoFile(item.path) && item.album ? ` — ${item.album}` : ''}`;
@@ -153,7 +152,7 @@ export default function MusicGrid() {
                                 <div
                                     key={item.id}
                                     className={clsx("group flex flex-col gap-3 rounded-2xl p-2.5 -mx-2.5 hover:bg-on-surface/5 transition-colors cursor-pointer relative", isSelected ? "base-theme:bg-secondary-container/60 base-theme:hover:bg-secondary-container/80" : "base-theme:hover:bg-surface-variant/30")}
-                                    onClick={(e) => handleItemClick(item, e)}
+                                    onClick={(e) => { void handleItemClick(item, e).catch(console.error); }}
                                     onContextMenu={(e) => handleContextMenu(e, item)}
                                 >
                                     <div className="aspect-square w-full rounded-2xl shadow-sm bg-neutral-200 dark:bg-neutral-800 overflow-hidden relative border border-black/5 dark:border-white/5 flex items-center justify-center">
@@ -170,6 +169,8 @@ export default function MusicGrid() {
                                                     <MdVideocam className="text-6xl text-neutral-600" />
                                                 </div>
                                             )
+                                        ) : item.type === 'artist' ? (
+                                            <ArtistPortrait src={item.cover_path} />
                                         ) : item.type === 'playlist' ? (
                                             item.id === 'playlist:favorites' ? (
                                                 <div className="w-full h-full bg-linear-to-br from-red-500 to-pink-600 flex items-center justify-center">
@@ -208,14 +209,14 @@ export default function MusicGrid() {
 
                                         {!isSelectionMode && (
                                             <div className="absolute inset-0 bg-linear-to-t from-black/40 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                                                <CardPlayButton variant="cover" onClick={() => handleItemClick(item)} className="bottom-3 left-3" />
+                                                <CardPlayButton variant="cover" onClick={() => { void handleItemClick(item).catch(console.error); }} className="bottom-3 left-3" />
                                                 <SmartMusicContextMenu
                                                     className="absolute bottom-3 right-3"
                                                     variant="cover"
                                                     tooltipText="更多"
                                                     items={item}
                                                     context="recent"
-                                                    onPlay={() => handleItemClick(item)}
+                                                    onPlay={() => { void handleItemClick(item).catch(console.error); }}
                                                     isSelected={isSelected}
                                                     onSelect={() => isSelectionMode
                                                         ? toggleSelection(item.id, item.type, item)

@@ -1,11 +1,23 @@
 import type { SongMetadata, RecentItem, Playlist } from '@/types';
 import { libraryService } from '@/services/libraryService';
 import { fileService } from '@/services/fileService';
+import { useLibraryStore } from '@/store/useLibraryStore';
+import { sortSongs } from '@/utils/songSort';
 
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { VideoMetadata } from '@/types';
 import { songMatchesAlbum } from '@/features/library/utils/grouping';
+
+export async function loadPlaylistSongsInSavedOrder(id: number | 'favorites'): Promise<SongMetadata[]> {
+    const settings = useLibraryStore.getState().getPlaylistSettings(String(id));
+    if (id === 'favorites') {
+        const songs = await libraryService.getFavorites(settings.sortKey === 'manual' ? settings.sortOrder : 'asc');
+        return settings.sortKey === 'manual' ? songs : sortSongs(songs, settings.sortKey, settings.sortOrder);
+    }
+    const songs = await libraryService.getPlaylistSongs(id);
+    return sortSongs(songs, settings.sortKey, settings.sortOrder);
+}
 
 export type MusicItem = SongMetadata | RecentItem | Playlist | ArtistData | AlbumData | VideoMetadata;
 type FlexibleMusicItem = MusicItem & Record<string, unknown>;
@@ -16,7 +28,7 @@ function asFlexibleMusicItem(item: unknown): FlexibleMusicItem | null {
 }
 
 function asString(value: unknown): string {
-    return typeof value === 'string' ? value : '';
+    return typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '';
 }
 
 function asNumber(value: unknown): number | undefined {
@@ -30,6 +42,26 @@ export function getAlbumMusicItemId(name: string, artist?: string): string {
         : `album:${albumName}`;
 }
 
+export function albumRecentItem(
+    name: string,
+    artist: string,
+    songs: SongMetadata[],
+    coverPath?: string | null,
+): RecentItem {
+    return {
+        id: getAlbumMusicItemId(name, artist),
+        type: 'album',
+        title: name,
+        artist,
+        description: `${songs.length} 首歌曲`,
+        cover: null,
+        cover_path: coverPath ?? songs[0]?.cover_path ?? null,
+        path: songs[0]?.path ?? '',
+        lastPlayed: Date.now(),
+        isLibraryItem: true,
+    };
+}
+
 /**
  * 标准化 MusicItem 以获取 ID 和类型。
  * 兼容 SongMetadata, RecentItem 以及 selectionStore 中的混合对象。
@@ -41,7 +73,7 @@ export function getMusicItemId(rawItem: unknown): string {
     // 1. If it's a RecentItem or SelectionItem with an explicit type
     const type = item.type;
     if (typeof type === 'string' && ['album', 'artist', 'playlist', 'folder'].includes(type) && item.id !== undefined) {
-        return String(item.id);
+        return asString(item.id);
     }
 
     // 2. String ID with prefix (standardized)
@@ -55,7 +87,7 @@ export function getMusicItemId(rawItem: unknown): string {
 
     // 3. Playlist object detection
     if (item.song_count !== undefined && item.updated_at !== undefined) {
-        return `playlist:${item.id}`;
+        return `playlist:${asString(item.id)}`;
     }
 
     // 4. Album/Artist object detection (from Grid views)
@@ -65,7 +97,7 @@ export function getMusicItemId(rawItem: unknown): string {
             return getAlbumMusicItemId(asString(item.name), asString(item.artist));
         }
         // ArtistData
-        return `artist:${item.name}`;
+        return `artist:${asString(item.name)}`;
     }
 
     // 5. Video detection (usually has path and thumbnail_path but missing artist/album)
@@ -75,7 +107,7 @@ export function getMusicItemId(rawItem: unknown): string {
     if (typeof item.path === 'string') return item.path;
 
     // 7. Last resort
-    if (item.id !== undefined) return String(item.id);
+    if (item.id !== undefined) return asString(item.id);
     return '';
 }
 
@@ -125,17 +157,21 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
 
         try {
             if (type === 'playlist') {
-                const idStr = String(item.id);
+                if (Array.isArray(item.songs)) {
+                    songs.push(...item.songs as SongMetadata[]);
+                    continue;
+                }
+                const idStr = asString(item.id);
                 // 处理 "playlist:123" 或 "123"
                 const cleanId = idStr.replace('playlist:', '');
 
                 if (cleanId === 'favorites') {
-                    const favs = await libraryService.getFavorites();
+                    const favs = await loadPlaylistSongsInSavedOrder('favorites');
                     songs.push(...favs);
                 } else {
                     const plId = parseInt(cleanId);
                     if (!isNaN(plId)) {
-                        const plSongs = await libraryService.getPlaylistSongs(plId);
+                        const plSongs = await loadPlaylistSongsInSavedOrder(plId);
                         songs.push(...plSongs);
                     }
                 }
@@ -209,7 +245,7 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
                 }
             }
         } catch (error) {
-            console.error(`Failed to resolve songs for item ${item.title || item.id}`, error);
+            console.error(`Failed to resolve songs for item ${asString(item.title) || asString(item.id)}`, error);
         }
     }
 

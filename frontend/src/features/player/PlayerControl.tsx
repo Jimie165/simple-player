@@ -36,9 +36,8 @@ export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullS
             >
                 <div className={clsx(
                     "content-player-shell pointer-events-auto relative isolate grid w-full items-center gap-3 rounded-full",
-                    mode === 'full' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_auto] px-8",
-                    mode === 'compact' && "h-20 max-w-190 grid-cols-[172px_minmax(0,1fr)_auto] px-8",
-                    isMini && "h-18 max-w-115 grid-cols-[minmax(0,1fr)_104px] px-4"
+                    !isMini && "h-14 max-w-170 grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 px-4",
+                    isMini && "h-14 max-w-115 grid-cols-[minmax(0,1fr)_auto] pr-4 pl-[11px]"
                 )}>
                     <PlaybackControls mode={mode} isSuspended={isSuspended} />
 
@@ -50,6 +49,7 @@ export default function PlayerControl({ isFullScreen, isSuspended, onToggleFullS
                             metadata={metadata}
                             isFullScreen={isFullScreen}
                             onToggleFullScreen={onToggleFullScreen}
+                            isMini={isMini}
                         />
                     </div>
 

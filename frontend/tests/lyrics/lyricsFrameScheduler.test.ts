@@ -11,9 +11,9 @@ describe('LyricsFrameScheduler', () => {
     });
 
     it('shares one animation frame and runs tasks in phase order', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         const requestFrame = vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return 1;
         });
         const cancelFrame = vi.fn();
@@ -28,7 +28,7 @@ describe('LyricsFrameScheduler', () => {
         const unsubscribeMotion = scheduler.subscribe('motion', () => calls.push('motion'));
 
         expect(requestFrame).toHaveBeenCalledTimes(1);
-        const runFrame = pendingFrame;
+        const runFrame = frame.pending;
         expect(runFrame).not.toBeNull();
         if (runFrame) runFrame(16);
         expect(calls).toEqual(['clock', 'motion', 'content']);
@@ -40,9 +40,9 @@ describe('LyricsFrameScheduler', () => {
     });
 
     it('coalesces same-phase callbacks behind one scheduler task', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return 1;
         }));
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -54,16 +54,16 @@ describe('LyricsFrameScheduler', () => {
         registry.subscribe((_now, deltaMs) => calls.push(deltaMs));
         registry.subscribe((_now, deltaMs) => calls.push(deltaMs * 2));
 
-        expect(pendingFrame).not.toBeNull();
-        pendingFrame?.(20);
+        expect(frame.pending).not.toBeNull();
+        frame.pending?.(20);
         expect(calls).toEqual([20, 40]);
         registry.dispose();
     });
 
     it('stops the loop when the last subscriber leaves and resumes without stale work', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         const requestFrame = vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return requestFrame.mock.calls.length;
         });
         const cancelFrame = vi.fn();
@@ -78,20 +78,20 @@ describe('LyricsFrameScheduler', () => {
         expect(requestFrame).toHaveBeenCalledTimes(1);
         scheduler.dispose();
         expect(cancelFrame).toHaveBeenCalledTimes(1);
-        pendingFrame?.(16);
+        frame.pending?.(16);
         expect(calls).toEqual([]);
 
         scheduler.subscribe('motion', (_now, deltaMs) => calls.push(deltaMs));
         expect(requestFrame).toHaveBeenCalledTimes(2);
-        pendingFrame?.(32);
+        frame.pending?.(32);
         expect(calls).toEqual([32]);
         scheduler.dispose();
     });
 
     it('keeps the frame clock continuous when a callback subscribes another task', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         const requestFrame = vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return requestFrame.mock.calls.length;
         });
         vi.stubGlobal('requestAnimationFrame', requestFrame);
@@ -109,17 +109,17 @@ describe('LyricsFrameScheduler', () => {
             }
         });
 
-        pendingFrame?.(16);
+        frame.pending?.(16);
         expect(deltas).toEqual([16]);
-        pendingFrame?.(32);
+        frame.pending?.(32);
         expect(deltas).toEqual([16, 16, 16]);
         scheduler.dispose();
     });
 
     it('does not execute a registry callback added during dispatch until the next frame', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return 1;
         }));
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -133,9 +133,9 @@ describe('LyricsFrameScheduler', () => {
             registry.subscribe(() => calls.push('second'));
         });
 
-        pendingFrame?.(16);
+        frame.pending?.(16);
         expect(calls).toEqual(['first']);
-        pendingFrame?.(32);
+        frame.pending?.(32);
         expect(calls).toEqual(['first', 'first', 'second']);
         registry.dispose();
     });
@@ -167,9 +167,9 @@ describe('LyricsFrameScheduler', () => {
     });
 
     it('defers a callback that is re-added while the registry is dispatching', () => {
-        let pendingFrame: FrameRequestCallback | null = null;
+        const frame: { pending: FrameRequestCallback | null } = { pending: null };
         vi.stubGlobal('requestAnimationFrame', vi.fn((callback: FrameRequestCallback) => {
-            pendingFrame = callback;
+            frame.pending = callback;
             return 1;
         }));
         vi.stubGlobal('cancelAnimationFrame', vi.fn());
@@ -186,9 +186,9 @@ describe('LyricsFrameScheduler', () => {
         };
         remove = registry.subscribe(callback);
 
-        pendingFrame?.(16);
+        frame.pending?.(16);
         expect(calls).toEqual(['callback']);
-        pendingFrame?.(32);
+        frame.pending?.(32);
         expect(calls).toEqual(['callback', 'replacement']);
         registry.dispose();
     });

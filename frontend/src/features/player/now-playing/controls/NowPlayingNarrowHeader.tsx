@@ -15,12 +15,12 @@ export function NowPlayingNarrowHeader({
     const { canNavigate, handleOpenArtist, handleOpenAlbum } = useNowPlayingNavigation({ metadata, onClose, push });
 
     return (
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-[clamp(0.125rem,0.3vmin,0.25rem)] min-w-0">
             <div className="flex flex-col min-w-0 flex-1">
                 <OverflowMarquee
                     resetToken={`narrow-title-${marqueeResetToken}-${metadata?.path || metadata?.title || 'empty'}`}
                     behavior="auto-then-hover"
-                    className="text-[clamp(0.85rem,3.8vw,1.1rem)] font-bold text-white leading-tight"
+                    className="text-[clamp(0.8rem,3.4vw,1rem)] font-bold text-white leading-tight"
                 >
                     <h1 className="whitespace-nowrap">
                         {metadata?.title || '未播放音乐'}
@@ -29,7 +29,7 @@ export function NowPlayingNarrowHeader({
                 <OverflowMarquee
                     resetToken={`narrow-meta-${marqueeResetToken}-${metadata?.path || metadata?.artist || 'empty'}`}
                     behavior="auto-then-hover"
-                    className="mt-1 text-[clamp(0.72rem,3vw,0.85rem)] font-medium leading-tight text-white opacity-45 mix-blend-plus-lighter"
+                    className="mt-1 text-[clamp(0.72rem,3vw,0.875rem)] font-medium leading-tight text-white opacity-45 mix-blend-plus-lighter"
                     contentClassName="flex w-max items-center gap-1 whitespace-nowrap"
                 >
                     <span
@@ -74,7 +74,7 @@ export function NowPlayingNarrowHeader({
                 <button
                     onClick={() => {
                         if (metadata && typeof metadata.id === 'number') {
-                            toggleFavorite(metadata);
+                            void (toggleFavorite(metadata)).catch(console.error);
                         }
                     }}
                     aria-label={metadata?.is_favorite ? '取消收藏' : '收藏'}

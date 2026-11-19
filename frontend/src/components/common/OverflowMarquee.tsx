@@ -172,54 +172,55 @@ export default function OverflowMarquee({
         <div
             ref={containerRef}
             className={clsx(
-                "relative overflow-hidden min-w-0 transition-all",
+                "flow-root min-w-0 transition-all",
                 className
             )}
-            style={containerMaskStyle}
             onMouseEnter={startHoverAnimation}
             onMouseLeave={stopHoverAnimation}
         >
-            <div
-                ref={measureRef}
-                aria-hidden="true"
-                className={clsx(
-                    "pointer-events-none invisible absolute left-0 top-0 w-max min-w-0",
-                    contentClassName
-                )}
-            >
-                {children}
-            </div>
-            <div
-                key={animationKey}
-                style={marqueeStyle}
-                className={clsx(
-                    "flex w-max",
-                    shouldAnimate && "marquee-loop"
-                )}
-                onAnimationEnd={() => {
-                    if (behavior === 'hover-once' || behavior === 'auto-then-hover') {
-                        setPhase('finished');
-                    }
-                }}
-            >
+            <div className="relative -my-[0.15em] overflow-hidden py-[0.15em]" style={containerMaskStyle}>
                 <div
+                    ref={measureRef}
+                    aria-hidden="true"
                     className={clsx(
-                        "min-w-0",
-                        shouldAnimate && "inline-flex shrink-0",
+                        "pointer-events-none invisible absolute left-0 top-0 w-max min-w-0",
                         contentClassName
                     )}
                 >
                     {children}
                 </div>
-                {shouldShowDuplicate && (
+                <div
+                    key={animationKey}
+                    style={marqueeStyle}
+                    className={clsx(
+                        "flex w-max",
+                        shouldAnimate && "marquee-loop"
+                    )}
+                    onAnimationEnd={() => {
+                        if (behavior === 'hover-once' || behavior === 'auto-then-hover') {
+                            setPhase('finished');
+                        }
+                    }}
+                >
                     <div
-                        aria-hidden="true"
-                        className={clsx("inline-flex shrink-0", contentClassName)}
-                        style={{ paddingLeft: gapPx }}
+                        className={clsx(
+                            "min-w-0",
+                            shouldAnimate && "inline-flex shrink-0",
+                            contentClassName
+                        )}
                     >
-                        {repeatedContent}
+                        {children}
                     </div>
-                )}
+                    {shouldShowDuplicate && (
+                        <div
+                            aria-hidden="true"
+                            className={clsx("inline-flex shrink-0", contentClassName)}
+                            style={{ paddingLeft: gapPx }}
+                        >
+                            {repeatedContent}
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

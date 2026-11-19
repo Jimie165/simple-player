@@ -18,6 +18,7 @@ type WordFillPlan = {
     startPx: number;
     endPx: number;
     featherPx: number;
+    maskPaddingPx: number;
     bridgeFromPrevious: boolean;
     bridgeToNext: boolean;
     chainIndex: number;
@@ -93,7 +94,9 @@ export function createLineFill(
                 Math.min(sourceDurationMs, parsedDurationMs) * compressedSpanMs / parsedDurationMs),
             startPx: firstRuntime.fillLeftPx,
             endPx: lastRuntime.fillLeftPx + lastRuntime.fillWidthPx,
-            featherPx: firstRuntime.fillFeatherPx,
+            // Match the 0.5em-wide word mask and its 0.5em padding in index.css.
+            featherPx: wordFill ? fontSize * 0.25 : firstRuntime.fillFeatherPx,
+            maskPaddingPx: wordFill ? fontSize * 0.5 : 0,
             bridgeFromPrevious: false,
             bridgeToNext: false,
             chainIndex: -1,
@@ -111,7 +114,6 @@ export function createLineFill(
         }
     }
     let chainIndex = -1;
-    let previousPlan: WordFillPlan | null = null;
     const timeline: FillTimelineSegment[] = [];
     plans.forEach(plan => {
         if (!plan) return;
@@ -122,11 +124,7 @@ export function createLineFill(
         segments.forEach(({ flatIndex }, index) => {
             const runtime = charRuntimes[flatIndex];
             if (!runtime) return;
-            const startPx = index === 0
-                ? previousPlan
-                    ? previousPlan.endPx + (previousPlan.bridgeToNext ? 0 : previousPlan.featherPx)
-                    : plan.startPx - plan.featherPx
-                : runtime.fillLeftPx;
+            const startPx = runtime.fillLeftPx;
             const endPx = (wordFill ? plan.endPx : runtime.fillLeftPx + runtime.fillWidthPx) +
                 (index === segments.length - 1 && !plan.bridgeToNext ? plan.featherPx : 0);
             timeline.push({
@@ -136,13 +134,14 @@ export function createLineFill(
                 endPx,
             });
         });
-        previousPlan = plan;
     });
 
     let currentWordIndex = -1;
+    let currentTimeMs = -Infinity;
     let currentHeadPx = timeline[0]?.startPx ?? 0;
     return {
         update(timeMs: number) {
+            currentTimeMs = timeMs;
             currentWordIndex = -1;
             plans.forEach((plan, wordIndex) => {
                 if (plan && timeMs >= plan.startMs) currentWordIndex = wordIndex;
@@ -157,11 +156,19 @@ export function createLineFill(
         },
         getWordFillStop(wordIndex: number): number | null {
             const group = wordGroups[wordIndex];
-            if (!group?.length) return null;
+            const plan = plans[wordIndex];
+            if (!group?.length || !plan) return null;
             const first = charRuntimes[group[0].flatIndex];
             const last = charRuntimes[group[group.length - 1].flatIndex];
             if (!first || !last) return null;
             const width = last.fillLeftPx + last.fillWidthPx - first.fillLeftPx;
+            if (wordFill) {
+                const reach = plan.featherPx + plan.maskPaddingPx + 1;
+                if (currentTimeMs <= plan.startMs) return -reach / Math.max(1, width) * 100;
+                if (!plan.bridgeToNext && currentTimeMs >= plan.startMs + plan.durationMs) {
+                    return (width + reach) / Math.max(1, width) * 100;
+                }
+            }
             return this.getFillStop(wordIndex, {
                 ...first,
                 fillPaddingPx: 0,
@@ -171,6 +178,10 @@ export function createLineFill(
         getFillStop(wordIndex: number, runtime: LineFillCharRuntime): number | null {
             const plan = plans[wordIndex];
             if (!plan) return null;
+            // Keep the entire feather outside words that have not started, even within a shared chain.
+            if (currentTimeMs <= plan.startMs) {
+                return -(runtime.fillFeatherPx + 1) / runtime.fillMaskWidthPx * 100;
+            }
             const currentPlan = plans[currentWordIndex];
             const headPx = currentPlan && plan.chainIndex === currentPlan.chainIndex
                 ? currentHeadPx

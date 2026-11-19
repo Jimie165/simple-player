@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SongMetadata } from '@/types';
 
 const mocks = vi.hoisted(() => ({
-    openDeleteConfirm: vi.fn(),
+    openDeleteConfirm: vi.fn<(items: unknown[], confirm: () => Promise<void>, ...args: unknown[]) => void>(),
     batchDeleteSongs: vi.fn(),
     markSongsAsOptimisticallyDeleted: vi.fn(),
     clearOptimisticallyDeletedSongs: vi.fn(),

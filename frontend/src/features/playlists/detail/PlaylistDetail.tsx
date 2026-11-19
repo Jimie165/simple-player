@@ -26,7 +26,7 @@ import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import type { RecentItem, SongMetadata, Playlist } from '@/types';
+import type { SongMetadata, Playlist } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface PlaylistDetailProps {
@@ -111,7 +111,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             // 1. Load Songs
             let list: SongMetadata[] = [];
             if (id === 'favorites') {
-                list = await libraryService.getFavorites(sortKey === 'manual' ? (sortOrder as 'asc' | 'desc') : 'asc');
+                list = await libraryService.getFavorites(sortKey === 'manual' ? (sortOrder) : 'asc');
             } else {
                 list = await libraryService.getPlaylistSongs(id);
             }
@@ -153,29 +153,12 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     }, [dataVersion, isVisible, loadData]);
 
     // Actions
-    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
-        id: song.path || '',
-        type: 'file',
-        title: song.title,
-        description: song.artist,
-        cover: null,
-        cover_path: song.cover_path || null,
-        path: song.path || '',
-        lastPlayed: Date.now(),
-        artist: song.artist,
-        album: song.album,
-        isLibraryItem: true
-    });
-
     const handlePlaySong = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         await playSong({
             song,
             index,
             playlist: filteredSongs,
-            options: {
-                ...options,
-                buildRecentItem: buildRecentForSong
-            },
+            options,
             context: {
                 type: 'playlist_detail',
                 name: displayName,
@@ -185,14 +168,10 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     };
 
     const handlePlayAll = async () => {
-        if (songs.length > 0) {
+        if (filteredSongs.length > 0) {
             await playList({
-                songs,
+                songs: filteredSongs,
                 startIndex: 0,
-                options: {
-                    restartIfCurrent: true,
-                    buildRecentItem: buildRecentForSong
-                },
                 context: {
                     type: 'playlist_detail',
                     name: displayName,
@@ -207,12 +186,9 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     };
 
     const handleShuffle = async () => {
-        if (songs.length > 0) {
+        if (filteredSongs.length > 0) {
             await shufflePlay({
-                songs,
-                options: {
-                    buildRecentItem: buildRecentForSong
-                },
+                songs: filteredSongs,
                 context: {
                     type: 'playlist_detail',
                     name: displayName,
@@ -251,10 +227,10 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
 
     const handleUpdateInfo = async (name: string, description: string | undefined, coverPath: string | undefined) => {
         if (id !== 'favorites') {
-            await libraryService.updatePlaylistInfo(id as number, name, description);
+            await libraryService.updatePlaylistInfo(id, name, description);
 
             if (coverPath !== playlistInfo?.cover_path) {
-                await libraryService.updatePlaylistCover(id as number, coverPath || "");
+                await libraryService.updatePlaylistCover(id, coverPath || "");
                 updateRecentItemCover(`playlist:${id}`, coverPath || null);
             }
             triggerLibraryUpdate();
@@ -378,7 +354,7 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     />
                 </div>
 
-                <div className="relative z-10 p-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
+                <div className="relative z-10 pl-12 pr-8 py-8 pt-28 md:pt-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
                     {/* Cover Art */}
                     <div className="shrink-0 group relative">
                         <SharedCover source={transitionSource} className={clsx(
@@ -433,14 +409,14 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                         {/* Actions */}
                         <div className="flex items-center gap-3 mt-4">
                             <button
-                                onClick={handlePlayAll}
+                                onClick={() => { void handlePlayAll().catch(console.error); }}
                                 className="flex items-center gap-2 px-6 py-2.5 bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary rounded-full hover:bg-primary/90 base-theme:dark:hover:bg-on-primary transition-all font-medium shadow-xs hover:shadow-sm active:scale-95"
                             >
                                 <MdPlayArrow className="text-2xl" />
                                 播放
                             </button>
                             <button
-                                onClick={handleShuffle}
+                                onClick={() => { void handleShuffle().catch(console.error); }}
                                 className="flex items-center gap-2 btn-blur text-primary base-theme:bg-secondary-container base-theme:text-on-secondary-container base-theme:hover:bg-secondary-container/80 px-6 py-2.5 rounded-full font-medium transition-all hover:bg-surface-container-highest"
                             >
                                 <MdShuffle className="text-xl" />
@@ -458,11 +434,11 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-neutral-500"></div>
                 </div>
             ) : (
-                <div className="px-2 pb-32 relative z-10">
+                <div className="relative z-10">
                     <SortableSongList
                         songs={filteredSongs}
-                        onPlay={handlePlaySong}
-                        onReorder={handleReorder}
+                        onPlay={(song, index, options) => { void handlePlaySong(song, index, options).catch(console.error); }}
+                        onReorder={(newOrder) => { void handleReorder(newOrder).catch(console.error); }}
                         disableReorder={id === 'favorites' || !!searchQuery}
                         sortKey={sortKey}
                         sortOrder={sortOrder}

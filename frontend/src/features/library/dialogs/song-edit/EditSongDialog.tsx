@@ -213,11 +213,10 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
 
     return (
         <MetadataEditDialogShell
-            cancelFirst
             isOpen={isOpen}
             saving={saving}
             onClose={searchOpen ? () => setSearchOpen(false) : onClose}
-            onSubmit={handleSubmit}
+            onSubmit={(event) => { void handleSubmit(event).catch(console.error); }}
             title="编辑歌曲信息"
             cover={(
                 <CoverImage
@@ -230,9 +229,9 @@ export default function EditSongDialog({ isOpen, song, onClose }: EditSongDialog
             )}
             header={(
                 <>
-                    <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{resolvedValues.title || song.title}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{resolvedValues.artist || '未知艺人'}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{resolvedValues.album || '未知专辑'}</div>
+                    <div className="truncate text-[18px] leading-6 text-on-surface">{resolvedValues.title || song.title}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{resolvedValues.artist || '未知艺人'}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{resolvedValues.album || '未知专辑'}</div>
                 </>
             )}
             tabs={tabs}

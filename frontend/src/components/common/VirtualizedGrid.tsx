@@ -1,4 +1,4 @@
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useRef } from 'react';
 import type { CSSProperties, Key, ReactNode } from 'react';
 import clsx from 'clsx';
 import { VirtuosoGrid } from 'react-virtuoso';
@@ -39,18 +39,9 @@ export default function VirtualizedGrid<TItem>({
     const scrollParent = useScrollViewport(true, wrapperRef);
     const viewportOverscan = useViewportOverscan(scrollParent);
 
-    useLayoutEffect(() => {
-        const listEl = wrapperRef.current?.querySelector('.virtualized-grid-list');
-        if (!(listEl instanceof HTMLElement)) return;
-
-        listEl.style.gridTemplateColumns = typeof listStyle?.gridTemplateColumns === 'string'
-            ? listStyle.gridTemplateColumns
-            : '';
-    }, [listStyle, scrollParent]);
-
     return (
         // Grid recycling changes top padding; browser scroll anchoring must not compensate for it.
-        <div ref={wrapperRef} className={clsx("w-full [overflow-anchor:none]", className)}>
+        <div ref={wrapperRef} style={listStyle} className={clsx("w-full [overflow-anchor:none]", className)}>
             {scrollParent && <VirtuosoGrid
                 useWindowScroll={false}
                 customScrollParent={scrollParent}

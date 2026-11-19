@@ -1,4 +1,5 @@
 import React from 'react';
+import { SONG_LIST_DIVIDER_RIGHT, SONG_LIST_GRID_GAP, SONG_LIST_HOVER_BACKGROUND, SONG_LIST_ROW_PADDING, songListDividerLeft } from '@/features/playlists/songlist/songListLayout';
 import { MdFavorite, MdFavoriteBorder } from 'react-icons/md';
 import clsx from 'clsx';
 
@@ -8,16 +9,12 @@ import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import type { MusicMenuContext } from '@/hooks/menu/useSongOperations';
 import CustomTooltip from '@/components/common/CustomTooltip';
 import { getMusicItemId } from '@/utils/musicItemUtils';
-import { usePlayerStore } from '@/store/usePlayerStore';
-import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 function SongListRowImpl({
     index,
     isLast,
     song,
     gridStyle,
-    gridGapClass,
-    rowPaddingClass,
     isSelectionMode,
     selected,
     previousSelected = false,
@@ -42,8 +39,6 @@ function SongListRowImpl({
     isLast: boolean;
     song: SongMetadata;
     gridStyle: React.CSSProperties;
-    gridGapClass: string;
-    rowPaddingClass: string;
     isSelectionMode: boolean;
     selected: boolean;
     previousSelected?: boolean;
@@ -65,37 +60,24 @@ function SongListRowImpl({
     onSelect: (song: SongMetadata) => void;
 }) {
     const id = getMusicItemId(song);
-    const { togglePlayback } = usePlaybackActions();
 
     return (
         <div
             key={id || index}
             onDoubleClick={() => {
-                if (!isSelectionMode) {
-                    const { metadata } = usePlayerStore.getState();
-                    const isCurrent = metadata && (
-                        (song.id !== undefined && song.id === metadata.id) ||
-                        (song.path === metadata.path)
-                    );
-                    if (isCurrent) {
-                        void togglePlayback();
-                    } else {
-                        onPlay(song, index);
-                    }
-                }
+                if (!isSelectionMode) onPlay(song, index, { restartIfCurrent: true });
             }}
             onClick={(e) => onRowClick(e, song)}
             onContextMenu={(e) => onContextMenu(e, song, index)}
             style={gridStyle}
             className={clsx(
-                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:right-4 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
+                "group isolate grid items-center relative before:absolute before:inset-y-0 before:-z-10 before:pointer-events-none before:transition-colors before:duration-150 after:absolute after:bottom-0 after:border-b after:border-outline-variant/40 after:pointer-events-none after:transition-opacity after:duration-150 hover:after:opacity-0",
                 "h-13.5",
-                context === 'library' ? "before:left-9 before:right-0" : "before:left-12 before:right-2",
-                isLast ? (context === 'library' ? "after:left-11" : "after:left-14") : hideCover
-                    ? (context === 'library' ? "after:left-19" : "after:left-22")
-                    : (context === 'library' ? "after:left-25" : "after:left-28"),
-                gridGapClass,
-                rowPaddingClass,
+                SONG_LIST_HOVER_BACKGROUND,
+                SONG_LIST_DIVIDER_RIGHT,
+                songListDividerLeft(isLast, hideCover),
+                SONG_LIST_GRID_GAP,
+                SONG_LIST_ROW_PADDING,
                 selected
                     ? "before:bg-on-surface/12 base-theme:before:bg-secondary-container after:opacity-0"
                     : "hover:before:bg-on-surface/8 active:before:bg-on-surface/10",
@@ -134,12 +116,16 @@ function SongListRowImpl({
                             song={song}
                             className="w-full h-full"
                             onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
-                            restartOnPlay
                         />
                     </div>
                 )}
                 {hideCover && (
-                    <span className="w-5 shrink-0 text-center text-on-surface-variant tabular-nums">{index + 1}</span>
+                    <SongCoverOverlay
+                        song={song}
+                        className="w-7 h-7"
+                        trackNumber={song.track_number || index + 1}
+                        onPlay={() => onPlay(song, index, { restartIfCurrent: true })}
+                    />
                 )}
                 <span className="font-medium truncate pr-4 text-on-surface">
                     {song.title}

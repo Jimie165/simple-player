@@ -101,17 +101,17 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
 
     return (
         <div className="relative flex h-full min-h-0 flex-col">
-            <div className="relative min-h-0 flex-1 border border-neutral-200 bg-white/40 dark:border-white/10 dark:bg-white/3 base-theme:bg-surface">
+            <div className="relative min-h-0 flex-1 border border-outline-variant/40 bg-on-surface/3">
                 <textarea
                     aria-label="歌词内容"
                     aria-busy={searching}
                     value={displayText}
                     readOnly={!customEnabled}
                     onChange={(event) => onChange({ lyricsText: event.target.value, lyricsSourcePath: values.lyricsSourcePath })}
-                    className={`lyrics-editor-scrollbar h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 font-mono text-sm leading-6 text-neutral-900 outline-none dark:text-white ${showEmptyState ? 'text-transparent caret-transparent' : ''}`}
+                    className={`lyrics-editor-scrollbar h-full min-h-0 w-full resize-none bg-transparent px-4 py-4 font-mono text-sm leading-6 text-on-surface outline-none ${showEmptyState ? 'text-transparent caret-transparent' : ''}`}
                 />
                 {showEmptyState && (
-                    <div role="status" aria-live="polite" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-neutral-900 dark:text-neutral-100">
+                    <div role="status" aria-live="polite" className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center text-on-surface">
                         {searching ? <>
                             <svg role="progressbar" aria-label="正在搜索歌词" viewBox="0 0 48 48" className="lyrics-search-ring mb-4 h-12 w-12 text-primary" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round">
                                 <g className="lyrics-search-ring-spin">
@@ -122,7 +122,7 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
                             <div className="text-[18px]">正在搜索歌词...</div>
                         </> : <>
                             <div className="text-[18px]">无可用歌词</div>
-                            <div className="mt-1 text-[16px] text-neutral-600 dark:text-neutral-400">此歌曲没有任何可用的歌词。</div>
+                            <div className="mt-1 text-[16px] text-on-surface-variant">此歌曲没有任何可用的歌词。</div>
                         </>}
                     </div>
                 )}
@@ -135,16 +135,16 @@ export default function SongLyricsFields({ songPath, values, onChange, onError, 
                     onClick={handleToggleCustom}
                     className="flex items-center gap-3"
                 >
-                    <span className={`grid h-5 w-5 place-items-center rounded-[5px] border-2 transition-colors ${customEnabled ? 'border-primary bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary' : 'border-neutral-400 text-transparent dark:border-neutral-500'}`}>
+                    <span className={`grid h-5 w-5 place-items-center rounded-[5px] border-2 transition-colors ${customEnabled ? 'border-primary bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary' : 'border-on-surface-variant/60 text-transparent'}`}>
                         <MdCheck className="text-base" />
                     </span>
-                    <span className="text-[15px] text-neutral-900 dark:text-neutral-100">自定义歌词</span>
+                    <span className="text-[15px] text-on-surface">自定义歌词</span>
                 </button>
 
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
-                        onClick={handleSelectLyrics}
+                        onClick={() => { void handleSelectLyrics().catch(console.error); }}
                         className="inline-flex h-10 items-center justify-center gap-1.5 rounded-lg border border-transparent px-3 text-sm font-medium text-primary hover:bg-primary/10 transition-colors"
                     >
                         <MdAttachFile className="h-5 w-5 shrink-0" />

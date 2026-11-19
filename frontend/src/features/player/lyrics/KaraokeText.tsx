@@ -117,6 +117,7 @@ function KaraokeTextBase({
         <span ref={contentRef} className={[
             lyricFillMode === 'character' ? 'karaoke-text-character' : '',
             wordFloat ? 'karaoke-text-word-float' : '',
+            wordFloat && lyricFillMode === 'line' ? 'karaoke-text-line-word-mask' : '',
             lyricLineBlendEnabled ? 'karaoke-text-background-blend' : '',
         ].filter(Boolean).join(' ')} style={{ display: 'block', position: 'relative', isolation: 'isolate' }}>
             {[false, true].map(dim => <span

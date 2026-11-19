@@ -217,7 +217,7 @@ export function useNowPlayingPanels({
     };
 
     useEffect(() => {
-        if (lyricsStatus !== 'empty' || !isLyricsOpen) return;
+        if ((lyricsStatus !== 'empty' && lyricsStatus !== 'error') || !isLyricsOpen) return;
         const frame = requestAnimationFrame(() => closePanel('lyrics'));
         return () => cancelAnimationFrame(frame);
     }, [lyricsStatus, isLyricsOpen, closePanel]);

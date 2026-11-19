@@ -22,11 +22,11 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import type { SongMetadata } from '@/types';
-import type { RecentItem } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { buildAlbums, buildArtists } from '@/features/library/utils/grouping';
 import { getSelectedPath } from '@/utils/dialogSelection';
-import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
+import { albumRecentItem } from '@/utils/musicItemUtils';
+import { artistRecentItem } from '@/utils/recentCollections';
 import type { SortOrder } from '@/utils/songSort';
 import { changeSongListSorting, persistSongListSorting, readSongListSorting } from '@/features/library/utils/songListSorting';
 import type { SongListSorting } from '@/features/library/utils/songListSorting';
@@ -61,8 +61,8 @@ export default function Library() {
     };
     // Store Actions
     // Store Actions
-    const { addToRecent, libraryVersion, triggerLibraryUpdate } = useLibraryStore();
-    const { playSong, shufflePlay } = usePlaybackActions();
+    const { libraryVersion, triggerLibraryUpdate } = useLibraryStore();
+    const { playSong, playList, shufflePlay } = usePlaybackActions();
     const { push } = useNavigationStore();
 
     // Local State
@@ -196,43 +196,42 @@ export default function Library() {
         });
     };
 
-    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
-        id: song.path || '',
-        type: 'file',
-        title: song.title,
-        description: song.artist,
-        cover: null,
-        cover_path: song.cover_path || null,
-        path: song.path || '',
-        lastPlayed: Date.now(),
-        artist: song.artist,
-        album: song.album,
-        isLibraryItem: true
-    });
-
     const handlePlaySong = async (
         song: SongMetadata,
         index: number,
         scopeSongs: SongMetadata[] = librarySongs,
-        addToHistory = true,
         options?: { restartIfCurrent?: boolean, disableShuffle?: boolean },
-        context?: { type: string, name: string, id?: string }
     ) => {
         await playSong({
             song,
             index,
             playlist: scopeSongs,
-            options: {
-                ...options,
-                addToRecent: addToHistory,
-                recentItem: addToHistory ? buildRecentForSong(song) : undefined
-            },
-            context: context || {
+            options,
+            context: {
                 type: 'library',
                 name: '音乐库',
                 id: 'library'
             }
         });
+    };
+
+    const playAlbum = (album: AlbumData, shuffle: boolean) => {
+        if (album.songs.length === 0) return;
+        void (shuffle ? shufflePlay : playList)({
+            songs: album.songs,
+            options: { recentItem: albumRecentItem(album.name, album.artist, album.songs, album.cover_path) },
+            context: { type: 'album_detail', name: album.name, id: album.name }
+        }).catch(console.error);
+    };
+
+    const playArtist = (artist: ArtistData, shuffle: boolean) => {
+        if (artist.songs.length === 0) return;
+        const songs = [...artist.songs].sort((a, b) => (b.year || 0) - (a.year || 0));
+        void (shuffle ? shufflePlay : playList)({
+            songs,
+            options: { recentItem: artistRecentItem(artist.name, songs, artist.cover) },
+            context: { type: 'artist_detail', name: artist.name, id: artist.name }
+        }).catch(console.error);
     };
 
     // --------------------------------------------------------
@@ -246,7 +245,7 @@ export default function Library() {
             hideHeader={false}
             actions={
                 <div className="flex items-center gap-2">
-                    <LibraryHeaderButton onClick={handleAddFolder} />
+                    <LibraryHeaderButton onClick={() => { void handleAddFolder().catch(console.error); }} />
                 </div>
             }
         >
@@ -286,18 +285,15 @@ export default function Library() {
                         />
                     )}
                     onShufflePlay={(songsToPlay) => {
-                        shufflePlay({
+                        void (shufflePlay({
                             songs: songsToPlay,
-                            options: {
-                                addToRecent: true,
-                                buildRecentItem: buildRecentForSong
-                            },
+                            recordSelectedSong: true,
                             context: {
                                 type: 'library',
                                 name: '音乐库',
                                 id: 'library'
                             }
-                        });
+                        })).catch(console.error);
                     }}
                 />
 
@@ -308,15 +304,15 @@ export default function Library() {
                             <motion.div
                                 key="songs"
                                 {...pageMotion}
-                                className="h-full"
+                                className="h-full -mx-8"
                             >
                                 <SongListView
                                     songs={librarySongs}
-                                    onPlay={(song, index, options, songs) => handlePlaySong(song, index, songs, true, options)}
+                                    onPlay={(song, index, options, songs) => { void handlePlaySong(song, index, songs, options).catch(console.error); }}
                                     sortControl={{ value: songSorting, onChange: handleSongSortingChange }}
                                     onOpenArtist={handleOpenArtistByName}
                                     onOpenAlbum={handleOpenAlbumByName}
-                                    footerSpacerClassName="h-6"
+                                    footerSpacerClassName="h-0"
                                 />
                             </motion.div>
                         )}
@@ -329,28 +325,8 @@ export default function Library() {
                                 <AlbumGridView
                                     albums={albums}
                                     hideYear={true}
-                                    onPlayAlbum={(album) => {
-                                        addToRecent({
-                                            id: getAlbumMusicItemId(album.name, album.artist),
-                                            type: 'album',
-                                            title: album.name,
-                                            artist: album.artist,
-                                            description: `${album.songs.length} 首歌曲`,
-                                            cover: null,
-                                            cover_path: album.cover_path || null,
-                                            path: album.songs[0]?.path || '',
-                                            lastPlayed: Date.now(),
-                                            isLibraryItem: true
-                                        });
-                                        if (album.songs.length > 0) {
-                                            handlePlaySong(album.songs[0], 0, album.songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: album.name, id: album.name });
-                                        }
-                                    }}
-                                    onShuffleAlbum={(album) => {
-                                        if (album.songs.length > 0) {
-                                            shufflePlay({ songs: album.songs, context: { type: 'album_detail', name: album.name, id: album.name } });
-                                        }
-                                    }}
+                                    onPlayAlbum={(album) => playAlbum(album, false)}
+                                    onShuffleAlbum={(album) => playAlbum(album, true)}
                                     onOpenAlbum={handleOpenAlbum}
                                     onOpenArtist={handleOpenArtistByName}
                                 />
@@ -364,18 +340,8 @@ export default function Library() {
                             >
                                 <ArtistGridView
                                     artists={artists}
-                                    onPlayArtist={(artist) => {
-                                        if (artist.songs.length > 0) {
-                                            // Sort by album year desc
-                                            const sorted = [...artist.songs].sort((a, b) => (b.year || 0) - (a.year || 0));
-                                            handlePlaySong(sorted[0], 0, sorted, true, { restartIfCurrent: true, disableShuffle: true }, { type: 'artist_detail', name: artist.name, id: artist.name });
-                                        }
-                                    }}
-                                    onShuffleArtist={(artist) => {
-                                        if (artist.songs.length > 0) {
-                                            shufflePlay({ songs: artist.songs, context: { type: 'artist_detail', name: artist.name, id: artist.name } });
-                                        }
-                                    }}
+                                    onPlayArtist={(artist) => playArtist(artist, false)}
+                                    onShuffleArtist={(artist) => playArtist(artist, true)}
                                     onOpenArtist={handleOpenArtist}
                                 />
                             </motion.div>

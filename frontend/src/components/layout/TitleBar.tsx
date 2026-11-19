@@ -10,9 +10,9 @@ export default function TitleBar() {
         const checkMaximized = async () => {
             setIsMaximized(await systemService.isMaximized());
         };
-        checkMaximized();
+        void (checkMaximized()).catch(console.error);
 
-        const unlisten = systemService.onResize(checkMaximized);
+        const unlisten = systemService.onResize(() => { void checkMaximized().catch(console.error); });
         return () => {
             unlisten
                 .then(f => {
@@ -32,7 +32,7 @@ export default function TitleBar() {
 
             {/* 最小化 */}
             <button
-                onClick={systemService.minimize}
+                onClick={() => { void systemService.minimize().catch(console.error); }}
                 className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-on-surface/10"
             >
                 <VscChromeMinimize className="text-lg" />
@@ -40,7 +40,7 @@ export default function TitleBar() {
 
             {/* 最大化/还原 */}
             <button
-                onClick={systemService.toggleMaximize}
+                onClick={() => { void systemService.toggleMaximize().catch(console.error); }}
                 aria-label={systemService.isMacOS ? (isMaximized ? '退出全屏' : '进入全屏') : (isMaximized ? '还原窗口' : '最大化窗口')}
                 className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-on-surface/10"
             >
@@ -53,7 +53,7 @@ export default function TitleBar() {
 
             {/* 关闭 */}
             <button
-                onClick={systemService.close}
+                onClick={() => { void systemService.close().catch(console.error); }}
                 // 关闭按钮保留 M3 风格，但在 Hover 时使用红色背景+白字
                 className="group flex h-8 w-8 items-center justify-center rounded-full text-on-surface transition-colors hover:bg-red-500 hover:text-white"
             >

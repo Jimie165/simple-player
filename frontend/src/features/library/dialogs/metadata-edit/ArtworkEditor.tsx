@@ -79,7 +79,7 @@ export default function ArtworkEditor({
             )}
             <button
                 type="button"
-                onClick={handleSelect}
+                onClick={() => { void handleSelect().catch(console.error); }}
                 className={`inline-flex h-9 items-center gap-1.5 rounded-md px-2 text-[15px] font-medium text-primary transition-colors hover:bg-primary/10 ${actionsContainer !== undefined ? 'order-first' : ''}`}
             >
                 <MdAdd className="text-[24px]" />
@@ -90,9 +90,9 @@ export default function ArtworkEditor({
 
     return (
         <div className="flex h-full min-h-0 flex-col items-center justify-center">
-            <div className={actionsContainer !== undefined ? "aspect-square h-[90%] max-h-[460px] max-w-full" : "w-[min(430px,100%)]"}>
+            <div className={actionsContainer !== undefined ? "aspect-square h-[90%] max-h-115 max-w-full" : "w-[min(430px,100%)]"}>
                 <div
-                    className="relative aspect-square max-h-full overflow-hidden rounded-lg border border-neutral-200 bg-neutral-100 shadow-sm dark:border-white/10 dark:bg-neutral-800"
+                    className="relative aspect-square max-h-full overflow-hidden rounded-lg border border-(--dialog-outline-color) bg-on-surface/5 shadow-sm"
                     onContextMenu={(event) => {
                         event.preventDefault();
                         if (hasCustomArtwork) {

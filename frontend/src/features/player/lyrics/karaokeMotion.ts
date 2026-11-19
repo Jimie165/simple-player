@@ -37,6 +37,7 @@ export type WordMotionWindow = {
 
 export const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
+const wordFillLiftDelayMs = 100;
 export const regularLiftMinDurationMs = 1000;
 const longToneThresholdMs = 1000;
 export const syllableLiftEm = 0.078;
@@ -140,6 +141,7 @@ export function prepareKaraokeCharRuntime(
     isLastWord: boolean,
     wordFloat = false,
     wordMotionItem = charItem,
+    wordFill = false,
 ): KaraokeCharRuntime {
     // Tail compression belongs to filling. Word-mode emphasis uses one shared
     // timing basis so trailing glyphs cannot lose their scale or peak early.
@@ -183,7 +185,7 @@ export function prepareKaraokeCharRuntime(
         emphasisDurationMs,
         wordEmphasisAttackMs: wordTiming.attackMs,
         wordEmphasisReleaseMs: wordTiming.releaseMs,
-        wordLiftDelayMs: motionDurationMs / 2.5 / charCount * charIndex,
+        wordLiftDelayMs: (wordFill ? wordFillLiftDelayMs : 0) + motionDurationMs / 2.5 / charCount * charIndex,
         wordLiftAttackMs: getWordLiftAttackMs(motionDurationMs, charCount, emphasisDurationMs),
         charDelayMs,
         motionAmount: Math.min(
@@ -271,6 +273,7 @@ export function getWordMotionWindow(
     group: IndexedCharItem[],
     isLastWord: boolean,
     wordFloat = false,
+    wordFill = false,
 ): WordMotionWindow {
     let startMs = Number.POSITIVE_INFINITY;
     let endMs = Number.NEGATIVE_INFINITY;
@@ -303,7 +306,8 @@ export function getWordMotionWindow(
         const wordTiming = getWordEmphasisTiming(motionItem.groupDurationMs, charCount, emphasisDurationMs);
         const wordLiftDurationMs = group[0].item.groupDurationMs;
         const wordLiftEndMs = wordFloat && charCount > 1
-            ? motionItem.groupStartMs + wordLiftDurationMs / 2.5 / charCount * charIndex
+            ? motionItem.groupStartMs + (wordFill ? wordFillLiftDelayMs : 0)
+                + wordLiftDurationMs / 2.5 / charCount * charIndex
                 + getWordLiftAttackMs(wordLiftDurationMs, charCount, emphasisDurationMs)
             : liftEndMs;
         const emphasisEndMs = wordFloat
@@ -343,4 +347,3 @@ export const getWordMotionOrders = (wordMotionWindows: WordMotionWindow[]) => {
         ),
     };
 };
-

@@ -17,7 +17,7 @@ export default function PageContainer({
     className
 }: PageContainerProps) {
     return (
-        <div className={clsx("flex flex-col h-full w-full min-h-0 px-8 pb-8", className)}>
+        <div className={clsx("flex flex-col h-full w-full min-h-0 px-8", className)}>
             {!hideHeader && (
                 <div className="flex items-center justify-between py-6 shrink-0 z-10 min-h-[88px]">
                     {title && (

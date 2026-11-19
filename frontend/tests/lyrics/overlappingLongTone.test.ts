@@ -40,7 +40,7 @@ describe('overlapping TTML long tones', () => {
         expect(getActiveLyricsState(items, lines, 199.954, strategy, true).activeIndices.has(displayIndex)).toBe(false);
     });
 
-    it('still compresses a nonoverlapping handoff by the missing lead time', () => {
-        expect(getTightHandoffVisualEndMs(words, lineEndMs, 200354)).toBe(199754);
+    it('still compresses a nonoverlapping handoff by at most 400ms', () => {
+        expect(getTightHandoffVisualEndMs(words, lineEndMs, 200354)).toBe(199554);
     });
 });

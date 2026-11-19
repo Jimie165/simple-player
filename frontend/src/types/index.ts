@@ -67,6 +67,8 @@ export interface LyricsLine {
     role: LyricsLineRole;
     start_time_ms: number | null;
     end_time_ms: number | null;
+    /** 行尾由下一时间标记推导，并非实际演唱结束时间。 */
+    end_time_inferred?: boolean;
     text: string;
     words: LyricsWord[];
     translation?: string | null;
@@ -149,6 +151,8 @@ export interface RecentItem {
     artist?: string;
     album?: string;
     isLibraryItem?: boolean;
+    /** 临时播放列表和艺人保留原始曲目顺序，用于回放。 */
+    songs?: SongMetadata[];
 }
 
 // 播放模式
@@ -158,6 +162,7 @@ export type MediaKind = 'audio' | 'video' | null;
 export type PlaybackStatus = 'idle' | 'playing' | 'paused' | 'ended';
 
 export interface PlaybackSnapshot {
+    output_unavailable?: boolean;
     session_id: number;
     status: PlaybackStatus;
     path: string | null;

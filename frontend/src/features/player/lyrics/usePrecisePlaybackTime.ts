@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePlayerStore } from '@/store/usePlayerStore';
+import { selectPlaybackAdvancing } from '@/features/player/runtime/selectPlaybackAdvancing';
 import { audioService } from '@/services/audioService';
 import type { LyricsFrameScheduler } from '@/features/player/lyrics/lyricsFrameScheduler';
 
@@ -16,7 +17,7 @@ export function usePrecisePlaybackTime(
     subscribeToPlayerTime = false,
     frameScheduler?: LyricsFrameScheduler,
 ) {
-    const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isPlaying = usePlayerStore(selectPlaybackAdvancing);
     const playbackRevision = usePlayerStore(state => state.playbackRevision);
     const [renderCurrentMs, setRenderCurrentMs] = useState(currentTime * 1000);
     const [syncRevision, setSyncRevision] = useState(0);
@@ -60,12 +61,16 @@ export function usePrecisePlaybackTime(
         calibrationRequestRef.current = true;
         const epoch = clockEpochRef.current;
         const requestedState = usePlayerStore.getState();
+        if (!selectPlaybackAdvancing(requestedState)) {
+            calibrationRequestRef.current = false;
+            return;
+        }
 
         try {
             const audioMs = (await audioService.getCurrentTime()) * 1000;
             const state = usePlayerStore.getState();
             // An older IPC reply must not overwrite a seek, pause or new song.
-            if (!Number.isFinite(audioMs) || epoch !== clockEpochRef.current ||
+            if (!selectPlaybackAdvancing(state) || !Number.isFinite(audioMs) || epoch !== clockEpochRef.current ||
                 state.playbackSessionId !== requestedState.playbackSessionId ||
                 state.playbackRevision !== requestedState.playbackRevision ||
                 state.isPlaying !== requestedState.isPlaying) return;
@@ -205,6 +210,10 @@ export function usePrecisePlaybackTime(
 
         let frame: number | null = null;
         const tick = (now: number, scheduledDeltaMs?: number) => {
+            if (!selectPlaybackAdvancing(usePlayerStore.getState())) {
+                lastTick.current = now;
+                return;
+            }
             const delta = scheduledDeltaMs ?? now - lastTick.current;
             lastTick.current = now;
             let nudgeMs = 0;

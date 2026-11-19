@@ -5,6 +5,7 @@ import { MdAdd, MdDelete, MdExpandLess, MdExpandMore, MdFolder } from 'react-ico
 
 import { libraryService } from '@/services/libraryService';
 import CustomTooltip from '@/components/common/CustomTooltip';
+import ConfirmDialog from '@/components/common/ConfirmDialog';
 import { SettingsGroup } from '@/features/settings/components/SettingsControls';
 import RestoreExcludedSongsDialog from '@/features/library/dialogs/RestoreExcludedSongsDialog';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -17,12 +18,17 @@ export default function MusicFoldersSection() {
     const libraryVersion = useLibraryStore(s => s.libraryVersion);
     const triggerLibraryUpdate = useLibraryStore((s) => s.triggerLibraryUpdate);
     const [musicFolders, setMusicFolders] = useState<LibraryFolder[]>([]);
+    const [removeDialog, setRemoveDialog] = useState<{
+        isOpen: boolean;
+        folder: LibraryFolder | null;
+    }>({ isOpen: false, folder: null });
     const [isAddingFolder, setIsAddingFolder] = useState(false);
     const [foldersExpanded, setFoldersExpanded] = useState(false);
     const [restorePrompt, setRestorePrompt] = useState<{
+        isOpen: boolean;
         folderPath: string;
         songs: SongMetadata[];
-    } | null>(null);
+    }>({ isOpen: false, folderPath: '', songs: [] });
 
     const reloadFolders = useCallback(async () => {
         try {
@@ -35,7 +41,7 @@ export default function MusicFoldersSection() {
 
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- reloadFolders 在异步 IPC 返回后更新状态，非同步调用
-        reloadFolders();
+        void (reloadFolders()).catch(console.error);
     }, [reloadFolders, libraryVersion]);
 
     const handleAddFolder = async () => {
@@ -49,7 +55,7 @@ export default function MusicFoldersSection() {
             await reloadFolders();
             if (result.existing_folder) {
                 if (result.excluded_songs.length > 0) {
-                    setRestorePrompt({ folderPath, songs: result.excluded_songs });
+                    setRestorePrompt({ isOpen: true, folderPath, songs: result.excluded_songs });
                 } else {
                     toast('该文件夹已在音乐库中，没有可恢复的歌曲', { id: 'add-folder' });
                 }
@@ -66,10 +72,8 @@ export default function MusicFoldersSection() {
     };
 
     const handleRemoveFolder = async (folder: LibraryFolder) => {
-        if (!confirm(`确定移除文件夹？\n${folder.path}\n该目录下的歌曲会从音乐库删除（收藏与播放列表中的引用一并清理）。`)) {
-            return;
-        }
         try {
+            setRemoveDialog((prev) => ({ ...prev, isOpen: false }));
             await libraryService.removeFolder(folder.path);
             await reloadFolders();
             triggerLibraryUpdate();
@@ -97,6 +101,16 @@ export default function MusicFoldersSection() {
 
     return (
         <>
+            <ConfirmDialog
+                isOpen={removeDialog.isOpen}
+                onClose={() => setRemoveDialog((prev) => ({ ...prev, isOpen: false }))}
+                onConfirm={() => {
+                    if (removeDialog.folder) void handleRemoveFolder(removeDialog.folder);
+                }}
+                title="移除文件夹"
+                description={`确定移除 ${removeDialog.folder?.path ?? ''}？该目录下的歌曲及其收藏、播放列表引用会从资料库删除，原始文件会保留。`}
+                confirmText="移除"
+            />
             <SettingsGroup title="音乐文件夹">
                 {musicFolders.length === 0 ? (
                     <div className="px-3.5 py-3 text-sm text-on-surface-variant">
@@ -116,7 +130,9 @@ export default function MusicFoldersSection() {
                             </CustomTooltip>
                             <CustomTooltip text="移除此文件夹">
                                 <button
-                                    onClick={() => handleRemoveFolder(folder)}
+                                    onClick={() => {
+                                        setRemoveDialog({ isOpen: true, folder });
+                                    }}
                                     aria-label="移除此文件夹"
                                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-on-surface-variant opacity-60 transition-all hover:bg-error/10 hover:text-error hover:opacity-100 active:scale-95 group-hover:opacity-100"
                                 >
@@ -148,7 +164,7 @@ export default function MusicFoldersSection() {
                         <span />
                     )}
                     <button
-                        onClick={handleAddFolder}
+                        onClick={() => { void handleAddFolder().catch(console.error); }}
                         disabled={isAddingFolder}
                         className="settings-control flex items-center gap-1 rounded-md px-3 py-1 text-[13px] font-medium text-on-surface transition-transform active:scale-[0.97] disabled:cursor-wait disabled:text-on-surface-variant"
                     >
@@ -158,10 +174,10 @@ export default function MusicFoldersSection() {
                 </div>
             </SettingsGroup>
             <RestoreExcludedSongsDialog
-                isOpen={restorePrompt !== null}
-                folderPath={restorePrompt?.folderPath ?? ''}
-                songs={restorePrompt?.songs ?? []}
-                onClose={() => setRestorePrompt(null)}
+                isOpen={restorePrompt.isOpen}
+                folderPath={restorePrompt.folderPath}
+                songs={restorePrompt.songs}
+                onClose={() => setRestorePrompt((prev) => ({ ...prev, isOpen: false }))}
                 onRestore={handleRestoreSongs}
             />
         </>

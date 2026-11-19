@@ -1,4 +1,4 @@
-import type { RefObject } from 'react';
+import type { CSSProperties, RefObject } from 'react';
 import clsx from 'clsx';
 import { motion } from 'framer-motion';
 import type { SongMetadata, LyricsDocument } from '@/types';
@@ -13,6 +13,9 @@ import NowPlayingQueueToggle from '@/features/player/now-playing/toolbar/NowPlay
 import NowPlayingLyricsToggle from '@/features/player/now-playing/toolbar/NowPlayingLyricsToggle';
 import NowPlayingLyricsPanel from '@/features/player/now-playing/panels/NowPlayingLyricsPanel';
 import type { SidePanel } from '@/features/player/now-playing/shared/types';
+
+const CONTROL_BASE = 'min(41vw - 42px, 75.2vh - 235px, 400px)';
+const NARROW_STANDARD_CONTROL_BASE = 'min(100vw - 88px, 75.2vh - 235px, 400px)';
 
 interface BaseLayoutProps {
     metadata: SongMetadata | null;
@@ -207,7 +210,7 @@ export function NowPlayingNarrowPanelLayout({
                     <div className="flex items-center gap-2">
                         <NowPlayingLyricsToggle
                             isLyricsOpen={isLyricsOpen}
-                            hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                            hasLyrics={(lyricsStatus !== 'empty' && lyricsStatus !== 'error') || isLyricsOpen}
                             onToggle={handleToggleLyrics}
                         />
                         <NowPlayingQueueToggle
@@ -277,7 +280,13 @@ export function NowPlayingStandardLayout({
             transition={{ duration: 0.4, ease: [0.32, 0.72, 0, 1] }}
             className="absolute inset-0 flex w-full min-h-0 px-[clamp(1rem,3vw,2rem)] pb-[clamp(3.5rem,6vw,5rem)]"
         >
-            <div className={clsx(
+            <div
+                style={{
+                    '--np-control-base': mainContentWidth < 560 || !(isQueueOpen || isLyricsOpen) ? NARROW_STANDARD_CONTROL_BASE : CONTROL_BASE,
+                    '--np-title-size': mainContentWidth < 560 ? 'clamp(0.8rem, 3.4vw, 1rem)' : 'clamp(0.8125rem, 2.4vmin, 1.5rem)',
+                    '--np-meta-size': mainContentWidth < 560 ? 'clamp(0.72rem, 3vw, 0.875rem)' : 'clamp(0.75rem, 2.1vmin, 1.3125rem)',
+                } as CSSProperties}
+                className={clsx(
                 "relative flex flex-col items-center justify-center mr-auto",
                 mainContentWidth < 560
                     ? "w-full px-[clamp(1rem,4vw,3rem)]"
@@ -354,10 +363,18 @@ export function NowPlayingStandardLayout({
                 onSeek={seek}
             />
 
-            <div className="absolute bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] z-30 flex items-center gap-[clamp(0.5rem,1.2vw,0.85rem)] mix-blend-plus-lighter">
+            <div
+                className={clsx(
+                    'absolute z-30 flex items-center mix-blend-plus-lighter',
+                    mainContentWidth < 560
+                        ? 'right-[clamp(1rem,5vw,2rem)] gap-2'
+                        : 'bottom-[clamp(1rem,2.5vw,2rem)] right-[clamp(1rem,2.5vw,2rem)] gap-[clamp(0.5rem,1.2vw,0.85rem)]'
+                )}
+                style={mainContentWidth < 560 ? { bottom: 'calc(clamp(1rem, 5vw, 2rem) - 12px)' } : undefined}
+            >
                 <NowPlayingLyricsToggle
                     isLyricsOpen={isLyricsOpen}
-                    hasLyrics={lyricsStatus !== 'empty' || isLyricsOpen}
+                    hasLyrics={(lyricsStatus !== 'empty' && lyricsStatus !== 'error') || isLyricsOpen}
                     onToggle={handleToggleLyrics}
                 />
                 <NowPlayingQueueToggle

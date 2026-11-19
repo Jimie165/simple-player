@@ -8,6 +8,9 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import type { PlaybackSnapshot } from '@/types';
 import { useAutoOnlineLyrics } from '@/features/player/runtime/useAutoOnlineLyrics';
+import { handleAudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
+import type { AudioOutputError } from '@/features/player/runtime/handleAudioOutputError';
+import { selectPlaybackAdvancing } from '@/features/player/runtime/selectPlaybackAdvancing';
 
 /**
  * Keeps media-side effects alive independently of the bottom player UI.
@@ -16,6 +19,7 @@ import { useAutoOnlineLyrics } from '@/features/player/runtime/useAutoOnlineLyri
  */
 function usePlaybackRuntime() {
     const isPlaying = usePlayerStore(state => state.isPlaying);
+    const isPlaybackAdvancing = usePlayerStore(selectPlaybackAdvancing);
     const mediaKind = usePlayerStore(state => state.mediaKind);
     const isSeeking = usePlayerStore(state => state.isSeeking);
     const currentTime = usePlayerStore(state => state.currentTime);
@@ -47,6 +51,7 @@ function usePlaybackRuntime() {
         seek,
     } = usePlaybackActions();
 
+    const snapshotEpochRef = useRef(0);
     const currentTimeRef = useRef(currentTime);
     const isSeekingRef = useRef(isSeeking);
     const callbacksRef = useRef({
@@ -61,6 +66,14 @@ function usePlaybackRuntime() {
         position: currentTime,
         updatedAt: 0,
     });
+
+    // A reply requested before a seek or track replacement cannot describe the current source.
+    useEffect(() => usePlayerStore.subscribe((state, previous) => {
+        if (state.isPlaying !== previous.isPlaying || state.isAudioLoaded !== previous.isAudioLoaded
+            || state.isSeeking !== previous.isSeeking || state.audioSeekInFlight !== previous.audioSeekInFlight
+            || state.audioLoadingCount !== previous.audioLoadingCount || state.playbackSessionId !== previous.playbackSessionId
+            || state.metadata?.path !== previous.metadata?.path) snapshotEpochRef.current++;
+    }), []);
 
     useEffect(() => {
         currentTimeRef.current = currentTime;
@@ -121,29 +134,38 @@ function usePlaybackRuntime() {
             if (Number.isFinite(time)) void callbacksRef.current.seek(time);
         });
         void register<number>('audio:ended', (endedSessionId) => {
-            const currentSessionId = usePlayerStore.getState().playbackSessionId;
+            const state = usePlayerStore.getState();
+            if (state.audioLoadingCount > 0 || state.audioRetryPosition !== null) return;
+            const currentSessionId = state.playbackSessionId;
             if (
                 Number.isFinite(endedSessionId) &&
                 currentSessionId !== 0 &&
                 endedSessionId !== currentSessionId
             ) return;
-            void callbacksRef.current.handlePlaybackEnded();
+            void callbacksRef.current.handlePlaybackEnded(endedSessionId);
         });
+        void register<AudioOutputError>('audio:output-error', handleAudioOutputError);
         void register<PlaybackSnapshot>('audio:state-changed', (snapshot) => {
             const state = usePlayerStore.getState();
+            if (snapshot.status === 'ended') {
+                if (snapshot.path === state.metadata?.path && snapshot.path === state.playbackPath && !snapshot.output_unavailable) {
+                    void callbacksRef.current.handlePlaybackEnded(snapshot.session_id);
+                }
+                return;
+            }
             if (
-                // End-of-track is resolved by audio:ended, including automatic continuation.
-                snapshot.status === 'ended' ||
                 state.mediaKind === 'video' ||
                 (snapshot.session_id !== 0 &&
                     state.playbackSessionId !== 0 &&
                     snapshot.session_id < state.playbackSessionId)
             ) return;
+            state.setPlaybackSnapshot(snapshot);
+            const current = usePlayerStore.getState();
+            if (current.playbackSessionId !== snapshot.session_id || current.playbackPath !== snapshot.path) return;
             positionAnchorRef.current = {
                 position: snapshot.position,
                 updatedAt: performance.now(),
             };
-            state.setPlaybackSnapshot(snapshot);
         });
 
         return () => {
@@ -186,19 +208,32 @@ function usePlaybackRuntime() {
     }, [metadata?.path, resetPlaybackClock, restartTrigger]);
 
     useEffect(() => {
-        if (!isPlaying || mediaKind !== 'audio') return;
+        if (!isPlaybackAdvancing || mediaKind !== 'audio') return;
 
         let disposed = false;
         const poll = async () => {
-            if (disposed || isSeekingRef.current) return;
+            const state = usePlayerStore.getState();
+            if (disposed || isSeekingRef.current || !selectPlaybackAdvancing(state)
+                || state.handledEndedSessionId === state.playbackSessionId) return;
+            const epoch = snapshotEpochRef.current;
             try {
                 const snapshot = await audioService.getPlaybackSnapshot();
-                if (!disposed && !isSeekingRef.current && snapshot.status !== 'ended') {
+                if (!disposed && !isSeekingRef.current && epoch === snapshotEpochRef.current
+                    && selectPlaybackAdvancing(usePlayerStore.getState())) {
+                    if (snapshot.status === 'ended') {
+                        const state = usePlayerStore.getState();
+                        if (snapshot.path === state.metadata?.path && snapshot.path === state.playbackPath && !snapshot.output_unavailable) {
+                            await callbacksRef.current.handlePlaybackEnded(snapshot.session_id);
+                        }
+                        return;
+                    }
+                    setPlaybackSnapshot(snapshot);
+                    const current = usePlayerStore.getState();
+                    if (current.playbackSessionId !== snapshot.session_id || current.playbackPath !== snapshot.path) return;
                     positionAnchorRef.current = {
                         position: snapshot.position,
                         updatedAt: performance.now(),
                     };
-                    setPlaybackSnapshot(snapshot);
                 }
             } catch (error) {
                 if (!disposed) console.warn('Failed to sync playback snapshot', error);
@@ -207,9 +242,9 @@ function usePlaybackRuntime() {
 
         void poll();
         const interval = window.setInterval(() => void poll(), 1000);
-        const clock = window.setInterval(() => {
+        const clock = isPlaying ? window.setInterval(() => {
             const state = usePlayerStore.getState();
-            if (disposed || state.mediaKind !== 'audio' || !state.isPlaying || state.isSeeking) return;
+            if (disposed || state.mediaKind !== 'audio' || !state.isPlaying || !state.isAudioLoaded || state.audioLoadingCount > 0 || state.isSeeking) return;
 
             const elapsed = (performance.now() - positionAnchorRef.current.updatedAt) / 1000;
             const duration = state.metadata?.duration;
@@ -217,13 +252,13 @@ function usePlaybackRuntime() {
                 ? Math.min(positionAnchorRef.current.position + elapsed, duration)
                 : positionAnchorRef.current.position + elapsed;
             setPlaybackTime(nextPosition);
-        }, 100);
+        }, 100) : null;
         return () => {
             disposed = true;
             window.clearInterval(interval);
-            window.clearInterval(clock);
+            if (clock !== null) window.clearInterval(clock);
         };
-    }, [isPlaying, mediaKind, setPlaybackSnapshot, setPlaybackTime]);
+    }, [isPlaying, isPlaybackAdvancing, mediaKind, setPlaybackSnapshot, setPlaybackTime]);
 
 }
 

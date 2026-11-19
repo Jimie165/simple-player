@@ -40,8 +40,8 @@ export const VideoLibrary: React.FC = () => {
     const activeTab = effectiveTab === 'folders' ? 'folders' : 'all';
 
     useEffect(() => {
-        fetchVideos();
-        fetchVideoFolders();
+        void (fetchVideos()).catch(console.error);
+        void (fetchVideoFolders()).catch(console.error);
     }, [fetchVideos, fetchVideoFolders]);
 
     useEffect(() => {
@@ -52,8 +52,8 @@ export const VideoLibrary: React.FC = () => {
             try {
                 const unlistenFn = await listen('video_scan_complete', () => {
                     if (isMounted) {
-                        fetchVideos();
-                        fetchVideoFolders();
+                        void (fetchVideos()).catch(console.error);
+                        void (fetchVideoFolders()).catch(console.error);
                     }
                 });
                 if (isMounted) {
@@ -66,7 +66,7 @@ export const VideoLibrary: React.FC = () => {
             }
         };
 
-        setupListeners();
+        void (setupListeners()).catch(console.error);
 
         return () => {
             isMounted = false;
@@ -275,7 +275,7 @@ export const VideoLibrary: React.FC = () => {
                             { value: 'name', label: '名称' },
                         ]}
                     />
-                    <LibraryHeaderButton onClick={handleAddFolder} />
+                    <LibraryHeaderButton onClick={() => { void handleAddFolder().catch(console.error); }} />
                 </div>
             }
         >
@@ -354,7 +354,7 @@ export const VideoLibrary: React.FC = () => {
                                             const allSelected = videos.length > 0 && videos.every(v => selectedIds.has(v.path));
 
                                             return (
-                                                <div className="flex flex-col gap-3 pt-5 pb-2 px-2 first:pt-0">
+                                                <div className="flex flex-col gap-3 pt-5 pb-2 first:pt-0">
                                                     {/* Folder Header */}
                                                     <div className="flex items-center justify-between text-on-surface pb-2 border-b border-outline-variant/10 group/header">
                                                         <div
@@ -396,7 +396,7 @@ export const VideoLibrary: React.FC = () => {
                                                                 animate={{ height: 'auto', opacity: 1 }}
                                                                 exit={{ height: 0, opacity: 0 }}
                                                                 transition={{ duration: 0.2 }}
-                                                                className="pl-2 overflow-hidden"
+                                                                className="overflow-hidden"
                                                             >
                                                                 <VideoGrid videos={videos} virtualized={false} />
                                                             </motion.div>

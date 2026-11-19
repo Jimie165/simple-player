@@ -235,6 +235,7 @@ export function buildLyricsLinesFromEntries(
             role,
             start_time_ms: entry.time_ms,
             end_time_ms: lineEndMs,
+            end_time_inferred: entry.end_ms === null,
             text: entry.text,
             words,
             translation: entry.translation,

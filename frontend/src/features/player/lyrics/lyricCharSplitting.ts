@@ -1,8 +1,10 @@
 import type { LyricsWord } from '@/types';
+import { tightHandoffLeadMs } from '@/features/player/lyrics/constants';
 
-const targetHandoffLeadMs = 600;
+// 行尾最多压缩 400ms，且不早于下一行起点前 1050ms。
+const maxHandoffCutMs = 400;
 const tailMinDurationRatio = 0.5;
-const tailMaxWindowMs = 700;
+const tailMaxWindowMs = 1000;
 const tailMaxChars = 8;
 const tailMinUsefulCutMs = 50;
 
@@ -161,7 +163,7 @@ function getTightHandoffCompressionPlan(
     // 重叠演唱不是换行交接，不能为了另一声部的起点压缩当前长音。
     if (nextLineStartMs < lineEndMs) return null;
 
-    const requiredCutMs = lineEndMs - (nextLineStartMs - targetHandoffLeadMs);
+    const requiredCutMs = Math.min(maxHandoffCutMs, lineEndMs - (nextLineStartMs - tightHandoffLeadMs));
     if (requiredCutMs <= 0) return null;
 
     const tailIndices = getTightHandoffTailIndices(chars, lineEndMs, requiredCutMs);

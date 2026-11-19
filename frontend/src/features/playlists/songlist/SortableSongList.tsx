@@ -1,4 +1,5 @@
 import { useState, useEffect, memo, useMemo, useRef } from 'react';
+import { SONG_LIST_DIVIDER_RIGHT, SONG_LIST_GRID_GAP, SONG_LIST_ROW_PADDING } from '@/features/playlists/songlist/songListLayout';
 import type { CSSProperties, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { MdAccessTime } from 'react-icons/md';
@@ -321,7 +322,7 @@ export default function SortableSongList({
                 formatDuration={formatDuration}
                 onSelect={(s: SongMetadata) => handleCheckboxClick(null, s, index)}
                 onAddToPlaylist={(song: SongMetadata) => useAddToPlaylistStore.getState().open(song)}
-                toggleFavorite={toggleFavorite}
+                toggleFavorite={(song) => { void toggleFavorite(song).catch(console.error); }}
                 isFav={isFav}
                 toggleSelection={toggleSelection}
                 onMenuOpen={() => {
@@ -335,7 +336,7 @@ export default function SortableSongList({
 
     return (
         <div ref={listRef} className="w-full relative select-none">
-            <div style={gridStyle} className="sticky top-10 z-45 grid gap-4 pt-2 pb-3 px-4 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl after:absolute after:bottom-0 after:left-14 after:right-4 after:border-b after:border-on-surface/10 after:pointer-events-none">
+            <div style={gridStyle} className={clsx("sticky top-10 z-45 grid pt-2 pb-3 text-[13px] text-on-surface-variant font-medium backdrop-blur-xl after:absolute after:bottom-0 after:left-12 after:border-b after:border-on-surface/10 after:pointer-events-none", SONG_LIST_GRID_GAP, SONG_LIST_ROW_PADDING, SONG_LIST_DIVIDER_RIGHT)}>
                 {/* Removed Index Header */}
                 <div></div>{/* Heart */}
                 {renderHeaderCell('标题')}
@@ -383,7 +384,7 @@ export default function SortableSongList({
                 </SortableContext>
 
                 {typeof document !== 'undefined' && createPortal(
-                    <DragOverlay adjustScale={true}>
+                    <DragOverlay adjustScale={true} className="pointer-events-none">
                         {activeId ? (() => {
                             const activeSong = songs.find((s, i) => getSongId(s, i) === activeId);
                             if (!activeSong) return null;
