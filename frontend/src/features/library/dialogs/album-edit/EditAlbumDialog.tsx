@@ -195,9 +195,9 @@ export default function EditAlbumDialog({ isOpen, album, onClose }: EditAlbumDia
             )}
             header={(
                 <>
-                    <div className="truncate text-[18px] leading-6 text-neutral-950 dark:text-neutral-50">{displayedAlbumName}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{displayedAlbumArtist}</div>
-                    <div className="truncate text-[15px] leading-6 text-neutral-500 dark:text-neutral-400">{album.songs.length} 首歌曲</div>
+                    <div className="truncate text-[18px] leading-6 text-on-surface">{displayedAlbumName}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{displayedAlbumArtist}</div>
+                    <div className="truncate text-[15px] leading-6 text-on-surface-variant">{album.songs.length} 首歌曲</div>
                 </>
             )}
             tabs={tabs}

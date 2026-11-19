@@ -13,7 +13,6 @@ export interface MetadataEditTab<T extends string> {
 interface MetadataEditDialogShellProps<T extends string> {
     isOpen: boolean;
     saving: boolean;
-    cancelFirst?: boolean;
     onClose: () => void;
     onSubmit: (event: React.FormEvent) => void;
     title: string;
@@ -33,7 +32,6 @@ interface MetadataEditDialogShellProps<T extends string> {
 export default function MetadataEditDialogShell<T extends string>({
     isOpen,
     saving,
-    cancelFirst = false,
     onClose,
     onSubmit,
     title,
@@ -50,28 +48,7 @@ export default function MetadataEditDialogShell<T extends string>({
     replacementView,
 }: MetadataEditDialogShellProps<T>) {
     const reducedMotion = useReducedMotion();
-    const button = 'rounded-lg border border-(--dialog-outline-color) px-4 py-2 text-sm disabled:opacity-40';
-    const confirmButton = (
-        <button
-            key="confirm"
-            type="submit"
-            disabled={saving}
-            className={`${button} bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary`}
-        >
-            {saving ? '保存中...' : '确定'}
-        </button>
-    );
-    const cancelButton = (
-        <button
-            key="cancel"
-            type="button"
-            onClick={onClose}
-            disabled={saving}
-            className={button}
-        >
-            取消
-        </button>
-    );
+    const button = 'rounded-lg border border-(--dialog-outline-color) px-4 py-2 text-sm font-medium transition-colors disabled:opacity-40';
     return (
         <Transition show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-9999" onClose={saving ? () => undefined : onClose}>
@@ -98,13 +75,13 @@ export default function MetadataEditDialogShell<T extends string>({
                                             type="button"
                                             onClick={onClose}
                                             disabled={saving}
-                                            className="absolute right-6 top-4 grid h-8 w-8 place-items-center text-neutral-900 transition-colors hover:text-[#ff2d46] disabled:opacity-50 dark:text-neutral-100"
+                                            className="absolute right-6 top-4 grid h-8 w-8 place-items-center text-on-surface transition-colors hover:text-[#ff2d46] disabled:opacity-50"
                                         >
                                             <MdClose className="text-2xl" />
                                         </button>
 
                                         <div className="flex items-start gap-3 pr-10">
-                                            <div className="h-19 w-19 shrink-0 overflow-hidden rounded-[5px] bg-neutral-100 shadow-sm ring-1 ring-black/5 dark:bg-neutral-800 dark:ring-white/10">
+                                            <div className="h-19 w-19 shrink-0 overflow-hidden rounded-[5px] bg-on-surface/5 shadow-sm border border-(--dialog-outline-color)">
                                                 {cover}
                                             </div>
                                             <div className="min-w-0 pt-1">{header}</div>
@@ -118,8 +95,8 @@ export default function MetadataEditDialogShell<T extends string>({
                                                         type="button"
                                                         onClick={() => onTabChange(tab.id)}
                                                         className={`relative whitespace-nowrap pb-4 transition-colors ${activeTab === tab.id
-                                                            ? 'text-neutral-950 dark:text-neutral-50'
-                                                            : 'text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-white'
+                                                            ? 'text-on-surface'
+                                                            : 'text-on-surface-variant hover:text-on-surface'
                                                             }`}
                                                     >
                                                         {tab.label}
@@ -144,7 +121,21 @@ export default function MetadataEditDialogShell<T extends string>({
                                     <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 px-6 pb-4 pt-3">
                                         <div>{footerStart}</div>
                                         <div className="flex gap-2">
-                                            {cancelFirst ? [cancelButton, confirmButton] : [confirmButton, cancelButton]}
+                                            <button
+                                                type="button"
+                                                onClick={onClose}
+                                                disabled={saving}
+                                                className={`${button} text-on-surface-variant hover:bg-on-surface/5 hover:text-on-surface`}
+                                            >
+                                                取消
+                                            </button>
+                                            <button
+                                                type="submit"
+                                                disabled={saving}
+                                                className={`${button} border-transparent bg-primary base-theme:dark:bg-primary-container base-theme:dark:text-on-primary-container text-on-primary hover:bg-primary/90 base-theme:dark:hover:bg-primary-container/80`}
+                                            >
+                                                {saving ? '保存中...' : '完成'}
+                                            </button>
                                         </div>
                                     </div>
                                 </motion.form>

@@ -90,9 +90,9 @@ export default function ArtworkEditor({
 
     return (
         <div className="flex h-full min-h-0 flex-col items-center justify-center">
-            <div className={actionsContainer !== undefined ? "aspect-square h-[90%] max-h-[460px] max-w-full" : "w-[min(430px,100%)]"}>
+            <div className={actionsContainer !== undefined ? "aspect-square h-[90%] max-h-115 max-w-full" : "w-[min(430px,100%)]"}>
                 <div
-                    className="relative aspect-square max-h-full overflow-hidden rounded-lg border border-(--dialog-outline-color) bg-neutral-100 shadow-sm dark:bg-neutral-800"
+                    className="relative aspect-square max-h-full overflow-hidden rounded-lg border border-(--dialog-outline-color) bg-on-surface/5 shadow-sm"
                     onContextMenu={(event) => {
                         event.preventDefault();
                         if (hasCustomArtwork) {

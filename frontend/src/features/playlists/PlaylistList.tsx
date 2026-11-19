@@ -12,7 +12,6 @@ import { useLibraryStore } from '@/store/useLibraryStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog';
-import CreatePlaylistDialog from '@/features/playlists/dialogs/CreatePlaylistDialog';
 import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
 import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
 import SortMenu from '@/components/common/SortMenu';
@@ -43,8 +42,15 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
         }
         return 'recently_added';
     });
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [editPlaylist, setEditPlaylist] = useState<Playlist | null>(null);
+    const [playlistDialog, setPlaylistDialog] = useState<{
+        isOpen: boolean;
+        mode: 'create' | 'edit';
+        playlist: Playlist | null;
+    }>({
+        isOpen: false,
+        mode: 'create',
+        playlist: null,
+    });
     const [contextMenu, setContextMenu] = useState<{ x: number; y: number; playlist: Playlist } | null>(null);
     const [favoritesContextMenu, setFavoritesContextMenu] = useState<{ x: number; y: number } | null>(null);
 
@@ -317,36 +323,37 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
     };
 
     const handleUpdatePlaylist = async (name: string, description: string | undefined, coverPath: string | undefined) => {
-        if (!editPlaylist) return;
-        await libraryService.updatePlaylistInfo(editPlaylist.id, name, description);
-        if (coverPath !== editPlaylist.cover_path) {
-            await libraryService.updatePlaylistCover(editPlaylist.id, coverPath || "");
-            updateRecentItemCover(`playlist:${editPlaylist.id}`, coverPath || null);
+        const target = playlistDialog.playlist;
+        if (!target) return;
+        await libraryService.updatePlaylistInfo(target.id, name, description);
+        if (coverPath !== target.cover_path) {
+            await libraryService.updatePlaylistCover(target.id, coverPath || "");
+            updateRecentItemCover(`playlist:${target.id}`, coverPath || null);
         }
         triggerLibraryUpdate();
-        setEditPlaylist(null);
     };
 
     return (
         <PageContainer
             title="播放列表"
-            actions={<PlaylistListActions setIsCreateOpen={setIsCreateOpen} />}
+            actions={
+                <PlaylistListActions
+                    setIsCreateOpen={(open) => {
+                        if (open) setPlaylistDialog({ isOpen: true, mode: 'create', playlist: null });
+                    }}
+                />
+            }
         >
             {/* confirm dialog removed, handled by useSongOperations globally */}
 
-            <CreatePlaylistDialog
-                isOpen={isCreateOpen}
-                onClose={() => setIsCreateOpen(false)}
-                onConfirm={handleCreate}
-            />
-
             <EditPlaylistDialog
-                isOpen={!!editPlaylist}
-                onClose={() => setEditPlaylist(null)}
-                onConfirm={handleUpdatePlaylist}
-                initialName={editPlaylist?.name || ''}
-                initialDescription={editPlaylist?.description || ''}
-                initialCover={editPlaylist?.cover_path || undefined}
+                mode={playlistDialog.mode}
+                isOpen={playlistDialog.isOpen}
+                onClose={() => setPlaylistDialog((prev) => ({ ...prev, isOpen: false }))}
+                onConfirm={playlistDialog.mode === 'create' ? handleCreate : handleUpdatePlaylist}
+                initialName={playlistDialog.playlist?.name || ''}
+                initialDescription={playlistDialog.playlist?.description || ''}
+                initialCover={playlistDialog.playlist?.cover_path || undefined}
             />
 
             {/* Toolbar */}
@@ -388,7 +395,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
                 handleAddFavoritesToQueue={() => { void handleAddFavoritesToQueue().catch(console.error); }}
                 handlePlayPlaylist={handlePlayPlaylist}
                 handleAddToQueue={handleAddToQueue}
-                setEditPlaylist={(pl) => setEditPlaylist(pl)}
+                setEditPlaylist={(pl) => setPlaylistDialog({ isOpen: true, mode: 'edit', playlist: pl })}
                 setContextMenu={setContextMenu}
                 setFavoritesContextMenu={setFavoritesContextMenu}
                 playlistCoverPaths={playlistCoverPaths}
@@ -402,7 +409,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
                     item={contextMenu.playlist}
                     context="playlist_list"
                     onClose={() => setContextMenu(null)}
-                    onEdit={() => setEditPlaylist(contextMenu.playlist)}
+                    onEdit={() => setPlaylistDialog({ isOpen: true, mode: 'edit', playlist: contextMenu.playlist })}
                     onShuffle={() => { void handlePlayPlaylist(contextMenu.playlist, true).catch(console.error); }}
                 />
             )}

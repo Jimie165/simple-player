@@ -85,7 +85,6 @@ export default function AlbumGridView({ albums, onPlayAlbum, onShuffleAlbum, onO
             onDeleteAlbum(albumToDelete);
         }
         setConfirmOpen(false);
-        setAlbumToDelete(null);
     };
 
     // Helper key for selection (Album Name + Artist as specific ID)

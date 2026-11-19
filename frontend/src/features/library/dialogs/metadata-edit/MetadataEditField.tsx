@@ -3,7 +3,7 @@ import { MdUndo } from 'react-icons/md';
 import clsx from 'clsx';
 import CustomTooltip from '@/components/common/CustomTooltip';
 
-const textInputClass = 'w-full bg-transparent px-0 pb-2 text-[15px] text-neutral-950 outline-none placeholder:text-neutral-400 dark:text-neutral-50 dark:placeholder:text-neutral-500';
+const textInputClass = 'w-full bg-transparent px-0 pb-2 text-[15px] text-on-surface outline-none placeholder:text-on-surface-variant/60';
 
 interface MetadataEditFieldProps {
     label: string;
@@ -32,7 +32,7 @@ export function MetadataEditField({
 }: MetadataEditFieldProps) {
     return (
         <label className={compact ? 'block' : 'block border-b border-(--dialog-divider-color) py-3'}>
-            <span className="mb-1 block text-[13px] text-neutral-500 dark:text-neutral-400">{label}</span>
+            <span className="mb-1 block text-[13px] text-on-surface-variant">{label}</span>
             <div className="relative">
                 <input
                     aria-label={label}
@@ -53,7 +53,7 @@ export function MetadataEditField({
                             type="button"
                             aria-label={`恢复${label}`}
                             onClick={onRestore}
-                            className="grid h-8 w-10 place-items-center rounded-md border border-(--dialog-outline-color) bg-white text-neutral-700 shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 dark:bg-neutral-900 dark:text-neutral-200 dark:hover:border-primary dark:hover:text-primary base-theme:bg-surface base-theme:text-primary base-theme:hover:bg-primary-container"
+                            className="grid h-8 w-10 place-items-center rounded-md border border-(--dialog-outline-color) bg-on-surface/5 text-on-surface-variant shadow-sm transition-colors hover:border-primary hover:text-primary active:scale-95 base-theme:bg-surface base-theme:text-primary base-theme:hover:bg-primary-container"
                         >
                             <MdUndo className="text-xl" />
                         </button>
@@ -74,5 +74,5 @@ export function MetadataEditFieldPair({ children }: { children: React.ReactNode 
 }
 
 export function MetadataEditFieldSeparator() {
-    return <span className="pb-2 text-[15px] text-neutral-500 dark:text-neutral-400">/</span>;
+    return <span className="pb-2 text-[15px] text-on-surface-variant">/</span>;
 }
