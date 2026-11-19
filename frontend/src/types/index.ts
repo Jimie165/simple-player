@@ -151,6 +151,8 @@ export interface RecentItem {
     artist?: string;
     album?: string;
     isLibraryItem?: boolean;
+    /** 临时播放列表和艺人保留原始曲目顺序，用于回放。 */
+    songs?: SongMetadata[];
 }
 
 // 播放模式

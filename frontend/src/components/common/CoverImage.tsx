@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useContext } from 'react';
-import { MdMusicNote, MdVideocam } from 'react-icons/md';
+import { MdMusicNote, MdPerson, MdVideocam } from 'react-icons/md';
 import clsx from 'clsx';
 import { getCoverThumbnailPath, resolveCover, resolveMediaPath } from '@/utils/mediaPath';
 import type { CoverThumbnailSize } from '@/utils/mediaPath';
@@ -24,6 +24,8 @@ interface CoverImageProps {
     iconClassName?: string;
     thumbnail?: CoverThumbnailSize | false;
     fallbackToSongCover?: boolean;
+    fallback?: 'media' | 'artist';
+    onImageLoad?: (image: HTMLImageElement) => void;
 }
 
 export default function CoverImage({
@@ -33,6 +35,8 @@ export default function CoverImage({
     iconClassName,
     thumbnail = 512,
     fallbackToSongCover = true,
+    fallback = 'media',
+    onImageLoad,
 }: CoverImageProps) {
     const [imageSrc, setImageSrc] = useState<string | null>(null);
     const [fallbackSrc, setFallbackSrc] = useState<string | null>(null);
@@ -97,14 +101,19 @@ export default function CoverImage({
     }, [song, src, libraryVersion, thumbnail, fallbackToSongCover]);
 
     if (imageSrc) {
+        const currentPath = src || (fallbackToSongCover ? song?.cover_path : null);
         return (
             <img
+                crossOrigin={onImageLoad && !imageSrc.startsWith('blob:') && !imageSrc.startsWith('data:') ? 'anonymous' : undefined}
                 src={imageSrc}
                 className={clsx("w-full h-full object-cover", className)}
                 alt={song?.title || "Cover"}
                 loading="lazy"
                 decoding="async"
                 onLoad={event => {
+                    if (imageIdentity?.path === currentPath && imageIdentity?.version === libraryVersion) {
+                        onImageLoad?.(event.currentTarget);
+                    }
                     if (artworkBackgroundEnabled && imageIdentity) {
                         artworkCache?.prime(imageIdentity.path, imageIdentity.version, event.currentTarget);
                     }
@@ -123,6 +132,8 @@ export default function CoverImage({
         <div className={clsx("w-full h-full flex items-center justify-center text-neutral-400 bg-neutral-200 dark:bg-neutral-800", className)}>
             {isVideo(song) ? (
                 <MdVideocam className={clsx("w-1/2 h-1/2", iconClassName)} />
+            ) : fallback === 'artist' ? (
+                <MdPerson className={clsx("w-1/2 h-1/2", iconClassName)} />
             ) : (
                 <MdMusicNote className={clsx("w-1/2 h-1/2", iconClassName)} />
             )}

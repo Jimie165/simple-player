@@ -117,12 +117,18 @@ const safeStorage = createJSONStorage(() => ({
                 try {
                     const parsed: unknown = JSON.parse(value);
                     if (parsed && typeof parsed === 'object' && 'state' in parsed && parsed.state && typeof parsed.state === 'object' && 'recentHistory' in parsed.state && Array.isArray(parsed.state.recentHistory)) {
-                        parsed.state.recentHistory = parsed.state.recentHistory
-                            .map((item: unknown) => {
-                                if (item && typeof item === 'object') return { ...item, cover: null };
-                                return item;
-                            })
-                            .slice(0, 20);
+                        const recent = parsed.state.recentHistory.slice(0, 20);
+                        // 单个保存的队列可能比其他几条记录加起来还大，逐步减半直到写入成功。
+                        for (let count = recent.length; count > 0; count = Math.floor(count / 2)) {
+                            parsed.state.recentHistory = recent.slice(0, count);
+                            try {
+                                localStorage.setItem(name, JSON.stringify(parsed));
+                                return;
+                            } catch (retryError) {
+                                if (!(retryError instanceof DOMException) || retryError.name !== 'QuotaExceededError') throw retryError;
+                            }
+                        }
+                        parsed.state.recentHistory = [];
                     }
                     localStorage.setItem(name, JSON.stringify(parsed));
                 } catch (innerError) {
@@ -187,7 +193,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
             const { recentHistory } = get();
             if (recentHistory.length === 0) return;
 
-            const hasPlaylistItems = recentHistory.some((item) => item.type === 'playlist');
+            const hasPlaylistItems = recentHistory.some((item) => item.type === 'playlist' && !item.songs);
 
             // Fetch latest data safely
             const [allSongs, allVideos, playlists] = await Promise.all([
@@ -247,7 +253,7 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                 return item;
             }).filter((item) => {
                 if (item.type === 'playlist') {
-                    if (item.id === 'playlist:favorites') return true;
+                    if (item.songs || item.id === 'playlist:favorites') return true;
                     const rawId = item.id.replace('playlist:', '');
                     const playlistId = Number.parseInt(rawId, 10);
                     return Number.isInteger(playlistId) && playlistIds.has(playlistId);
@@ -266,14 +272,21 @@ export const useLibraryStore = create<LibraryState>()(persist((set, get) => ({
                 return true;
             });
 
-            set({ recentHistory: newRecent });
+            const refreshed = new Map(newRecent.map((item) => [item.id, item]));
+            set((state) => ({
+                recentHistory: state.recentHistory.flatMap((item) => {
+                    // 保留刷新数据期间新增或重新播放的记录。
+                    if (!recentHistory.includes(item)) return [item];
+                    const updated = refreshed.get(item.id);
+                    return updated ? [updated] : [];
+                }),
+            }));
         } catch (e) {
             console.error('Failed to refresh recent history', e);
         }
     },
 
     addToRecent: (item) => set((state) => {
-        if (item.type === 'artist') return state;
         const safeItem = sanitizeRecentItem(item);
         // 使用 id 去重而不是 path；专辑按 album:name 唯一标识。
         const filtered = state.recentHistory.filter(i => {

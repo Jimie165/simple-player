@@ -26,7 +26,7 @@ import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh
 
 import { libraryService } from '@/services/libraryService';
 import { useLibraryStore } from '@/store/useLibraryStore';
-import type { RecentItem, SongMetadata, Playlist } from '@/types';
+import type { SongMetadata, Playlist } from '@/types';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 
 interface PlaylistDetailProps {
@@ -153,29 +153,12 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
     }, [dataVersion, isVisible, loadData]);
 
     // Actions
-    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
-        id: song.path || '',
-        type: 'file',
-        title: song.title,
-        description: song.artist,
-        cover: null,
-        cover_path: song.cover_path || null,
-        path: song.path || '',
-        lastPlayed: Date.now(),
-        artist: song.artist,
-        album: song.album,
-        isLibraryItem: true
-    });
-
     const handlePlaySong = async (song: SongMetadata, index: number, options?: { restartIfCurrent?: boolean }) => {
         await playSong({
             song,
             index,
             playlist: filteredSongs,
-            options: {
-                ...options,
-                buildRecentItem: buildRecentForSong
-            },
+            options,
             context: {
                 type: 'playlist_detail',
                 name: displayName,
@@ -189,10 +172,6 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
             await playList({
                 songs: filteredSongs,
                 startIndex: 0,
-                options: {
-                    restartIfCurrent: true,
-                    buildRecentItem: buildRecentForSong
-                },
                 context: {
                     type: 'playlist_detail',
                     name: displayName,
@@ -210,9 +189,6 @@ export default function PlaylistDetail({ id, name: initialName, transitionSource
         if (filteredSongs.length > 0) {
             await shufflePlay({
                 songs: filteredSongs,
-                options: {
-                    buildRecentItem: buildRecentForSong
-                },
                 context: {
                     type: 'playlist_detail',
                     name: displayName,

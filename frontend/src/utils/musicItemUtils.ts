@@ -42,6 +42,26 @@ export function getAlbumMusicItemId(name: string, artist?: string): string {
         : `album:${albumName}`;
 }
 
+export function albumRecentItem(
+    name: string,
+    artist: string,
+    songs: SongMetadata[],
+    coverPath?: string | null,
+): RecentItem {
+    return {
+        id: getAlbumMusicItemId(name, artist),
+        type: 'album',
+        title: name,
+        artist,
+        description: `${songs.length} 首歌曲`,
+        cover: null,
+        cover_path: coverPath ?? songs[0]?.cover_path ?? null,
+        path: songs[0]?.path ?? '',
+        lastPlayed: Date.now(),
+        isLibraryItem: true,
+    };
+}
+
 /**
  * 标准化 MusicItem 以获取 ID 和类型。
  * 兼容 SongMetadata, RecentItem 以及 selectionStore 中的混合对象。
@@ -137,6 +157,10 @@ export async function resolveSongsFromItems(items: unknown[]): Promise<SongMetad
 
         try {
             if (type === 'playlist') {
+                if (Array.isArray(item.songs)) {
+                    songs.push(...item.songs as SongMetadata[]);
+                    continue;
+                }
                 const idStr = asString(item.id);
                 // 处理 "playlist:123" 或 "123"
                 const cleanId = idStr.replace('playlist:', '');

@@ -12,6 +12,7 @@ import type { RecentItem, SongMetadata } from '@/types';
 import SmartMusicContextMenu from '@/components/common/SmartMusicContextMenu';
 import SmartCursorContextMenu from '@/components/common/SmartCursorContextMenu';
 import CoverImage from '@/components/common/CoverImage';
+import ArtistPortrait from '@/components/common/ArtistPortrait';
 import PlaylistCoverCollage from '@/components/common/PlaylistCoverCollage';
 
 import CardPlayButton from '@/components/common/CardPlayButton';
@@ -170,6 +171,8 @@ export default function MusicGrid() {
                                                     <MdVideocam className="text-6xl text-neutral-600" />
                                                 </div>
                                             )
+                                        ) : item.type === 'artist' ? (
+                                            <ArtistPortrait src={item.cover_path} />
                                         ) : item.type === 'playlist' ? (
                                             item.id === 'playlist:favorites' ? (
                                                 <div className="w-full h-full bg-linear-to-br from-red-500 to-pink-600 flex items-center justify-center">

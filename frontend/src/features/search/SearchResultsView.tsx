@@ -9,6 +9,8 @@ import ArtistGridView, { type ArtistData } from '@/features/library/components/A
 import AlbumGridView, { type AlbumData } from '@/features/library/components/AlbumGridView';
 import { MdSearch } from 'react-icons/md';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
+import { albumRecentItem } from '@/utils/musicItemUtils';
+import { artistRecentItem } from '@/utils/recentCollections';
 import { useNavigationStore } from '@/store/useNavigationStore';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
@@ -33,7 +35,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
     const [error, setError] = useState<string | null>(null);
 
     // Player controls
-    const { pausePlayback, playSong } = usePlaybackActions();
+    const { pausePlayback, playSong, playList } = usePlaybackActions();
     const { push } = useNavigationStore();
     const setVideoMode = usePlayerStore(s => s.setVideoMode);
     const setVideoMetadata = usePlayerStore(s => s.setVideoMetadata);
@@ -190,20 +192,7 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
             song,
             index,
             playlist: matchingSongs, // Use only matched songs playlist
-            options: {
-                ...options,
-                recentItem: {
-                    id: song.path || '',
-                    type: 'file',
-                    title: song.title,
-                    description: song.artist,
-                    cover: null,
-                    cover_path: song.cover_path || null,
-                    path: song.path || '',
-                    lastPlayed: Date.now(),
-                    artist: song.artist
-                }
-            }
+            options
         });
     };
 
@@ -236,7 +225,11 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 onPlayArtist={(artist) => {
                                     if (artist.songs.length > 0) {
                                         // Reuse logic or import util? Just basic play for now
-                                        void (playSong({ song: artist.songs[0], index: 0, playlist: artist.songs, options: { restartIfCurrent: true } })).catch(console.error);
+                                        void (playList({
+                                            songs: artist.songs,
+                                            options: { recentItem: artistRecentItem(artist.name, artist.songs, artist.cover) },
+                                            context: { type: 'artist_detail', name: artist.name, id: artist.name }
+                                        })).catch(console.error);
                                     }
                                 }}
                                 onOpenArtist={(artist) => push({ type: 'artist_detail', data: artist })}
@@ -259,7 +252,11 @@ export default function SearchResultsView({ query }: SearchResultsViewProps) {
                                 hideYear={true}
                                 onPlayAlbum={(album) => {
                                     if (album.songs.length > 0) {
-                                        void (playSong({ song: album.songs[0], index: 0, playlist: album.songs, options: { restartIfCurrent: true } })).catch(console.error);
+                                        void (playList({
+                                            songs: album.songs,
+                                            options: { recentItem: albumRecentItem(album.name, album.artist, album.songs, album.cover_path) },
+                                            context: { type: 'album_detail', name: album.name, id: album.name }
+                                        })).catch(console.error);
                                     }
                                 }}
                                 onOpenAlbum={(album) => push({ type: 'album_detail', data: album })}

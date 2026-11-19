@@ -9,7 +9,7 @@ import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { usePlayerStore } from '@/store/usePlayerStore';
 import { useLibraryStore } from '@/store/useLibraryStore';
 import { useSelectionStore } from '@/store/useSelectionStore';
-import { loadPlaylistSongsInSavedOrder } from '@/utils/musicItemUtils';
+import { resolveSongsFromItems } from '@/utils/musicItemUtils';
 import { formatTime } from '@/utils/time';
 import { getSelectedPath } from '@/utils/dialogSelection';
 import { songMatchesAlbum } from '@/features/library/utils/grouping';
@@ -244,22 +244,11 @@ export function useRecentPlayback() {
             } catch (err) {
                 console.error("Failed to play recent album", err);
             }
-        } else if (item.type === 'playlist') {
+        } else if (item.type === 'playlist' || item.type === 'artist') {
             try {
-                const plIdStr = item.id.replace('playlist:', '');
-                let songs: SongMetadata[] = [];
-
-                if (plIdStr === 'favorites') {
-                    songs = await loadPlaylistSongsInSavedOrder('favorites');
-                } else {
-                    const plId = parseInt(plIdStr);
-                    if (!isNaN(plId)) {
-                        songs = await loadPlaylistSongsInSavedOrder(plId);
-                    }
-                }
-                await playListHelper(songs);
+                await playListHelper(await resolveSongsFromItems([item]));
             } catch (err) {
-                console.error("Failed to play recent playlist", err);
+                console.error("Failed to play recent collection", err);
             }
         } else if (item.type === 'video') {
             try {

@@ -8,14 +8,14 @@ import ArtistDetailView from '@/features/library/components/ArtistDetailView';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 import type { SongMetadata } from '@/types';
-import type { RecentItem } from '@/types';
 import { useSelectionStore } from '@/store/useSelectionStore';
 import { usePlaybackActions } from '@/hooks/playback/usePlaybackActions';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { AnimatePresence } from 'framer-motion';
 import ScrollArea from '@/components/common/ScrollArea';
 import { buildAlbums, getAlbumDisplayArtist, songMatchesAlbum } from '@/features/library/utils/grouping';
-import { getAlbumMusicItemId } from '@/utils/musicItemUtils';
+import { albumRecentItem } from '@/utils/musicItemUtils';
+import { artistRecentItem } from '@/utils/recentCollections';
 import { useContentArtworkTheme } from '@/hooks/useContentArtworkTheme';
 import ArtworkThemeLayer from '@/components/layout/ArtworkThemeLayer';
 import { getDetailMotion, pageMotion } from '@/utils/viewTransition';
@@ -36,8 +36,10 @@ function GlobalDetailStack() {
     const coverTransition = useNavigationStore(state => state.coverTransition);
     const moreTransitionsEnabled = useThemeStore(state => state.moreTransitionsEnabled);
     const push = useNavigationStore(state => state.push);
-    const addToRecent = useLibraryStore(state => state.addToRecent);
-    const { playSong, shufflePlay } = usePlaybackActions();
+    const { playSong, playList, shufflePlay } = usePlaybackActions();
+    const playCollection: OverlayProps['onPlayCollection'] = (params, shuffle = false) => {
+        void (shuffle ? shufflePlay : playList)(params).catch(console.error);
+    };
     const [settledOverlayDepth, setSettledOverlayDepth] = useState(overlayStack.length);
 
     const transitionDirection: OverlayTransitionDirection = overlayStack.length > settledOverlayDepth
@@ -52,30 +54,14 @@ function GlobalDetailStack() {
     const firstVisibleOverlayIndex = Math.max(0, overlayStack.length - visibleOverlayCount);
     const visibleOverlays = overlayStack.slice(firstVisibleOverlayIndex);
 
-    // Helper: Play Song Logic
-    const buildRecentForSong = (song: SongMetadata): RecentItem => ({
-        id: song.path || '',
-        type: 'file',
-        title: song.title,
-        description: song.artist,
-        cover: null,
-        cover_path: song.cover_path || null,
-        path: song.path || '',
-        lastPlayed: Date.now(),
-        isLibraryItem: true,
-        artist: song.artist
-    });
-
-    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], addToHistory = true, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => {
+    const handlePlaySong = async (song: SongMetadata, index: number, scopeSongs: SongMetadata[] = [], options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => {
         await playSong({
             song,
             index,
             playlist: scopeSongs,
             options: {
                 ...options,
-                disableShuffle: true,
-                addToRecent: addToHistory,
-                recentItem: addToHistory ? buildRecentForSong(song) : undefined
+                disableShuffle: true
             },
             context
         });
@@ -169,9 +155,8 @@ function GlobalDetailStack() {
                                                 <AlbumOverlay
                                                     data={activeView.data as AlbumData}
                                                     transitionSource={activeView.transitionSource}
-                                                    onPlaySong={(song, index, scopeSongs, addToHistory, options, context) => { void handlePlaySong(song, index, scopeSongs, addToHistory, options, context).catch(console.error); }}
-                                                    onShuffle={(params) => { void shufflePlay(params).catch(console.error); }}
-                                                    addToRecent={addToRecent}
+                                                    onPlaySong={(song, index, scopeSongs, options, context) => { void handlePlaySong(song, index, scopeSongs, options, context).catch(console.error); }}
+                                                    onPlayCollection={playCollection}
                                                     onOpenArtistByName={(artistName) => { void handleOpenArtistByName(artistName).catch(console.error); }}
                                                 />
                                             );
@@ -181,9 +166,8 @@ function GlobalDetailStack() {
                                                     initialTab={activeView.tab}
                                                     data={activeView.data as ArtistData}
                                                     transitionSource={activeView.transitionSource}
-                                                    onPlaySong={(song, index, scopeSongs, addToHistory, options, context) => { void handlePlaySong(song, index, scopeSongs, addToHistory, options, context).catch(console.error); }}
-                                                    onShuffle={(params) => { void shufflePlay(params).catch(console.error); }}
-                                                    addToRecent={addToRecent}
+                                                    onPlaySong={(song, index, scopeSongs, options, context) => { void handlePlaySong(song, index, scopeSongs, options, context).catch(console.error); }}
+                                                    onPlayCollection={playCollection}
                                                     push={push}
                                                     onOpenArtistByName={(artistName) => { void handleOpenArtistByName(artistName).catch(console.error); }}
                                                 />
@@ -209,14 +193,13 @@ interface OverlayProps {
     initialTab?: string;
     transitionSource?: CoverTransitionSource;
     data: AlbumData | ArtistData;
-    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], addToHistory?: boolean, options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
-    onShuffle: (params: { songs: SongMetadata[], context?: { type: string, name: string, id?: string } }) => void;
-    addToRecent: (item: RecentItem) => void;
+    onPlaySong: (song: SongMetadata, index: number, scopeSongs: SongMetadata[], options?: { restartIfCurrent?: boolean, disableShuffle?: boolean }, context?: { type: string, name: string, id?: string }) => void;
+    onPlayCollection: (params: Parameters<ReturnType<typeof usePlaybackActions>['playList']>[0], shuffle?: boolean) => void;
     push?: (view: { type: 'album_detail'; data: AlbumData; transitionSource?: CoverTransitionSource }) => void;
     onOpenArtistByName: (name: string) => void;
 }
 
-function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuffle, addToRecent, onOpenArtistByName }: OverlayProps) {
+function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onPlayCollection, onOpenArtistByName }: OverlayProps) {
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const pop = useNavigationStore(state => state.pop);
     const resolvedSongIdsRef = useRef<Set<number> | null>(null);
@@ -270,33 +253,23 @@ function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuff
         void (fetchAlbumSongs()).catch(console.error);
     }, [albumInitialData, libraryVersion]);
 
+    const playAlbum = (shuffle: boolean) => {
+        const songs = albumData.songs || [];
+        if (songs.length === 0) return;
+        onPlayCollection({
+            songs,
+            options: { recentItem: albumRecentItem(albumData.name, albumData.artist, songs, albumData.cover_path) },
+            context: { type: 'album_detail', name: albumData.name, id: albumData.name }
+        }, shuffle);
+    };
+
     return (
         <AlbumDetailView
             transitionSource={transitionSource}
             album={{ ...albumData, songs: albumData.songs || [] }} // Ensure songs is never undefined
-            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], true, { ...options, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name })}
-            onPlayAll={() => {
-                const songs = albumData.songs || [];
-                addToRecent({
-                    id: getAlbumMusicItemId(albumData.name, albumData.artist),
-                    type: 'album',
-                    title: albumData.name,
-                    artist: albumData.artist,
-                    description: `${songs.length} 首歌曲`,
-                    cover: null,
-                    cover_path: albumData.cover_path || null,
-                    path: songs[0]?.path || '',
-                    lastPlayed: Date.now(),
-                    isLibraryItem: true
-                });
-                if (songs.length > 0) onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name });
-            }}
-            onShuffle={() => {
-                const songs = albumData.songs || [];
-                if (songs.length > 0) {
-                    onShuffle({ songs, context: { type: 'album_detail', name: albumData.name, id: albumData.name } });
-                }
-            }}
+            onPlay={(song, idx, options) => onPlaySong(song, idx, albumData.songs || [], { ...options, disableShuffle: true }, { type: 'album_detail', name: albumData.name, id: albumData.name })}
+            onPlayAll={() => playAlbum(false)}
+            onShuffle={() => playAlbum(true)}
             onOpenAlbumByName={() => { }}
             onOpenArtistByName={onOpenArtistByName}
             onAlbumDeleted={pop}
@@ -304,7 +277,7 @@ function AlbumOverlay({ data: initialData, transitionSource, onPlaySong, onShuff
     );
 }
 
-function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlaySong, onShuffle, addToRecent, push, onOpenArtistByName }: OverlayProps) {
+function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlaySong, onPlayCollection, push, onOpenArtistByName }: OverlayProps) {
     const libraryVersion = useLibraryStore(state => state.libraryVersion);
     const artistInitialData = useMemo<ArtistData>(() => {
         const data = initialData as Partial<ArtistData>;
@@ -358,21 +331,11 @@ function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlay
     const handlePlayAlbum = (album: AlbumData) => {
         const songs = album.songs || [];
         if (songs.length === 0) return;
-
-        addToRecent({
-            id: getAlbumMusicItemId(album.name, album.artist),
-            type: 'album',
-            title: album.name,
-            artist: album.artist,
-            description: `${songs.length} 首歌曲`,
-            cover: null,
-            cover_path: album.cover_path || null,
-            path: songs[0]?.path || '',
-            lastPlayed: Date.now(),
-            isLibraryItem: true
+        onPlayCollection({
+            songs,
+            options: { recentItem: albumRecentItem(album.name, album.artist, songs, album.cover_path) },
+            context: { type: 'album_detail', name: album.name, id: album.name }
         });
-
-        onPlaySong(songs[0], 0, songs, false, { restartIfCurrent: true }, { type: 'album_detail', name: album.name, id: album.name });
     };
 
     const sortedSongs = useMemo(() => {
@@ -387,12 +350,16 @@ function ArtistOverlay({ data: initialData, transitionSource, initialTab, onPlay
             albums={artistAlbums}
             onShuffle={() => {
                 if (sortedSongs.length > 0) {
-                    onShuffle({ songs: sortedSongs, context: { type: 'artist_detail', name: artistData.name, id: artistData.name } });
+                    onPlayCollection({
+                        songs: sortedSongs,
+                        options: { recentItem: artistRecentItem(artistData.name, sortedSongs, artistData.cover) },
+                        context: { type: 'artist_detail', name: artistData.name, id: artistData.name }
+                    }, true);
                 }
             }}
             onPlayAlbum={handlePlayAlbum}
             onOpenAlbum={handleOpenAlbum}
-            onPlaySong={(song, idx, options) => onPlaySong(song, idx, sortedSongs, true, { ...options, disableShuffle: true }, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
+            onPlaySong={(song, idx, options) => onPlaySong(song, idx, sortedSongs, { ...options, disableShuffle: true }, { type: 'artist_detail', name: artistData.name, id: artistData.name })}
             onOpenArtistByName={onOpenArtistByName}
             onOpenAlbumByName={() => { }}
         />

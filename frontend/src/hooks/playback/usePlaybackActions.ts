@@ -5,6 +5,7 @@ import { getManualNextIndexFn, getPreviousIndexFn, withoutQueueMetadata } from '
 import { audioService } from '@/services/audioService';
 import type { RecentItem, SongMetadata } from '@/types';
 import toast from 'react-hot-toast';
+import { playlistSnapshotItem } from '@/utils/recentCollections';
 import { handleMissingSong } from '@/hooks/playback/handleMissingSong';
 
 export interface PlayOptions {
@@ -12,7 +13,6 @@ export interface PlayOptions {
     addToRecent?: boolean;
     disableShuffle?: boolean;
     recentItem?: RecentItem;
-    buildRecentItem?: (song: SongMetadata) => RecentItem;
 }
 
 interface PlaySongParams {
@@ -35,6 +35,8 @@ interface ShufflePlayParams {
     songs: SongMetadata[];
     options?: PlayOptions;
     context?: { type: string, name: string, id?: string };
+    /** 只记录随机到的这一首，而不是整个列表。 */
+    recordSelectedSong?: boolean;
 }
 
 interface PlayQueueParams {
@@ -64,6 +66,22 @@ async function runPlaybackTransition(task: (transitionId: number) => Promise<voi
 }
 
 const isActiveTransition = (transitionId: number) => transitionId === playbackTransitionId;
+
+function recentSong(song: SongMetadata, path: string): RecentItem {
+    return {
+        id: path,
+        path,
+        type: 'file',
+        title: song.title,
+        description: song.artist,
+        cover: null,
+        cover_path: song.cover_path || null,
+        lastPlayed: Date.now(),
+        artist: song.artist,
+        album: song.album,
+        isLibraryItem: song.id !== undefined,
+    };
+}
 
 const isSameSong = (a: SongMetadata | null, b: SongMetadata) => {
     if (!a) return false;
@@ -378,13 +396,8 @@ export function usePlaybackActions() {
             setPlaybackSnapshot(snapshot, song);
 
 
-
-            // If just playing a song without playlist change, maybe we don't update context?
-            // Usually we do update playlist if context changes.
-
             if (options?.addToRecent !== false) {
-                const recentItem = options?.recentItem ?? options?.buildRecentItem?.(song);
-                if (recentItem) addToRecent(recentItem);
+                addToRecent(options?.recentItem ?? recentSong(song, song.path));
             }
         } catch (error) {
             if (!isActiveTransition(transitionId) || usePlayerStore.getState().playbackSessionId !== previousSessionId) return;
@@ -409,7 +422,7 @@ export function usePlaybackActions() {
         }, !isSameSong(usePlayerStore.getState().metadata, params.song));
     }, [playSongInternal]);
 
-    const shufflePlay = useCallback(async ({ songs, options, context }: ShufflePlayParams) => {
+    const shufflePlay = useCallback(async ({ songs, options, context, recordSelectedSong }: ShufflePlayParams) => {
         if (songs.length === 0) return;
         const randomIndex = Math.floor(Math.random() * songs.length);
         const song = songs[randomIndex];
@@ -425,15 +438,16 @@ export function usePlaybackActions() {
         toggleShuffleList(true);
         setShuffleState(true);
 
-        const recentItem = options?.recentItem ?? options?.buildRecentItem?.(song);
-
         await playSong({
             song,
             index: 0,
             options: {
                 ...options,
                 restartIfCurrent: true,
-                recentItem
+                recentItem: options?.recentItem
+                    ?? (recordSelectedSong || options?.addToRecent === false
+                        ? undefined
+                        : playlistSnapshotItem(songs, context)),
             },
             context
         });
@@ -463,8 +477,12 @@ export function usePlaybackActions() {
             index: startIndex,
             playlist: songs,
             options: {
+                restartIfCurrent: true,
                 ...options,
-                disableShuffle: !shuffle
+                disableShuffle: true,
+                recentItem: options?.addToRecent === false
+                    ? undefined
+                    : options?.recentItem ?? playlistSnapshotItem(songs, context),
             },
             context
         });
