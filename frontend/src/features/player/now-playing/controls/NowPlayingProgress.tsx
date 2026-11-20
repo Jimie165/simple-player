@@ -3,6 +3,7 @@ import { usePlayerStore } from '@/store/usePlayerStore';
 import type { SongMetadata } from '@/types';
 import { usePlaybackLoadingVisible } from '@/features/player/controls/usePlaybackLoadingVisible';
 import { formatTime } from '@/utils/time';
+import { NOW_PLAYING_SLIDER_SIZE } from '@/features/player/now-playing/controls/nowPlayingSliderSize';
 
 interface NowPlayingProgressProps {
     metadata: SongMetadata | null;
@@ -36,9 +37,7 @@ export default function NowPlayingProgress({
                 onChange={onChange}
                 onMouseDown={onMouseDown}
                 onMouseUp={onMouseUp}
-                trackHeightClass={isNarrow ? 'h-[6px]' : 'h-[clamp(4px,1vmin,8px)]'}
-                hoverHeightClass={isNarrow ? 'group-hover:h-[8px]' : 'group-hover:h-[clamp(7px,1.75vmin,14px)]'}
-                activeHeightClass={isNarrow ? 'group-active:h-[10px]' : 'group-active:h-[clamp(8px,2vmin,16px)]'}
+                {...NOW_PLAYING_SLIDER_SIZE}
             />
             <div className={isNarrow
                 ? 'flex justify-between text-[max(1.2vh,0.8rem)] font-medium text-white/50 select-none'
