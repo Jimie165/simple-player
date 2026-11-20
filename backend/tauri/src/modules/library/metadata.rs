@@ -1,9 +1,10 @@
 use crate::utils::path::normalize_db_path;
+use lofty::file::TaggedFile;
 use lofty::id3::v2::{
     Frame, Id3v2Tag, SyncTextContentType, SynchronizedTextFrame, TimestampFormat,
 };
 use lofty::prelude::*;
-use lofty::read_from_path;
+use lofty::probe::Probe;
 use lofty::tag::{ItemKey, TagType};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -54,6 +55,7 @@ pub struct SongMetadata {
     pub rating: Option<i32>,
     pub lyrics_text: Option<String>,
     pub lyrics_source_path: Option<String>,
+    #[serde(default)]
     pub lyrics_offset_ms: i32,
     pub unique_id: Option<i64>, // Playlist Entry ID
     // 媒体详细信息
@@ -161,10 +163,15 @@ fn extract_id3v2_lyrics(tag: &Id3v2Tag) -> Option<LyricsData> {
     fallback
 }
 
+fn read_tags(path: &Path) -> Result<TaggedFile, String> {
+    // Use the extension as a fallback when Lofty cannot identify the file from its contents.
+    Probe::open(path)
+        .and_then(|probe| probe.guess_file_type()?.read())
+        .map_err(|e| format!("Failed to read metadata: {}", e))
+}
+
 pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
-    let path_obj = Path::new(path);
-    let tagged_file =
-        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
+    let tagged_file = read_tags(Path::new(path))?;
 
     if let Some(tag) = tagged_file.tag(TagType::Id3v2) {
         let id3v2_tag: Id3v2Tag = tag.clone().into();
@@ -195,9 +202,7 @@ pub fn get_lyrics(path: &str) -> Result<LyricsData, String> {
 }
 
 pub fn get_raw_lyrics(path: &str) -> Result<Option<String>, String> {
-    let path_obj = Path::new(path);
-    let tagged_file =
-        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
+    let tagged_file = read_tags(Path::new(path))?;
 
     if let Some(tag) = tagged_file.tag(TagType::Id3v2) {
         let id3v2_tag: Id3v2Tag = tag.clone().into();
@@ -301,15 +306,15 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
     let size = std::fs::metadata(path_obj).map(|m| m.len()).ok();
 
     // 使用 lofty 读取文件标签
-    let tagged_file =
-        read_from_path(path_obj).map_err(|e| format!("Failed to read metadata: {}", e))?;
+    let tagged_file = read_tags(path_obj)?;
 
-    // 获取标签信息
+    // WAV can store text in RIFF INFO alongside or instead of its primary ID3v2 tag.
     let tag = tagged_file.primary_tag();
+    let riff_info = tagged_file.tag(TagType::RiffInfo);
+    let tags = || tag.into_iter().chain(riff_info);
 
-    let title = tag
-        .as_ref()
-        .and_then(|t| t.title().map(|s| s.to_string()))
+    let title = tags()
+        .find_map(|t| t.title().map(|s| s.into_owned()))
         .unwrap_or_else(|| {
             path_obj
                 .file_name()
@@ -318,14 +323,12 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
                 .to_string()
         });
 
-    let artist = tag
-        .as_ref()
-        .and_then(|t| t.artist().map(|s| s.to_string()))
+    let artist = tags()
+        .find_map(|t| t.artist().map(|s| s.into_owned()))
         .unwrap_or_else(|| "Unknown Artist".to_string());
 
-    let album = tag
-        .as_ref()
-        .and_then(|t| t.album().map(|s| s.to_string()))
+    let album = tags()
+        .find_map(|t| t.album().map(|s| s.into_owned()))
         .unwrap_or_else(|| "Unknown Album".to_string());
 
     // 扩展元数据
@@ -335,16 +338,13 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
             .map(|s| s.to_string())
     });
 
-    let year = tag
-        .as_ref()
-        .and_then(|t| t.date())
-        .map(|d| i32::from(d.year));
+    let year = tags().find_map(|t| t.date()).map(|d| i32::from(d.year));
 
-    let genre = tag.as_ref().and_then(|t| t.genre().map(|s| s.to_string()));
+    let genre = tags().find_map(|t| t.genre().map(|s| s.into_owned()));
 
-    let track_number = tag.as_ref().and_then(|t| t.track()).map(|n| n as i32);
+    let track_number = tags().find_map(|t| t.track()).map(|n| n as i32);
 
-    let track_total = tag.as_ref().and_then(|t| t.track_total()).map(|n| n as i32);
+    let track_total = tags().find_map(|t| t.track_total()).map(|n| n as i32);
 
     let disc_number = tag.as_ref().and_then(|t| t.disk()).map(|n| n as i32);
 
@@ -415,4 +415,73 @@ pub fn get_metadata(path: &str, app_cache_dir: Option<&Path>) -> Result<SongMeta
         frame_rate: None,
         channels,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_metadata;
+    use lofty::config::WriteOptions;
+    use lofty::prelude::{Accessor, TagExt};
+    use lofty::tag::{Tag, TagType};
+    use std::{fs, time::SystemTime};
+
+    #[test]
+    fn wav_metadata_uses_riff_info_for_fields_missing_from_id3() {
+        let path = std::env::temp_dir().join(format!(
+            "simple-player-riff-info-{}.wav",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            include_bytes!("../../../tests/fixtures/riff-info.wav"),
+        )
+        .unwrap();
+        let riff_only = get_metadata(path.to_str().unwrap(), None);
+
+        let mut id3 = Tag::new(TagType::Id3v2);
+        id3.set_artist("ID3 Artist".into());
+        id3.save_to_path(&path, WriteOptions::default()).unwrap();
+        let with_id3 = get_metadata(path.to_str().unwrap(), None);
+        fs::remove_file(path).unwrap();
+
+        let riff_only = riff_only.unwrap();
+        assert_eq!(riff_only.title, "Fixture Title");
+        assert_eq!(riff_only.artist, "Fixture Artist");
+        assert_eq!(riff_only.album, "Fixture Album");
+        assert_eq!(riff_only.genre.as_deref(), Some("Fixture Genre"));
+
+        let with_id3 = with_id3.unwrap();
+        assert_eq!(with_id3.artist, "ID3 Artist");
+        assert_eq!(with_id3.title, "Fixture Title");
+        assert_eq!(with_id3.album, "Fixture Album");
+    }
+
+    #[test]
+    fn reads_flac_tags_and_cover_from_file_named_m4a() {
+        let nonce = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory = std::env::temp_dir().join(format!(
+            "simple-player-metadata-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir(&directory).unwrap();
+        let path = directory.join("track.m4a");
+        fs::write(&path, include_bytes!("../../../tests/fixtures/tagged.flac")).unwrap();
+
+        let metadata = get_metadata(path.to_str().unwrap(), Some(&directory));
+        let cover_exists = metadata
+            .as_ref()
+            .ok()
+            .and_then(|metadata| metadata.cover_path.as_deref())
+            .is_some_and(|path| directory.join(path).is_file());
+        fs::remove_dir_all(&directory).unwrap();
+
+        let metadata = metadata.unwrap();
+        assert_eq!(metadata.artist, "Fixture Artist");
+        assert_eq!(metadata.album, "Fixture Album");
+        assert_eq!(metadata.duration, 1);
+        assert!(cover_exists);
+    }
 }
