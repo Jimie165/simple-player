@@ -2,13 +2,7 @@ import type { SongMetadata } from '@/types';
 import type { AlbumData } from '@/features/library/components/AlbumGridView';
 import type { ArtistData } from '@/features/library/components/ArtistGridView';
 
-const compareAlphaNum = (a: string, b: string) => {
-    const isAsciiA = /^[a-zA-Z]/.test(a);
-    const isAsciiB = /^[a-zA-Z]/.test(b);
-    if (isAsciiA && !isAsciiB) return -1;
-    if (!isAsciiA && isAsciiB) return 1;
-    return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-};
+import { compareNames } from '@/utils/textCompare';
 
 const UNKNOWN_ALBUM = 'Unknown Album';
 const UNKNOWN_ARTIST = 'Unknown Artist';
@@ -59,9 +53,9 @@ export function buildAlbums(librarySongs: SongMetadata[], albumSortKey: 'name' |
         };
     });
     if (albumSortKey === 'name') {
-        list.sort((a, b) => compareAlphaNum(a.name, b.name));
+        list.sort((a, b) => compareNames(a.name, b.name));
     } else {
-        list.sort((a, b) => compareAlphaNum(a.artist, b.artist));
+        list.sort((a, b) => compareNames(a.artist, b.artist));
     }
     return list;
 }
@@ -94,6 +88,6 @@ export function buildArtists(librarySongs: SongMetadata[]): ArtistData[] {
         artist.albumCount = artistAlbums.size;
     });
 
-    list.sort((a, b) => compareAlphaNum(a.name, b.name));
+    list.sort((a, b) => compareNames(a.name, b.name));
     return list;
 }

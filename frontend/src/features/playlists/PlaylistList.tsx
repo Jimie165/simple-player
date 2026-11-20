@@ -15,6 +15,7 @@ import EditPlaylistDialog from '@/features/playlists/dialogs/EditPlaylistDialog'
 import PlaylistListActions from '@/features/playlists/list/PlaylistListActions';
 import PlaylistSearchControl from '@/features/playlists/detail/PlaylistSearchControl';
 import SortMenu from '@/components/common/SortMenu';
+import { compareNames } from '@/utils/textCompare';
 import PlaylistCardsGrid from '@/features/playlists/list/PlaylistCardsGrid';
 import { runPlaylistDataRefresh } from '@/features/playlists/playlistDataRefresh';
 
@@ -141,7 +142,7 @@ export default function PlaylistList({ isVisible }: { isVisible: boolean }) {
         }
 
         list.sort((a, b) => {
-            if (sortKey === 'name') return a.name.localeCompare(b.name);
+            if (sortKey === 'name') return compareNames(a.name, b.name);
             if (sortKey === 'recently_played') {
                 // Sort by last_played_at descending, null values at the end
                 const aTime = new Date(a.last_played_at || '').getTime() || 0;
