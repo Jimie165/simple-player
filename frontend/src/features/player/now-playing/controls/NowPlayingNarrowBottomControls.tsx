@@ -5,6 +5,7 @@ import VolumeIcon from '@/components/common/VolumeIcon';
 import MusicSlider from '@/components/common/MusicSlider';
 import type { NowPlayingControlsSectionProps } from '@/features/player/now-playing/controls/NowPlayingControlTypes';
 import NowPlayingProgress from '@/features/player/now-playing/controls/NowPlayingProgress';
+import { NOW_PLAYING_SLIDER_SIZE } from '@/features/player/now-playing/controls/nowPlayingSliderSize';
 
 export function NowPlayingNarrowBottomControls({
     metadata,
@@ -97,9 +98,7 @@ export function NowPlayingNarrowBottomControls({
                     onChange={handleVolumeChange}
                     onMouseDown={handleVolumeSeekStart}
                     onMouseUp={handleVolumeSeekEnd}
-                    trackHeightClass="h-[6px]"
-                    hoverHeightClass="group-hover:h-[8px]"
-                    activeHeightClass="group-active:h-[10px]"
+                    {...NOW_PLAYING_SLIDER_SIZE}
                     className="flex-1"
                 />
                 <VolumeIcon className="text-white/50 text-sm" />

@@ -9,6 +9,7 @@ import OverflowMarquee from '@/components/common/OverflowMarquee';
 import type { NowPlayingControlsSectionProps } from '@/features/player/now-playing/controls/NowPlayingControlTypes';
 import { useNowPlayingNavigation } from '@/features/player/now-playing/controls/useNowPlayingNavigation';
 import NowPlayingProgress from '@/features/player/now-playing/controls/NowPlayingProgress';
+import { NOW_PLAYING_SLIDER_SIZE } from '@/features/player/now-playing/controls/nowPlayingSliderSize';
 
 export type { NowPlayingControlsSectionProps } from '@/features/player/now-playing/controls/NowPlayingControlTypes';
 export { NowPlayingNarrowHeader } from '@/features/player/now-playing/controls/NowPlayingNarrowHeader';
@@ -185,9 +186,7 @@ export default function NowPlayingControlsSection({
                     onChange={handleVolumeChange}
                     onMouseDown={handleVolumeSeekStart}
                     onMouseUp={handleVolumeSeekEnd}
-                    trackHeightClass="h-[clamp(3px,0.75vmin,6px)]"
-                    hoverHeightClass="group-hover:h-[clamp(5px,1.25vmin,10px)]"
-                    activeHeightClass="group-active:h-[clamp(6px,1.5vmin,12px)]"
+                    {...NOW_PLAYING_SLIDER_SIZE}
                     className="flex-1"
                 />
                 <VolumeIcon className="text-white/40 text-[max(0.875rem,calc(var(--np-control-base)*0.05))]" />

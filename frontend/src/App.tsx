@@ -375,7 +375,8 @@ function App() {
         mainContentWidth={mainContentWidth}
       />
       <Toaster
-        position="top-center"
+        position="bottom-center"
+        containerStyle={{ bottom: isFullScreen ? 16 : 96 }}
         toastOptions={{
           style: {
             background: 'var(--md-sys-color-surface-container-high)',

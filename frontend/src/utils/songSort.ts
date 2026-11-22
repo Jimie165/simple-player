@@ -1,4 +1,5 @@
 import type { SongMetadata } from '@/types';
+import { compareNames } from '@/utils/textCompare';
 
 export type SortKey = 'manual' | 'title' | 'artist' | 'album' | 'duration';
 export type SortOrder = 'asc' | 'desc';
@@ -24,15 +25,8 @@ export function sortSongs(songs: SongMetadata[], sortKey: SortKey, sortOrder: So
         if (valB === undefined || valB === null) valB = '';
 
         if (typeof valA === 'string' && typeof valB === 'string') {
-            const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
-            const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
-
-            if (isAsciiA && !isAsciiB) return sortOrder === 'asc' ? -1 : 1;
-            if (!isAsciiA && isAsciiB) return sortOrder === 'asc' ? 1 : -1;
-
-            return sortOrder === 'asc'
-                ? valA.localeCompare(valB, 'zh-CN', { numeric: true, sensitivity: 'base' })
-                : valB.localeCompare(valA, 'zh-CN', { numeric: true, sensitivity: 'base' });
+            const res = compareNames(valA, valB);
+            return sortOrder === 'asc' ? res : -res;
         }
 
         // Default fallback

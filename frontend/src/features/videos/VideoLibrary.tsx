@@ -21,6 +21,7 @@ import RestoreArchivedVideosDialog from '@/features/videos/dialogs/RestoreArchiv
 import { useVideoScanProgress } from '@/hooks/useVideoScanProgress';
 import { useScrollViewport } from '@/hooks/useScrollViewport';
 import { getSelectedPath } from '@/utils/dialogSelection';
+import { compareNames } from '@/utils/textCompare';
 
 export const VideoLibrary: React.FC = () => {
     const { scanning, progress } = useVideoScanProgress();
@@ -93,19 +94,7 @@ export const VideoLibrary: React.FC = () => {
         return [...videos].sort((a, b) => {
             let res = 0;
             if (sortBy === 'name') {
-                const valA = a.title;
-                const valB = b.title;
-                const isAsciiA = valA.length > 0 && valA.charCodeAt(0) <= 0x7F;
-                const isAsciiB = valB.length > 0 && valB.charCodeAt(0) <= 0x7F;
-
-                if (isAsciiA && !isAsciiB) {
-                    res = -1;
-                } else if (!isAsciiA && isAsciiB) {
-                    res = 1;
-                } else {
-                    res = valA.localeCompare(valB, 'zh-CN', { numeric: true, sensitivity: 'base' });
-                }
-
+                res = compareNames(a.title, b.title);
                 if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;
@@ -208,17 +197,7 @@ export const VideoLibrary: React.FC = () => {
             if (sortBy === 'name') {
                 const nameA = a.path.split(/[/\\]/).pop() || '';
                 const nameB = b.path.split(/[/\\]/).pop() || '';
-                const isAsciiA = nameA.length > 0 && nameA.charCodeAt(0) <= 0x7F;
-                const isAsciiB = nameB.length > 0 && nameB.charCodeAt(0) <= 0x7F;
-
-                if (isAsciiA && !isAsciiB) {
-                    res = -1;
-                } else if (!isAsciiA && isAsciiB) {
-                    res = 1;
-                } else {
-                    res = nameA.localeCompare(nameB, 'zh-CN', { numeric: true, sensitivity: 'base' });
-                }
-
+                res = compareNames(nameA, nameB);
                 if (sortOrder === 'desc') res = -res;
             } else if (sortBy === 'created') {
                 const timeA = new Date(a.created_at).getTime() || 0;

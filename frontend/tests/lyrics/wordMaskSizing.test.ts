@@ -34,9 +34,9 @@ describe('word-group mask sizing', () => {
     afterEach(() => vi.unstubAllGlobals());
 
     it.each<[LyricFillMode, LyricFloatMode, boolean]>([
-        ['line', 'word', true], ['line', 'character', false],
+        ['line', 'word', true], ['line', 'character', true],
         ['character', 'word', false], ['character', 'character', false],
-    ])('enables the larger mask only for fill=%s, float=%s', (fill, float, enabled) => {
+    ])('enables the larger mask only for fill=line (fill=%s, float=%s)', (fill, float, enabled) => {
         theme.lyricFillMode = fill;
         theme.lyricFloatMode = float;
         const html = renderToStaticMarkup(createElement(KaraokeText, {

@@ -62,7 +62,6 @@ export function createLineFill(
             runtime.fillPaddingPx = padding;
             const featherPx = fontSize * (0.16 + runtime.longToneAmount * 0.1);
             runtime.fillFeatherPx = featherPx;
-            element.style.setProperty('--kfe', String(featherPx / maskWidth * 100));
             width += advance;
         });
         lineWidth += width;

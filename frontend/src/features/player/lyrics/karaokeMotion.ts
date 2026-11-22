@@ -12,7 +12,6 @@ export type KaraokeCharRuntime = {
     isLongTone: boolean;
     longToneAmount: number;
     glowToneAmount: number;
-    fillEdgeWidth: number;
     fillLeftPx: number;
     fillWidthPx: number;
     fillMaskWidthPx: number;
@@ -39,10 +38,16 @@ export const karaokeExitDurationMs = 250;
 const animationHeadstartMs = 100;
 const wordFillLiftDelayMs = 100;
 export const regularLiftMinDurationMs = 1000;
+const characterLiftMinDurationMs = 800;
 const longToneThresholdMs = 1000;
 export const syllableLiftEm = 0.078;
 export const restingCharTransform = 'translateY(0em)';
 export const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+/** Shared rise for both lift units: a whole word, or a single character in character mode. */
+export const getLiftOffsetEm = (elapsedMs: number, durationMs: number, wordFloat: boolean) =>
+    -syllableLiftEm * Math.sin(clamp01(elapsedMs / Math.max(
+        wordFloat ? regularLiftMinDurationMs : characterLiftMinDurationMs, durationMs,
+    )) * Math.PI / 2);
 const smoothstep = (value: number) => {
     const x = clamp01(value);
     return x * x * (3 - 2 * x);
@@ -94,25 +99,6 @@ const getEmphasisDurationMs = (
     Math.max(1000, groupDurationMs) *
     (isLastWord ? 1.2 : 1)
 );
-const getEmphasisPulse = (value: number) => {
-    const x = clamp01(value);
-    return x < 0.5
-        ? evaluateCubicBezier(
-            x / 0.5,
-            0.2,
-            0.4,
-            0.58,
-            1
-        )
-        : 1 - evaluateCubicBezier(
-            (x - 0.5) / 0.5,
-            0.3,
-            0,
-            0.58,
-            1
-        );
-};
-
 const getWordEmphasisTiming = (durationMs: number, charCount: number, emphasisDurationMs: number) => {
     if (charCount === 1) {
         return { attackMs: emphasisDurationMs * 0.5, releaseMs: emphasisDurationMs * 0.7 };
@@ -139,13 +125,11 @@ const getWordEmphasisPulse = (elapsedMs: number, attackMs: number, releaseMs: nu
 export function prepareKaraokeCharRuntime(
     charItem: FlatCharItem,
     isLastWord: boolean,
-    wordFloat = false,
-    wordMotionItem = charItem,
+    motionItem = charItem,
     wordFill = false,
 ): KaraokeCharRuntime {
-    // Tail compression belongs to filling. Word-mode emphasis uses one shared
+    // Tail compression belongs to filling. Emphasis uses the word's shared
     // timing basis so trailing glyphs cannot lose their scale or peak early.
-    const motionItem = wordFloat ? wordMotionItem : charItem;
     const motionDurationMs = motionItem.groupDurationMs;
     const longToneRaw = clamp01((charItem.groupDurationMs - longToneThresholdMs) / 760);
     const longToneAmount = smoothstep(longToneRaw);
@@ -164,16 +148,13 @@ export function prepareKaraokeCharRuntime(
         isLastWord
     );
     const wordTiming = getWordEmphasisTiming(motionDurationMs, charCount, emphasisDurationMs);
-    const charDelayMs = wordFloat
-        ? getWordEmphasisDelayMs(emphasisDurationMs, charCount, charIndex)
-        : emphasisDurationMs / 2.5 / charCount * charIndex;
+    const charDelayMs = getWordEmphasisDelayMs(emphasisDurationMs, charCount, charIndex);
 
     return {
         item: charItem,
         isLongTone,
         longToneAmount,
         glowToneAmount,
-        fillEdgeWidth: 26 + longToneAmount * 18,
         fillLeftPx: 0,
         fillWidthPx: 0,
         fillMaskWidthPx: 0,
@@ -201,17 +182,15 @@ export function getKaraokeCharStyle(
     fillStop: number,
     glowDisabled = false,
     output: KaraokeCharStyle = { transform: '', fillStop: 0, glowAlpha: 0 },
-    emphasisOnly = false,
+    characterLift = false,
 ): KaraokeCharStyle {
     const {
         item: charItem,
         isLongTone,
-        longToneAmount,
         glowToneAmount,
         charCount,
         charIndex,
         motionStartMs,
-        emphasisDurationMs,
         wordEmphasisAttackMs,
         wordEmphasisReleaseMs,
         wordLiftDelayMs,
@@ -223,41 +202,24 @@ export function getKaraokeCharStyle(
         time_ms,
         durationMs,
     } = charItem;
-    const elapsedMs = timeMs - time_ms;
-    const hasStarted = elapsedMs > 0;
-    const attackMs = Math.max(regularLiftMinDurationMs, durationMs);
-    const regularLift = hasStarted
-        ? Math.sin(
-            (clamp01(elapsedMs / attackMs) * Math.PI) / 2
-        )
-        : 0;
-
     const emphasisElapsedMs = timeMs - motionStartMs - charDelayMs;
-    // Most words are shorter than the emphasis threshold. Avoid evaluating
-    // the cubic curve for those characters while preserving the exact zero
-    // result of the original multiplication.
-    const emphasisCurve = (emphasisOnly ? isLongTone : longToneAmount > 0) || (!glowDisabled && glowToneAmount > 0)
-        ? emphasisOnly
-            ? getWordEmphasisPulse(
-                emphasisElapsedMs, wordEmphasisAttackMs, wordEmphasisReleaseMs,
-            )
-            : getEmphasisPulse(emphasisElapsedMs / emphasisDurationMs)
+    // Both float modes share the word-mode emphasis, expressing the full
+    // duration-based amount including shorter sustained words.
+    const emphasisPulse = isLongTone
+        ? getWordEmphasisPulse(emphasisElapsedMs, wordEmphasisAttackMs, wordEmphasisReleaseMs)
         : 0;
-    // Let word-mode glyphs express the full duration-based emphasis,
-    // including shorter sustained words.
-    const emphasisPulse = emphasisCurve * (emphasisOnly ? 1 : longToneAmount);
-    const glowPulse = emphasisCurve * glowToneAmount;
+    const glowPulse = emphasisPulse * glowToneAmount;
     const centerOffset = charCount / 2 - charIndex;
     const translateX =
         -emphasisPulse * 0.03 * motionAmount * centerOffset;
     // Sustained words distribute the same lift across their glyphs. Moving the
     // container as well would double the lift and hide the travelling wave.
-    const translateY = emphasisOnly
-        ? charCount > 1
+    const translateY = characterLift
+        ? getLiftOffsetEm(timeMs - time_ms, durationMs, false)
+        : charCount > 1
             ? -syllableLiftEm * Math.sin(clamp01((timeMs - motionStartMs - wordLiftDelayMs) / wordLiftAttackMs) * Math.PI / 2)
-            : 0
-        : regularLift * -syllableLiftEm;
-    const scaleAmount = emphasisOnly ? Math.min(0.16, 0.175 * motionAmount) : 0.1 * motionAmount;
+            : 0;
+    const scaleAmount = Math.min(0.16, 0.175 * motionAmount);
     const scale = 1 + emphasisPulse * scaleAmount;
 
     output.transform = isLongTone
@@ -279,8 +241,10 @@ export function getWordMotionWindow(
     let endMs = Number.NEGATIVE_INFINITY;
 
     group.forEach(({ item }) => {
-        const motionItem = wordFloat ? group[0].item : item;
-        const liftEndMs = item.time_ms + Math.max(regularLiftMinDurationMs, item.durationMs);
+        const motionItem = group[0].item;
+        const liftEndMs = item.time_ms + Math.max(
+            wordFloat ? regularLiftMinDurationMs : characterLiftMinDurationMs, item.durationMs,
+        );
         const progressionStartMs =
             item.groupStartMs - animationHeadstartMs;
         const progressionEndMs =
@@ -298,21 +262,17 @@ export function getWordMotionWindow(
             0,
             item.activeCharIndexInWord
         );
-        const charDelayMs = wordFloat
-            ? getWordEmphasisDelayMs(emphasisDurationMs, charCount, charIndex)
-            : emphasisDurationMs / 2.5 / charCount * charIndex;
+        const charDelayMs = getWordEmphasisDelayMs(emphasisDurationMs, charCount, charIndex);
         const emphasisStartMs =
             motionItem.groupStartMs + charDelayMs;
         const wordTiming = getWordEmphasisTiming(motionItem.groupDurationMs, charCount, emphasisDurationMs);
         const wordLiftDurationMs = group[0].item.groupDurationMs;
-        const wordLiftEndMs = wordFloat && charCount > 1
+        const wordLiftEndMs = charCount > 1
             ? motionItem.groupStartMs + (wordFill ? wordFillLiftDelayMs : 0)
                 + wordLiftDurationMs / 2.5 / charCount * charIndex
                 + getWordLiftAttackMs(wordLiftDurationMs, charCount, emphasisDurationMs)
             : liftEndMs;
-        const emphasisEndMs = wordFloat
-            ? emphasisStartMs + wordTiming.attackMs + wordTiming.releaseMs
-            : emphasisStartMs + emphasisDurationMs;
+        const emphasisEndMs = emphasisStartMs + wordTiming.attackMs + wordTiming.releaseMs;
         startMs = Math.min(
             startMs,
             progressionStartMs,
