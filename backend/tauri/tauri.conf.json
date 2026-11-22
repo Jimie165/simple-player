@@ -1,7 +1,7 @@
 {
     "productName": "Simple Player",
     "mainBinaryName": "Simple Player",
-    "version": "0.5.1",
+    "version": "0.5.2",
     "identifier": "com.simpleplayer.desktop",
     "build": {
         "beforeDevCommand": "pnpm --filter simple-player-ui dev",
